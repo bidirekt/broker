@@ -140,11 +140,11 @@ func (s *IntegrationSuite) TestMemoization_IdenticalChecksReplayTheStoredVerdict
 	s.mustPostForMemoization("/api/participants", `{"participant":"cart"}`)
 	s.mustPostForMemoization("/api/environments", `{"environment":"production"}`)
 	s.mustPostForMemoization("/api/contracts",
-		s.publishBody("orders", "v1", contractFragment{"api.json", memoizationOrdersProviderContract}))
+		s.publishBody("orders", "v1", contractFragment{"api.yaml", memoizationOrdersProviderContract}))
 	s.mustPostForMemoization("/api/deployments",
 		`{"participant":"orders","version":"v1","environment":"production"}`)
 	s.mustPostForMemoization("/api/contracts",
-		s.publishBody("cart", "v1", contractFragment{"api.json", memoizationOrdersConsumerContract}))
+		s.publishBody("cart", "v1", contractFragment{"api.yaml", memoizationOrdersConsumerContract}))
 	s.mustPostForMemoization("/api/deployments",
 		`{"participant":"cart","version":"v1","environment":"production"}`)
 
@@ -215,18 +215,18 @@ func (s *IntegrationSuite) TestMemoization_AliasedVersionHitsTheStoredVerdict() 
 	s.mustPostForMemoization("/api/participants", `{"participant":"cart"}`)
 	s.mustPostForMemoization("/api/environments", `{"environment":"production"}`)
 	s.mustPostForMemoization("/api/contracts",
-		s.publishBody("orders", "v1", contractFragment{"api.json", memoizationOrdersProviderContract}))
+		s.publishBody("orders", "v1", contractFragment{"api.yaml", memoizationOrdersProviderContract}))
 	s.mustPostForMemoization("/api/deployments",
 		`{"participant":"orders","version":"v1","environment":"production"}`)
 	s.mustPostForMemoization("/api/contracts",
-		s.publishBody("cart", "v1", contractFragment{"api.json", memoizationOrdersConsumerContract}))
+		s.publishBody("cart", "v1", contractFragment{"api.yaml", memoizationOrdersConsumerContract}))
 
 	_, first := s.canIDeployForMemoization("cart", "v1")
 	s.False(first.Deployable)
 	s.Equal(1, s.countRows("compatibility_verdicts"))
 
 	s.mustPostForMemoization("/api/contracts",
-		s.publishBody("cart", "a1b2c3d", contractFragment{"api.json", memoizationOrdersConsumerContract}))
+		s.publishBody("cart", "a1b2c3d", contractFragment{"api.yaml", memoizationOrdersConsumerContract}))
 
 	_, aliased := s.canIDeployForMemoization("cart", "a1b2c3d")
 
@@ -246,13 +246,13 @@ func (s *IntegrationSuite) TestMemoization_CachedVerdictKeepsLiveEnvironmentBrea
 	s.mustPostForMemoization("/api/participants", `{"participant":"cart"}`)
 	s.mustPostForMemoization("/api/environments", `{"environment":"production"}`)
 	s.mustPostForMemoization("/api/contracts",
-		s.publishBody("orders", "v1", contractFragment{"api.json", memoizationOrdersProviderContract}))
+		s.publishBody("orders", "v1", contractFragment{"api.yaml", memoizationOrdersProviderContract}))
 	s.mustPostForMemoization("/api/deployments",
 		`{"participant":"orders","version":"v1","environment":"production"}`)
 	s.mustPostForMemoization("/api/contracts",
-		s.publishBody("billing", "v1", contractFragment{"api.json", memoizationBillingProviderContract}))
+		s.publishBody("billing", "v1", contractFragment{"api.yaml", memoizationBillingProviderContract}))
 	s.mustPostForMemoization("/api/contracts",
-		s.publishBody("cart", "v1", contractFragment{"api.json", memoizationMixedConsumerContract}))
+		s.publishBody("cart", "v1", contractFragment{"api.yaml", memoizationMixedConsumerContract}))
 
 	firstBody, first := s.canIDeployForMemoization("cart", "v1")
 	s.False(first.Deployable)
@@ -305,11 +305,11 @@ func (s *IntegrationSuite) TestMemoization_HitOnACompatiblePairSkipsTheDiff() {
 	s.mustPostForMemoization("/api/participants", `{"participant":"cart"}`)
 	s.mustPostForMemoization("/api/environments", `{"environment":"production"}`)
 	s.mustPostForMemoization("/api/contracts",
-		s.publishBody("orders", "v1", contractFragment{"api.json", memoizationOrdersProviderContract}))
+		s.publishBody("orders", "v1", contractFragment{"api.yaml", memoizationOrdersProviderContract}))
 	s.mustPostForMemoization("/api/deployments",
 		`{"participant":"orders","version":"v1","environment":"production"}`)
 	s.mustPostForMemoization("/api/contracts",
-		s.publishBody("cart", "v1", contractFragment{"api.json", memoizationCompatibleConsumerContract}))
+		s.publishBody("cart", "v1", contractFragment{"api.yaml", memoizationCompatibleConsumerContract}))
 
 	_, first := s.canIDeployForMemoization("cart", "v1")
 	s.True(first.Deployable)
@@ -348,11 +348,11 @@ func (s *IntegrationSuite) TestMemoization_HitOnAnIncompatiblePairSkipsTheDiff()
 	s.mustPostForMemoization("/api/participants", `{"participant":"cart"}`)
 	s.mustPostForMemoization("/api/environments", `{"environment":"production"}`)
 	s.mustPostForMemoization("/api/contracts",
-		s.publishBody("orders", "v1", contractFragment{"api.json", memoizationOrdersProviderContract}))
+		s.publishBody("orders", "v1", contractFragment{"api.yaml", memoizationOrdersProviderContract}))
 	s.mustPostForMemoization("/api/deployments",
 		`{"participant":"orders","version":"v1","environment":"production"}`)
 	s.mustPostForMemoization("/api/contracts",
-		s.publishBody("cart", "v1", contractFragment{"api.json", memoizationOrdersConsumerContract}))
+		s.publishBody("cart", "v1", contractFragment{"api.yaml", memoizationOrdersConsumerContract}))
 
 	_, first := s.canIDeployForMemoization("cart", "v1")
 	s.False(first.Deployable)

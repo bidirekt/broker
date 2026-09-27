@@ -42,7 +42,7 @@ func singleFragment(t *testing.T, raw string) []contract.Fragment {
 	var document any
 	require.NoError(t, yaml.Unmarshal([]byte(raw), &document))
 
-	return []contract.Fragment{{Source: "api.json", Document: document}}
+	return []contract.Fragment{{Source: "api.yaml", Document: document}}
 }
 
 func toResourceModels(t *testing.T, raw string) []model.UploadedResource {

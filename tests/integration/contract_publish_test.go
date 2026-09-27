@@ -3,7 +3,6 @@ package integration_test
 import (
 	"context"
 	"net/http"
-	"strings"
 )
 
 const contractBody = `{
@@ -206,7 +205,7 @@ func (s *IntegrationSuite) TestHappyPath_PublishContract() {
 	status, _ := s.post("/api/participants", petsParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, body := s.post("/api/contracts", s.publishBody("pets_service", "1", contractFragment{"api.json", contractBody}))
+	status, body := s.post("/api/contracts", s.publishBody("pets_service", "1", contractFragment{"api.yaml", contractBody}))
 	s.Equal(http.StatusOK, status)
 	s.JSONEq(`{"message":"contract publish successful"}`, body)
 
@@ -227,10 +226,10 @@ func (s *IntegrationSuite) TestPublish_SameVersionSameContent_Returns200NoNewRow
 	status, _ := s.post("/api/participants", petsParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/contracts", s.publishBody("pets_service", "1", contractFragment{"api.json", contractBody}))
+	status, _ = s.post("/api/contracts", s.publishBody("pets_service", "1", contractFragment{"api.yaml", contractBody}))
 	s.Require().Equal(http.StatusOK, status)
 
-	status, body := s.post("/api/contracts", s.publishBody("pets_service", "1", contractFragment{"api.json", contractBody}))
+	status, body := s.post("/api/contracts", s.publishBody("pets_service", "1", contractFragment{"api.yaml", contractBody}))
 	s.Equal(http.StatusOK, status)
 	s.JSONEq(`{"message":"contract publish successful"}`, body)
 
@@ -241,10 +240,10 @@ func (s *IntegrationSuite) TestPublish_SameVersionDifferentContent_Returns409() 
 	status, _ := s.post("/api/participants", petsParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/contracts", s.publishBody("pets_service", "1", contractFragment{"api.json", contractBody}))
+	status, _ = s.post("/api/contracts", s.publishBody("pets_service", "1", contractFragment{"api.yaml", contractBody}))
 	s.Require().Equal(http.StatusOK, status)
 
-	status, body := s.post("/api/contracts", s.publishBody("pets_service", "1", contractFragment{"api.json", contractBodyAlt}))
+	status, body := s.post("/api/contracts", s.publishBody("pets_service", "1", contractFragment{"api.yaml", contractBodyAlt}))
 	s.Equal(http.StatusConflict, status)
 	s.JSONEq(`{"message":"contract version already exists with different content"}`, body)
 
@@ -274,7 +273,7 @@ func (s *IntegrationSuite) TestPublishContract_BlankParticipant() {
 	s.Require().Equal(http.StatusOK, status)
 
 	for _, participant := range []string{"", "   "} {
-		status, body := s.post("/api/contracts", s.publishBody(participant, "1", contractFragment{"api.json", contractBody}))
+		status, body := s.post("/api/contracts", s.publishBody(participant, "1", contractFragment{"api.yaml", contractBody}))
 		s.Equal(http.StatusBadRequest, status)
 		s.JSONEq(`{"message":"contract invalid input"}`, body)
 	}
@@ -295,7 +294,7 @@ func (s *IntegrationSuite) TestPublishContract_UnsupportedExtension() {
 
 	status, body := s.post("/api/contracts", s.publishBody("pets_service", "1", contractFragment{"notes.txt", contractBody}))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"unsupported contract file: notes.txt (expected .yaml, .yml or .json)"}`, body)
+	s.JSONEq(`{"message":"unsupported contract file: notes.txt (expected .yaml or .yml)"}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 }
@@ -311,13 +310,13 @@ func (s *IntegrationSuite) TestPublishContract_MalformedYAML() {
 	s.Equal(0, s.countRows("contracts"))
 }
 
-func (s *IntegrationSuite) TestPublishContract_MalformedJSON() {
+func (s *IntegrationSuite) TestPublishContract_JSONExtensionRejected() {
 	status, _ := s.post("/api/participants", petsParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, body := s.post("/api/contracts", s.publishBody("pets_service", "1", contractFragment{"broken.json", `{"provides":`}))
+	status, body := s.post("/api/contracts", s.publishBody("pets_service", "1", contractFragment{"broken.json", contractBody}))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"malformed contract file: broken.json: [1:12] could not find map value\n>  1 | {\"provides\":\n                  ^\n"}`, body)
+	s.JSONEq(`{"message":"unsupported contract file: broken.json (expected .yaml or .yml)"}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 }
@@ -326,7 +325,7 @@ func (s *IntegrationSuite) TestPublishContract_CommitHashVersion() {
 	status, _ := s.post("/api/participants", petsParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, body := s.post("/api/contracts", s.publishBody("pets_service", "a1b2c3d4e5f6", contractFragment{"api.json", contractBody}))
+	status, body := s.post("/api/contracts", s.publishBody("pets_service", "a1b2c3d4e5f6", contractFragment{"api.yaml", contractBody}))
 	s.Equal(http.StatusOK, status)
 	s.JSONEq(`{"message":"contract publish successful"}`, body)
 
@@ -342,10 +341,10 @@ func (s *IntegrationSuite) TestPublishContract_ParamEndpoint_RejectedNothingStor
 	status, _ := s.post("/api/participants", petsParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, body := s.post("/api/contracts", s.publishBody("pets_service", "1", contractFragment{"api.json", contractBodyParamEndpoint}))
+	status, body := s.post("/api/contracts", s.publishBody("pets_service", "1", contractFragment{"api.yaml", contractBodyParamEndpoint}))
 	s.Equal(http.StatusBadRequest, status)
 	s.JSONEq(`{"message":"contract validation failed","violations":[`+
-		`{"code":"endpoint.syntax","path":"provides;rest;/users/{userId}","source":"api.json","details":{"key":"/users/{userId}","error":"dynamic path segments must use *"}}`+
+		`{"code":"endpoint.syntax","path":"provides;rest;/users/{userId}","source":"api.yaml","details":{"key":"/users/{userId}","error":"dynamic path segments must use *"}}`+
 		`]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
@@ -355,17 +354,17 @@ func (s *IntegrationSuite) TestPublishContract_BadServiceName_RejectedNothingSto
 	status, _ := s.post("/api/participants", petsParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, body := s.post("/api/contracts", s.publishBody("pets_service", "1", contractFragment{"api.json", contractBodyBadServiceName}))
+	status, body := s.post("/api/contracts", s.publishBody("pets_service", "1", contractFragment{"api.yaml", contractBodyBadServiceName}))
 	s.Equal(http.StatusBadRequest, status)
 	s.JSONEq(`{"message":"contract validation failed","violations":[`+
-		`{"code":"service.name_syntax","path":"consumes;Payments-API","source":"api.json","details":{"key":"Payments-API","error":"must be snake_case"}}`+
+		`{"code":"service.name_syntax","path":"consumes;Payments-API","source":"api.yaml","details":{"key":"Payments-API","error":"must be snake_case"}}`+
 		`]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 }
 
 func (s *IntegrationSuite) TestPublishContract_UnknownParticipant() {
-	status, body := s.post("/api/contracts", s.publishBody("ghost_service", "1", contractFragment{"api.json", contractBody}))
+	status, body := s.post("/api/contracts", s.publishBody("ghost_service", "1", contractFragment{"api.yaml", contractBody}))
 	s.Equal(http.StatusNotFound, status)
 	s.JSONEq(`{"message":"contract participant not found"}`, body)
 }
@@ -530,12 +529,12 @@ func (s *IntegrationSuite) TestPublishContract_SameContentSplitInFragments_Alias
 	status, _ := s.post("/api/participants", petsParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/contracts", s.publishBody("pets_service", "v42", contractFragment{"api.json", contractBody}))
+	status, _ = s.post("/api/contracts", s.publishBody("pets_service", "v42", contractFragment{"api.yaml", contractBody}))
 	s.Require().Equal(http.StatusOK, status)
 
 	status, body := s.post("/api/contracts", s.publishBody("pets_service", "v43",
-		contractFragment{"endpoints.json", contractBodyEndpointsFragment},
-		contractFragment{"schemas.json", contractBodySchemasFragment},
+		contractFragment{"endpoints.yaml", contractBodyEndpointsFragment},
+		contractFragment{"schemas.yaml", contractBodySchemasFragment},
 	))
 	s.Equal(http.StatusOK, status)
 	s.JSONEq(`{"message":"contract publish successful"}`, body)
@@ -760,40 +759,6 @@ schemas:
         type: string
 `
 
-const equivalentContractJSON = `{
-  "provides": {
-    "rest": {
-      "/pets": {
-        "get": {
-          "responses": { "999": "Pet" }
-        }
-      }
-    }
-  },
-  "schemas": {
-    "Pet": {
-      "type": "object",
-      "properties": {
-        "id": { "type": "strng" }
-      }
-    }
-  }
-}`
-
-const equivalentContractYAML = `provides:
-  rest:
-    /pets:
-      get:
-        responses:
-          999: Pet
-schemas:
-  Pet:
-    type: object
-    properties:
-      id:
-        type: strng
-`
-
 const parentAndNestedEndpointsOutOfRangeYAML = `provides:
   rest:
     /pets:
@@ -885,30 +850,6 @@ func (s *IntegrationSuite) TestPublishContract_MultipleDocuments_Rejected() {
 	s.Equal(0, s.countRows("contracts"))
 }
 
-func (s *IntegrationSuite) TestPublishContract_JSONAndYAML_YieldTheSameViolations() {
-	status, _ := s.post("/api/participants", petsParticipantBody)
-	s.Require().Equal(http.StatusOK, status)
-
-	status, jsonBody := s.post("/api/contracts", s.publishBody("pets_service", "1",
-		contractFragment{"api.json", equivalentContractJSON},
-	))
-	s.Equal(http.StatusBadRequest, status)
-
-	status, yamlBody := s.post("/api/contracts", s.publishBody("pets_service", "1",
-		contractFragment{"api.yaml", equivalentContractYAML},
-	))
-	s.Equal(http.StatusBadRequest, status)
-
-	violations := `{"message":"contract validation failed","violations":[` +
-		`{"code":"status.out_of_range","path":"provides;rest;/pets;get;responses;999","source":"api.json","details":{"key":"999","error":"must be between 100 and 599"}},` +
-		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;id;type","source":"api.json","details":{"value":"strng","allowed":"object, array, string, integer, float, boolean"}}` +
-		`]}`
-	s.JSONEq(violations, jsonBody)
-	s.JSONEq(strings.ReplaceAll(violations, "api.json", "api.yaml"), yamlBody)
-
-	s.Equal(0, s.countRows("contracts"))
-}
-
 func (s *IntegrationSuite) TestPublishContract_ShapeViolations_KeepDocumentOrderPerSource() {
 	status, _ := s.post("/api/participants", petsParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
@@ -928,10 +869,10 @@ func (s *IntegrationSuite) TestPublishContract_ShapeViolations_KeepDocumentOrder
 }
 
 func (s *IntegrationSuite) TestPublishContract_ShapeViolation_ReportedBeforeParticipantLookup() {
-	status, body := s.post("/api/contracts", s.publishBody("ghost_service", "1", contractFragment{"api.json", contractBodyParamEndpoint}))
+	status, body := s.post("/api/contracts", s.publishBody("ghost_service", "1", contractFragment{"api.yaml", contractBodyParamEndpoint}))
 	s.Equal(http.StatusBadRequest, status)
 	s.JSONEq(`{"message":"contract validation failed","violations":[`+
-		`{"code":"endpoint.syntax","path":"provides;rest;/users/{userId}","source":"api.json","details":{"key":"/users/{userId}","error":"dynamic path segments must use *"}}`+
+		`{"code":"endpoint.syntax","path":"provides;rest;/users/{userId}","source":"api.yaml","details":{"key":"/users/{userId}","error":"dynamic path segments must use *"}}`+
 		`]}`, body)
 
 	s.Equal(0, s.countRows("participants"))

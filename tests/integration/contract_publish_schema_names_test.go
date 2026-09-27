@@ -116,11 +116,11 @@ func (s *IntegrationSuite) TestPublishContract_UnresolvedResponseSchema_SingleFi
 	s.Require().Equal(http.StatusOK, status)
 
 	status, body := s.post("/api/contracts", s.publishBody("names_service", "1",
-		contractFragment{"api.json", namesSingleFileJSON},
+		contractFragment{"api.yaml", namesSingleFileJSON},
 	))
 	s.Equal(http.StatusBadRequest, status)
 	s.JSONEq(`{"message":"contract validation failed","violations":[`+
-		`{"code":"schema.unresolved_name","path":"provides;rest;/pets;get;responses;200","source":"api.json","details":{"schema":"Inexistente","resource":"provides GET /pets 200"}}`+
+		`{"code":"schema.unresolved_name","path":"provides;rest;/pets;get;responses;200","source":"api.yaml","details":{"schema":"Inexistente","resource":"provides GET /pets 200"}}`+
 		`]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))

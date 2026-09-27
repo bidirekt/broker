@@ -287,8 +287,8 @@ func mergedResource(t *testing.T, resources []model.UploadedResource, interactio
 
 func TestMerge_TwoConsumerModulesReadingOneResponse_UnionOfProperties(t *testing.T) {
 	resources := mergeResources(t,
-		mergedFile{"list.json", listModuleJSON},
-		mergedFile{"detail.json", detailModuleJSON},
+		mergedFile{"list.yaml", listModuleJSON},
+		mergedFile{"detail.yaml", detailModuleJSON},
 	)
 
 	require.Len(t, resources, 1)
@@ -307,8 +307,8 @@ func TestMerge_TwoConsumerModulesReadingOneResponse_UnionOfProperties(t *testing
 
 func TestMerge_TwoConsumerModulesSendingOneRequest_FieldSentByOneIsOptional(t *testing.T) {
 	resources := mergeResources(t,
-		mergedFile{"create.json", createModuleJSON},
-		mergedFile{"import.json", importModuleJSON},
+		mergedFile{"create.yaml", createModuleJSON},
+		mergedFile{"import.yaml", importModuleJSON},
 	)
 
 	request := mergedResource(t, resources, model.RestRequest)
@@ -323,8 +323,8 @@ func TestMerge_TwoConsumerModulesSendingOneRequest_FieldSentByOneIsOptional(t *t
 
 func TestMerge_ResponseRequiredByOneReader_StaysRequired(t *testing.T) {
 	resources := mergeResources(t,
-		mergedFile{"optional.json", optionalReaderJSON},
-		mergedFile{"required.json", requiredReaderJSON},
+		mergedFile{"optional.yaml", optionalReaderJSON},
+		mergedFile{"required.yaml", requiredReaderJSON},
 	)
 
 	resource := mergedResource(t, resources, model.RestResponse)
@@ -335,8 +335,8 @@ func TestMerge_ResponseRequiredByOneReader_StaysRequired(t *testing.T) {
 
 func TestMerge_ResponseOptionalForEveryReader_StaysOptional(t *testing.T) {
 	resources := mergeResources(t,
-		mergedFile{"optional.json", optionalReaderJSON},
-		mergedFile{"other_optional.json", otherOptionalReaderJSON},
+		mergedFile{"optional.yaml", optionalReaderJSON},
+		mergedFile{"other_optional.yaml", otherOptionalReaderJSON},
 	)
 
 	resource := mergedResource(t, resources, model.RestResponse)
@@ -347,8 +347,8 @@ func TestMerge_ResponseOptionalForEveryReader_StaysOptional(t *testing.T) {
 
 func TestMerge_RequestOptionalForOneSender_IsOptionalForAll(t *testing.T) {
 	resources := mergeResources(t,
-		mergedFile{"optional.json", optionalSenderJSON},
-		mergedFile{"required.json", requiredSenderJSON},
+		mergedFile{"optional.yaml", optionalSenderJSON},
+		mergedFile{"required.yaml", requiredSenderJSON},
 	)
 
 	request := mergedResource(t, resources, model.RestRequest)
@@ -359,10 +359,10 @@ func TestMerge_RequestOptionalForOneSender_IsOptionalForAll(t *testing.T) {
 
 func TestMerge_IdenticalDeclarationInTwoFiles_BuildsOneResource(t *testing.T) {
 	merged := mergeResources(t,
-		mergedFile{"a.json", listModuleJSON},
-		mergedFile{"b.json", listModuleJSON},
+		mergedFile{"a.yaml", listModuleJSON},
+		mergedFile{"b.yaml", listModuleJSON},
 	)
-	single := mergeResources(t, mergedFile{"a.json", listModuleJSON})
+	single := mergeResources(t, mergedFile{"a.yaml", listModuleJSON})
 
 	require.Len(t, merged, 1)
 	assert.Equal(t, single, merged)
@@ -370,16 +370,16 @@ func TestMerge_IdenticalDeclarationInTwoFiles_BuildsOneResource(t *testing.T) {
 
 func TestMerge_FragmentOrderReversed_ProducesTheSameContract(t *testing.T) {
 	forward := mergeContract(t,
-		mergedFile{"list.json", listModuleJSON},
-		mergedFile{"detail.json", detailModuleJSON},
-		mergedFile{"create.json", createModuleJSON},
-		mergedFile{"import.json", importModuleJSON},
+		mergedFile{"list.yaml", listModuleJSON},
+		mergedFile{"detail.yaml", detailModuleJSON},
+		mergedFile{"create.yaml", createModuleJSON},
+		mergedFile{"import.yaml", importModuleJSON},
 	)
 	backward := mergeContract(t,
-		mergedFile{"import.json", importModuleJSON},
-		mergedFile{"create.json", createModuleJSON},
-		mergedFile{"detail.json", detailModuleJSON},
-		mergedFile{"list.json", listModuleJSON},
+		mergedFile{"import.yaml", importModuleJSON},
+		mergedFile{"create.yaml", createModuleJSON},
+		mergedFile{"detail.yaml", detailModuleJSON},
+		mergedFile{"list.yaml", listModuleJSON},
 	)
 
 	assert.Equal(t, forward.Resources, backward.Resources)
@@ -389,8 +389,8 @@ func TestMerge_FragmentOrderReversed_ProducesTheSameContract(t *testing.T) {
 
 func TestMerge_ProvidedResourceDeclaredTwice_FirstSourceWins(t *testing.T) {
 	resources := mergeResources(t,
-		mergedFile{"b.json", providedPetsDetailJSON},
-		mergedFile{"a.json", providedPetsJSON},
+		mergedFile{"b.yaml", providedPetsDetailJSON},
+		mergedFile{"a.yaml", providedPetsJSON},
 	)
 
 	require.Len(t, resources, 1)

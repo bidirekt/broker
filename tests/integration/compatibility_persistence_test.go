@@ -115,7 +115,7 @@ func (s *IntegrationSuite) TestCompatibilityPersistence_BootstrapCheckRecordsNoC
 	s.mustPostForPersistence("/api/participants", `{"participant":"widgets"}`)
 	s.mustPostForPersistence("/api/environments", `{"environment":"production"}`)
 	s.mustPostForPersistence("/api/contracts",
-		s.publishBody("widgets", "v1", contractFragment{"api.json", persistenceStandaloneContract}))
+		s.publishBody("widgets", "v1", contractFragment{"api.yaml", persistenceStandaloneContract}))
 
 	status, body := s.post("/api/can-i-deploy",
 		`{"participant":"widgets","version":"v1","environment":"production"}`)
@@ -149,7 +149,7 @@ func (s *IntegrationSuite) TestCompatibilityPersistence_NotFoundCounterpartKeeps
 	s.mustPostForPersistence("/api/participants", `{"participant":"front"}`)
 	s.mustPostForPersistence("/api/environments", `{"environment":"production"}`)
 	s.mustPostForPersistence("/api/contracts",
-		s.publishBody("front", "v1", contractFragment{"api.json", persistenceGhostConsumerContract}))
+		s.publishBody("front", "v1", contractFragment{"api.yaml", persistenceGhostConsumerContract}))
 
 	status, body := s.post("/api/can-i-deploy",
 		`{"participant":"front","version":"v1","environment":"production"}`)
@@ -179,9 +179,9 @@ func (s *IntegrationSuite) TestCompatibilityPersistence_NotDeployedCounterpartKe
 	s.mustPostForPersistence("/api/participants", `{"participant":"front"}`)
 	s.mustPostForPersistence("/api/environments", `{"environment":"production"}`)
 	s.mustPostForPersistence("/api/contracts",
-		s.publishBody("widgets", "v1", contractFragment{"api.json", persistenceWidgetsProviderContract}))
+		s.publishBody("widgets", "v1", contractFragment{"api.yaml", persistenceWidgetsProviderContract}))
 	s.mustPostForPersistence("/api/contracts",
-		s.publishBody("front", "v1", contractFragment{"api.json", persistenceWidgetsConsumerContract}))
+		s.publishBody("front", "v1", contractFragment{"api.yaml", persistenceWidgetsConsumerContract}))
 
 	status, body := s.post("/api/can-i-deploy",
 		`{"participant":"front","version":"v1","environment":"production"}`)
@@ -212,11 +212,11 @@ func (s *IntegrationSuite) TestCompatibilityPersistence_CompatiblePairIsStoredWi
 	s.mustPostForPersistence("/api/participants", `{"participant":"front"}`)
 	s.mustPostForPersistence("/api/environments", `{"environment":"production"}`)
 	s.mustPostForPersistence("/api/contracts",
-		s.publishBody("widgets", "v1", contractFragment{"api.json", persistenceWidgetsProviderContract}))
+		s.publishBody("widgets", "v1", contractFragment{"api.yaml", persistenceWidgetsProviderContract}))
 	s.mustPostForPersistence("/api/deployments",
 		`{"participant":"widgets","version":"v1","environment":"production"}`)
 	s.mustPostForPersistence("/api/contracts",
-		s.publishBody("front", "v1", contractFragment{"api.json", persistenceWidgetsConsumerContract}))
+		s.publishBody("front", "v1", contractFragment{"api.yaml", persistenceWidgetsConsumerContract}))
 
 	status, body := s.post("/api/can-i-deploy",
 		`{"participant":"front","version":"v1","environment":"production"}`)
@@ -258,11 +258,11 @@ func (s *IntegrationSuite) TestCompatibilityPersistence_IncompatiblePairStoresEv
 	s.mustPostForPersistence("/api/participants", `{"participant":"front"}`)
 	s.mustPostForPersistence("/api/environments", `{"environment":"production"}`)
 	s.mustPostForPersistence("/api/contracts",
-		s.publishBody("widgets", "v1", contractFragment{"api.json", persistenceWidgetsProviderContract}))
+		s.publishBody("widgets", "v1", contractFragment{"api.yaml", persistenceWidgetsProviderContract}))
 	s.mustPostForPersistence("/api/deployments",
 		`{"participant":"widgets","version":"v1","environment":"production"}`)
 	s.mustPostForPersistence("/api/contracts",
-		s.publishBody("front", "v1", contractFragment{"api.json", persistenceWidgetsBreakingConsumerContract}))
+		s.publishBody("front", "v1", contractFragment{"api.yaml", persistenceWidgetsBreakingConsumerContract}))
 
 	status, body := s.post("/api/can-i-deploy",
 		`{"participant":"front","version":"v1","environment":"production"}`)
@@ -322,11 +322,11 @@ func (s *IntegrationSuite) TestCompatibilityPersistence_RepeatedCheckDoesNotGrow
 	s.mustPostForPersistence("/api/participants", `{"participant":"front"}`)
 	s.mustPostForPersistence("/api/environments", `{"environment":"production"}`)
 	s.mustPostForPersistence("/api/contracts",
-		s.publishBody("widgets", "v1", contractFragment{"api.json", persistenceWidgetsProviderContract}))
+		s.publishBody("widgets", "v1", contractFragment{"api.yaml", persistenceWidgetsProviderContract}))
 	s.mustPostForPersistence("/api/deployments",
 		`{"participant":"widgets","version":"v1","environment":"production"}`)
 	s.mustPostForPersistence("/api/contracts",
-		s.publishBody("front", "v1", contractFragment{"api.json", persistenceWidgetsBreakingConsumerContract}))
+		s.publishBody("front", "v1", contractFragment{"api.yaml", persistenceWidgetsBreakingConsumerContract}))
 
 	firstStatus, firstBody := s.post("/api/can-i-deploy",
 		`{"participant":"front","version":"v1","environment":"production"}`)
@@ -351,9 +351,9 @@ func (s *IntegrationSuite) TestCompatibilityPersistence_RecordingTheSamePairTwic
 	s.mustPostForPersistence("/api/participants", `{"participant":"front"}`)
 	s.mustPostForPersistence("/api/environments", `{"environment":"production"}`)
 	s.mustPostForPersistence("/api/contracts",
-		s.publishBody("widgets", "v1", contractFragment{"api.json", persistenceWidgetsProviderContract}))
+		s.publishBody("widgets", "v1", contractFragment{"api.yaml", persistenceWidgetsProviderContract}))
 	s.mustPostForPersistence("/api/contracts",
-		s.publishBody("front", "v1", contractFragment{"api.json", persistenceWidgetsConsumerContract}))
+		s.publishBody("front", "v1", contractFragment{"api.yaml", persistenceWidgetsConsumerContract}))
 
 	compatibilityRepository := repository.NewCompatibilityRepository(s.Pool)
 
