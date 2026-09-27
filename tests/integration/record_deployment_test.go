@@ -63,7 +63,7 @@ func (s *IntegrationSuite) seedApiParticipantContractAndProductionEnv() {
 	status, _ := s.post("/api/participants", apiParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.json", apiV1ContractBody}))
+	status, _ = s.post("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.yaml", apiV1ContractBody}))
 	s.Require().Equal(http.StatusOK, status)
 
 	status, _ = s.post("/api/environments", productionEnvBodyForDeploy)
@@ -127,10 +127,10 @@ func (s *IntegrationSuite) TestRecordDeployment_RollbackWritesNewRow() {
 	status, _ := s.post("/api/participants", apiParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.json", apiV1ContractBody}))
+	status, _ = s.post("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.yaml", apiV1ContractBody}))
 	s.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/contracts", s.publishBody("api", "v2", contractFragment{"api.json", apiV2ContractBody}))
+	status, _ = s.post("/api/contracts", s.publishBody("api", "v2", contractFragment{"api.yaml", apiV2ContractBody}))
 	s.Require().Equal(http.StatusOK, status)
 
 	status, _ = s.post("/api/environments", productionEnvBodyForDeploy)
@@ -235,7 +235,7 @@ func (s *IntegrationSuite) TestRecordDeployment_UnknownEnvironmentReturns404() {
 	status, _ := s.post("/api/participants", apiParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.json", apiV1ContractBody}))
+	status, _ = s.post("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.yaml", apiV1ContractBody}))
 	s.Require().Equal(http.StatusOK, status)
 
 	status, body := s.post("/api/deployments", apiV1DeploymentBody)

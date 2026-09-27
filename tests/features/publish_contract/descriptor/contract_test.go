@@ -186,12 +186,12 @@ func TestContract_RaizQueNaoEhMapaEhKind(t *testing.T) {
 func TestContract_JsonDecodificadoSegueOMesmoCaminho(t *testing.T) {
 	source := `{"provides": {"rest": {"/pets": {"get": {"responses": {"200": "Pet", "600": "Nope"}}}}}}`
 
-	violations := descriptor.Validate(descriptor.Contract, contractDocument(t, source), "api.json")
+	violations := descriptor.Validate(descriptor.Contract, contractDocument(t, source), "api.yaml")
 
 	require.Len(t, violations, 1)
 	assert.Equal(t, "status.out_of_range", violations[0].ErrorCode)
 	assert.Equal(t, "provides;rest;/pets;get;responses;600", violations[0].Path)
-	assert.Equal(t, "api.json", violations[0].Source)
+	assert.Equal(t, "api.yaml", violations[0].Source)
 }
 
 func TestContract_EndpointComParametroReprovaEmProvidesEConsumes(t *testing.T) {

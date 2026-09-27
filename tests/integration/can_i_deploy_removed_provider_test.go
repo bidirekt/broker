@@ -138,10 +138,10 @@ func (s *IntegrationSuite) mustPostForRemoval(path, body string) {
 func (s *IntegrationSuite) removalSetup(consumerContract string) {
 	s.mustPostForRemoval("/api/environments", `{"environment":"production"}`)
 	s.mustPostForRemoval("/api/participants", `{"participant":"catalog"}`)
-	s.mustPostForRemoval("/api/contracts", s.publishBody("catalog", "v1", contractFragment{"api.json", removalCatalogV1Contract}))
+	s.mustPostForRemoval("/api/contracts", s.publishBody("catalog", "v1", contractFragment{"api.yaml", removalCatalogV1Contract}))
 	s.mustPostForRemoval("/api/deployments", `{"participant":"catalog","version":"v1","environment":"production"}`)
 	s.mustPostForRemoval("/api/participants", `{"participant":"web"}`)
-	s.mustPostForRemoval("/api/contracts", s.publishBody("web", "v1", contractFragment{"api.json", consumerContract}))
+	s.mustPostForRemoval("/api/contracts", s.publishBody("web", "v1", contractFragment{"api.yaml", consumerContract}))
 	s.mustPostForRemoval("/api/deployments", `{"participant":"web","version":"v1","environment":"production"}`)
 }
 
@@ -180,7 +180,7 @@ func (s *IntegrationSuite) verdictBreaksForRemoval() [][]removalVerdictBreakJSON
 
 func (s *IntegrationSuite) TestRemovedProvider_BlocksWhileTheConsumerIsDeployed() {
 	s.removalSetup(removalWebV1Contract)
-	s.mustPostForRemoval("/api/contracts", s.publishBody("catalog", "v2", contractFragment{"api.json", removalCatalogV2Contract}))
+	s.mustPostForRemoval("/api/contracts", s.publishBody("catalog", "v2", contractFragment{"api.yaml", removalCatalogV2Contract}))
 
 	response, body := s.canIDeployForRemoval("catalog", "v2")
 
@@ -202,8 +202,8 @@ func (s *IntegrationSuite) TestRemovedProvider_BlocksWhileTheConsumerIsDeployed(
 
 func (s *IntegrationSuite) TestRemovedProvider_IsAllowedOnceTheConsumerStopsConsuming() {
 	s.removalSetup(removalWebV1Contract)
-	s.mustPostForRemoval("/api/contracts", s.publishBody("catalog", "v2", contractFragment{"api.json", removalCatalogV2Contract}))
-	s.mustPostForRemoval("/api/contracts", s.publishBody("web", "v2", contractFragment{"api.json", removalWebV2Contract}))
+	s.mustPostForRemoval("/api/contracts", s.publishBody("catalog", "v2", contractFragment{"api.yaml", removalCatalogV2Contract}))
+	s.mustPostForRemoval("/api/contracts", s.publishBody("web", "v2", contractFragment{"api.yaml", removalWebV2Contract}))
 	s.mustPostForRemoval("/api/deployments", `{"participant":"web","version":"v2","environment":"production"}`)
 
 	response, _ := s.canIDeployForRemoval("catalog", "v2")
@@ -216,8 +216,8 @@ func (s *IntegrationSuite) TestRemovedProvider_IsAllowedOnceTheConsumerStopsCons
 
 func (s *IntegrationSuite) TestRemovedProvider_KeepsBlockingOnLaterVersions() {
 	s.removalSetup(removalWebV1Contract)
-	s.mustPostForRemoval("/api/contracts", s.publishBody("catalog", "v2", contractFragment{"api.json", removalCatalogV2Contract}))
-	s.mustPostForRemoval("/api/contracts", s.publishBody("catalog", "v3", contractFragment{"api.json", removalCatalogV3Contract}))
+	s.mustPostForRemoval("/api/contracts", s.publishBody("catalog", "v2", contractFragment{"api.yaml", removalCatalogV2Contract}))
+	s.mustPostForRemoval("/api/contracts", s.publishBody("catalog", "v3", contractFragment{"api.yaml", removalCatalogV3Contract}))
 
 	response, _ := s.canIDeployForRemoval("catalog", "v3")
 
@@ -229,7 +229,7 @@ func (s *IntegrationSuite) TestRemovedProvider_KeepsBlockingOnLaterVersions() {
 
 func (s *IntegrationSuite) TestRemovedProvider_IsNeverStoredAsAVerdict() {
 	s.removalSetup(removalWebBreakingContract)
-	s.mustPostForRemoval("/api/contracts", s.publishBody("catalog", "v2", contractFragment{"api.json", removalCatalogV2Contract}))
+	s.mustPostForRemoval("/api/contracts", s.publishBody("catalog", "v2", contractFragment{"api.yaml", removalCatalogV2Contract}))
 
 	// The removal and the property break land on the same counterpart in map order: repeating
 	// the check on a clean slate exercises both arrival orders of the merge.
@@ -263,9 +263,9 @@ func (s *IntegrationSuite) TestRemovedProvider_IsNeverStoredAsAVerdict() {
 
 func (s *IntegrationSuite) TestRemovedProvider_ConsumerCheckIgnoresItsOwnRemovedConsumption() {
 	s.removalSetup(removalWebV1Contract)
-	s.mustPostForRemoval("/api/contracts", s.publishBody("catalog", "v2", contractFragment{"api.json", removalCatalogV2Contract}))
+	s.mustPostForRemoval("/api/contracts", s.publishBody("catalog", "v2", contractFragment{"api.yaml", removalCatalogV2Contract}))
 	s.mustPostForRemoval("/api/deployments", `{"participant":"catalog","version":"v2","environment":"production"}`)
-	s.mustPostForRemoval("/api/contracts", s.publishBody("web", "v2", contractFragment{"api.json", removalWebV2Contract}))
+	s.mustPostForRemoval("/api/contracts", s.publishBody("web", "v2", contractFragment{"api.yaml", removalWebV2Contract}))
 
 	response, _ := s.canIDeployForRemoval("web", "v2")
 

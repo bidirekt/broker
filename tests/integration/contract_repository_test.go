@@ -37,7 +37,7 @@ func (s *IntegrationSuite) publishOrdersContract() {
 	status, _ := s.post("/api/participants", ordersParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/contracts", s.publishBody("orders_service", "1", contractFragment{"api.json", ordersContractBody}))
+	status, _ = s.post("/api/contracts", s.publishBody("orders_service", "1", contractFragment{"api.yaml", ordersContractBody}))
 	s.Require().Equal(http.StatusOK, status)
 }
 

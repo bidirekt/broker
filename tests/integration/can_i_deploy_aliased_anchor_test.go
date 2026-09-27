@@ -41,14 +41,14 @@ func (s *IntegrationSuite) TestCanIDeploy_AnchorsToAnAliasedDeployedProvider() {
 	mustPost("/api/participants", `{"participant":"front"}`)
 	mustPost("/api/environments", `{"environment":"production"}`)
 
-	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.json", anchorProviderV1Contract}))
+	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.yaml", anchorProviderV1Contract}))
 	// CI republishes the same content under the commit sha: an alias, no new snapshot
-	mustPost("/api/contracts", s.publishBody("api", "a1b2c3d", contractFragment{"api.json", anchorProviderV1Contract}))
+	mustPost("/api/contracts", s.publishBody("api", "a1b2c3d", contractFragment{"api.yaml", anchorProviderV1Contract}))
 	mustPost("/api/deployments", `{"participant":"api","version":"a1b2c3d","environment":"production"}`)
 	// a real new snapshot that was never deployed
-	mustPost("/api/contracts", s.publishBody("api", "v2", contractFragment{"api.json", anchorProviderV2Contract}))
+	mustPost("/api/contracts", s.publishBody("api", "v2", contractFragment{"api.yaml", anchorProviderV2Contract}))
 
-	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.json", anchorConsumerV1Contract}))
+	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.yaml", anchorConsumerV1Contract}))
 
 	status, body := s.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
 	s.Equal(http.StatusOK, status)
@@ -75,12 +75,12 @@ func (s *IntegrationSuite) TestCanIDeploy_AnchorsToAnAliasedDeployedConsumer() {
 	mustPost("/api/participants", `{"participant":"front"}`)
 	mustPost("/api/environments", `{"environment":"production"}`)
 
-	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.json", anchorConsumerV1Contract}))
-	mustPost("/api/contracts", s.publishBody("front", "a1b2c3d", contractFragment{"api.json", anchorConsumerV1Contract}))
+	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.yaml", anchorConsumerV1Contract}))
+	mustPost("/api/contracts", s.publishBody("front", "a1b2c3d", contractFragment{"api.yaml", anchorConsumerV1Contract}))
 	mustPost("/api/deployments", `{"participant":"front","version":"a1b2c3d","environment":"production"}`)
-	mustPost("/api/contracts", s.publishBody("front", "v2", contractFragment{"api.json", anchorConsumerV2Contract}))
+	mustPost("/api/contracts", s.publishBody("front", "v2", contractFragment{"api.yaml", anchorConsumerV2Contract}))
 
-	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.json", anchorProviderV1Contract}))
+	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.yaml", anchorProviderV1Contract}))
 
 	status, body := s.post("/api/can-i-deploy", `{"participant":"api","version":"v1","environment":"production"}`)
 	s.Equal(http.StatusOK, status)

@@ -128,11 +128,11 @@ func (s *IntegrationSuite) TestCanIDeploy_HappyPath() {
 	}
 
 	mustPost("/api/participants", `{"participant":"api"}`)
-	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.json", apiV1ProviderContract}))
+	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.yaml", apiV1ProviderContract}))
 	mustPost("/api/environments", `{"environment":"production"}`)
 	mustPost("/api/deployments", `{"participant":"api","version":"v1","environment":"production"}`)
 	mustPost("/api/participants", `{"participant":"front"}`)
-	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.json", frontV1ConsumerContract}))
+	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.yaml", frontV1ConsumerContract}))
 
 	status, body := s.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
 	s.Equal(http.StatusOK, status)
@@ -175,7 +175,7 @@ func (s *IntegrationSuite) TestCanIDeploy_HappyPath() {
 	s.Equal("[]", v1Breaks)
 
 	mustPost("/api/deployments", `{"participant":"front","version":"v1","environment":"production"}`)
-	mustPost("/api/contracts", s.publishBody("front", "v2", contractFragment{"api.json", frontV2ConsumerContract}))
+	mustPost("/api/contracts", s.publishBody("front", "v2", contractFragment{"api.yaml", frontV2ConsumerContract}))
 
 	status, body = s.post("/api/can-i-deploy", `{"participant":"front","version":"v2","environment":"production"}`)
 	s.Equal(http.StatusOK, status)
@@ -287,9 +287,9 @@ func (s *IntegrationSuite) TestCanIDeploy_ProviderCheckedAgainstDeployedConsumer
 	mustPost("/api/participants", `{"participant":"api"}`)
 	mustPost("/api/participants", `{"participant":"front"}`)
 	mustPost("/api/environments", `{"environment":"production"}`)
-	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.json", providerCheckedConsumerContract}))
+	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.yaml", providerCheckedConsumerContract}))
 	mustPost("/api/deployments", `{"participant":"front","version":"v1","environment":"production"}`)
-	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.json", apiV1ProviderContract}))
+	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.yaml", apiV1ProviderContract}))
 
 	status, body := s.post("/api/can-i-deploy", `{"participant":"api","version":"v1","environment":"production"}`)
 	s.Equal(http.StatusOK, status)
@@ -343,7 +343,7 @@ func (s *IntegrationSuite) TestCanIDeploy_RecordsOneRowPerDependency() {
 	s.Require().Equal(http.StatusOK, status)
 
 	status, _ = s.post("/api/contracts",
-		s.publishBody("app", "v1", contractFragment{"api.json", appV1ThreeDependenciesContract}))
+		s.publishBody("app", "v1", contractFragment{"api.yaml", appV1ThreeDependenciesContract}))
 	s.Require().Equal(http.StatusOK, status)
 
 	status, body := s.post("/api/can-i-deploy",
@@ -452,14 +452,14 @@ func (s *IntegrationSuite) TestCanIDeploy_TwoDeployableOneBreaking() {
 	}
 	mustPost("/api/environments", `{"environment":"production"}`)
 
-	mustPost("/api/contracts", s.publishBody("users", "v1", contractFragment{"api.json", usersV1ProviderContract}))
+	mustPost("/api/contracts", s.publishBody("users", "v1", contractFragment{"api.yaml", usersV1ProviderContract}))
 	mustPost("/api/deployments", `{"participant":"users","version":"v1","environment":"production"}`)
-	mustPost("/api/contracts", s.publishBody("auth", "v1", contractFragment{"api.json", authV1ProviderContract}))
+	mustPost("/api/contracts", s.publishBody("auth", "v1", contractFragment{"api.yaml", authV1ProviderContract}))
 	mustPost("/api/deployments", `{"participant":"auth","version":"v1","environment":"production"}`)
-	mustPost("/api/contracts", s.publishBody("catalog", "v1", contractFragment{"api.json", catalogV1ProviderContract}))
+	mustPost("/api/contracts", s.publishBody("catalog", "v1", contractFragment{"api.yaml", catalogV1ProviderContract}))
 	mustPost("/api/deployments", `{"participant":"catalog","version":"v1","environment":"production"}`)
 
-	mustPost("/api/contracts", s.publishBody("app", "v1", contractFragment{"api.json", appV1MixedDependenciesContract}))
+	mustPost("/api/contracts", s.publishBody("app", "v1", contractFragment{"api.yaml", appV1MixedDependenciesContract}))
 
 	status, body := s.post("/api/can-i-deploy", `{"participant":"app","version":"v1","environment":"production"}`)
 	s.Equal(http.StatusOK, status)
@@ -558,10 +558,10 @@ func (s *IntegrationSuite) TestCanIDeploy_ProviderExistsButNotDeployedInTargetEn
 	mustPost("/api/environments", `{"environment":"production"}`)
 	mustPost("/api/environments", `{"environment":"staging"}`)
 
-	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.json", providerThingContract}))
+	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.yaml", providerThingContract}))
 	mustPost("/api/deployments", `{"participant":"api","version":"v1","environment":"staging"}`)
 
-	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.json", consumerThingContract}))
+	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.yaml", consumerThingContract}))
 
 	status, body := s.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
 	s.Equal(http.StatusOK, status)
@@ -848,16 +848,16 @@ func (s *IntegrationSuite) TestCanIDeploy_ConsumerAndProviderSameContract() {
 	}
 	mustPost("/api/environments", `{"environment":"production"}`)
 
-	mustPost("/api/contracts", s.publishBody("users", "v1", contractFragment{"api.json", dualRoleUsersV1Contract}))
+	mustPost("/api/contracts", s.publishBody("users", "v1", contractFragment{"api.yaml", dualRoleUsersV1Contract}))
 	checkDeployableAndDeploy("users", "v1")
 
-	mustPost("/api/contracts", s.publishBody("pets", "v1", contractFragment{"api.json", dualRolePetsV1Contract}))
+	mustPost("/api/contracts", s.publishBody("pets", "v1", contractFragment{"api.yaml", dualRolePetsV1Contract}))
 	checkDeployableAndDeploy("pets", "v1")
 
-	mustPost("/api/contracts", s.publishBody("app", "v1", contractFragment{"api.json", dualRoleAppV1Contract}))
+	mustPost("/api/contracts", s.publishBody("app", "v1", contractFragment{"api.yaml", dualRoleAppV1Contract}))
 	checkDeployableAndDeploy("app", "v1")
 
-	mustPost("/api/contracts", s.publishBody("pets", "v2", contractFragment{"api.json", dualRolePetsV2Contract}))
+	mustPost("/api/contracts", s.publishBody("pets", "v2", contractFragment{"api.yaml", dualRolePetsV2Contract}))
 
 	status, body := s.post("/api/can-i-deploy", `{"participant":"pets","version":"v2","environment":"production"}`)
 	s.Equal(http.StatusOK, status)
@@ -992,9 +992,9 @@ func (s *IntegrationSuite) TestCanIDeploy_MissingArrayReportsEveryNestedProperty
 	mustPost("/api/participants", `{"participant":"front"}`)
 	mustPost("/api/environments", `{"environment":"production"}`)
 
-	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.json", arrayProviderContract}))
+	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.yaml", arrayProviderContract}))
 	mustPost("/api/deployments", `{"participant":"api","version":"v1","environment":"production"}`)
-	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.json", arrayConsumerContract}))
+	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.yaml", arrayConsumerContract}))
 
 	status, body := s.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
 	s.Equal(http.StatusOK, status)
@@ -1044,8 +1044,8 @@ func (s *IntegrationSuite) TestCanIDeploy_ProviderExistsButDeployedNowhere() {
 	mustPost("/api/participants", `{"participant":"front"}`)
 	mustPost("/api/environments", `{"environment":"production"}`)
 
-	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.json", providerThingContract}))
-	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.json", consumerThingContract}))
+	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.yaml", providerThingContract}))
+	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.yaml", consumerThingContract}))
 
 	status, body := s.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
 	s.Equal(http.StatusOK, status)
@@ -1085,11 +1085,11 @@ func (s *IntegrationSuite) TestCanIDeploy_ChecksProviderAtItsDeployedVersion() {
 	mustPost("/api/participants", `{"participant":"front"}`)
 	mustPost("/api/environments", `{"environment":"production"}`)
 
-	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.json", apiV1ProviderContract}))
+	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.yaml", apiV1ProviderContract}))
 	mustPost("/api/deployments", `{"participant":"api","version":"v1","environment":"production"}`)
 	// published but never deployed — must not influence the verdict
-	mustPost("/api/contracts", s.publishBody("api", "v2", contractFragment{"api.json", apiV2IncompatibleProviderContract}))
-	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.json", frontV1ConsumerContract}))
+	mustPost("/api/contracts", s.publishBody("api", "v2", contractFragment{"api.yaml", apiV2IncompatibleProviderContract}))
+	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.yaml", frontV1ConsumerContract}))
 
 	status, body := s.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
 	s.Equal(http.StatusOK, status)
@@ -1117,11 +1117,11 @@ func (s *IntegrationSuite) TestCanIDeploy_ChecksConsumerAtItsDeployedVersion() {
 	mustPost("/api/participants", `{"participant":"front"}`)
 	mustPost("/api/environments", `{"environment":"production"}`)
 
-	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.json", frontV1ConsumerContract}))
+	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.yaml", frontV1ConsumerContract}))
 	mustPost("/api/deployments", `{"participant":"front","version":"v1","environment":"production"}`)
 	// published but never deployed — must not influence the verdict
-	mustPost("/api/contracts", s.publishBody("front", "v2", contractFragment{"api.json", frontV2ConsumerContract}))
-	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.json", apiV1ProviderContract}))
+	mustPost("/api/contracts", s.publishBody("front", "v2", contractFragment{"api.yaml", frontV2ConsumerContract}))
+	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.yaml", apiV1ProviderContract}))
 
 	status, body := s.post("/api/can-i-deploy", `{"participant":"api","version":"v1","environment":"production"}`)
 	s.Equal(http.StatusOK, status)
@@ -1178,10 +1178,10 @@ func (s *IntegrationSuite) TestCanIDeploy_RemovedProviderPropertyIsNotChecked() 
 	mustPost("/api/participants", `{"participant":"front"}`)
 	mustPost("/api/environments", `{"environment":"production"}`)
 
-	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.json", removedRequestProviderV1Contract}))
-	mustPost("/api/contracts", s.publishBody("api", "v2", contractFragment{"api.json", removedRequestProviderV2Contract}))
+	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.yaml", removedRequestProviderV1Contract}))
+	mustPost("/api/contracts", s.publishBody("api", "v2", contractFragment{"api.yaml", removedRequestProviderV2Contract}))
 	mustPost("/api/deployments", `{"participant":"api","version":"v2","environment":"production"}`)
-	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.json", removedRequestConsumerContract}))
+	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.yaml", removedRequestConsumerContract}))
 
 	status, body := s.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
 	s.Equal(http.StatusOK, status)
@@ -1230,10 +1230,10 @@ func (s *IntegrationSuite) TestCanIDeploy_RemovedConsumerPropertyIsNotChecked() 
 	mustPost("/api/participants", `{"participant":"front"}`)
 	mustPost("/api/environments", `{"environment":"production"}`)
 
-	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.json", removedResponseConsumerV1Contract}))
-	mustPost("/api/contracts", s.publishBody("front", "v2", contractFragment{"api.json", removedResponseConsumerV2Contract}))
+	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.yaml", removedResponseConsumerV1Contract}))
+	mustPost("/api/contracts", s.publishBody("front", "v2", contractFragment{"api.yaml", removedResponseConsumerV2Contract}))
 	mustPost("/api/deployments", `{"participant":"front","version":"v2","environment":"production"}`)
-	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.json", apiV1ProviderContract}))
+	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.yaml", apiV1ProviderContract}))
 
 	status, body := s.post("/api/can-i-deploy", `{"participant":"api","version":"v1","environment":"production"}`)
 	s.Equal(http.StatusOK, status)
@@ -1254,7 +1254,7 @@ func (s *IntegrationSuite) TestCanIDeploy_UnknownEnvironmentReturns404() {
 	status, _ := s.post("/api/participants", `{"participant":"api"}`)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.json", apiV1ProviderContract}))
+	status, _ = s.post("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.yaml", apiV1ProviderContract}))
 	s.Require().Equal(http.StatusOK, status)
 
 	status, body := s.post("/api/can-i-deploy", `{"participant":"api","version":"v1","environment":"production"}`)

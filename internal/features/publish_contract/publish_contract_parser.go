@@ -16,9 +16,9 @@ import (
 
 func decodeFragment(fragment ContractFragment) (contract.Fragment, error) {
 	extension := strings.ToLower(filepath.Ext(fragment.Source))
-	if extension != ".yaml" && extension != ".yml" && extension != ".json" {
+	if extension != ".yaml" && extension != ".yml" {
 		return contract.Fragment{}, fmt.Errorf(
-			"unsupported contract file: %s (expected .yaml, .yml or .json)",
+			"unsupported contract file: %s (expected .yaml or .yml)",
 			fragment.Source,
 		)
 	}
