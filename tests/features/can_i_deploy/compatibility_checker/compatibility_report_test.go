@@ -238,3 +238,44 @@ func TestCachedPropertyBreaksCarryTheRoleOfTheCurrentCheck(t *testing.T) {
 		})
 	}
 }
+
+func TestFreshBreaksOfAnInteractionAreSortedByProperty(t *testing.T) {
+	consumerProperties := map[string]model.Property{}
+	for _, property := range []string{"$.weight", "$.photoUrl", "$.ownerId", "$.name", "$.age", "$.color"} {
+		consumerProperties[property] = model.Property{Type: "string"}
+	}
+
+	consumer, provider := postPetsResources("201", consumerProperties, map[string]model.Property{})
+
+	report := checkFrom(consumer, model.ResourceCounterparts{
+		Providers: map[string]model.PersistedResource{postPetsHash: provider},
+	})
+
+	var properties []string
+	for _, leaf := range report.Hierarchical[petstoreAPI].Endpoints["/pets"]["post"]["201"] {
+		properties = append(properties, leaf.Details["property"])
+	}
+
+	assert.Equal(t, []string{"$.age", "$.color", "$.name", "$.ownerId", "$.photoUrl", "$.weight"}, properties)
+}
+
+func TestCachedBreaksOfAnInteractionAreSortedByProperty(t *testing.T) {
+	item := compatibility_checker.NewIncompatibleItem()
+	for _, property := range []string{"$.weight", "$.photoUrl"} {
+		item.AppendCachedBreakChange(model.VerdictBreak{
+			Endpoint:    "/pets",
+			Method:      "post",
+			Interaction: "201",
+			Reason:      string(compatibility_checker.ReasonPropertyMissingInProvider),
+			Details:     map[string]string{"property": property, "consumerName": petstoreWeb, "providerName": petstoreAPI},
+		})
+	}
+
+	report := compatibility_checker.NewContractCompatibilityReport(petstoreWeb, "2.0.0", production)
+	report.AppendResult(petstoreAPI, item)
+
+	leaves := report.Hierarchical[petstoreAPI].Endpoints["/pets"]["post"]["201"]
+	require.Len(t, leaves, 2)
+	assert.Equal(t, "$.photoUrl", leaves[0].Details["property"])
+	assert.Equal(t, "$.weight", leaves[1].Details["property"])
+}
