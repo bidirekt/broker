@@ -1,6 +1,10 @@
 package compatibility_checker
 
 import (
+	"cmp"
+	"slices"
+	"strings"
+
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/guregu/null"
 )
@@ -182,10 +186,14 @@ func (h *Hierarchical) appendBreak(
 		h.Endpoints[endpoint][method] = make(HierarchicalInteraction)
 	}
 
-	h.Endpoints[endpoint][method][interaction] = append(
-		h.Endpoints[endpoint][method][interaction],
-		breakChange,
-	)
+	breaks := append(h.Endpoints[endpoint][method][interaction], breakChange)
+	slices.SortStableFunc(breaks, func(a, b ContractBreakingChange) int {
+		return cmp.Or(
+			strings.Compare(a.Details["property"], b.Details["property"]),
+			strings.Compare(string(a.Reason), string(b.Reason)),
+		)
+	})
+	h.Endpoints[endpoint][method][interaction] = breaks
 
 	h.Deployable = false
 }
