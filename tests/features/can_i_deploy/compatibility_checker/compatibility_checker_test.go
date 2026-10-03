@@ -190,7 +190,7 @@ func TestTypeMismatchTypesResolvedByRole(t *testing.T) {
 	assert.Equal(t, "api", providerChecked.ProviderName())
 }
 
-func TestBreakMarshalsOnlyReasonAndDetails(t *testing.T) {
+func TestBreakMarshalsOnlyReasonRoleAndDetails(t *testing.T) {
 	change := compatibility_checker.NewPropertyBreakChange(
 		consumerResource(), providerResource(), compatibility_checker.ReasonPropertyTypeMismatch, "$.id",
 	)
@@ -206,7 +206,7 @@ func TestBreakMarshalsOnlyReasonAndDetails(t *testing.T) {
 		keys = append(keys, key)
 	}
 
-	assert.ElementsMatch(t, []string{"reason", "details"}, keys)
+	assert.ElementsMatch(t, []string{"reason", "role", "details"}, keys)
 }
 
 func TestProviderNotDeployedDetails(t *testing.T) {
