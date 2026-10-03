@@ -106,6 +106,11 @@ func (r *ContractCompatibilityReport) AppendResult(dependency string, result *In
 	}
 
 	for _, breakChange := range result.Breaks {
+		breakChange.Role = RoleProvider
+		if breakChange.CheckedResource.IsConsumer() {
+			breakChange.Role = RoleConsumer
+		}
+
 		hierarchical.appendBreak(
 			breakChange.CheckedResource.Endpoint,
 			breakChange.CheckedResource.Method,
@@ -115,12 +120,18 @@ func (r *ContractCompatibilityReport) AppendResult(dependency string, result *In
 	}
 
 	for _, cachedBreak := range result.CachedBreaks {
+		role := RoleProvider
+		if cachedBreak.Details["consumerName"] == r.ParticipantName {
+			role = RoleConsumer
+		}
+
 		hierarchical.appendBreak(
 			cachedBreak.Endpoint,
 			cachedBreak.Method,
 			cachedBreak.Interaction,
 			ContractBreakingChange{
 				Reason:  BreakingReason(cachedBreak.Reason),
+				Role:    role,
 				Details: cachedBreak.Details,
 			},
 		)

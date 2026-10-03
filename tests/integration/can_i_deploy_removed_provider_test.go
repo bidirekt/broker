@@ -8,6 +8,7 @@ import (
 
 type removalBreakJSON struct {
 	Reason  string            `json:"reason"`
+	Role    string            `json:"role"`
 	Details map[string]string `json:"details"`
 }
 
@@ -196,6 +197,7 @@ func (s *IntegrationSuite) TestRemovedProvider_BlocksWhileTheConsumerIsDeployed(
 	breaks := web.Endpoints["/items"]["get"]["200"]
 	s.Require().Len(breaks, 1)
 	s.Equal(removedProviderReason, breaks[0].Reason)
+	s.Equal("provider", breaks[0].Role)
 	s.Nil(breaks[0].Details)
 	s.NotContains(body, `"details"`)
 }

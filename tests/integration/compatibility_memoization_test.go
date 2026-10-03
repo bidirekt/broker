@@ -8,6 +8,7 @@ import (
 
 type memoizationBreak struct {
 	Reason  string            `json:"reason"`
+	Role    string            `json:"role"`
 	Details map[string]string `json:"details"`
 }
 
@@ -153,6 +154,7 @@ func (s *IntegrationSuite) TestMemoization_IdenticalChecksReplayTheStoredVerdict
 
 	expectedBreak := memoizationBreak{
 		Reason: "property_missing_in_provider",
+		Role:   "consumer",
 		Details: map[string]string{
 			"property":     "$.total",
 			"consumerName": "cart",
@@ -182,6 +184,7 @@ func (s *IntegrationSuite) TestMemoization_IdenticalChecksReplayTheStoredVerdict
 	s.False(fromTheOtherSide.Deployable)
 	s.Equal([]memoizationBreak{{
 		Reason: "property_missing_in_consumer",
+		Role:   "provider",
 		Details: map[string]string{
 			"property":     "$.fabricated",
 			"consumerName": "cart",
@@ -259,6 +262,7 @@ func (s *IntegrationSuite) TestMemoization_CachedVerdictKeepsLiveEnvironmentBrea
 
 	expectedBreak := memoizationBreak{
 		Reason: "property_missing_in_provider",
+		Role:   "consumer",
 		Details: map[string]string{
 			"property":     "$.total",
 			"consumerName": "cart",
@@ -324,6 +328,7 @@ func (s *IntegrationSuite) TestMemoization_HitOnACompatiblePairSkipsTheDiff() {
 	s.False(second.Deployable)
 	s.Equal([]memoizationBreak{{
 		Reason: "property_missing_in_consumer",
+		Role:   "consumer",
 		Details: map[string]string{
 			"property":     "$.fabricated",
 			"consumerName": "cart",

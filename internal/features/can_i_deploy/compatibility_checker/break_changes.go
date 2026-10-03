@@ -19,10 +19,18 @@ const (
 	ReasonProviderResourceRemovedButStillConsumed      BreakingReason = "provider_resource_removed_but_still_consumed"
 )
 
+type BreakRole string
+
+const (
+	RoleConsumer BreakRole = "consumer"
+	RoleProvider BreakRole = "provider"
+)
+
 type ContractBreakingChange struct {
 	CheckedResource     *model.PersistedResource `json:"-"`
 	CounterpartResource *model.PersistedResource `json:"-"`
 	Reason              BreakingReason           `json:"reason"`
+	Role                BreakRole                `json:"role"`
 	Details             map[string]string        `json:"details,omitempty"`
 }
 

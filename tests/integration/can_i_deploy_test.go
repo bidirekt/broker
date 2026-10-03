@@ -8,6 +8,7 @@ import (
 
 type breakJSON struct {
 	Reason  string            `json:"reason"`
+	Role    string            `json:"role"`
 	Details map[string]string `json:"details"`
 }
 
@@ -187,7 +188,7 @@ func (s *IntegrationSuite) TestCanIDeploy_HappyPath() {
 	s.Equal("v2", got.Version)
 	s.Equal("production", got.Environment)
 
-	// break leaves are slim {reason, details} — no resources on the wire
+	// break leaves are slim {reason, role, details} — no resources on the wire
 	s.NotContains(body, "checkedResource")
 	s.NotContains(body, "counterpartResource")
 
@@ -207,6 +208,7 @@ func (s *IntegrationSuite) TestCanIDeploy_HappyPath() {
 
 	typeMismatch, ok := byReason["property_type_mismatch"]
 	s.Require().True(ok)
+	s.Equal("consumer", typeMismatch.Role)
 	s.Equal(map[string]string{
 		"property":             "$.id",
 		"consumerName":         "front",
@@ -217,6 +219,7 @@ func (s *IntegrationSuite) TestCanIDeploy_HappyPath() {
 
 	missing, ok := byReason["property_missing_in_provider"]
 	s.Require().True(ok)
+	s.Equal("consumer", missing.Role)
 	s.Equal(map[string]string{"property": "$.name", "consumerName": "front", "providerName": "api", "propertyType": "string"}, missing.Details)
 
 	s.Equal(2, s.countRows("compatibility_checks"))
@@ -311,6 +314,7 @@ func (s *IntegrationSuite) TestCanIDeploy_ProviderCheckedAgainstDeployedConsumer
 
 	b := breaks[0]
 	s.Equal("property_type_mismatch", b.Reason)
+	s.Equal("provider", b.Role)
 	// types resolved by role even though the provider is the checked side
 	s.Equal(map[string]string{
 		"property":             "$.id",
@@ -369,6 +373,7 @@ func (s *IntegrationSuite) TestCanIDeploy_RecordsOneRowPerDependency() {
 		s.Require().Lenf(breaks, 1, "missing break for %s", provider)
 		b := breaks[0]
 		s.Equal("provider_resource_not_found", b.Reason)
+		s.Equal("consumer", b.Role)
 		s.Empty(b.Details)
 	}
 
@@ -488,6 +493,7 @@ func (s *IntegrationSuite) TestCanIDeploy_TwoDeployableOneBreaking() {
 	s.Require().Len(breaks, 1)
 	b := breaks[0]
 	s.Equal("property_type_mismatch", b.Reason)
+	s.Equal("consumer", b.Role)
 	s.Equal(map[string]string{
 		"property":             "$.id",
 		"consumerName":         "app",
@@ -582,6 +588,7 @@ func (s *IntegrationSuite) TestCanIDeploy_ProviderExistsButNotDeployedInTargetEn
 
 	b := breaks[0]
 	s.Equal("provider_resource_not_deployed_in_environment", b.Reason)
+	s.Equal("consumer", b.Role)
 	s.Equal(map[string]string{"deployedEnvironments": "staging"}, b.Details)
 
 	s.Equal(1, s.countRows("compatibility_checks"))
@@ -886,11 +893,13 @@ func (s *IntegrationSuite) TestCanIDeploy_ConsumerAndProviderSameContract() {
 	requestBreaks := appResult.Endpoints["/pets"]["post"]["request"]
 	s.Require().Len(requestBreaks, 1)
 	s.Equal("property_missing_in_consumer", requestBreaks[0].Reason)
+	s.Equal("provider", requestBreaks[0].Role)
 	s.Equal(map[string]string{"property": "$.breed", "consumerName": "app", "providerName": "pets", "propertyType": "string"}, requestBreaks[0].Details)
 
 	responseBreaks := appResult.Endpoints["/pets/*"]["get"]["200"]
 	s.Require().Len(responseBreaks, 1)
 	s.Equal("property_missing_in_provider", responseBreaks[0].Reason)
+	s.Equal("provider", responseBreaks[0].Role)
 	s.Equal(map[string]string{"property": "$.name", "consumerName": "app", "providerName": "pets", "propertyType": "string"}, responseBreaks[0].Details)
 
 	usersResult, ok := got.Results["users"]
@@ -902,6 +911,7 @@ func (s *IntegrationSuite) TestCanIDeploy_ConsumerAndProviderSameContract() {
 	consumerBreaks := usersResult.Endpoints["/users/*"]["get"]["200"]
 	s.Require().Len(consumerBreaks, 1)
 	s.Equal("property_type_mismatch", consumerBreaks[0].Reason)
+	s.Equal("consumer", consumerBreaks[0].Role)
 	s.Equal(map[string]string{
 		"property":             "$.userId",
 		"consumerName":         "pets",
@@ -1015,22 +1025,26 @@ func (s *IntegrationSuite) TestCanIDeploy_MissingArrayReportsEveryNestedProperty
 	list, ok := byProperty["$.list"]
 	s.Require().True(ok)
 	s.Equal("property_missing_in_provider", list.Reason)
+	s.Equal("consumer", list.Role)
 	s.Equal(map[string]string{"property": "$.list", "consumerName": "front", "providerName": "api", "propertyType": "array<object>"}, list.Details)
 
 	listItems, ok := byProperty["$.list[]"]
 	s.Require().True(ok)
 	s.Equal("property_missing_in_provider", listItems.Reason)
+	s.Equal("consumer", listItems.Role)
 	s.Equal(map[string]string{"property": "$.list[]", "consumerName": "front", "providerName": "api", "propertyType": "object"}, listItems.Details)
 
 	listItemName, ok := byProperty["$.list[].name"]
 	s.Require().True(ok)
 	s.Equal("property_missing_in_provider", listItemName.Reason)
+	s.Equal("consumer", listItemName.Role)
 	s.Equal(map[string]string{"property": "$.list[].name", "consumerName": "front", "providerName": "api", "propertyType": "string"}, listItemName.Details)
 
 	// an optional missing array emits no break itself, but its required items still report
 	items, ok := byProperty["$.tags[]"]
 	s.Require().True(ok)
 	s.Equal("property_missing_in_provider", items.Reason)
+	s.Equal("consumer", items.Role)
 	s.Equal(map[string]string{"property": "$.tags[]", "consumerName": "front", "providerName": "api", "propertyType": "string"}, items.Details)
 }
 
@@ -1066,6 +1080,7 @@ func (s *IntegrationSuite) TestCanIDeploy_ProviderExistsButDeployedNowhere() {
 
 	b := breaks[0]
 	s.Equal("provider_resource_not_deployed_in_environment", b.Reason)
+	s.Equal("consumer", b.Role)
 	s.Empty(b.Details)
 }
 
