@@ -1,0 +1,10 @@
+services:
+  broker:
+    image: ghcr.io/bidirekt/broker:0.1.0
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # Postgres no mesmo host do VPS
+    environment:
+      BIDIREKT_DATABASE_URL: ${BIDIREKT_DATABASE_URL:?set BIDIREKT_DATABASE_URL}
+    ports:
+      - "127.0.0.1:8080:8080"

@@ -1,0 +1,28 @@
+# Local use only: fixed credentials, broker exposed on localhost:8080.
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: bidirekt
+      POSTGRES_PASSWORD: bidirekt
+      POSTGRES_DB: bidirekt
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bidirekt -d bidirekt"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  broker:
+    image: ghcr.io/bidirekt/broker:latest
+    environment:
+      BIDIREKT_DATABASE_URL: postgres://bidirekt:bidirekt@postgres:5432/bidirekt?sslmode=disable
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
