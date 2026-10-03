@@ -7,7 +7,6 @@ require (
 	github.com/gofiber/fiber/v3 v3.2.0
 	github.com/guregu/null v4.0.0+incompatible
 	github.com/jackc/pgx/v5 v5.9.2
-	github.com/joho/godotenv v1.5.1
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.42.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.42.0
