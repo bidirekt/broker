@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
+	"time"
 
 	"github.com/bidirekt/broker/migrations"
 	"github.com/bidirekt/broker/pkg/migrator"
@@ -15,21 +17,90 @@ import (
 )
 
 type Components struct {
-	Server *fiber.App
-	Pool   *pgxpool.Pool
+	Server     *fiber.App
+	Pool       *pgxpool.Pool
+	ListenAddr string
 }
 
-func createDatabasePool() *pgxpool.Pool {
-	pool, err := pgxpool.New(context.Background(), os.Getenv("DATABASE_URL"))
+const defaultListenAddr = ":8080"
+
+func ListenAddr() string {
+	if listenAddr := os.Getenv("BIDIREKT_LISTEN_ADDR"); listenAddr != "" {
+		return listenAddr
+	}
+
+	return defaultListenAddr
+}
+
+const (
+	defaultDatabaseConnectAttempts = 10
+	defaultDatabaseConnectTimeout  = 5 * time.Second
+	databaseConnectRetryPause      = 2 * time.Second
+)
+
+func databaseConnectAttempts() (int, error) {
+	value := os.Getenv("BIDIREKT_DATABASE_CONNECT_RETRIES")
+	if value == "" {
+		return defaultDatabaseConnectAttempts, nil
+	}
+
+	attempts, err := strconv.Atoi(value)
+	if err != nil || attempts < 1 {
+		return 0, errors.New("BIDIREKT_DATABASE_CONNECT_RETRIES must be a positive integer")
+	}
+
+	return attempts, nil
+}
+
+func createDatabasePool() (*pgxpool.Pool, error) {
+	databaseURL := os.Getenv("BIDIREKT_DATABASE_URL")
+	if databaseURL == "" {
+		return nil, errors.New("BIDIREKT_DATABASE_URL is required")
+	}
+
+	config, err := pgxpool.ParseConfig(databaseURL)
 	if err != nil {
-		panic(fmt.Errorf("failed to create database pool: %w", err))
+		return nil, fmt.Errorf("invalid BIDIREKT_DATABASE_URL: %w", err)
 	}
 
-	if err := pool.Ping(context.Background()); err != nil {
-		panic(fmt.Errorf("failed to ping database: %w", err))
+	attempts, err := databaseConnectAttempts()
+	if err != nil {
+		return nil, err
 	}
 
-	return pool
+	// a ping that gives up does not stop the dial: pgxpool keeps it going in the
+	// background, for 2 minutes when the URL sets no connect_timeout
+	if config.ConnConfig.ConnectTimeout == 0 {
+		config.ConnConfig.ConnectTimeout = defaultDatabaseConnectTimeout
+	}
+
+	pool, err := pgxpool.NewWithConfig(context.Background(), config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create database pool: %w", err)
+	}
+
+	for attempt := 1; attempt <= attempts; attempt++ {
+		if attempt > 1 {
+			time.Sleep(databaseConnectRetryPause)
+		}
+
+		if err = pingDatabase(pool, config.ConnConfig.ConnectTimeout); err == nil {
+			return pool, nil
+		}
+
+		log.Printf("database not ready (attempt %d/%d): %v", attempt, attempts, err)
+	}
+
+	pool.Close()
+
+	return nil, fmt.Errorf("database not ready, giving up after attempt %d: %w", attempts, err)
+}
+
+func pingDatabase(pool *pgxpool.Pool, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return pool.Ping(ctx)
 }
 
 // contracts of a few thousand resources do not fit fiber's 4 MiB default
@@ -63,22 +134,31 @@ func createHttpServer() *fiber.App {
 	return server
 }
 
-func runMigrations(pool *pgxpool.Pool) {
+func runMigrations(pool *pgxpool.Pool) error {
 	m := migrator.New(pool, migrations.FS, "public.schema_migrations")
 
 	if err := m.Migrate(); err != nil {
-		panic(fmt.Errorf("failed to run migrations: %w", err))
+		return fmt.Errorf("failed to run migrations: %w", err)
 	}
+
+	return nil
 }
 
-func New() *Components {
-	pool := createDatabasePool()
+func New() (*Components, error) {
+	pool, err := createDatabasePool()
+	if err != nil {
+		return nil, err
+	}
 	server := createHttpServer()
 
-	runMigrations(pool)
+	if err := runMigrations(pool); err != nil {
+		pool.Close()
+		return nil, err
+	}
 
 	return &Components{
-		Server: server,
-		Pool:   pool,
-	}
+		Server:     server,
+		Pool:       pool,
+		ListenAddr: ListenAddr(),
+	}, nil
 }

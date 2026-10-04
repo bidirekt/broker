@@ -11,8 +11,11 @@ import (
 	"github.com/bidirekt/broker/internal/features/rename_participant"
 )
 
-func Run() *components.Components {
-	components := components.New()
+func Run() (*components.Components, error) {
+	components, err := components.New()
+	if err != nil {
+		return nil, err
+	}
 
 	create_participant.Register(components)
 	create_environment.Register(components)
@@ -22,5 +25,9 @@ func Run() *components.Components {
 	rename_participant.Register(components)
 	health.Register(components)
 
-	return components
+	return components, nil
+}
+
+func Healthcheck() error {
+	return health.Check(components.ListenAddr())
 }

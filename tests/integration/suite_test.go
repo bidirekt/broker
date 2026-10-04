@@ -53,9 +53,10 @@ func (s *IntegrationSuite) SetupSuite() {
 	connStr, err := container.ConnectionString(ctx, "sslmode=disable")
 	s.Require().NoError(err)
 
-	s.Require().NoError(os.Setenv("DATABASE_URL", connStr))
+	s.Require().NoError(os.Setenv("BIDIREKT_DATABASE_URL", connStr))
 
-	s.Components = internal.Run()
+	s.Components, err = internal.Run()
+	s.Require().NoError(err)
 	s.Pool = s.Components.Pool
 }
 
