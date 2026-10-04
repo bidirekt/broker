@@ -37,7 +37,7 @@ func (s *IntegrationSuite) SetupSuite() {
 	ctx := context.Background()
 
 	container, err := postgres.Run(ctx,
-		"postgres:16.6-alpine",
+		"postgres:18.6-alpine",
 		postgres.WithDatabase("contracttests"),
 		postgres.WithUsername("contracttests"),
 		postgres.WithPassword("s3cr3t"),
