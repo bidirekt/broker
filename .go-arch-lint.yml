@@ -12,6 +12,8 @@ components:
   feature_create_environment: { in: internal/features/create_environment }
   feature_create_participant: { in: internal/features/create_participant }
   feature_health:             { in: internal/features/health }
+  feature_list_environments:  { in: internal/features/list_environments }
+  feature_list_participants:  { in: internal/features/list_participants }
   feature_publish_contract:   { in: internal/features/publish_contract }
   feature_record_deployment:  { in: internal/features/record_deployment }
   feature_rename_participant: { in: internal/features/rename_participant }
@@ -44,6 +46,8 @@ deps:
       - feature_create_environment
       - feature_create_participant
       - feature_health
+      - feature_list_environments
+      - feature_list_participants
       - feature_publish_contract
       - feature_record_deployment
       - feature_rename_participant
@@ -61,6 +65,12 @@ deps:
     canUse: [fiber, guregu_null]
   feature_health:
     mayDependOn: [components]
+    canUse: [fiber]
+  feature_list_environments:
+    mayDependOn: [components, repository, model]
+    canUse: [fiber]
+  feature_list_participants:
+    mayDependOn: [components, repository, model]
     canUse: [fiber]
   feature_publish_contract:
     mayDependOn: [contracts, components, repository, model, validations]
@@ -100,6 +110,8 @@ deps:
       - feature_create_environment
       - feature_create_participant
       - feature_health
+      - feature_list_environments
+      - feature_list_participants
       - feature_publish_contract
       - feature_record_deployment
       - feature_rename_participant

@@ -38,6 +38,15 @@ const (
 			($1)
 		RETURNING id
 	`
+
+	listEnvironmentNamesQuery = `
+		SELECT
+			name
+		FROM
+			environments
+		ORDER BY
+			name COLLATE "C"
+	`
 )
 
 type EnvironmentRepository struct {
@@ -72,4 +81,27 @@ func (r *EnvironmentRepository) Create(ctx context.Context, e *model.Environment
 	if err := r.pool.QueryRow(ctx, insertEnvironmentQuery, e.Name).Scan(&e.ID); err != nil {
 		panic(fmt.Errorf("error inserting environment: %w", err))
 	}
+}
+
+func (this *EnvironmentRepository) ListNames(ctx context.Context) []string {
+	rows, err := this.pool.Query(ctx, listEnvironmentNamesQuery)
+	if err != nil {
+		panic(fmt.Errorf("error listing environment names: %w", err))
+	}
+	defer rows.Close()
+
+	names := make([]string, 0)
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			panic(fmt.Errorf("error scanning environment name: %w", err))
+		}
+		names = append(names, name)
+	}
+
+	if err := rows.Err(); err != nil {
+		panic(fmt.Errorf("error listing environment names: %w", err))
+	}
+
+	return names
 }

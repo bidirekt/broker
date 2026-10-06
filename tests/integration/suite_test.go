@@ -104,6 +104,19 @@ func (s *IntegrationSuite) post(path, body string) (status int, response string)
 	return resp.StatusCode, string(bytes)
 }
 
+func (s *IntegrationSuite) get(path string) (status int, response string) {
+	req := httptest.NewRequest("GET", path, nil)
+
+	resp, err := s.Components.Server.Test(req, fiber.TestConfig{Timeout: 10 * time.Second})
+	s.Require().NoError(err)
+	defer func() { _ = resp.Body.Close() }()
+
+	bytes, err := io.ReadAll(resp.Body)
+	s.Require().NoError(err)
+
+	return resp.StatusCode, string(bytes)
+}
+
 type contractFragment struct {
 	Source  string `json:"source"`
 	Content string `json:"content"`
