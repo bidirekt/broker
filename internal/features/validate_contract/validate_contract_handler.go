@@ -35,7 +35,7 @@ func NewValidateContractHandler(
 		deploymentRepository:  deploymentRepository,
 		environmentRepository: environmentRepository,
 		participantRepository: participantRepository,
-		compatibilityChecker:  compatibility_checker.NewCompatibilityChecker(verdictsNeverFound{}),
+		compatibilityChecker:  compatibility_checker.NewCompatibilityChecker(localFilesHaveNoVerdict{}),
 	}
 }
 
@@ -93,16 +93,11 @@ func (this *ValidateContractHandler) Handle(ctx fiber.Ctx) error {
 	counterparts := this.contractRepository.LoadCounterparts(ctx.Context(), localContract, environment.ID)
 	compatibilityReport := this.compatibilityChecker.Check(ctx.Context(), localContract, environment, counterparts)
 
-	deployable := true
-	for _, result := range compatibilityReport.Results {
-		deployable = deployable && result.Deployable
-	}
-
 	return ctx.Status(fiber.StatusOK).JSON(ValidateContractResponseBody{
 		Message:     ContractValidated,
 		Participant: participant.Name,
 		Environment: environment.Name,
-		Deployable:  deployable,
+		Deployable:  compatibilityReport.Deployable(),
 		Results:     compatibilityReport.Hierarchical,
 	})
 }
@@ -113,11 +108,9 @@ func (this *ValidateContractHandler) toRemovedSinceDeployed(
 	environment *model.Environment,
 	uploadedContract *model.UploadedContract,
 ) (map[string]model.PersistedResource, error) {
-	removedResources := make(map[string]model.PersistedResource)
-
 	version, deployed := this.deploymentRepository.CurrentVersionInEnv(ctx, participant.ID, environment.ID)
 	if !deployed {
-		return removedResources, nil
+		return nil, nil
 	}
 
 	deployedContract, exists := this.contractRepository.GetContractByNameAndVersion(ctx, participant.Name, version)
@@ -125,29 +118,7 @@ func (this *ValidateContractHandler) toRemovedSinceDeployed(
 		return nil, fmt.Errorf("deployed version %q of participant %q has no contract", version, participant.Name)
 	}
 
-	deployedProperties := make(map[string]model.ResourceProperties, len(deployedContract.Resources))
-	for hash, resource := range deployedContract.Resources {
-		if !resource.Removed {
-			deployedProperties[hash] = resource.Properties
-		}
-	}
-
-	localProperties := make(map[string]model.ResourceProperties, len(uploadedContract.Resources))
-	for hash, resource := range uploadedContract.Resources {
-		localProperties[hash] = resource.Properties
-	}
-
-	for hash, change := range contract_differ.DiffResourceProperties(deployedProperties, localProperties).Resources {
-		if change.Kind != model.ChangeRemoved {
-			continue
-		}
-
-		removedResource := deployedContract.Resources[hash]
-		removedResource.Removed = true
-		removedResources[hash] = removedResource
-	}
-
-	return removedResources, nil
+	return contract_differ.RemovedSinceDeployed(deployedContract, uploadedContract), nil
 }
 
 func toPersistedContract(
@@ -179,11 +150,9 @@ func toPersistedContract(
 	}
 }
 
-// verdictsNeverFound keeps the pair cache out: local files are no stored snapshot, so no
-// verdict can describe them.
-type verdictsNeverFound struct{}
+type localFilesHaveNoVerdict struct{}
 
-func (this verdictsNeverFound) GetVerdict(context.Context, int64, int64) (*model.CompatibilityVerdict, bool) {
+func (this localFilesHaveNoVerdict) GetVerdict(context.Context, int64, int64) (*model.CompatibilityVerdict, bool) {
 	return nil, false
 }
 

@@ -7,6 +7,21 @@ func DiffContracts(current *model.PersistedContract, next *model.UploadedContrac
 	return DiffResourceProperties(loadedProperties(current), uploadedProperties(next))
 }
 
+func RemovedSinceDeployed(deployed *model.PersistedContract, next *model.UploadedContract) map[string]model.PersistedResource {
+	removed := make(map[string]model.PersistedResource)
+	for key, change := range DiffContracts(deployed, next).Resources {
+		resource := deployed.Resources[key]
+		if change.Kind != model.ChangeRemoved || resource.Removed {
+			continue
+		}
+
+		resource.Removed = true
+		removed[key] = resource
+	}
+
+	return removed
+}
+
 func loadedProperties(contract *model.PersistedContract) map[string]model.ResourceProperties {
 	properties := make(map[string]model.ResourceProperties, len(contract.Resources))
 	for key, resource := range contract.Resources {
