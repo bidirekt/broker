@@ -15,6 +15,7 @@ components:
   feature_publish_contract:   { in: internal/features/publish_contract }
   feature_record_deployment:  { in: internal/features/record_deployment }
   feature_rename_participant: { in: internal/features/rename_participant }
+  feature_validate_contract:  { in: internal/features/validate_contract }
   components:                 { in: internal/components }
   contracts:                  { in: internal/contracts/** }
   repository:                 { in: internal/repository }
@@ -46,6 +47,7 @@ deps:
       - feature_publish_contract
       - feature_record_deployment
       - feature_rename_participant
+      - feature_validate_contract
     canUse: [fiber]
 
   feature_can_i_deploy:
@@ -68,6 +70,9 @@ deps:
     canUse: [fiber, guregu_null]
   feature_rename_participant:
     mayDependOn: [components, repository, model, validations]
+    canUse: [fiber, guregu_null]
+  feature_validate_contract:
+    mayDependOn: [contracts, components, repository, model, validations]
     canUse: [fiber, guregu_null]
 
   components:
@@ -98,6 +103,7 @@ deps:
       - feature_publish_contract
       - feature_record_deployment
       - feature_rename_participant
+      - feature_validate_contract
       - repository
       - model
       - validations
