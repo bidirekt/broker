@@ -41,6 +41,11 @@ func (this *IntegrationSuite) SetupSuite() {
 		postgres.WithDatabase("contracttests"),
 		postgres.WithUsername("contracttests"),
 		postgres.WithPassword("s3cr3t"),
+		// An ICU default collation orders names differently from "C", so a
+		// ListNames query that drops COLLATE "C" fails the SortedByteWise tests.
+		testcontainers.WithEnv(map[string]string{
+			"POSTGRES_INITDB_ARGS": "--locale-provider=icu --icu-locale=en-US",
+		}),
 		testcontainers.WithWaitStrategy(
 			wait.ForLog("database system is ready to accept connections").
 				WithOccurrence(2).
