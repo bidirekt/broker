@@ -9,6 +9,7 @@ import (
 	"github.com/bidirekt/broker/internal/features/publish_contract"
 	"github.com/bidirekt/broker/internal/features/record_deployment"
 	"github.com/bidirekt/broker/internal/features/rename_participant"
+	"github.com/bidirekt/broker/internal/features/validate_contract"
 )
 
 func Run() (*components.Components, error) {
@@ -20,6 +21,7 @@ func Run() (*components.Components, error) {
 	create_participant.Register(components)
 	create_environment.Register(components)
 	publish_contract.Register(components)
+	validate_contract.Register(components)
 	can_i_deploy.Register(components)
 	record_deployment.Register(components)
 	rename_participant.Register(components)

@@ -73,10 +73,7 @@ func (this *CanIDeployHandler) Handle(ctx fiber.Ctx) error {
 		counterparts,
 	)
 
-	deployable := true
-	for _, result := range compatibilityReport.Results {
-		deployable = deployable && result.Deployable
-	}
+	deployable := compatibilityReport.Deployable()
 
 	this.recordCheck(ctx.Context(), contract, environment, deployable, compatibilityReport)
 

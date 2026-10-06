@@ -13,10 +13,11 @@ import (
 )
 
 const (
-	petstoreWeb  = "petstore_web"
-	petstoreAPI  = "petstore_api"
-	production   = "production"
-	postPetsHash = "post-pets"
+	petstoreWeb    = "petstore_web"
+	petstoreMobile = "petstore_mobile"
+	petstoreAPI    = "petstore_api"
+	production     = "production"
+	postPetsHash   = "post-pets"
 )
 
 type noStoredVerdicts struct{}
@@ -278,4 +279,37 @@ func TestCachedBreaksOfAnInteractionAreSortedByProperty(t *testing.T) {
 	require.Len(t, leaves, 2)
 	assert.Equal(t, "$.photoUrl", leaves[0].Details["property"])
 	assert.Equal(t, "$.weight", leaves[1].Details["property"])
+}
+
+func TestReportIsDeployableOnlyWhenEveryResultIs(t *testing.T) {
+	t.Run("without results", func(t *testing.T) {
+		report := compatibility_checker.NewContractCompatibilityReport(petstoreAPI, "4.0.0", production)
+
+		assert.True(t, report.Deployable())
+	})
+
+	t.Run("with every result deployable", func(t *testing.T) {
+		report := compatibility_checker.NewContractCompatibilityReport(petstoreAPI, "4.0.0", production)
+		report.AppendResult(petstoreWeb, compatibility_checker.NewIncompatibleItem())
+		report.AppendResult(petstoreMobile, compatibility_checker.NewIncompatibleItem())
+
+		assert.True(t, report.Deployable())
+	})
+
+	t.Run("with one result not deployable", func(t *testing.T) {
+		broken := compatibility_checker.NewIncompatibleItem()
+		broken.AppendCachedBreakChange(model.VerdictBreak{
+			Endpoint:    "/pets",
+			Method:      "post",
+			Interaction: "201",
+			Reason:      string(compatibility_checker.ReasonPropertyMissingInProvider),
+			Details:     map[string]string{"property": "$.name", "consumerName": petstoreMobile, "providerName": petstoreAPI},
+		})
+
+		report := compatibility_checker.NewContractCompatibilityReport(petstoreAPI, "4.0.0", production)
+		report.AppendResult(petstoreWeb, compatibility_checker.NewIncompatibleItem())
+		report.AppendResult(petstoreMobile, broken)
+
+		assert.False(t, report.Deployable())
+	})
 }

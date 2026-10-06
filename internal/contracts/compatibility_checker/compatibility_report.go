@@ -174,6 +174,16 @@ func (r *ContractCompatibilityReport) AppendResult(dependency string, result *In
 	r.Results[dependency] = existing
 }
 
+func (this *ContractCompatibilityReport) Deployable() bool {
+	for _, result := range this.Results {
+		if !result.Deployable {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (h *Hierarchical) appendBreak(
 	endpoint, method, interaction string,
 	breakChange ContractBreakingChange,
