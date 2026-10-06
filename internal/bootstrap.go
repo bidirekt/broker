@@ -6,6 +6,8 @@ import (
 	"github.com/bidirekt/broker/internal/features/create_environment"
 	"github.com/bidirekt/broker/internal/features/create_participant"
 	"github.com/bidirekt/broker/internal/features/health"
+	"github.com/bidirekt/broker/internal/features/list_environments"
+	"github.com/bidirekt/broker/internal/features/list_participants"
 	"github.com/bidirekt/broker/internal/features/publish_contract"
 	"github.com/bidirekt/broker/internal/features/record_deployment"
 	"github.com/bidirekt/broker/internal/features/rename_participant"
@@ -26,6 +28,8 @@ func Run() (*components.Components, error) {
 	record_deployment.Register(components)
 	rename_participant.Register(components)
 	health.Register(components)
+	list_participants.Register(components)
+	list_environments.Register(components)
 
 	return components, nil
 }

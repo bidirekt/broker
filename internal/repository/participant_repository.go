@@ -48,6 +48,15 @@ const (
 			name = $1
 		RETURNING id
 	`
+
+	listParticipantNamesQuery = `
+		SELECT
+			name
+		FROM
+			participants
+		ORDER BY
+			name COLLATE "C"
+	`
 )
 
 type ParticipantRepository struct {
@@ -101,4 +110,18 @@ func (r *ParticipantRepository) Rename(ctx context.Context, oldName, newName str
 	}
 
 	return true, false
+}
+
+func (this *ParticipantRepository) ListNames(ctx context.Context) []string {
+	rows, err := this.pool.Query(ctx, listParticipantNamesQuery)
+	if err != nil {
+		panic(fmt.Errorf("error listing participant names: %w", err))
+	}
+
+	names, err := pgx.AppendRows(make([]string, 0), rows, pgx.RowTo[string])
+	if err != nil {
+		panic(fmt.Errorf("error listing participant names: %w", err))
+	}
+
+	return names
 }
