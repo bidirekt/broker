@@ -94,63 +94,63 @@ const memoizationFabricatedBreaks = `
    "details": { "property": "$.fabricated", "consumerName": "cart",
                 "providerName": "orders", "propertyType": "boolean" } }]`
 
-func (s *IntegrationSuite) mustPostForMemoization(path, body string) {
-	status, response := s.post(path, body)
-	s.Require().Equalf(http.StatusOK, status, "POST %s: %s", path, response)
+func (this *IntegrationSuite) mustPostForMemoization(path, body string) {
+	status, response := this.post(path, body)
+	this.Require().Equalf(http.StatusOK, status, "POST %s: %s", path, response)
 }
 
-func (s *IntegrationSuite) canIDeployForMemoization(participant, version string) (string, memoizationResponse) {
-	status, body := s.post("/api/can-i-deploy",
+func (this *IntegrationSuite) canIDeployForMemoization(participant, version string) (string, memoizationResponse) {
+	status, body := this.post("/api/can-i-deploy",
 		`{"participant":"`+participant+`","version":"`+version+`","environment":"production"}`)
-	s.Require().Equalf(http.StatusOK, status, "can-i-deploy %s@%s: %s", participant, version, body)
+	this.Require().Equalf(http.StatusOK, status, "can-i-deploy %s@%s: %s", participant, version, body)
 
 	var parsed memoizationResponse
-	s.Require().NoError(json.Unmarshal([]byte(body), &parsed))
+	this.Require().NoError(json.Unmarshal([]byte(body), &parsed))
 
 	return body, parsed
 }
 
-func (s *IntegrationSuite) storedVerdictBreaksForMemoization() string {
+func (this *IntegrationSuite) storedVerdictBreaksForMemoization() string {
 	var breaks string
-	s.Require().NoError(s.Pool.QueryRow(context.Background(),
+	this.Require().NoError(this.Pool.QueryRow(context.Background(),
 		`SELECT breaks::text FROM compatibility_verdicts`).Scan(&breaks))
 	return breaks
 }
 
-func (s *IntegrationSuite) storedVerdictForMemoization() []memoizationStoredBreak {
+func (this *IntegrationSuite) storedVerdictForMemoization() []memoizationStoredBreak {
 	var breaks []byte
-	s.Require().NoError(s.Pool.QueryRow(context.Background(),
+	this.Require().NoError(this.Pool.QueryRow(context.Background(),
 		`SELECT breaks FROM compatibility_verdicts`).Scan(&breaks))
 
 	var stored []memoizationStoredBreak
-	s.Require().NoError(json.Unmarshal(breaks, &stored))
+	this.Require().NoError(json.Unmarshal(breaks, &stored))
 
 	return stored
 }
 
-func (s *IntegrationSuite) rewriteStoredVerdictForMemoization(breaks string) {
-	_, err := s.Pool.Exec(context.Background(),
+func (this *IntegrationSuite) rewriteStoredVerdictForMemoization(breaks string) {
+	_, err := this.Pool.Exec(context.Background(),
 		`UPDATE compatibility_verdicts SET breaks = $1`, breaks)
-	s.Require().NoError(err)
+	this.Require().NoError(err)
 }
 
 // The pair is deployed on both sides, so either participant can be the one checking — and both
 // directions have to land on the single canonical verdict row.
-func (s *IntegrationSuite) TestMemoization_IdenticalChecksReplayTheStoredVerdict() {
-	s.mustPostForMemoization("/api/participants", `{"participant":"orders"}`)
-	s.mustPostForMemoization("/api/participants", `{"participant":"cart"}`)
-	s.mustPostForMemoization("/api/environments", `{"environment":"production"}`)
-	s.mustPostForMemoization("/api/contracts",
-		s.publishBody("orders", "v1", contractFragment{"api.yaml", memoizationOrdersProviderContract}))
-	s.mustPostForMemoization("/api/deployments",
+func (this *IntegrationSuite) TestMemoization_IdenticalChecksReplayTheStoredVerdict() {
+	this.mustPostForMemoization("/api/participants", `{"participant":"orders"}`)
+	this.mustPostForMemoization("/api/participants", `{"participant":"cart"}`)
+	this.mustPostForMemoization("/api/environments", `{"environment":"production"}`)
+	this.mustPostForMemoization("/api/contracts",
+		this.publishBody("orders", "v1", contractFragment{"api.yaml", memoizationOrdersProviderContract}))
+	this.mustPostForMemoization("/api/deployments",
 		`{"participant":"orders","version":"v1","environment":"production"}`)
-	s.mustPostForMemoization("/api/contracts",
-		s.publishBody("cart", "v1", contractFragment{"api.yaml", memoizationOrdersConsumerContract}))
-	s.mustPostForMemoization("/api/deployments",
+	this.mustPostForMemoization("/api/contracts",
+		this.publishBody("cart", "v1", contractFragment{"api.yaml", memoizationOrdersConsumerContract}))
+	this.mustPostForMemoization("/api/deployments",
 		`{"participant":"cart","version":"v1","environment":"production"}`)
 
-	firstBody, first := s.canIDeployForMemoization("cart", "v1")
-	s.False(first.Deployable)
+	firstBody, first := this.canIDeployForMemoization("cart", "v1")
+	this.False(first.Deployable)
 
 	expectedBreak := memoizationBreak{
 		Reason: "property_missing_in_provider",
@@ -162,27 +162,27 @@ func (s *IntegrationSuite) TestMemoization_IdenticalChecksReplayTheStoredVerdict
 			"propertyType": "integer",
 		},
 	}
-	s.Equal([]memoizationBreak{expectedBreak},
+	this.Equal([]memoizationBreak{expectedBreak},
 		first.Results["orders"].Endpoints["/orders"]["get"]["200"])
 
-	s.Equal(1, s.countRows("compatibility_checks"))
-	s.Equal(1, s.countRows("compatibility_check_results"))
-	s.Equal(1, s.countRows("compatibility_verdicts"))
+	this.Equal(1, this.countRows("compatibility_checks"))
+	this.Equal(1, this.countRows("compatibility_check_results"))
+	this.Equal(1, this.countRows("compatibility_verdicts"))
 
-	secondBody, _ := s.canIDeployForMemoization("cart", "v1")
-	s.Equal(firstBody, secondBody)
+	secondBody, _ := this.canIDeployForMemoization("cart", "v1")
+	this.Equal(firstBody, secondBody)
 
-	s.Equal(2, s.countRows("compatibility_checks"))
-	s.Equal(2, s.countRows("compatibility_check_results"))
-	s.Equal(1, s.countRows("compatibility_verdicts"))
+	this.Equal(2, this.countRows("compatibility_checks"))
+	this.Equal(2, this.countRows("compatibility_check_results"))
+	this.Equal(1, this.countRows("compatibility_verdicts"))
 
 	// Rewriting the fact to something the live diff cannot produce shows the reversed direction
 	// resolves to the very same canonical row instead of recomputing its own answer.
-	s.rewriteStoredVerdictForMemoization(memoizationFabricatedBreaks)
+	this.rewriteStoredVerdictForMemoization(memoizationFabricatedBreaks)
 
-	_, fromTheOtherSide := s.canIDeployForMemoization("orders", "v1")
-	s.False(fromTheOtherSide.Deployable)
-	s.Equal([]memoizationBreak{{
+	_, fromTheOtherSide := this.canIDeployForMemoization("orders", "v1")
+	this.False(fromTheOtherSide.Deployable)
+	this.Equal([]memoizationBreak{{
 		Reason: "property_missing_in_consumer",
 		Role:   "provider",
 		Details: map[string]string{
@@ -193,72 +193,72 @@ func (s *IntegrationSuite) TestMemoization_IdenticalChecksReplayTheStoredVerdict
 		},
 	}}, fromTheOtherSide.Results["cart"].Endpoints["/orders"]["get"]["200"])
 
-	s.Equal(3, s.countRows("compatibility_checks"))
-	s.Equal(3, s.countRows("compatibility_check_results"))
-	s.Equal(1, s.countRows("compatibility_verdicts"))
+	this.Equal(3, this.countRows("compatibility_checks"))
+	this.Equal(3, this.countRows("compatibility_check_results"))
+	this.Equal(1, this.countRows("compatibility_verdicts"))
 
 	var contractIDOne, contractIDTwo int64
-	s.Require().NoError(s.Pool.QueryRow(context.Background(),
+	this.Require().NoError(this.Pool.QueryRow(context.Background(),
 		`SELECT contract_id_one, contract_id_two FROM compatibility_verdicts`).
 		Scan(&contractIDOne, &contractIDTwo))
-	s.Less(contractIDOne, contractIDTwo)
+	this.Less(contractIDOne, contractIDTwo)
 
 	var pairedResults int
-	s.Require().NoError(s.Pool.QueryRow(context.Background(),
+	this.Require().NoError(this.Pool.QueryRow(context.Background(),
 		`SELECT count(*) FROM compatibility_check_results
 		  WHERE verdict_contract_id_one = $1 AND verdict_contract_id_two = $2`,
 		contractIDOne, contractIDTwo).Scan(&pairedResults))
-	s.Equal(3, pairedResults)
+	this.Equal(3, pairedResults)
 }
 
 // Republishing the same content under another version name is an alias: same snapshot, same
 // pair, so the stored verdict answers for it.
-func (s *IntegrationSuite) TestMemoization_AliasedVersionHitsTheStoredVerdict() {
-	s.mustPostForMemoization("/api/participants", `{"participant":"orders"}`)
-	s.mustPostForMemoization("/api/participants", `{"participant":"cart"}`)
-	s.mustPostForMemoization("/api/environments", `{"environment":"production"}`)
-	s.mustPostForMemoization("/api/contracts",
-		s.publishBody("orders", "v1", contractFragment{"api.yaml", memoizationOrdersProviderContract}))
-	s.mustPostForMemoization("/api/deployments",
+func (this *IntegrationSuite) TestMemoization_AliasedVersionHitsTheStoredVerdict() {
+	this.mustPostForMemoization("/api/participants", `{"participant":"orders"}`)
+	this.mustPostForMemoization("/api/participants", `{"participant":"cart"}`)
+	this.mustPostForMemoization("/api/environments", `{"environment":"production"}`)
+	this.mustPostForMemoization("/api/contracts",
+		this.publishBody("orders", "v1", contractFragment{"api.yaml", memoizationOrdersProviderContract}))
+	this.mustPostForMemoization("/api/deployments",
 		`{"participant":"orders","version":"v1","environment":"production"}`)
-	s.mustPostForMemoization("/api/contracts",
-		s.publishBody("cart", "v1", contractFragment{"api.yaml", memoizationOrdersConsumerContract}))
+	this.mustPostForMemoization("/api/contracts",
+		this.publishBody("cart", "v1", contractFragment{"api.yaml", memoizationOrdersConsumerContract}))
 
-	_, first := s.canIDeployForMemoization("cart", "v1")
-	s.False(first.Deployable)
-	s.Equal(1, s.countRows("compatibility_verdicts"))
+	_, first := this.canIDeployForMemoization("cart", "v1")
+	this.False(first.Deployable)
+	this.Equal(1, this.countRows("compatibility_verdicts"))
 
-	s.mustPostForMemoization("/api/contracts",
-		s.publishBody("cart", "a1b2c3d", contractFragment{"api.yaml", memoizationOrdersConsumerContract}))
+	this.mustPostForMemoization("/api/contracts",
+		this.publishBody("cart", "a1b2c3d", contractFragment{"api.yaml", memoizationOrdersConsumerContract}))
 
-	_, aliased := s.canIDeployForMemoization("cart", "a1b2c3d")
+	_, aliased := this.canIDeployForMemoization("cart", "a1b2c3d")
 
-	s.Equal(first.Results, aliased.Results)
-	s.Equal(first.Deployable, aliased.Deployable)
+	this.Equal(first.Results, aliased.Results)
+	this.Equal(first.Deployable, aliased.Deployable)
 
-	s.Equal(2, s.countRows("compatibility_checks"))
-	s.Equal(2, s.countRows("compatibility_check_results"))
-	s.Equal(1, s.countRows("compatibility_verdicts"))
+	this.Equal(2, this.countRows("compatibility_checks"))
+	this.Equal(2, this.countRows("compatibility_check_results"))
+	this.Equal(1, this.countRows("compatibility_verdicts"))
 }
 
 // A cached pair does not silence the environment checks: not_found and not_deployed depend on
 // deployments, never on the verdict, so they are evaluated live on every call.
-func (s *IntegrationSuite) TestMemoization_CachedVerdictKeepsLiveEnvironmentBreaks() {
-	s.mustPostForMemoization("/api/participants", `{"participant":"orders"}`)
-	s.mustPostForMemoization("/api/participants", `{"participant":"billing"}`)
-	s.mustPostForMemoization("/api/participants", `{"participant":"cart"}`)
-	s.mustPostForMemoization("/api/environments", `{"environment":"production"}`)
-	s.mustPostForMemoization("/api/contracts",
-		s.publishBody("orders", "v1", contractFragment{"api.yaml", memoizationOrdersProviderContract}))
-	s.mustPostForMemoization("/api/deployments",
+func (this *IntegrationSuite) TestMemoization_CachedVerdictKeepsLiveEnvironmentBreaks() {
+	this.mustPostForMemoization("/api/participants", `{"participant":"orders"}`)
+	this.mustPostForMemoization("/api/participants", `{"participant":"billing"}`)
+	this.mustPostForMemoization("/api/participants", `{"participant":"cart"}`)
+	this.mustPostForMemoization("/api/environments", `{"environment":"production"}`)
+	this.mustPostForMemoization("/api/contracts",
+		this.publishBody("orders", "v1", contractFragment{"api.yaml", memoizationOrdersProviderContract}))
+	this.mustPostForMemoization("/api/deployments",
 		`{"participant":"orders","version":"v1","environment":"production"}`)
-	s.mustPostForMemoization("/api/contracts",
-		s.publishBody("billing", "v1", contractFragment{"api.yaml", memoizationBillingProviderContract}))
-	s.mustPostForMemoization("/api/contracts",
-		s.publishBody("cart", "v1", contractFragment{"api.yaml", memoizationMixedConsumerContract}))
+	this.mustPostForMemoization("/api/contracts",
+		this.publishBody("billing", "v1", contractFragment{"api.yaml", memoizationBillingProviderContract}))
+	this.mustPostForMemoization("/api/contracts",
+		this.publishBody("cart", "v1", contractFragment{"api.yaml", memoizationMixedConsumerContract}))
 
-	firstBody, first := s.canIDeployForMemoization("cart", "v1")
-	s.False(first.Deployable)
+	firstBody, first := this.canIDeployForMemoization("cart", "v1")
+	this.False(first.Deployable)
 
 	expectedBreak := memoizationBreak{
 		Reason: "property_missing_in_provider",
@@ -270,63 +270,63 @@ func (s *IntegrationSuite) TestMemoization_CachedVerdictKeepsLiveEnvironmentBrea
 			"propertyType": "integer",
 		},
 	}
-	s.Equal([]memoizationBreak{expectedBreak},
+	this.Equal([]memoizationBreak{expectedBreak},
 		first.Results["orders"].Endpoints["/orders"]["get"]["200"])
-	s.Equal("provider_resource_not_found",
+	this.Equal("provider_resource_not_found",
 		first.Results["orders"].Endpoints["/ghosts"]["get"]["200"][0].Reason)
-	s.Equal("provider_resource_not_deployed_in_environment",
+	this.Equal("provider_resource_not_deployed_in_environment",
 		first.Results["billing"].Endpoints["/invoices"]["get"]["200"][0].Reason)
 
-	s.Equal(1, s.countRows("compatibility_verdicts"))
-	s.Equal([]memoizationStoredBreak{{
+	this.Equal(1, this.countRows("compatibility_verdicts"))
+	this.Equal([]memoizationStoredBreak{{
 		Endpoint:    "/orders",
 		Method:      "get",
 		Interaction: "200",
 		Reason:      "property_missing_in_provider",
 		Details:     expectedBreak.Details,
-	}}, s.storedVerdictForMemoization())
+	}}, this.storedVerdictForMemoization())
 
-	secondBody, second := s.canIDeployForMemoization("cart", "v1")
-	s.Equal(firstBody, secondBody)
-	s.Equal([]memoizationBreak{expectedBreak},
+	secondBody, second := this.canIDeployForMemoization("cart", "v1")
+	this.Equal(firstBody, secondBody)
+	this.Equal([]memoizationBreak{expectedBreak},
 		second.Results["orders"].Endpoints["/orders"]["get"]["200"])
 
-	s.Equal(2, s.countRows("compatibility_checks"))
-	s.Equal(4, s.countRows("compatibility_check_results"))
-	s.Equal(1, s.countRows("compatibility_verdicts"))
+	this.Equal(2, this.countRows("compatibility_checks"))
+	this.Equal(4, this.countRows("compatibility_check_results"))
+	this.Equal(1, this.countRows("compatibility_verdicts"))
 
 	var pairedResults int
-	s.Require().NoError(s.Pool.QueryRow(context.Background(),
+	this.Require().NoError(this.Pool.QueryRow(context.Background(),
 		`SELECT count(*) FROM compatibility_check_results
 		  WHERE verdict_contract_id_one IS NOT NULL`).Scan(&pairedResults))
-	s.Equal(2, pairedResults)
+	this.Equal(2, pairedResults)
 }
 
 // The stored verdict is rewritten to something the live diff would never produce: whatever the
 // response carries afterwards can only have come from storage, not from checkResources.
-func (s *IntegrationSuite) TestMemoization_HitOnACompatiblePairSkipsTheDiff() {
-	s.mustPostForMemoization("/api/participants", `{"participant":"orders"}`)
-	s.mustPostForMemoization("/api/participants", `{"participant":"cart"}`)
-	s.mustPostForMemoization("/api/environments", `{"environment":"production"}`)
-	s.mustPostForMemoization("/api/contracts",
-		s.publishBody("orders", "v1", contractFragment{"api.yaml", memoizationOrdersProviderContract}))
-	s.mustPostForMemoization("/api/deployments",
+func (this *IntegrationSuite) TestMemoization_HitOnACompatiblePairSkipsTheDiff() {
+	this.mustPostForMemoization("/api/participants", `{"participant":"orders"}`)
+	this.mustPostForMemoization("/api/participants", `{"participant":"cart"}`)
+	this.mustPostForMemoization("/api/environments", `{"environment":"production"}`)
+	this.mustPostForMemoization("/api/contracts",
+		this.publishBody("orders", "v1", contractFragment{"api.yaml", memoizationOrdersProviderContract}))
+	this.mustPostForMemoization("/api/deployments",
 		`{"participant":"orders","version":"v1","environment":"production"}`)
-	s.mustPostForMemoization("/api/contracts",
-		s.publishBody("cart", "v1", contractFragment{"api.yaml", memoizationCompatibleConsumerContract}))
+	this.mustPostForMemoization("/api/contracts",
+		this.publishBody("cart", "v1", contractFragment{"api.yaml", memoizationCompatibleConsumerContract}))
 
-	_, first := s.canIDeployForMemoization("cart", "v1")
-	s.True(first.Deployable)
-	s.Empty(first.Results["orders"].Endpoints)
+	_, first := this.canIDeployForMemoization("cart", "v1")
+	this.True(first.Deployable)
+	this.Empty(first.Results["orders"].Endpoints)
 
-	s.Equal(1, s.countRows("compatibility_verdicts"))
-	s.Equal("[]", s.storedVerdictBreaksForMemoization())
+	this.Equal(1, this.countRows("compatibility_verdicts"))
+	this.Equal("[]", this.storedVerdictBreaksForMemoization())
 
-	s.rewriteStoredVerdictForMemoization(memoizationFabricatedBreaks)
+	this.rewriteStoredVerdictForMemoization(memoizationFabricatedBreaks)
 
-	_, second := s.canIDeployForMemoization("cart", "v1")
-	s.False(second.Deployable)
-	s.Equal([]memoizationBreak{{
+	_, second := this.canIDeployForMemoization("cart", "v1")
+	this.False(second.Deployable)
+	this.Equal([]memoizationBreak{{
 		Reason: "property_missing_in_consumer",
 		Role:   "consumer",
 		Details: map[string]string{
@@ -336,39 +336,39 @@ func (s *IntegrationSuite) TestMemoization_HitOnACompatiblePairSkipsTheDiff() {
 			"propertyType": "boolean",
 		},
 	}}, second.Results["orders"].Endpoints["/orders"]["get"]["200"])
-	s.False(second.Results["orders"].Deployable)
-	s.Require().NotNil(second.Results["orders"].ParticipantVersion)
-	s.Equal("v1", *second.Results["orders"].ParticipantVersion)
+	this.False(second.Results["orders"].Deployable)
+	this.Require().NotNil(second.Results["orders"].ParticipantVersion)
+	this.Equal("v1", *second.Results["orders"].ParticipantVersion)
 
-	s.Equal(1, s.countRows("compatibility_verdicts"))
+	this.Equal(1, this.countRows("compatibility_verdicts"))
 
 	var deployable bool
-	s.Require().NoError(s.Pool.QueryRow(context.Background(),
+	this.Require().NoError(this.Pool.QueryRow(context.Background(),
 		`SELECT deployable FROM compatibility_checks ORDER BY id DESC LIMIT 1`).Scan(&deployable))
-	s.False(deployable)
+	this.False(deployable)
 }
 
-func (s *IntegrationSuite) TestMemoization_HitOnAnIncompatiblePairSkipsTheDiff() {
-	s.mustPostForMemoization("/api/participants", `{"participant":"orders"}`)
-	s.mustPostForMemoization("/api/participants", `{"participant":"cart"}`)
-	s.mustPostForMemoization("/api/environments", `{"environment":"production"}`)
-	s.mustPostForMemoization("/api/contracts",
-		s.publishBody("orders", "v1", contractFragment{"api.yaml", memoizationOrdersProviderContract}))
-	s.mustPostForMemoization("/api/deployments",
+func (this *IntegrationSuite) TestMemoization_HitOnAnIncompatiblePairSkipsTheDiff() {
+	this.mustPostForMemoization("/api/participants", `{"participant":"orders"}`)
+	this.mustPostForMemoization("/api/participants", `{"participant":"cart"}`)
+	this.mustPostForMemoization("/api/environments", `{"environment":"production"}`)
+	this.mustPostForMemoization("/api/contracts",
+		this.publishBody("orders", "v1", contractFragment{"api.yaml", memoizationOrdersProviderContract}))
+	this.mustPostForMemoization("/api/deployments",
 		`{"participant":"orders","version":"v1","environment":"production"}`)
-	s.mustPostForMemoization("/api/contracts",
-		s.publishBody("cart", "v1", contractFragment{"api.yaml", memoizationOrdersConsumerContract}))
+	this.mustPostForMemoization("/api/contracts",
+		this.publishBody("cart", "v1", contractFragment{"api.yaml", memoizationOrdersConsumerContract}))
 
-	_, first := s.canIDeployForMemoization("cart", "v1")
-	s.False(first.Deployable)
-	s.Equal(1, s.countRows("compatibility_verdicts"))
+	_, first := this.canIDeployForMemoization("cart", "v1")
+	this.False(first.Deployable)
+	this.Equal(1, this.countRows("compatibility_verdicts"))
 
-	s.rewriteStoredVerdictForMemoization(`[]`)
+	this.rewriteStoredVerdictForMemoization(`[]`)
 
-	_, second := s.canIDeployForMemoization("cart", "v1")
-	s.True(second.Deployable)
-	s.True(second.Results["orders"].Deployable)
-	s.Empty(second.Results["orders"].Endpoints)
+	_, second := this.canIDeployForMemoization("cart", "v1")
+	this.True(second.Deployable)
+	this.True(second.Results["orders"].Deployable)
+	this.Empty(second.Results["orders"].Endpoints)
 
-	s.Equal(1, s.countRows("compatibility_verdicts"))
+	this.Equal(1, this.countRows("compatibility_verdicts"))
 }

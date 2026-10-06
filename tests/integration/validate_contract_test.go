@@ -141,12 +141,12 @@ const validateUnresolvedSchemaYAML = `provides:
           200: Missing
 `
 
-func (s *IntegrationSuite) mustPostForValidate(path, body string) {
-	status, response := s.post(path, body)
-	s.Require().Equalf(http.StatusOK, status, "POST %s: %s", path, response)
+func (this *IntegrationSuite) mustPostForValidate(path, body string) {
+	status, response := this.post(path, body)
+	this.Require().Equalf(http.StatusOK, status, "POST %s: %s", path, response)
 }
 
-func (s *IntegrationSuite) validateBody(participant, environment string, files ...validateFile) string {
+func (this *IntegrationSuite) validateBody(participant, environment string, files ...validateFile) string {
 	body, err := json.Marshal(struct {
 		Participant string         `json:"participant"`
 		Environment string         `json:"environment"`
@@ -156,112 +156,112 @@ func (s *IntegrationSuite) validateBody(participant, environment string, files .
 		Environment: environment,
 		Contracts:   files,
 	})
-	s.Require().NoError(err)
+	this.Require().NoError(err)
 
 	return string(body)
 }
 
-func (s *IntegrationSuite) validateOK(participant string, files ...validateFile) (validateResponseJSON, string) {
-	status, body := s.post("/api/contracts/validate", s.validateBody(participant, "production", files...))
-	s.Require().Equalf(http.StatusOK, status, "validate %s: %s", participant, body)
+func (this *IntegrationSuite) validateOK(participant string, files ...validateFile) (validateResponseJSON, string) {
+	status, body := this.post("/api/contracts/validate", this.validateBody(participant, "production", files...))
+	this.Require().Equalf(http.StatusOK, status, "validate %s: %s", participant, body)
 
 	var response validateResponseJSON
-	s.Require().NoError(json.Unmarshal([]byte(body), &response))
-	s.Equal("contract validated successfully", response.Message)
-	s.Equal(participant, response.Participant)
-	s.Equal("production", response.Environment)
+	this.Require().NoError(json.Unmarshal([]byte(body), &response))
+	this.Equal("contract validated successfully", response.Message)
+	this.Equal(participant, response.Participant)
+	this.Equal("production", response.Environment)
 
 	return response, body
 }
 
-func (s *IntegrationSuite) publishAndDeployForValidate(participant, version, content string) {
-	s.mustPostForValidate("/api/contracts", s.publishBody(participant, version, contractFragment{"api.yaml", content}))
-	s.mustPostForValidate("/api/deployments",
+func (this *IntegrationSuite) publishAndDeployForValidate(participant, version, content string) {
+	this.mustPostForValidate("/api/contracts", this.publishBody(participant, version, contractFragment{"api.yaml", content}))
+	this.mustPostForValidate("/api/deployments",
 		`{"participant":"`+participant+`","version":"`+version+`","environment":"production"}`)
 }
 
-func (s *IntegrationSuite) setupForValidate(participants ...string) {
-	s.mustPostForValidate("/api/environments", `{"environment":"production"}`)
+func (this *IntegrationSuite) setupForValidate(participants ...string) {
+	this.mustPostForValidate("/api/environments", `{"environment":"production"}`)
 	for _, participant := range participants {
-		s.mustPostForValidate("/api/participants", `{"participant":"`+participant+`"}`)
+		this.mustPostForValidate("/api/participants", `{"participant":"`+participant+`"}`)
 	}
 }
 
-func (s *IntegrationSuite) rowCountsForValidate() map[string]int {
+func (this *IntegrationSuite) rowCountsForValidate() map[string]int {
 	counts := make(map[string]int, len(validateTables))
 	for _, table := range validateTables {
-		counts[table] = s.countRows(table)
+		counts[table] = this.countRows(table)
 	}
 
 	return counts
 }
 
-func (s *IntegrationSuite) TestValidateContract_InvalidInput() {
-	s.setupForValidate("catalog")
+func (this *IntegrationSuite) TestValidateContract_InvalidInput() {
+	this.setupForValidate("catalog")
 
 	file := validateFile{"api.yaml", validateCatalogStockYAML}
 	cases := map[string]string{
 		"unparseable body":    `{"participant":`,
-		"empty participant":   s.validateBody(" ", "production", file),
-		"empty environment":   s.validateBody("catalog", "", file),
-		"empty contracts":     s.validateBody("catalog", "production"),
-		"blank source":        s.validateBody("catalog", "production", validateFile{"  ", validateCatalogStockYAML}),
-		"blank unknown names": s.validateBody("ghost", "nowhere", validateFile{"", ""}, validateFile{"notes.txt", "x"}),
+		"empty participant":   this.validateBody(" ", "production", file),
+		"empty environment":   this.validateBody("catalog", "", file),
+		"empty contracts":     this.validateBody("catalog", "production"),
+		"blank source":        this.validateBody("catalog", "production", validateFile{"  ", validateCatalogStockYAML}),
+		"blank unknown names": this.validateBody("ghost", "nowhere", validateFile{"", ""}, validateFile{"notes.txt", "x"}),
 	}
 
 	for name, body := range cases {
-		status, response := s.post("/api/contracts/validate", body)
-		s.Equal(http.StatusBadRequest, status, name)
-		s.JSONEq(`{"message":"contract invalid input"}`, response, name)
+		status, response := this.post("/api/contracts/validate", body)
+		this.Equal(http.StatusBadRequest, status, name)
+		this.JSONEq(`{"message":"contract invalid input"}`, response, name)
 	}
 }
 
-func (s *IntegrationSuite) TestValidateContract_DecodeErrorComesBeforeParticipantNotFound() {
-	status, body := s.post("/api/contracts/validate",
-		s.validateBody("ghost", "nowhere", validateFile{"notes.txt", validateCatalogStockYAML}))
-	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"unsupported contract file: notes.txt (expected .yaml or .yml)"}`, body)
+func (this *IntegrationSuite) TestValidateContract_DecodeErrorComesBeforeParticipantNotFound() {
+	status, body := this.post("/api/contracts/validate",
+		this.validateBody("ghost", "nowhere", validateFile{"notes.txt", validateCatalogStockYAML}))
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(`{"message":"unsupported contract file: notes.txt (expected .yaml or .yml)"}`, body)
 
-	status, body = s.post("/api/contracts/validate",
-		s.validateBody("ghost", "nowhere", validateFile{"broken.yaml", "provides: {"}))
-	s.Equal(http.StatusBadRequest, status)
-	s.Contains(body, `"message":"malformed contract file: broken.yaml:`)
+	status, body = this.post("/api/contracts/validate",
+		this.validateBody("ghost", "nowhere", validateFile{"broken.yaml", "provides: {"}))
+	this.Equal(http.StatusBadRequest, status)
+	this.Contains(body, `"message":"malformed contract file: broken.yaml:`)
 }
 
-func (s *IntegrationSuite) TestValidateContract_ShapeViolationComesBeforeParticipantNotFound() {
-	status, body := s.post("/api/contracts/validate",
-		s.validateBody("ghost", "nowhere", validateFile{"api.yaml", validateUnknownKeyYAML}))
+func (this *IntegrationSuite) TestValidateContract_ShapeViolationComesBeforeParticipantNotFound() {
+	status, body := this.post("/api/contracts/validate",
+		this.validateBody("ghost", "nowhere", validateFile{"api.yaml", validateUnknownKeyYAML}))
 
-	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"contract validation failed","violations":[`+
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(`{"message":"contract validation failed","violations":[`+
 		`{"code":"key.unknown","path":"provides;message","source":"api.yaml","details":{"key":"message"}}`+
 		`]}`, body)
 }
 
-func (s *IntegrationSuite) TestValidateContract_ParticipantNotFoundComesBeforeEnvironmentNotFound() {
-	status, body := s.post("/api/contracts/validate",
-		s.validateBody("ghost", "nowhere", validateFile{"api.yaml", validateUnresolvedSchemaYAML}))
+func (this *IntegrationSuite) TestValidateContract_ParticipantNotFoundComesBeforeEnvironmentNotFound() {
+	status, body := this.post("/api/contracts/validate",
+		this.validateBody("ghost", "nowhere", validateFile{"api.yaml", validateUnresolvedSchemaYAML}))
 
-	s.Equal(http.StatusNotFound, status)
-	s.JSONEq(`{"message":"participant not found"}`, body)
+	this.Equal(http.StatusNotFound, status)
+	this.JSONEq(`{"message":"participant not found"}`, body)
 }
 
-func (s *IntegrationSuite) TestValidateContract_EnvironmentNotFoundComesBeforeRuleViolation() {
-	s.setupForValidate("catalog")
+func (this *IntegrationSuite) TestValidateContract_EnvironmentNotFoundComesBeforeRuleViolation() {
+	this.setupForValidate("catalog")
 
-	status, body := s.post("/api/contracts/validate",
-		s.validateBody("catalog", "nowhere", validateFile{"api.yaml", validateUnresolvedSchemaYAML}))
+	status, body := this.post("/api/contracts/validate",
+		this.validateBody("catalog", "nowhere", validateFile{"api.yaml", validateUnresolvedSchemaYAML}))
 
-	s.Equal(http.StatusNotFound, status)
-	s.JSONEq(`{"message":"environment not found"}`, body)
+	this.Equal(http.StatusNotFound, status)
+	this.JSONEq(`{"message":"environment not found"}`, body)
 }
 
-func (s *IntegrationSuite) TestValidateContract_RuleViolation() {
-	s.setupForValidate("catalog")
+func (this *IntegrationSuite) TestValidateContract_RuleViolation() {
+	this.setupForValidate("catalog")
 
-	status, body := s.post("/api/contracts/validate",
-		s.validateBody(" catalog ", " production ", validateFile{"api.yaml", validateUnresolvedSchemaYAML}))
-	s.Equal(http.StatusBadRequest, status)
+	status, body := this.post("/api/contracts/validate",
+		this.validateBody(" catalog ", " production ", validateFile{"api.yaml", validateUnresolvedSchemaYAML}))
+	this.Equal(http.StatusBadRequest, status)
 
 	var response struct {
 		Message    string `json:"message"`
@@ -270,216 +270,216 @@ func (s *IntegrationSuite) TestValidateContract_RuleViolation() {
 			Source string `json:"source"`
 		} `json:"violations"`
 	}
-	s.Require().NoError(json.Unmarshal([]byte(body), &response))
-	s.Equal("contract validation failed", response.Message)
-	s.Require().Len(response.Violations, 1)
-	s.Equal("schema.unresolved_name", response.Violations[0].Code)
-	s.Equal("api.yaml", response.Violations[0].Source)
+	this.Require().NoError(json.Unmarshal([]byte(body), &response))
+	this.Equal("contract validation failed", response.Message)
+	this.Require().Len(response.Violations, 1)
+	this.Equal("schema.unresolved_name", response.Violations[0].Code)
+	this.Equal("api.yaml", response.Violations[0].Source)
 }
 
-func (s *IntegrationSuite) TestValidateContract_Compatible() {
-	s.setupForValidate("catalog", "web")
-	s.publishAndDeployForValidate("catalog", "v1", validateCatalogItemsAndStockYAML)
+func (this *IntegrationSuite) TestValidateContract_Compatible() {
+	this.setupForValidate("catalog", "web")
+	this.publishAndDeployForValidate("catalog", "v1", validateCatalogItemsAndStockYAML)
 
-	response, _ := s.validateOK("web", validateFile{"api.yaml", validateWebItemsYAML})
+	response, _ := this.validateOK("web", validateFile{"api.yaml", validateWebItemsYAML})
 
-	s.True(response.Deployable)
-	s.Require().Len(response.Results, 1)
+	this.True(response.Deployable)
+	this.Require().Len(response.Results, 1)
 	catalog := response.Results["catalog"]
-	s.True(catalog.Deployable)
-	s.Empty(catalog.Endpoints)
-	s.Require().NotNil(catalog.ParticipantVersion)
-	s.Equal("v1", *catalog.ParticipantVersion)
+	this.True(catalog.Deployable)
+	this.Empty(catalog.Endpoints)
+	this.Require().NotNil(catalog.ParticipantVersion)
+	this.Equal("v1", *catalog.ParticipantVersion)
 }
 
-func (s *IntegrationSuite) TestValidateContract_IncompatibleWithDeployedProvider() {
-	s.setupForValidate("catalog", "web")
-	s.publishAndDeployForValidate("catalog", "v1", validateCatalogItemsAndStockYAML)
+func (this *IntegrationSuite) TestValidateContract_IncompatibleWithDeployedProvider() {
+	this.setupForValidate("catalog", "web")
+	this.publishAndDeployForValidate("catalog", "v1", validateCatalogItemsAndStockYAML)
 
-	response, _ := s.validateOK("web", validateFile{"api.yaml", validateWebIntegerItemsYAML})
+	response, _ := this.validateOK("web", validateFile{"api.yaml", validateWebIntegerItemsYAML})
 
-	s.False(response.Deployable)
-	s.Require().Len(response.Results, 1)
+	this.False(response.Deployable)
+	this.Require().Len(response.Results, 1)
 	catalog := response.Results["catalog"]
-	s.False(catalog.Deployable)
+	this.False(catalog.Deployable)
 
 	breaks := catalog.Endpoints["/items"]["get"]["200"]
-	s.Require().Len(breaks, 1)
-	s.Equal("property_type_mismatch", breaks[0].Reason)
+	this.Require().Len(breaks, 1)
+	this.Equal("property_type_mismatch", breaks[0].Reason)
 }
 
-func (s *IntegrationSuite) TestValidateContract_ConsumerOfNeverPublishedProvider() {
-	s.setupForValidate("catalog", "web")
+func (this *IntegrationSuite) TestValidateContract_ConsumerOfNeverPublishedProvider() {
+	this.setupForValidate("catalog", "web")
 
-	response, _ := s.validateOK("web", validateFile{"api.yaml", validateWebItemsYAML})
+	response, _ := this.validateOK("web", validateFile{"api.yaml", validateWebItemsYAML})
 
-	s.False(response.Deployable)
+	this.False(response.Deployable)
 	breaks := response.Results["catalog"].Endpoints["/items"]["get"]["200"]
-	s.Require().Len(breaks, 1)
-	s.Equal("provider_resource_not_found", breaks[0].Reason)
+	this.Require().Len(breaks, 1)
+	this.Equal("provider_resource_not_found", breaks[0].Reason)
 }
 
-func (s *IntegrationSuite) TestValidateContract_ConsumerOfProviderNotDeployedInEnvironment() {
-	s.setupForValidate("catalog", "web")
-	s.mustPostForValidate("/api/contracts",
-		s.publishBody("catalog", "v1", contractFragment{"api.yaml", validateCatalogItemsAndStockYAML}))
+func (this *IntegrationSuite) TestValidateContract_ConsumerOfProviderNotDeployedInEnvironment() {
+	this.setupForValidate("catalog", "web")
+	this.mustPostForValidate("/api/contracts",
+		this.publishBody("catalog", "v1", contractFragment{"api.yaml", validateCatalogItemsAndStockYAML}))
 
-	response, _ := s.validateOK("web", validateFile{"api.yaml", validateWebItemsYAML})
+	response, _ := this.validateOK("web", validateFile{"api.yaml", validateWebItemsYAML})
 
-	s.False(response.Deployable)
+	this.False(response.Deployable)
 	breaks := response.Results["catalog"].Endpoints["/items"]["get"]["200"]
-	s.Require().Len(breaks, 1)
-	s.Equal("provider_resource_not_deployed_in_environment", breaks[0].Reason)
+	this.Require().Len(breaks, 1)
+	this.Equal("provider_resource_not_deployed_in_environment", breaks[0].Reason)
 }
 
-func (s *IntegrationSuite) TestValidateContract_IgnoresPublishedButNotDeployedVersions() {
-	s.setupForValidate("catalog", "web", "billing")
-	s.publishAndDeployForValidate("catalog", "v1", validateCatalogItemsAndStockYAML)
-	s.mustPostForValidate("/api/contracts",
-		s.publishBody("catalog", "v2", contractFragment{"api.yaml", validateCatalogIntegerItemsYAML}))
-	s.mustPostForValidate("/api/contracts",
-		s.publishBody("billing", "v1", contractFragment{"api.yaml", validateWebIntegerItemsYAML}))
+func (this *IntegrationSuite) TestValidateContract_IgnoresPublishedButNotDeployedVersions() {
+	this.setupForValidate("catalog", "web", "billing")
+	this.publishAndDeployForValidate("catalog", "v1", validateCatalogItemsAndStockYAML)
+	this.mustPostForValidate("/api/contracts",
+		this.publishBody("catalog", "v2", contractFragment{"api.yaml", validateCatalogIntegerItemsYAML}))
+	this.mustPostForValidate("/api/contracts",
+		this.publishBody("billing", "v1", contractFragment{"api.yaml", validateWebIntegerItemsYAML}))
 
-	consumer, _ := s.validateOK("web", validateFile{"api.yaml", validateWebItemsYAML})
-	s.True(consumer.Deployable)
-	s.Require().NotNil(consumer.Results["catalog"].ParticipantVersion)
-	s.Equal("v1", *consumer.Results["catalog"].ParticipantVersion)
+	consumer, _ := this.validateOK("web", validateFile{"api.yaml", validateWebItemsYAML})
+	this.True(consumer.Deployable)
+	this.Require().NotNil(consumer.Results["catalog"].ParticipantVersion)
+	this.Equal("v1", *consumer.Results["catalog"].ParticipantVersion)
 
-	provider, _ := s.validateOK("catalog", validateFile{"api.yaml", validateCatalogItemsAndStockYAML})
-	s.True(provider.Deployable)
-	s.NotContains(provider.Results, "billing")
+	provider, _ := this.validateOK("catalog", validateFile{"api.yaml", validateCatalogItemsAndStockYAML})
+	this.True(provider.Deployable)
+	this.NotContains(provider.Results, "billing")
 }
 
-func (s *IntegrationSuite) TestValidateContract_WithoutConsumesInEnvironmentWithoutConsumers() {
-	s.setupForValidate("catalog")
+func (this *IntegrationSuite) TestValidateContract_WithoutConsumesInEnvironmentWithoutConsumers() {
+	this.setupForValidate("catalog")
 
-	response, body := s.validateOK("catalog", validateFile{"api.yaml", validateCatalogItemsAndStockYAML})
+	response, body := this.validateOK("catalog", validateFile{"api.yaml", validateCatalogItemsAndStockYAML})
 
-	s.True(response.Deployable)
-	s.Empty(response.Results)
-	s.JSONEq(`{"message":"contract validated successfully","participant":"catalog","environment":"production","deployable":true,"results":{}}`, body)
+	this.True(response.Deployable)
+	this.Empty(response.Results)
+	this.JSONEq(`{"message":"contract validated successfully","participant":"catalog","environment":"production","deployable":true,"results":{}}`, body)
 }
 
-func (s *IntegrationSuite) TestValidateContract_StoresNothing() {
-	s.setupForValidate("catalog", "web")
-	s.publishAndDeployForValidate("catalog", "v1", validateCatalogItemsAndStockYAML)
-	s.publishAndDeployForValidate("web", "v1", validateWebItemsYAML)
+func (this *IntegrationSuite) TestValidateContract_StoresNothing() {
+	this.setupForValidate("catalog", "web")
+	this.publishAndDeployForValidate("catalog", "v1", validateCatalogItemsAndStockYAML)
+	this.publishAndDeployForValidate("web", "v1", validateWebItemsYAML)
 
-	before := s.rowCountsForValidate()
+	before := this.rowCountsForValidate()
 
-	compatible, _ := s.validateOK("web", validateFile{"api.yaml", validateWebItemsYAML})
-	s.True(compatible.Deployable)
-	s.Equal(before, s.rowCountsForValidate())
+	compatible, _ := this.validateOK("web", validateFile{"api.yaml", validateWebItemsYAML})
+	this.True(compatible.Deployable)
+	this.Equal(before, this.rowCountsForValidate())
 
-	incompatible, _ := s.validateOK("catalog", validateFile{"api.yaml", validateCatalogIntegerItemsYAML})
-	s.False(incompatible.Deployable)
-	s.Equal(before, s.rowCountsForValidate())
+	incompatible, _ := this.validateOK("catalog", validateFile{"api.yaml", validateCatalogIntegerItemsYAML})
+	this.False(incompatible.Deployable)
+	this.Equal(before, this.rowCountsForValidate())
 
-	status, _ := s.post("/api/contracts/validate",
-		s.validateBody("catalog", "production", validateFile{"api.yaml", validateUnresolvedSchemaYAML}))
-	s.Equal(http.StatusBadRequest, status)
-	s.Equal(before, s.rowCountsForValidate())
+	status, _ := this.post("/api/contracts/validate",
+		this.validateBody("catalog", "production", validateFile{"api.yaml", validateUnresolvedSchemaYAML}))
+	this.Equal(http.StatusBadRequest, status)
+	this.Equal(before, this.rowCountsForValidate())
 }
 
-func (s *IntegrationSuite) TestValidateContract_IgnoresStoredPairVerdicts() {
-	s.setupForValidate("catalog", "web")
-	s.publishAndDeployForValidate("catalog", "v1", validateCatalogItemsAndStockYAML)
-	s.publishAndDeployForValidate("web", "v1", validateWebIntegerItemsYAML)
+func (this *IntegrationSuite) TestValidateContract_IgnoresStoredPairVerdicts() {
+	this.setupForValidate("catalog", "web")
+	this.publishAndDeployForValidate("catalog", "v1", validateCatalogItemsAndStockYAML)
+	this.publishAndDeployForValidate("web", "v1", validateWebIntegerItemsYAML)
 
-	status, body := s.post("/api/can-i-deploy", `{"participant":"web","version":"v1","environment":"production"}`)
-	s.Require().Equal(http.StatusOK, status, body)
-	s.Require().Contains(body, `"deployable":false`)
-	s.Require().Equal(1, s.countRows("compatibility_verdicts"))
+	status, body := this.post("/api/can-i-deploy", `{"participant":"web","version":"v1","environment":"production"}`)
+	this.Require().Equal(http.StatusOK, status, body)
+	this.Require().Contains(body, `"deployable":false`)
+	this.Require().Equal(1, this.countRows("compatibility_verdicts"))
 
-	response, _ := s.validateOK("web", validateFile{"api.yaml", validateWebItemsYAML})
+	response, _ := this.validateOK("web", validateFile{"api.yaml", validateWebItemsYAML})
 
-	s.True(response.Deployable)
-	s.Empty(response.Results["catalog"].Endpoints)
-	s.Equal(1, s.countRows("compatibility_verdicts"))
+	this.True(response.Deployable)
+	this.Empty(response.Results["catalog"].Endpoints)
+	this.Equal(1, this.countRows("compatibility_verdicts"))
 }
 
-func (s *IntegrationSuite) TestValidateContract_RemovedResourceStillConsumedBlocks() {
-	s.setupForValidate("catalog", "web")
-	s.publishAndDeployForValidate("catalog", "v1", validateCatalogItemsAndStockYAML)
-	s.publishAndDeployForValidate("web", "v1", validateWebItemsYAML)
+func (this *IntegrationSuite) TestValidateContract_RemovedResourceStillConsumedBlocks() {
+	this.setupForValidate("catalog", "web")
+	this.publishAndDeployForValidate("catalog", "v1", validateCatalogItemsAndStockYAML)
+	this.publishAndDeployForValidate("web", "v1", validateWebItemsYAML)
 
-	response, _ := s.validateOK("catalog", validateFile{"api.yaml", validateCatalogStockYAML})
+	response, _ := this.validateOK("catalog", validateFile{"api.yaml", validateCatalogStockYAML})
 
-	s.False(response.Deployable)
-	s.Require().Len(response.Results, 1)
+	this.False(response.Deployable)
+	this.Require().Len(response.Results, 1)
 	web := response.Results["web"]
-	s.False(web.Deployable)
-	s.Require().NotNil(web.ParticipantVersion)
-	s.Equal("v1", *web.ParticipantVersion)
+	this.False(web.Deployable)
+	this.Require().NotNil(web.ParticipantVersion)
+	this.Equal("v1", *web.ParticipantVersion)
 
-	s.Require().Len(web.Endpoints, 1)
+	this.Require().Len(web.Endpoints, 1)
 	breaks := web.Endpoints["/items"]["get"]["200"]
-	s.Require().Len(breaks, 1)
-	s.Equal("provider_resource_removed_but_still_consumed", breaks[0].Reason)
+	this.Require().Len(breaks, 1)
+	this.Equal("provider_resource_removed_but_still_consumed", breaks[0].Reason)
 }
 
-func (s *IntegrationSuite) TestValidateContract_NothingRemovedWhenParticipantIsNotDeployed() {
-	s.setupForValidate("catalog", "web")
-	s.mustPostForValidate("/api/contracts",
-		s.publishBody("catalog", "v1", contractFragment{"api.yaml", validateCatalogItemsAndStockYAML}))
-	s.publishAndDeployForValidate("web", "v1", validateWebItemsYAML)
+func (this *IntegrationSuite) TestValidateContract_NothingRemovedWhenParticipantIsNotDeployed() {
+	this.setupForValidate("catalog", "web")
+	this.mustPostForValidate("/api/contracts",
+		this.publishBody("catalog", "v1", contractFragment{"api.yaml", validateCatalogItemsAndStockYAML}))
+	this.publishAndDeployForValidate("web", "v1", validateWebItemsYAML)
 
-	response, _ := s.validateOK("catalog", validateFile{"api.yaml", validateCatalogStockYAML})
+	response, _ := this.validateOK("catalog", validateFile{"api.yaml", validateCatalogStockYAML})
 
-	s.True(response.Deployable)
-	s.Empty(response.Results)
+	this.True(response.Deployable)
+	this.Empty(response.Results)
 }
 
-func (s *IntegrationSuite) TestValidateContract_ConsumerOfNeverOfferedResourceIsIgnored() {
-	s.setupForValidate("catalog", "web")
-	s.publishAndDeployForValidate("catalog", "v1", validateCatalogStockYAML)
-	s.publishAndDeployForValidate("web", "v1", validateWebItemsYAML)
+func (this *IntegrationSuite) TestValidateContract_ConsumerOfNeverOfferedResourceIsIgnored() {
+	this.setupForValidate("catalog", "web")
+	this.publishAndDeployForValidate("catalog", "v1", validateCatalogStockYAML)
+	this.publishAndDeployForValidate("web", "v1", validateWebItemsYAML)
 
-	response, _ := s.validateOK("catalog", validateFile{"api.yaml", validateCatalogStockYAML})
+	response, _ := this.validateOK("catalog", validateFile{"api.yaml", validateCatalogStockYAML})
 
-	s.True(response.Deployable)
-	s.NotContains(response.Results, "web")
+	this.True(response.Deployable)
+	this.NotContains(response.Results, "web")
 }
 
-func (s *IntegrationSuite) TestValidateContract_ResourceAlreadyRemovedInDeployedVersionDoesNotCount() {
-	s.setupForValidate("catalog", "web")
-	s.mustPostForValidate("/api/contracts",
-		s.publishBody("catalog", "v1", contractFragment{"api.yaml", validateCatalogItemsAndStockYAML}))
-	s.publishAndDeployForValidate("catalog", "v2", validateCatalogStockYAML)
-	s.publishAndDeployForValidate("web", "v1", validateWebItemsYAML)
+func (this *IntegrationSuite) TestValidateContract_ResourceAlreadyRemovedInDeployedVersionDoesNotCount() {
+	this.setupForValidate("catalog", "web")
+	this.mustPostForValidate("/api/contracts",
+		this.publishBody("catalog", "v1", contractFragment{"api.yaml", validateCatalogItemsAndStockYAML}))
+	this.publishAndDeployForValidate("catalog", "v2", validateCatalogStockYAML)
+	this.publishAndDeployForValidate("web", "v1", validateWebItemsYAML)
 
-	response, _ := s.validateOK("catalog", validateFile{"api.yaml", validateCatalogStockYAML})
+	response, _ := this.validateOK("catalog", validateFile{"api.yaml", validateCatalogStockYAML})
 
-	s.True(response.Deployable)
-	s.Empty(response.Results)
+	this.True(response.Deployable)
+	this.Empty(response.Results)
 }
 
-func (s *IntegrationSuite) TestValidateContract_RemovalIsMeasuredFromTheDeployedVersion() {
-	s.setupForValidate("catalog", "web")
-	s.publishAndDeployForValidate("catalog", "v1", validateCatalogItemsAndStockYAML)
-	s.mustPostForValidate("/api/contracts",
-		s.publishBody("catalog", "v2", contractFragment{"api.yaml", validateCatalogStockYAML}))
-	s.publishAndDeployForValidate("web", "v1", validateWebItemsYAML)
+func (this *IntegrationSuite) TestValidateContract_RemovalIsMeasuredFromTheDeployedVersion() {
+	this.setupForValidate("catalog", "web")
+	this.publishAndDeployForValidate("catalog", "v1", validateCatalogItemsAndStockYAML)
+	this.mustPostForValidate("/api/contracts",
+		this.publishBody("catalog", "v2", contractFragment{"api.yaml", validateCatalogStockYAML}))
+	this.publishAndDeployForValidate("web", "v1", validateWebItemsYAML)
 
-	response, _ := s.validateOK("catalog", validateFile{"api.yaml", validateCatalogStockYAML})
+	response, _ := this.validateOK("catalog", validateFile{"api.yaml", validateCatalogStockYAML})
 
-	s.False(response.Deployable)
+	this.False(response.Deployable)
 	breaks := response.Results["web"].Endpoints["/items"]["get"]["200"]
-	s.Require().Len(breaks, 1)
-	s.Equal("provider_resource_removed_but_still_consumed", breaks[0].Reason)
+	this.Require().Len(breaks, 1)
+	this.Equal("provider_resource_removed_but_still_consumed", breaks[0].Reason)
 }
 
-func (s *IntegrationSuite) TestValidateContract_DeployedVersionWithoutContractIsAnInternalError() {
-	s.setupForValidate("catalog")
-	_, err := s.Pool.Exec(context.Background(),
+func (this *IntegrationSuite) TestValidateContract_DeployedVersionWithoutContractIsAnInternalError() {
+	this.setupForValidate("catalog")
+	_, err := this.Pool.Exec(context.Background(),
 		`INSERT INTO deployments (participant_id, version, environment_id, rollback)
 		 SELECT p.id, 'v9', e.id, false FROM participants p, environments e
 		  WHERE p.name = 'catalog' AND e.name = 'production'`)
-	s.Require().NoError(err)
+	this.Require().NoError(err)
 
-	status, body := s.post("/api/contracts/validate",
-		s.validateBody("catalog", "production", validateFile{"api.yaml", validateCatalogStockYAML}))
+	status, body := this.post("/api/contracts/validate",
+		this.validateBody("catalog", "production", validateFile{"api.yaml", validateCatalogStockYAML}))
 
-	s.Equal(http.StatusInternalServerError, status)
-	s.JSONEq(`{"message":"internal error"}`, body)
+	this.Equal(http.StatusInternalServerError, status)
+	this.JSONEq(`{"message":"internal error"}`, body)
 }

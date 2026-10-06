@@ -129,49 +129,49 @@ const removalWebBreakingContract = `
   }
 }`
 
-func (s *IntegrationSuite) mustPostForRemoval(path, body string) {
-	status, response := s.post(path, body)
-	s.Require().Equalf(http.StatusOK, status, "POST %s: %s", path, response)
+func (this *IntegrationSuite) mustPostForRemoval(path, body string) {
+	status, response := this.post(path, body)
+	this.Require().Equalf(http.StatusOK, status, "POST %s: %s", path, response)
 }
 
 // removalSetup publishes catalog v1 with /items and /stock, a consumer of both, and deploys
 // both to production. The caller publishes the catalog version that drops /items.
-func (s *IntegrationSuite) removalSetup(consumerContract string) {
-	s.mustPostForRemoval("/api/environments", `{"environment":"production"}`)
-	s.mustPostForRemoval("/api/participants", `{"participant":"catalog"}`)
-	s.mustPostForRemoval("/api/contracts", s.publishBody("catalog", "v1", contractFragment{"api.yaml", removalCatalogV1Contract}))
-	s.mustPostForRemoval("/api/deployments", `{"participant":"catalog","version":"v1","environment":"production"}`)
-	s.mustPostForRemoval("/api/participants", `{"participant":"web"}`)
-	s.mustPostForRemoval("/api/contracts", s.publishBody("web", "v1", contractFragment{"api.yaml", consumerContract}))
-	s.mustPostForRemoval("/api/deployments", `{"participant":"web","version":"v1","environment":"production"}`)
+func (this *IntegrationSuite) removalSetup(consumerContract string) {
+	this.mustPostForRemoval("/api/environments", `{"environment":"production"}`)
+	this.mustPostForRemoval("/api/participants", `{"participant":"catalog"}`)
+	this.mustPostForRemoval("/api/contracts", this.publishBody("catalog", "v1", contractFragment{"api.yaml", removalCatalogV1Contract}))
+	this.mustPostForRemoval("/api/deployments", `{"participant":"catalog","version":"v1","environment":"production"}`)
+	this.mustPostForRemoval("/api/participants", `{"participant":"web"}`)
+	this.mustPostForRemoval("/api/contracts", this.publishBody("web", "v1", contractFragment{"api.yaml", consumerContract}))
+	this.mustPostForRemoval("/api/deployments", `{"participant":"web","version":"v1","environment":"production"}`)
 }
 
-func (s *IntegrationSuite) canIDeployForRemoval(participant, version string) (removalCanIDeployJSON, string) {
-	status, body := s.post(
+func (this *IntegrationSuite) canIDeployForRemoval(participant, version string) (removalCanIDeployJSON, string) {
+	status, body := this.post(
 		"/api/can-i-deploy",
 		`{"participant":"`+participant+`","version":"`+version+`","environment":"production"}`,
 	)
-	s.Require().Equalf(http.StatusOK, status, "can-i-deploy %s %s: %s", participant, version, body)
+	this.Require().Equalf(http.StatusOK, status, "can-i-deploy %s %s: %s", participant, version, body)
 
 	var response removalCanIDeployJSON
-	s.Require().NoError(json.Unmarshal([]byte(body), &response))
+	this.Require().NoError(json.Unmarshal([]byte(body), &response))
 
 	return response, body
 }
 
-func (s *IntegrationSuite) verdictBreaksForRemoval() [][]removalVerdictBreakJSON {
-	rows, err := s.Pool.Query(context.Background(), `SELECT breaks::text FROM compatibility_verdicts`)
-	s.Require().NoError(err)
+func (this *IntegrationSuite) verdictBreaksForRemoval() [][]removalVerdictBreakJSON {
+	rows, err := this.Pool.Query(context.Background(), `SELECT breaks::text FROM compatibility_verdicts`)
+	this.Require().NoError(err)
 	defer rows.Close()
 
 	verdicts := make([][]removalVerdictBreakJSON, 0)
 
 	for rows.Next() {
 		var raw string
-		s.Require().NoError(rows.Scan(&raw))
+		this.Require().NoError(rows.Scan(&raw))
 
 		var breaks []removalVerdictBreakJSON
-		s.Require().NoError(json.Unmarshal([]byte(raw), &breaks))
+		this.Require().NoError(json.Unmarshal([]byte(raw), &breaks))
 
 		verdicts = append(verdicts, breaks)
 	}
@@ -179,69 +179,69 @@ func (s *IntegrationSuite) verdictBreaksForRemoval() [][]removalVerdictBreakJSON
 	return verdicts
 }
 
-func (s *IntegrationSuite) TestRemovedProvider_BlocksWhileTheConsumerIsDeployed() {
-	s.removalSetup(removalWebV1Contract)
-	s.mustPostForRemoval("/api/contracts", s.publishBody("catalog", "v2", contractFragment{"api.yaml", removalCatalogV2Contract}))
+func (this *IntegrationSuite) TestRemovedProvider_BlocksWhileTheConsumerIsDeployed() {
+	this.removalSetup(removalWebV1Contract)
+	this.mustPostForRemoval("/api/contracts", this.publishBody("catalog", "v2", contractFragment{"api.yaml", removalCatalogV2Contract}))
 
-	response, body := s.canIDeployForRemoval("catalog", "v2")
+	response, body := this.canIDeployForRemoval("catalog", "v2")
 
-	s.False(response.Deployable)
-	s.Require().Len(response.Results, 1)
+	this.False(response.Deployable)
+	this.Require().Len(response.Results, 1)
 
 	web := response.Results["web"]
-	s.False(web.Deployable)
-	s.Require().NotNil(web.ParticipantVersion)
-	s.Equal("v1", *web.ParticipantVersion)
+	this.False(web.Deployable)
+	this.Require().NotNil(web.ParticipantVersion)
+	this.Equal("v1", *web.ParticipantVersion)
 
-	s.Require().Len(web.Endpoints, 1)
+	this.Require().Len(web.Endpoints, 1)
 	breaks := web.Endpoints["/items"]["get"]["200"]
-	s.Require().Len(breaks, 1)
-	s.Equal(removedProviderReason, breaks[0].Reason)
-	s.Equal("provider", breaks[0].Role)
-	s.Nil(breaks[0].Details)
-	s.NotContains(body, `"details"`)
+	this.Require().Len(breaks, 1)
+	this.Equal(removedProviderReason, breaks[0].Reason)
+	this.Equal("provider", breaks[0].Role)
+	this.Nil(breaks[0].Details)
+	this.NotContains(body, `"details"`)
 }
 
-func (s *IntegrationSuite) TestRemovedProvider_IsAllowedOnceTheConsumerStopsConsuming() {
-	s.removalSetup(removalWebV1Contract)
-	s.mustPostForRemoval("/api/contracts", s.publishBody("catalog", "v2", contractFragment{"api.yaml", removalCatalogV2Contract}))
-	s.mustPostForRemoval("/api/contracts", s.publishBody("web", "v2", contractFragment{"api.yaml", removalWebV2Contract}))
-	s.mustPostForRemoval("/api/deployments", `{"participant":"web","version":"v2","environment":"production"}`)
+func (this *IntegrationSuite) TestRemovedProvider_IsAllowedOnceTheConsumerStopsConsuming() {
+	this.removalSetup(removalWebV1Contract)
+	this.mustPostForRemoval("/api/contracts", this.publishBody("catalog", "v2", contractFragment{"api.yaml", removalCatalogV2Contract}))
+	this.mustPostForRemoval("/api/contracts", this.publishBody("web", "v2", contractFragment{"api.yaml", removalWebV2Contract}))
+	this.mustPostForRemoval("/api/deployments", `{"participant":"web","version":"v2","environment":"production"}`)
 
-	response, _ := s.canIDeployForRemoval("catalog", "v2")
+	response, _ := this.canIDeployForRemoval("catalog", "v2")
 
-	s.True(response.Deployable)
-	s.Require().Len(response.Results, 1)
-	s.True(response.Results["web"].Deployable)
-	s.Empty(response.Results["web"].Endpoints)
+	this.True(response.Deployable)
+	this.Require().Len(response.Results, 1)
+	this.True(response.Results["web"].Deployable)
+	this.Empty(response.Results["web"].Endpoints)
 }
 
-func (s *IntegrationSuite) TestRemovedProvider_KeepsBlockingOnLaterVersions() {
-	s.removalSetup(removalWebV1Contract)
-	s.mustPostForRemoval("/api/contracts", s.publishBody("catalog", "v2", contractFragment{"api.yaml", removalCatalogV2Contract}))
-	s.mustPostForRemoval("/api/contracts", s.publishBody("catalog", "v3", contractFragment{"api.yaml", removalCatalogV3Contract}))
+func (this *IntegrationSuite) TestRemovedProvider_KeepsBlockingOnLaterVersions() {
+	this.removalSetup(removalWebV1Contract)
+	this.mustPostForRemoval("/api/contracts", this.publishBody("catalog", "v2", contractFragment{"api.yaml", removalCatalogV2Contract}))
+	this.mustPostForRemoval("/api/contracts", this.publishBody("catalog", "v3", contractFragment{"api.yaml", removalCatalogV3Contract}))
 
-	response, _ := s.canIDeployForRemoval("catalog", "v3")
+	response, _ := this.canIDeployForRemoval("catalog", "v3")
 
-	s.False(response.Deployable)
+	this.False(response.Deployable)
 	breaks := response.Results["web"].Endpoints["/items"]["get"]["200"]
-	s.Require().Len(breaks, 1)
-	s.Equal(removedProviderReason, breaks[0].Reason)
+	this.Require().Len(breaks, 1)
+	this.Equal(removedProviderReason, breaks[0].Reason)
 }
 
-func (s *IntegrationSuite) TestRemovedProvider_IsNeverStoredAsAVerdict() {
-	s.removalSetup(removalWebBreakingContract)
-	s.mustPostForRemoval("/api/contracts", s.publishBody("catalog", "v2", contractFragment{"api.yaml", removalCatalogV2Contract}))
+func (this *IntegrationSuite) TestRemovedProvider_IsNeverStoredAsAVerdict() {
+	this.removalSetup(removalWebBreakingContract)
+	this.mustPostForRemoval("/api/contracts", this.publishBody("catalog", "v2", contractFragment{"api.yaml", removalCatalogV2Contract}))
 
 	// The removal and the property break land on the same counterpart in map order: repeating
 	// the check on a clean slate exercises both arrival orders of the merge.
 	for range 5 {
-		_, err := s.Pool.Exec(context.Background(),
+		_, err := this.Pool.Exec(context.Background(),
 			`TRUNCATE compatibility_check_results, compatibility_checks, compatibility_verdicts`)
-		s.Require().NoError(err)
+		this.Require().NoError(err)
 
-		response, _ := s.canIDeployForRemoval("catalog", "v2")
-		s.False(response.Deployable)
+		response, _ := this.canIDeployForRemoval("catalog", "v2")
+		this.False(response.Deployable)
 
 		reasons := make([]string, 0)
 		for _, methods := range response.Results["web"].Endpoints {
@@ -253,26 +253,26 @@ func (s *IntegrationSuite) TestRemovedProvider_IsNeverStoredAsAVerdict() {
 				}
 			}
 		}
-		s.ElementsMatch([]string{removedProviderReason, "property_missing_in_provider"}, reasons)
+		this.ElementsMatch([]string{removedProviderReason, "property_missing_in_provider"}, reasons)
 
-		verdicts := s.verdictBreaksForRemoval()
-		s.Require().Len(verdicts, 1)
-		s.Require().Len(verdicts[0], 1)
-		s.Equal("property_missing_in_provider", verdicts[0][0].Reason)
-		s.Equal("/stock", verdicts[0][0].Endpoint)
+		verdicts := this.verdictBreaksForRemoval()
+		this.Require().Len(verdicts, 1)
+		this.Require().Len(verdicts[0], 1)
+		this.Equal("property_missing_in_provider", verdicts[0][0].Reason)
+		this.Equal("/stock", verdicts[0][0].Endpoint)
 	}
 }
 
-func (s *IntegrationSuite) TestRemovedProvider_ConsumerCheckIgnoresItsOwnRemovedConsumption() {
-	s.removalSetup(removalWebV1Contract)
-	s.mustPostForRemoval("/api/contracts", s.publishBody("catalog", "v2", contractFragment{"api.yaml", removalCatalogV2Contract}))
-	s.mustPostForRemoval("/api/deployments", `{"participant":"catalog","version":"v2","environment":"production"}`)
-	s.mustPostForRemoval("/api/contracts", s.publishBody("web", "v2", contractFragment{"api.yaml", removalWebV2Contract}))
+func (this *IntegrationSuite) TestRemovedProvider_ConsumerCheckIgnoresItsOwnRemovedConsumption() {
+	this.removalSetup(removalWebV1Contract)
+	this.mustPostForRemoval("/api/contracts", this.publishBody("catalog", "v2", contractFragment{"api.yaml", removalCatalogV2Contract}))
+	this.mustPostForRemoval("/api/deployments", `{"participant":"catalog","version":"v2","environment":"production"}`)
+	this.mustPostForRemoval("/api/contracts", this.publishBody("web", "v2", contractFragment{"api.yaml", removalWebV2Contract}))
 
-	response, _ := s.canIDeployForRemoval("web", "v2")
+	response, _ := this.canIDeployForRemoval("web", "v2")
 
-	s.True(response.Deployable)
-	s.Require().Len(response.Results, 1)
-	s.True(response.Results["catalog"].Deployable)
-	s.Empty(response.Results["catalog"].Endpoints)
+	this.True(response.Deployable)
+	this.Require().Len(response.Results, 1)
+	this.True(response.Results["catalog"].Deployable)
+	this.Empty(response.Results["catalog"].Endpoints)
 }

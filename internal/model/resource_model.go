@@ -9,12 +9,12 @@ const (
 
 type Direction string
 
-func (direction Direction) String() string {
-	return string(direction)
+func (this Direction) String() string {
+	return string(this)
 }
 
 type Interaction string
 
-func (interaction Interaction) String() string {
-	return string(interaction)
+func (this Interaction) String() string {
+	return string(this)
 }

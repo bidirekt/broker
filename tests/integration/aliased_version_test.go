@@ -31,80 +31,80 @@ const aliasConsumerContract = `
   "schemas": { "Thing": { "type": "object", "properties": { "id": { "type": "string" } } } }
 }`
 
-func (s *IntegrationSuite) TestPublish_IdenticalContentNewVersion_AliasesTheSnapshot() {
+func (this *IntegrationSuite) TestPublish_IdenticalContentNewVersion_AliasesTheSnapshot() {
 	mustPost := func(path, body string) {
-		status, _ := s.post(path, body)
-		s.Require().Equalf(http.StatusOK, status, "POST %s", path)
+		status, _ := this.post(path, body)
+		this.Require().Equalf(http.StatusOK, status, "POST %s", path)
 	}
 
 	mustPost("/api/participants", `{"participant":"api"}`)
-	mustPost("/api/contracts", s.publishBody("api", "a1b2c3d", contractFragment{"api.yaml", aliasProviderContract}))
-	mustPost("/api/contracts", s.publishBody("api", "e4f5a6b", contractFragment{"api.yaml", aliasProviderContract}))
+	mustPost("/api/contracts", this.publishBody("api", "a1b2c3d", contractFragment{"api.yaml", aliasProviderContract}))
+	mustPost("/api/contracts", this.publishBody("api", "e4f5a6b", contractFragment{"api.yaml", aliasProviderContract}))
 
 	// one snapshot, two version names pointing at it
-	s.Equal(1, s.countRows("contracts"))
-	s.Equal(2, s.countRows("contract_versions"))
+	this.Equal(1, this.countRows("contracts"))
+	this.Equal(2, this.countRows("contract_versions"))
 
 	var contractIDs int
-	s.Require().NoError(s.Pool.QueryRow(context.Background(),
+	this.Require().NoError(this.Pool.QueryRow(context.Background(),
 		`SELECT count(DISTINCT contract_id) FROM contract_versions`).Scan(&contractIDs))
-	s.Equal(1, contractIDs)
+	this.Equal(1, contractIDs)
 }
 
-func (s *IntegrationSuite) TestPublish_ChangedContentNewVersion_CreatesSnapshot() {
+func (this *IntegrationSuite) TestPublish_ChangedContentNewVersion_CreatesSnapshot() {
 	mustPost := func(path, body string) {
-		status, _ := s.post(path, body)
-		s.Require().Equalf(http.StatusOK, status, "POST %s", path)
+		status, _ := this.post(path, body)
+		this.Require().Equalf(http.StatusOK, status, "POST %s", path)
 	}
 
 	mustPost("/api/participants", `{"participant":"api"}`)
-	mustPost("/api/contracts", s.publishBody("api", "a1b2c3d", contractFragment{"api.yaml", aliasProviderContract}))
-	mustPost("/api/contracts", s.publishBody("api", "e4f5a6b", contractFragment{"api.yaml", aliasProviderChangedContract}))
+	mustPost("/api/contracts", this.publishBody("api", "a1b2c3d", contractFragment{"api.yaml", aliasProviderContract}))
+	mustPost("/api/contracts", this.publishBody("api", "e4f5a6b", contractFragment{"api.yaml", aliasProviderChangedContract}))
 
-	s.Equal(2, s.countRows("contracts"))
-	s.Equal(2, s.countRows("contract_versions"))
+	this.Equal(2, this.countRows("contracts"))
+	this.Equal(2, this.countRows("contract_versions"))
 }
 
-func (s *IntegrationSuite) TestCanIDeploy_ResolvesAnAliasedVersion() {
+func (this *IntegrationSuite) TestCanIDeploy_ResolvesAnAliasedVersion() {
 	mustPost := func(path, body string) {
-		status, _ := s.post(path, body)
-		s.Require().Equalf(http.StatusOK, status, "POST %s", path)
+		status, _ := this.post(path, body)
+		this.Require().Equalf(http.StatusOK, status, "POST %s", path)
 	}
 
 	mustPost("/api/participants", `{"participant":"api"}`)
 	mustPost("/api/participants", `{"participant":"front"}`)
 	mustPost("/api/environments", `{"environment":"production"}`)
 
-	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.yaml", aliasProviderContract}))
+	mustPost("/api/contracts", this.publishBody("api", "v1", contractFragment{"api.yaml", aliasProviderContract}))
 	mustPost("/api/deployments", `{"participant":"api","version":"v1","environment":"production"}`)
 
 	// republished unchanged under a commit sha, the way CI does
-	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.yaml", aliasConsumerContract}))
-	mustPost("/api/contracts", s.publishBody("front", "a1b2c3d", contractFragment{"api.yaml", aliasConsumerContract}))
+	mustPost("/api/contracts", this.publishBody("front", "v1", contractFragment{"api.yaml", aliasConsumerContract}))
+	mustPost("/api/contracts", this.publishBody("front", "a1b2c3d", contractFragment{"api.yaml", aliasConsumerContract}))
 
-	status, body := s.post("/api/can-i-deploy", `{"participant":"front","version":"a1b2c3d","environment":"production"}`)
-	s.Equal(http.StatusOK, status)
-	s.Contains(body, `"version":"a1b2c3d"`)
-	s.Contains(body, `"deployable":true`)
+	status, body := this.post("/api/can-i-deploy", `{"participant":"front","version":"a1b2c3d","environment":"production"}`)
+	this.Equal(http.StatusOK, status)
+	this.Contains(body, `"version":"a1b2c3d"`)
+	this.Contains(body, `"deployable":true`)
 }
 
-func (s *IntegrationSuite) TestRecordDeployment_ResolvesAnAliasedVersion() {
+func (this *IntegrationSuite) TestRecordDeployment_ResolvesAnAliasedVersion() {
 	mustPost := func(path, body string) {
-		status, _ := s.post(path, body)
-		s.Require().Equalf(http.StatusOK, status, "POST %s", path)
+		status, _ := this.post(path, body)
+		this.Require().Equalf(http.StatusOK, status, "POST %s", path)
 	}
 
 	mustPost("/api/participants", `{"participant":"api"}`)
 	mustPost("/api/environments", `{"environment":"production"}`)
 
-	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.yaml", aliasProviderContract}))
-	mustPost("/api/contracts", s.publishBody("api", "a1b2c3d", contractFragment{"api.yaml", aliasProviderContract}))
+	mustPost("/api/contracts", this.publishBody("api", "v1", contractFragment{"api.yaml", aliasProviderContract}))
+	mustPost("/api/contracts", this.publishBody("api", "a1b2c3d", contractFragment{"api.yaml", aliasProviderContract}))
 
-	status, _ := s.post("/api/deployments", `{"participant":"api","version":"a1b2c3d","environment":"production"}`)
-	s.Equal(http.StatusOK, status)
+	status, _ := this.post("/api/deployments", `{"participant":"api","version":"a1b2c3d","environment":"production"}`)
+	this.Equal(http.StatusOK, status)
 
 	var deployedVersion string
-	s.Require().NoError(s.Pool.QueryRow(context.Background(),
+	this.Require().NoError(this.Pool.QueryRow(context.Background(),
 		`SELECT version FROM deployments LIMIT 1`).Scan(&deployedVersion))
-	s.Equal("a1b2c3d", deployedVersion)
+	this.Equal("a1b2c3d", deployedVersion)
 }

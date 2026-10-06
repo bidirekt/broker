@@ -33,7 +33,7 @@ type IntegrationSuite struct {
 	Pool       *pgxpool.Pool
 }
 
-func (s *IntegrationSuite) SetupSuite() {
+func (this *IntegrationSuite) SetupSuite() {
 	ctx := context.Background()
 
 	container, err := postgres.Run(ctx,
@@ -47,30 +47,30 @@ func (s *IntegrationSuite) SetupSuite() {
 				WithStartupTimeout(60*time.Second),
 		),
 	)
-	s.Require().NoError(err)
-	s.container = container
+	this.Require().NoError(err)
+	this.container = container
 
 	connStr, err := container.ConnectionString(ctx, "sslmode=disable")
-	s.Require().NoError(err)
+	this.Require().NoError(err)
 
-	s.Require().NoError(os.Setenv("BIDIREKT_DATABASE_URL", connStr))
+	this.Require().NoError(os.Setenv("BIDIREKT_DATABASE_URL", connStr))
 
-	s.Components, err = internal.Run()
-	s.Require().NoError(err)
-	s.Pool = s.Components.Pool
+	this.Components, err = internal.Run()
+	this.Require().NoError(err)
+	this.Pool = this.Components.Pool
 }
 
-func (s *IntegrationSuite) TearDownSuite() {
-	if s.Pool != nil {
-		s.Pool.Close()
+func (this *IntegrationSuite) TearDownSuite() {
+	if this.Pool != nil {
+		this.Pool.Close()
 	}
-	if s.container != nil {
-		_ = s.container.Terminate(context.Background())
+	if this.container != nil {
+		_ = this.container.Terminate(context.Background())
 	}
 }
 
-func (s *IntegrationSuite) SetupTest() {
-	_, err := s.Pool.Exec(context.Background(),
+func (this *IntegrationSuite) SetupTest() {
+	_, err := this.Pool.Exec(context.Background(),
 		`TRUNCATE 
 			compatibility_check_results,
 			compatibility_checks,
@@ -87,32 +87,32 @@ func (s *IntegrationSuite) SetupTest() {
 			RESTART IDENTITY CASCADE`,
 	)
 
-	s.Require().NoError(err)
+	this.Require().NoError(err)
 }
 
-func (s *IntegrationSuite) post(path, body string) (status int, response string) {
+func (this *IntegrationSuite) post(path, body string) (status int, response string) {
 	req := httptest.NewRequest("POST", path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := s.Components.Server.Test(req, fiber.TestConfig{Timeout: 10 * time.Second})
-	s.Require().NoError(err)
+	resp, err := this.Components.Server.Test(req, fiber.TestConfig{Timeout: 10 * time.Second})
+	this.Require().NoError(err)
 	defer func() { _ = resp.Body.Close() }()
 
 	bytes, err := io.ReadAll(resp.Body)
-	s.Require().NoError(err)
+	this.Require().NoError(err)
 
 	return resp.StatusCode, string(bytes)
 }
 
-func (s *IntegrationSuite) get(path string) (status int, response string) {
+func (this *IntegrationSuite) get(path string) (status int, response string) {
 	req := httptest.NewRequest("GET", path, nil)
 
-	resp, err := s.Components.Server.Test(req, fiber.TestConfig{Timeout: 10 * time.Second})
-	s.Require().NoError(err)
+	resp, err := this.Components.Server.Test(req, fiber.TestConfig{Timeout: 10 * time.Second})
+	this.Require().NoError(err)
 	defer func() { _ = resp.Body.Close() }()
 
 	bytes, err := io.ReadAll(resp.Body)
-	s.Require().NoError(err)
+	this.Require().NoError(err)
 
 	return resp.StatusCode, string(bytes)
 }
@@ -122,7 +122,7 @@ type contractFragment struct {
 	Content string `json:"content"`
 }
 
-func (s *IntegrationSuite) publishBody(participant, version string, fragments ...contractFragment) string {
+func (this *IntegrationSuite) publishBody(participant, version string, fragments ...contractFragment) string {
 	body, err := json.Marshal(struct {
 		Participant string             `json:"participant"`
 		Version     string             `json:"version"`
@@ -132,16 +132,16 @@ func (s *IntegrationSuite) publishBody(participant, version string, fragments ..
 		Version:     version,
 		Contracts:   fragments,
 	})
-	s.Require().NoError(err)
+	this.Require().NoError(err)
 
 	return string(body)
 }
 
-func (s *IntegrationSuite) countRows(table string) int {
+func (this *IntegrationSuite) countRows(table string) int {
 	var count int
-	err := s.Pool.QueryRow(context.Background(),
+	err := this.Pool.QueryRow(context.Background(),
 		fmt.Sprintf("SELECT count(*) FROM %s", table),
 	).Scan(&count)
-	s.Require().NoError(err)
+	this.Require().NoError(err)
 	return count
 }

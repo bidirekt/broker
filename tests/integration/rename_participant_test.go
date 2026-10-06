@@ -36,138 +36,138 @@ const renameV1ContractBody = `
   }
 }`
 
-func (s *IntegrationSuite) TestRenameParticipant_NewNameNotSnakeCase_Rejected() {
-	status, _ := s.post("/api/participants", renamePetsBody)
-	s.Require().Equal(http.StatusOK, status)
+func (this *IntegrationSuite) TestRenameParticipant_NewNameNotSnakeCase_Rejected() {
+	status, _ := this.post("/api/participants", renamePetsBody)
+	this.Require().Equal(http.StatusOK, status)
 
-	status, body := s.post("/api/participants/rename", `{"oldName":"pets_service","newName":"Pets-Service"}`)
-	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"participant name must be snake_case"}`, body)
+	status, body := this.post("/api/participants/rename", `{"oldName":"pets_service","newName":"Pets-Service"}`)
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(`{"message":"participant name must be snake_case"}`, body)
 
 	// the participant is still findable under its old name: nothing was renamed
-	s.Positive(s.renameParticipantID("pets_service"))
+	this.Positive(this.renameParticipantID("pets_service"))
 }
 
-func (s *IntegrationSuite) TestRenameParticipant_SuccessPreservesIdentityAndReferences() {
-	status, _ := s.post("/api/participants", renamePetsBody)
-	s.Require().Equal(http.StatusOK, status)
+func (this *IntegrationSuite) TestRenameParticipant_SuccessPreservesIdentityAndReferences() {
+	status, _ := this.post("/api/participants", renamePetsBody)
+	this.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/contracts", s.publishBody("pets_service", "v1", contractFragment{"api.yaml", renameV1ContractBody}))
-	s.Require().Equal(http.StatusOK, status)
+	status, _ = this.post("/api/contracts", this.publishBody("pets_service", "v1", contractFragment{"api.yaml", renameV1ContractBody}))
+	this.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/environments", renameProductionEnvBody)
-	s.Require().Equal(http.StatusOK, status)
+	status, _ = this.post("/api/environments", renameProductionEnvBody)
+	this.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/deployments", renameV1DeploymentBody)
-	s.Require().Equal(http.StatusOK, status)
+	status, _ = this.post("/api/deployments", renameV1DeploymentBody)
+	this.Require().Equal(http.StatusOK, status)
 
-	originalID := s.renameParticipantID("pets_service")
-	contractsBefore := s.countRows("contracts")
-	resourcesBefore := s.countRows("resources")
-	deploymentsBefore := s.countRows("deployments")
-	s.Require().Positive(resourcesBefore)
+	originalID := this.renameParticipantID("pets_service")
+	contractsBefore := this.countRows("contracts")
+	resourcesBefore := this.countRows("resources")
+	deploymentsBefore := this.countRows("deployments")
+	this.Require().Positive(resourcesBefore)
 
-	status, body := s.post("/api/participants/rename", `{"oldName":"pets_service","newName":"orders_service"}`)
-	s.Equal(http.StatusOK, status)
-	s.JSONEq(`{"message":"participant renamed"}`, body)
+	status, body := this.post("/api/participants/rename", `{"oldName":"pets_service","newName":"orders_service"}`)
+	this.Equal(http.StatusOK, status)
+	this.JSONEq(`{"message":"participant renamed"}`, body)
 
 	var (
 		idAfter   int64
 		nameAfter string
 	)
-	err := s.Pool.QueryRow(context.Background(),
+	err := this.Pool.QueryRow(context.Background(),
 		`SELECT id, name FROM participants WHERE id = $1`, originalID,
 	).Scan(&idAfter, &nameAfter)
-	s.Require().NoError(err)
-	s.Equal(originalID, idAfter)
-	s.Equal("orders_service", nameAfter)
-	s.Equal(1, s.countRows("participants"))
+	this.Require().NoError(err)
+	this.Equal(originalID, idAfter)
+	this.Equal("orders_service", nameAfter)
+	this.Equal(1, this.countRows("participants"))
 
-	s.Equal(contractsBefore, s.countRows("contracts"))
-	s.Equal(resourcesBefore, s.countRows("resources"))
-	s.Equal(deploymentsBefore, s.countRows("deployments"))
-	s.Equal(contractsBefore, s.renameRowsReferencing("contracts", originalID))
-	s.Equal(resourcesBefore, s.renameRowsReferencing("resources", originalID))
-	s.Equal(deploymentsBefore, s.renameRowsReferencing("deployments", originalID))
+	this.Equal(contractsBefore, this.countRows("contracts"))
+	this.Equal(resourcesBefore, this.countRows("resources"))
+	this.Equal(deploymentsBefore, this.countRows("deployments"))
+	this.Equal(contractsBefore, this.renameRowsReferencing("contracts", originalID))
+	this.Equal(resourcesBefore, this.renameRowsReferencing("resources", originalID))
+	this.Equal(deploymentsBefore, this.renameRowsReferencing("deployments", originalID))
 }
 
-func (s *IntegrationSuite) TestRenameParticipant_OntoExistingNameIsRejectedNeverMerged() {
-	status, _ := s.post("/api/participants", renamePetsBody)
-	s.Require().Equal(http.StatusOK, status)
-	status, _ = s.post("/api/participants", renameOrdersBody)
-	s.Require().Equal(http.StatusOK, status)
+func (this *IntegrationSuite) TestRenameParticipant_OntoExistingNameIsRejectedNeverMerged() {
+	status, _ := this.post("/api/participants", renamePetsBody)
+	this.Require().Equal(http.StatusOK, status)
+	status, _ = this.post("/api/participants", renameOrdersBody)
+	this.Require().Equal(http.StatusOK, status)
 
-	petsID := s.renameParticipantID("pets_service")
-	ordersID := s.renameParticipantID("orders_service")
+	petsID := this.renameParticipantID("pets_service")
+	ordersID := this.renameParticipantID("orders_service")
 
-	status, body := s.post("/api/participants/rename", `{"oldName":"pets_service","newName":"orders_service"}`)
-	s.Equal(http.StatusConflict, status)
-	s.JSONEq(`{"message":"participant already exists"}`, body)
+	status, body := this.post("/api/participants/rename", `{"oldName":"pets_service","newName":"orders_service"}`)
+	this.Equal(http.StatusConflict, status)
+	this.JSONEq(`{"message":"participant already exists"}`, body)
 
-	s.Equal(2, s.countRows("participants"))
-	s.Equal(petsID, s.renameParticipantID("pets_service"))
-	s.Equal(ordersID, s.renameParticipantID("orders_service"))
+	this.Equal(2, this.countRows("participants"))
+	this.Equal(petsID, this.renameParticipantID("pets_service"))
+	this.Equal(ordersID, this.renameParticipantID("orders_service"))
 }
 
-func (s *IntegrationSuite) TestRenameParticipant_UnknownParticipantReturns404() {
-	status, body := s.post("/api/participants/rename", `{"oldName":"unknown_service","newName":"orders_service"}`)
-	s.Equal(http.StatusNotFound, status)
-	s.JSONEq(`{"message":"participant not found"}`, body)
+func (this *IntegrationSuite) TestRenameParticipant_UnknownParticipantReturns404() {
+	status, body := this.post("/api/participants/rename", `{"oldName":"unknown_service","newName":"orders_service"}`)
+	this.Equal(http.StatusNotFound, status)
+	this.JSONEq(`{"message":"participant not found"}`, body)
 
-	s.Equal(0, s.countRows("participants"))
+	this.Equal(0, this.countRows("participants"))
 }
 
-func (s *IntegrationSuite) TestRenameParticipant_MissingNewNameReturns400() {
-	status, _ := s.post("/api/participants", renamePetsBody)
-	s.Require().Equal(http.StatusOK, status)
+func (this *IntegrationSuite) TestRenameParticipant_MissingNewNameReturns400() {
+	status, _ := this.post("/api/participants", renamePetsBody)
+	this.Require().Equal(http.StatusOK, status)
 
-	status, body := s.post("/api/participants/rename", `{"oldName":"pets_service"}`)
-	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"participant invalid input"}`, body)
+	status, body := this.post("/api/participants/rename", `{"oldName":"pets_service"}`)
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(`{"message":"participant invalid input"}`, body)
 
-	s.Equal(1, s.countRows("participants"))
-	s.NotZero(s.renameParticipantID("pets_service"))
+	this.Equal(1, this.countRows("participants"))
+	this.NotZero(this.renameParticipantID("pets_service"))
 }
 
-func (s *IntegrationSuite) TestRenameParticipant_EmptyNewNameReturns400() {
-	status, _ := s.post("/api/participants", renamePetsBody)
-	s.Require().Equal(http.StatusOK, status)
+func (this *IntegrationSuite) TestRenameParticipant_EmptyNewNameReturns400() {
+	status, _ := this.post("/api/participants", renamePetsBody)
+	this.Require().Equal(http.StatusOK, status)
 
-	status, body := s.post("/api/participants/rename", `{"oldName":"pets_service","newName":""}`)
-	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"participant invalid input"}`, body)
+	status, body := this.post("/api/participants/rename", `{"oldName":"pets_service","newName":""}`)
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(`{"message":"participant invalid input"}`, body)
 
-	s.Equal(1, s.countRows("participants"))
-	s.NotZero(s.renameParticipantID("pets_service"))
+	this.Equal(1, this.countRows("participants"))
+	this.NotZero(this.renameParticipantID("pets_service"))
 }
 
-func (s *IntegrationSuite) TestRenameParticipant_SameNameIsNoOpSuccess() {
-	status, _ := s.post("/api/participants", renamePetsBody)
-	s.Require().Equal(http.StatusOK, status)
-	originalID := s.renameParticipantID("pets_service")
+func (this *IntegrationSuite) TestRenameParticipant_SameNameIsNoOpSuccess() {
+	status, _ := this.post("/api/participants", renamePetsBody)
+	this.Require().Equal(http.StatusOK, status)
+	originalID := this.renameParticipantID("pets_service")
 
-	status, body := s.post("/api/participants/rename", `{"oldName":"pets_service","newName":"pets_service"}`)
-	s.Equal(http.StatusOK, status)
-	s.JSONEq(`{"message":"participant renamed"}`, body)
+	status, body := this.post("/api/participants/rename", `{"oldName":"pets_service","newName":"pets_service"}`)
+	this.Equal(http.StatusOK, status)
+	this.JSONEq(`{"message":"participant renamed"}`, body)
 
-	s.Equal(1, s.countRows("participants"))
-	s.Equal(originalID, s.renameParticipantID("pets_service"))
+	this.Equal(1, this.countRows("participants"))
+	this.Equal(originalID, this.renameParticipantID("pets_service"))
 }
 
-func (s *IntegrationSuite) renameParticipantID(name string) int64 {
+func (this *IntegrationSuite) renameParticipantID(name string) int64 {
 	var id int64
-	err := s.Pool.QueryRow(context.Background(),
+	err := this.Pool.QueryRow(context.Background(),
 		`SELECT id FROM participants WHERE name = $1`, name,
 	).Scan(&id)
-	s.Require().NoError(err)
+	this.Require().NoError(err)
 	return id
 }
 
-func (s *IntegrationSuite) renameRowsReferencing(table string, participantID int64) int {
+func (this *IntegrationSuite) renameRowsReferencing(table string, participantID int64) int {
 	var count int
-	err := s.Pool.QueryRow(context.Background(),
+	err := this.Pool.QueryRow(context.Background(),
 		fmt.Sprintf("SELECT count(*) FROM %s WHERE participant_id = $1", table), participantID,
 	).Scan(&count)
-	s.Require().NoError(err)
+	this.Require().NoError(err)
 	return count
 }
