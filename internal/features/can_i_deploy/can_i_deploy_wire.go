@@ -1,7 +1,7 @@
 package can_i_deploy
 
 import (
-	"github.com/bidirekt/broker/internal/features/can_i_deploy/compatibility_checker"
+	"github.com/bidirekt/broker/internal/contracts/compatibility_checker"
 )
 
 const ContractChecked = "contract checked successfully"

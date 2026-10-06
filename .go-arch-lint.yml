@@ -8,14 +8,15 @@ allow:
 components:
   cmd:                        { in: cmd/** }
   bootstrap:                  { in: internal }
-  feature_can_i_deploy:       { in: internal/features/can_i_deploy/** }
+  feature_can_i_deploy:       { in: internal/features/can_i_deploy }
   feature_create_environment: { in: internal/features/create_environment }
   feature_create_participant: { in: internal/features/create_participant }
   feature_health:             { in: internal/features/health }
-  feature_publish_contract:   { in: internal/features/publish_contract/** }
+  feature_publish_contract:   { in: internal/features/publish_contract }
   feature_record_deployment:  { in: internal/features/record_deployment }
   feature_rename_participant: { in: internal/features/rename_participant }
   components:                 { in: internal/components }
+  contracts:                  { in: internal/contracts/** }
   repository:                 { in: internal/repository }
   model:                      { in: internal/model }
   validations:                { in: internal/validations }
@@ -48,7 +49,7 @@ deps:
     canUse: [fiber]
 
   feature_can_i_deploy:
-    mayDependOn: [feature_can_i_deploy, components, repository, model, validations]
+    mayDependOn: [contracts, components, repository, model, validations]
     canUse: [fiber, guregu_null]
   feature_create_environment:
     mayDependOn: [components, repository, model, validations]
@@ -60,8 +61,8 @@ deps:
     mayDependOn: [components]
     canUse: [fiber]
   feature_publish_contract:
-    mayDependOn: [feature_publish_contract, components, repository, model, validations]
-    canUse: [fiber, guregu_null, yaml]
+    mayDependOn: [contracts, components, repository, model, validations]
+    canUse: [fiber, guregu_null]
   feature_record_deployment:
     mayDependOn: [components, repository, model, validations]
     canUse: [fiber, guregu_null]
@@ -72,6 +73,9 @@ deps:
   components:
     mayDependOn: [model, pkg, migrations]
     canUse: [fiber, pgx]
+  contracts:
+    mayDependOn: [contracts, model, validations]
+    canUse: [yaml, guregu_null]
   repository:
     mayDependOn: [model, validations]
     canUse: [pgx, guregu_null]
@@ -86,6 +90,7 @@ deps:
     mayDependOn:
       - bootstrap
       - components
+      - contracts
       - feature_can_i_deploy
       - feature_create_environment
       - feature_create_participant

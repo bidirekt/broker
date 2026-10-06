@@ -3,7 +3,7 @@ package can_i_deploy
 import (
 	"context"
 
-	"github.com/bidirekt/broker/internal/features/can_i_deploy/compatibility_checker"
+	"github.com/bidirekt/broker/internal/contracts/compatibility_checker"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/bidirekt/broker/internal/repository"
 	"github.com/gofiber/fiber/v3"
