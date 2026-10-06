@@ -2,14 +2,12 @@ package publish_contract
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 
-	"github.com/bidirekt/broker/internal/features/publish_contract/contract"
-	"github.com/bidirekt/broker/internal/features/publish_contract/contract_differ"
-	"github.com/bidirekt/broker/internal/features/publish_contract/descriptor"
-	"github.com/bidirekt/broker/internal/features/publish_contract/mapper/fragmentmapper"
-	"github.com/bidirekt/broker/internal/features/publish_contract/validator"
-	"github.com/bidirekt/broker/internal/features/publish_contract/violation"
+	"github.com/bidirekt/broker/internal/contracts/contract_differ"
+	"github.com/bidirekt/broker/internal/contracts/contractfiles"
+	"github.com/bidirekt/broker/internal/contracts/violation"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/bidirekt/broker/internal/repository"
 	"github.com/gofiber/fiber/v3"
@@ -42,23 +40,13 @@ func (this *PublishContractHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondInvalidInput(ctx)
 	}
 
-	fragments := make([]contract.Fragment, 0, len(requestBody.Contracts))
-	for _, uploaded := range requestBody.Contracts {
-		if strings.TrimSpace(uploaded.Source) == "" {
-			return this.respondInvalidInput(ctx)
-		}
-
-		fragment, err := decodeFragment(uploaded)
-		if err != nil {
-			return this.respondBadRequest(ctx, err)
-		}
-
-		fragments = append(fragments, fragment)
+	fragments, shapeViolations, err := contractfiles.ToFragments(requestBody.Contracts)
+	if errors.Is(err, contractfiles.ErrBlankSource) {
+		return this.respondInvalidInput(ctx)
 	}
 
-	var shapeViolations []violation.Violation
-	for _, fragment := range contract.SortedBySource(fragments) {
-		shapeViolations = append(shapeViolations, descriptor.Validate(descriptor.Contract, fragment.Document, fragment.Source)...)
+	if err != nil {
+		return this.respondBadRequest(ctx, err)
 	}
 
 	if len(shapeViolations) > 0 {
@@ -70,21 +58,15 @@ func (this *PublishContractHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondParticipantNotFound(ctx)
 	}
 
-	declarations := fragmentmapper.ToDeclarations(fragments)
+	contractContent, _ := json.Marshal(requestBody.Contracts)
 
-	if violations := validator.Validate(declarations); len(violations) > 0 {
+	uploadedContract, violations, err := contractfiles.ToUploadedContract(fragments, participant, version, string(contractContent))
+	if len(violations) > 0 {
 		return this.respondValidationFailed(ctx, violations)
 	}
 
-	resources := fragmentmapper.ToResourceModels(declarations)
-
-	contractContent, _ := json.Marshal(requestBody.Contracts)
-
-	uploadedContract := model.NewUploadedContract(participant.ID, participant.Name, version, string(contractContent))
-	for _, resource := range resources {
-		if err := uploadedContract.AddResource(&resource); err != nil {
-			return this.respondPublishFailed(ctx)
-		}
+	if err != nil {
+		return this.respondPublishFailed(ctx)
 	}
 
 	if existing, found := this.contractRepository.LoadChecksumForVersion(ctx.Context(), uploadedContract.ParticipantID, version); found {

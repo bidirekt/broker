@@ -1,7 +1,8 @@
 package publish_contract
 
 import (
-	"github.com/bidirekt/broker/internal/features/publish_contract/violation"
+	"github.com/bidirekt/broker/internal/contracts/contractfiles"
+	"github.com/bidirekt/broker/internal/contracts/violation"
 )
 
 const (
@@ -13,15 +14,10 @@ const (
 	ContractPublishFailed       string = "contract publish failed"
 )
 
-type ContractFragment struct {
-	Source  string `json:"source"`
-	Content string `json:"content"`
-}
-
 type PublishContractRequestBody struct {
-	ServiceName string             `json:"participant"`
-	Version     string             `json:"version"`
-	Contracts   []ContractFragment `json:"contracts"`
+	ServiceName string               `json:"participant"`
+	Version     string               `json:"version"`
+	Contracts   []contractfiles.File `json:"contracts"`
 }
 
 type PublishContractResponseBody struct {
