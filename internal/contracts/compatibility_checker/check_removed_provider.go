@@ -4,7 +4,7 @@ import "github.com/bidirekt/broker/internal/model"
 
 // checkRemovedProvider runs outside the pair cache: the pair verdict may have been stored by
 // the consumer's own check, which never sees the removal, so it is always resolved live.
-func (c *CompatibilityChecker) checkRemovedProvider(
+func (this *CompatibilityChecker) checkRemovedProvider(
 	removedResource model.PersistedResource,
 	counterparts model.ResourceCounterparts,
 	report *ContractCompatibilityReport,

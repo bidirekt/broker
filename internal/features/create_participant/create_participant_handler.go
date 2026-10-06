@@ -19,44 +19,44 @@ func NewCreateParticipantHandler(
 	}
 }
 
-func (ctr *CreateParticipantHandler) Handle(ctx fiber.Ctx) error {
+func (this *CreateParticipantHandler) Handle(ctx fiber.Ctx) error {
 	requestBody := &CreateParticipantRequestBody{}
 	if err := ctx.Bind().JSON(requestBody); err != nil {
-		return ctr.respondInvalidInput(ctx)
+		return this.respondInvalidInput(ctx)
 	}
 
 	if requestBody.Participant == "" {
-		return ctr.respondInvalidInput(ctx)
+		return this.respondInvalidInput(ctx)
 	}
 
 	if validations.ParticipantName(requestBody.Participant) != nil {
-		return ctr.respondInvalidName(ctx)
+		return this.respondInvalidName(ctx)
 	}
 
-	if ctr.participantRepository.ExistsByName(ctx.Context(), requestBody.Participant) {
-		return ctr.respondAlreadyExists(ctx)
+	if this.participantRepository.ExistsByName(ctx.Context(), requestBody.Participant) {
+		return this.respondAlreadyExists(ctx)
 	}
 
-	ctr.participantRepository.Create(ctx.Context(), model.NewParticipant(requestBody.Participant))
+	this.participantRepository.Create(ctx.Context(), model.NewParticipant(requestBody.Participant))
 
 	return ctx.Status(fiber.StatusOK).JSON(CreateParticipantResponseBody{
 		Message: ParticipantCreated,
 	})
 }
 
-func (ctr *CreateParticipantHandler) respondInvalidInput(ctx fiber.Ctx) error {
+func (this *CreateParticipantHandler) respondInvalidInput(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(CreateParticipantResponseBody{
 		Message: ParticipantInvalidInput,
 	})
 }
 
-func (ctr *CreateParticipantHandler) respondInvalidName(ctx fiber.Ctx) error {
+func (this *CreateParticipantHandler) respondInvalidName(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(CreateParticipantResponseBody{
 		Message: ParticipantNameNotSnakeCase,
 	})
 }
 
-func (ctr *CreateParticipantHandler) respondAlreadyExists(ctx fiber.Ctx) error {
+func (this *CreateParticipantHandler) respondAlreadyExists(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusOK).JSON(CreateParticipantResponseBody{
 		Message: ParticipantAlreadyExists,
 	})

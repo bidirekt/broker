@@ -7,7 +7,7 @@ import (
 )
 
 // LoadCounterparts loads the deployed counterparts of the contract's resources in the environment, once per hash and side.
-func (r *ContractRepository) LoadCounterparts(
+func (this *ContractRepository) LoadCounterparts(
 	ctx context.Context,
 	contract *model.PersistedContract,
 	environmentID int64,
@@ -28,7 +28,7 @@ func (r *ContractRepository) LoadCounterparts(
 
 			providersQueried[resource.ProviderHash] = true
 
-			provider, err := r.GetProviderResourceByConsumerResource(ctx, resource.ProviderHash, environmentID)
+			provider, err := this.GetProviderResourceByConsumerResource(ctx, resource.ProviderHash, environmentID)
 			if err == nil {
 				counterparts.Providers[resource.ProviderHash] = provider
 			}
@@ -37,7 +37,7 @@ func (r *ContractRepository) LoadCounterparts(
 				continue
 			}
 
-			counterparts.Consumers[resource.ProviderHash] = r.GetConsumersResourcesByProviderHashAndEnvironmentID(
+			counterparts.Consumers[resource.ProviderHash] = this.GetConsumersResourcesByProviderHashAndEnvironmentID(
 				ctx,
 				resource.ProviderHash,
 				environmentID,

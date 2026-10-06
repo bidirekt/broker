@@ -65,8 +65,8 @@ func NewDeploymentRepository(pool *pgxpool.Pool) *DeploymentRepository {
 	return &DeploymentRepository{pool: pool}
 }
 
-func (r *DeploymentRepository) Insert(ctx context.Context, d *model.Deployment) {
-	err := r.pool.QueryRow(
+func (this *DeploymentRepository) Insert(ctx context.Context, d *model.Deployment) {
+	err := this.pool.QueryRow(
 		ctx,
 		insertDeploymentQuery,
 		d.Participant.ID,
@@ -81,9 +81,9 @@ func (r *DeploymentRepository) Insert(ctx context.Context, d *model.Deployment) 
 	}
 }
 
-func (r *DeploymentRepository) CurrentVersionInEnv(ctx context.Context, participantID int64, environmentID int64) (string, bool) {
+func (this *DeploymentRepository) CurrentVersionInEnv(ctx context.Context, participantID int64, environmentID int64) (string, bool) {
 	var version string
-	err := r.pool.QueryRow(ctx, currentVersionInEnvQuery, participantID, environmentID).Scan(&version)
+	err := this.pool.QueryRow(ctx, currentVersionInEnvQuery, participantID, environmentID).Scan(&version)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", false
 	}
@@ -93,8 +93,8 @@ func (r *DeploymentRepository) CurrentVersionInEnv(ctx context.Context, particip
 	return version, true
 }
 
-func (r *DeploymentRepository) ListCurrentDeploymentsInEnv(ctx context.Context, environmentID int64) []model.Deployment {
-	rows, err := r.pool.Query(ctx, listCurrentDeploymentsInEnvQuery, environmentID)
+func (this *DeploymentRepository) ListCurrentDeploymentsInEnv(ctx context.Context, environmentID int64) []model.Deployment {
+	rows, err := this.pool.Query(ctx, listCurrentDeploymentsInEnvQuery, environmentID)
 	if err != nil {
 		panic(fmt.Errorf("error listing current deployments in env: %w", err))
 	}

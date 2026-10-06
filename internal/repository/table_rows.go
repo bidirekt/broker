@@ -46,57 +46,57 @@ type tableRow struct {
 	DeploymentVersion     sql.NullString
 }
 
-func (c *tableRow) toPersistedContractModel() *model.PersistedContract {
+func (this *tableRow) toPersistedContractModel() *model.PersistedContract {
 	return &model.PersistedContract{
-		ID:              c.ContractID,
-		ParticipantID:   c.ParticipantID,
-		ParticipantName: c.ParticipantName,
-		Version:         c.ContractVersion,
-		ContractContent: c.ContractContent,
+		ID:              this.ContractID,
+		ParticipantID:   this.ParticipantID,
+		ParticipantName: this.ParticipantName,
+		Version:         this.ContractVersion,
+		ContractContent: this.ContractContent,
 		Resources:       make(map[string]model.PersistedResource),
 	}
 }
 
-func (c *tableRow) toResourceModel() model.PersistedResource {
+func (this *tableRow) toResourceModel() model.PersistedResource {
 	resource := model.PersistedResource{
-		Direction:        model.Direction(c.ResourceDirection),
-		Interaction:      model.Interaction(c.ResourceInteraction),
-		Endpoint:         c.ResourceEndpoint,
-		Method:           c.ResourceMethod,
+		Direction:        model.Direction(this.ResourceDirection),
+		Interaction:      model.Interaction(this.ResourceInteraction),
+		Endpoint:         this.ResourceEndpoint,
+		Method:           this.ResourceMethod,
 		Properties:       make(map[string]model.Property),
 		DeployedVersions: make(map[string]string),
-		ParticipantName:  c.ParticipantName,
-		ParticipantID:    c.ParticipantID,
-		ContractID:       c.ContractID,
-		ProviderHash:     c.ResourceProviderHash,
-		Removed:          c.ResourceVersionChangeType == string(model.ChangeRemoved),
+		ParticipantName:  this.ParticipantName,
+		ParticipantID:    this.ParticipantID,
+		ContractID:       this.ContractID,
+		ProviderHash:     this.ResourceProviderHash,
+		Removed:          this.ResourceVersionChangeType == string(model.ChangeRemoved),
 	}
 
-	if c.ResourceVersion != "" {
-		resource.ParticipantVersion = null.StringFrom(c.ResourceVersion)
+	if this.ResourceVersion != "" {
+		resource.ParticipantVersion = null.StringFrom(this.ResourceVersion)
 	}
 
-	if c.ResourceConsumedProvider.String != "" {
-		resource.ConsumedProvider = null.StringFrom(c.ResourceConsumedProvider.String)
+	if this.ResourceConsumedProvider.String != "" {
+		resource.ConsumedProvider = null.StringFrom(this.ResourceConsumedProvider.String)
 	}
 
-	if c.ResourceResponseStatusCode.String != "" {
-		resource.ResponseStatusCode = null.StringFrom(c.ResourceResponseStatusCode.String)
+	if this.ResourceResponseStatusCode.String != "" {
+		resource.ResponseStatusCode = null.StringFrom(this.ResourceResponseStatusCode.String)
 	}
 
-	if c.ResourceConsumerHash.String != "" {
-		resource.ConsumerHash = null.StringFrom(c.ResourceConsumerHash.String)
+	if this.ResourceConsumerHash.String != "" {
+		resource.ConsumerHash = null.StringFrom(this.ResourceConsumerHash.String)
 	}
 
 	return resource
 }
 
-func (c *tableRow) toPropertyModel() model.Property {
+func (this *tableRow) toPropertyModel() model.Property {
 	return model.Property{
-		ID:       c.PropertyID,
-		Path:     c.PropertyPath,
-		Type:     c.PropertyVersionType.String,
-		Optional: c.PropertyVersionOptional.Bool,
+		ID:       this.PropertyID,
+		Path:     this.PropertyPath,
+		Type:     this.PropertyVersionType.String,
+		Optional: this.PropertyVersionOptional.Bool,
 	}
 }
 

@@ -31,25 +31,25 @@ func NewUploadedContract(
 }
 
 // AddResource keys the resource by its hash and rejects a hash already taken.
-func (contract *UploadedContract) AddResource(resource *UploadedResource) error {
-	if contract.Resources == nil {
-		contract.Resources = make(map[string]UploadedResource)
+func (this *UploadedContract) AddResource(resource *UploadedResource) error {
+	if this.Resources == nil {
+		this.Resources = make(map[string]UploadedResource)
 	}
 
-	resource.ParticipantName = contract.ParticipantName
+	resource.ParticipantName = this.ParticipantName
 	hash := resource.PrimaryHash()
 
-	if _, taken := contract.Resources[hash]; taken {
+	if _, taken := this.Resources[hash]; taken {
 		return fmt.Errorf("resource already added: %s", resource.Describe())
 	}
 
-	contract.Resources[hash] = *resource
+	this.Resources[hash] = *resource
 
 	return nil
 }
 
-func (contract *UploadedContract) Checksum() string {
-	payload, _ := json.Marshal(contract.Resources)
+func (this *UploadedContract) Checksum() string {
+	payload, _ := json.Marshal(this.Resources)
 	sum := sha256.Sum256(payload)
 	return hex.EncodeToString(sum[:])
 }

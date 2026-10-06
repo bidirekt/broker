@@ -122,46 +122,46 @@ const frontV2ConsumerContract = `
   }
 }`
 
-func (s *IntegrationSuite) TestCanIDeploy_HappyPath() {
+func (this *IntegrationSuite) TestCanIDeploy_HappyPath() {
 	mustPost := func(path, body string) {
-		status, _ := s.post(path, body)
-		s.Require().Equalf(http.StatusOK, status, "POST %s", path)
+		status, _ := this.post(path, body)
+		this.Require().Equalf(http.StatusOK, status, "POST %s", path)
 	}
 
 	mustPost("/api/participants", `{"participant":"api"}`)
-	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.yaml", apiV1ProviderContract}))
+	mustPost("/api/contracts", this.publishBody("api", "v1", contractFragment{"api.yaml", apiV1ProviderContract}))
 	mustPost("/api/environments", `{"environment":"production"}`)
 	mustPost("/api/deployments", `{"participant":"api","version":"v1","environment":"production"}`)
 	mustPost("/api/participants", `{"participant":"front"}`)
-	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.yaml", frontV1ConsumerContract}))
+	mustPost("/api/contracts", this.publishBody("front", "v1", contractFragment{"api.yaml", frontV1ConsumerContract}))
 
-	status, body := s.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
-	s.Equal(http.StatusOK, status)
+	status, body := this.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
+	this.Equal(http.StatusOK, status)
 
 	var v1Got canIDeployResponse
-	s.Require().NoError(json.Unmarshal([]byte(body), &v1Got))
-	s.True(v1Got.Deployable)
-	s.Equal("front", v1Got.Participant)
-	s.Equal("v1", v1Got.Version)
-	s.Equal("production", v1Got.Environment)
+	this.Require().NoError(json.Unmarshal([]byte(body), &v1Got))
+	this.True(v1Got.Deployable)
+	this.Equal("front", v1Got.Participant)
+	this.Equal("v1", v1Got.Version)
+	this.Equal("production", v1Got.Environment)
 
-	s.Require().Len(v1Got.Results, 1)
+	this.Require().Len(v1Got.Results, 1)
 	v1Api := v1Got.Results["api"]
-	s.True(v1Api.Deployable)
-	s.Require().NotNil(v1Api.ParticipantVersion)
-	s.Equal("v1", *v1Api.ParticipantVersion)
+	this.True(v1Api.Deployable)
+	this.Require().NotNil(v1Api.ParticipantVersion)
+	this.Equal("v1", *v1Api.ParticipantVersion)
 	// compatible counterparts render "endpoints":{}, never null
-	s.Contains(body, `"endpoints":{}`)
-	s.Require().NotNil(v1Api.Endpoints)
-	s.Empty(v1Api.Endpoints)
+	this.Contains(body, `"endpoints":{}`)
+	this.Require().NotNil(v1Api.Endpoints)
+	this.Empty(v1Api.Endpoints)
 
-	s.Equal(1, s.countRows("compatibility_checks"))
-	s.Equal(1, s.countRows("compatibility_check_results"))
-	s.Equal(1, s.countRows("compatibility_verdicts"))
+	this.Equal(1, this.countRows("compatibility_checks"))
+	this.Equal(1, this.countRows("compatibility_check_results"))
+	this.Equal(1, this.countRows("compatibility_verdicts"))
 
 	var v1Deployable, v1ResultDeployable, v1VerdictDeployable bool
 	var v1Breaks string
-	s.Require().NoError(s.Pool.QueryRow(context.Background(),
+	this.Require().NoError(this.Pool.QueryRow(context.Background(),
 		`SELECT ch.deployable, r.deployable, v.deployable, v.breaks::text
 		   FROM compatibility_checks ch
 		   JOIN compatibility_check_results r ON r.check_id = ch.id
@@ -170,46 +170,46 @@ func (s *IntegrationSuite) TestCanIDeploy_HappyPath() {
 		    AND v.contract_id_two = r.verdict_contract_id_two
 		  WHERE ch.version = 'v1'`).
 		Scan(&v1Deployable, &v1ResultDeployable, &v1VerdictDeployable, &v1Breaks))
-	s.True(v1Deployable)
-	s.True(v1ResultDeployable)
-	s.True(v1VerdictDeployable)
-	s.Equal("[]", v1Breaks)
+	this.True(v1Deployable)
+	this.True(v1ResultDeployable)
+	this.True(v1VerdictDeployable)
+	this.Equal("[]", v1Breaks)
 
 	mustPost("/api/deployments", `{"participant":"front","version":"v1","environment":"production"}`)
-	mustPost("/api/contracts", s.publishBody("front", "v2", contractFragment{"api.yaml", frontV2ConsumerContract}))
+	mustPost("/api/contracts", this.publishBody("front", "v2", contractFragment{"api.yaml", frontV2ConsumerContract}))
 
-	status, body = s.post("/api/can-i-deploy", `{"participant":"front","version":"v2","environment":"production"}`)
-	s.Equal(http.StatusOK, status)
+	status, body = this.post("/api/can-i-deploy", `{"participant":"front","version":"v2","environment":"production"}`)
+	this.Equal(http.StatusOK, status)
 
 	var got canIDeployResponse
-	s.Require().NoError(json.Unmarshal([]byte(body), &got))
-	s.False(got.Deployable)
-	s.Equal("front", got.Participant)
-	s.Equal("v2", got.Version)
-	s.Equal("production", got.Environment)
+	this.Require().NoError(json.Unmarshal([]byte(body), &got))
+	this.False(got.Deployable)
+	this.Equal("front", got.Participant)
+	this.Equal("v2", got.Version)
+	this.Equal("production", got.Environment)
 
 	// break leaves are slim {reason, role, details} — no resources on the wire
-	s.NotContains(body, "checkedResource")
-	s.NotContains(body, "counterpartResource")
+	this.NotContains(body, "checkedResource")
+	this.NotContains(body, "counterpartResource")
 
-	s.Require().Len(got.Results, 1)
+	this.Require().Len(got.Results, 1)
 	api := got.Results["api"]
-	s.False(api.Deployable)
-	s.Require().NotNil(api.ParticipantVersion)
-	s.Equal("v1", *api.ParticipantVersion)
+	this.False(api.Deployable)
+	this.Require().NotNil(api.ParticipantVersion)
+	this.Equal("v1", *api.ParticipantVersion)
 
-	s.Require().Len(api.Endpoints, 1)
-	s.Require().Len(api.Endpoints["/things"], 1)
-	s.Require().Len(api.Endpoints["/things"]["get"], 1)
+	this.Require().Len(api.Endpoints, 1)
+	this.Require().Len(api.Endpoints["/things"], 1)
+	this.Require().Len(api.Endpoints["/things"]["get"], 1)
 	breaks := api.Endpoints["/things"]["get"]["200"]
-	s.Require().Len(breaks, 2)
+	this.Require().Len(breaks, 2)
 
 	byReason := breaksByReason(breaks)
 
 	typeMismatch, ok := byReason["property_type_mismatch"]
-	s.Require().True(ok)
-	s.Equal("consumer", typeMismatch.Role)
-	s.Equal(map[string]string{
+	this.Require().True(ok)
+	this.Equal("consumer", typeMismatch.Role)
+	this.Equal(map[string]string{
 		"property":             "$.id",
 		"consumerName":         "front",
 		"providerName":         "api",
@@ -218,17 +218,17 @@ func (s *IntegrationSuite) TestCanIDeploy_HappyPath() {
 	}, typeMismatch.Details)
 
 	missing, ok := byReason["property_missing_in_provider"]
-	s.Require().True(ok)
-	s.Equal("consumer", missing.Role)
-	s.Equal(map[string]string{"property": "$.name", "consumerName": "front", "providerName": "api", "propertyType": "string"}, missing.Details)
+	this.Require().True(ok)
+	this.Equal("consumer", missing.Role)
+	this.Equal(map[string]string{"property": "$.name", "consumerName": "front", "providerName": "api", "propertyType": "string"}, missing.Details)
 
-	s.Equal(2, s.countRows("compatibility_checks"))
-	s.Equal(2, s.countRows("compatibility_check_results"))
-	s.Equal(2, s.countRows("compatibility_verdicts"))
+	this.Equal(2, this.countRows("compatibility_checks"))
+	this.Equal(2, this.countRows("compatibility_check_results"))
+	this.Equal(2, this.countRows("compatibility_verdicts"))
 
 	var v2Deployable, v2VerdictDeployable bool
 	var v2Breaks []byte
-	s.Require().NoError(s.Pool.QueryRow(context.Background(),
+	this.Require().NoError(this.Pool.QueryRow(context.Background(),
 		`SELECT ch.deployable, v.deployable, v.breaks
 		   FROM compatibility_checks ch
 		   JOIN compatibility_check_results r ON r.check_id = ch.id
@@ -237,23 +237,23 @@ func (s *IntegrationSuite) TestCanIDeploy_HappyPath() {
 		    AND v.contract_id_two = r.verdict_contract_id_two
 		  WHERE ch.version = 'v2'`).
 		Scan(&v2Deployable, &v2VerdictDeployable, &v2Breaks))
-	s.False(v2Deployable)
-	s.False(v2VerdictDeployable)
+	this.False(v2Deployable)
+	this.False(v2VerdictDeployable)
 
 	var storedBreaks []verdictBreakJSON
-	s.Require().NoError(json.Unmarshal(v2Breaks, &storedBreaks))
-	s.Require().Len(storedBreaks, 2)
+	this.Require().NoError(json.Unmarshal(v2Breaks, &storedBreaks))
+	this.Require().Len(storedBreaks, 2)
 
 	storedByReason := map[string]verdictBreakJSON{}
 	for _, stored := range storedBreaks {
-		s.Equal("/things", stored.Endpoint)
-		s.Equal("get", stored.Method)
-		s.Equal("200", stored.Interaction)
+		this.Equal("/things", stored.Endpoint)
+		this.Equal("get", stored.Method)
+		this.Equal("200", stored.Interaction)
 		storedByReason[stored.Reason] = stored
 	}
 
-	s.Equal(typeMismatch.Details, storedByReason["property_type_mismatch"].Details)
-	s.Equal(missing.Details, storedByReason["property_missing_in_provider"].Details)
+	this.Equal(typeMismatch.Details, storedByReason["property_type_mismatch"].Details)
+	this.Equal(missing.Details, storedByReason["property_missing_in_provider"].Details)
 }
 
 const providerCheckedConsumerContract = `
@@ -281,42 +281,42 @@ const providerCheckedConsumerContract = `
   }
 }`
 
-func (s *IntegrationSuite) TestCanIDeploy_ProviderCheckedAgainstDeployedConsumer() {
+func (this *IntegrationSuite) TestCanIDeploy_ProviderCheckedAgainstDeployedConsumer() {
 	mustPost := func(path, body string) {
-		status, _ := s.post(path, body)
-		s.Require().Equalf(http.StatusOK, status, "POST %s", path)
+		status, _ := this.post(path, body)
+		this.Require().Equalf(http.StatusOK, status, "POST %s", path)
 	}
 
 	mustPost("/api/participants", `{"participant":"api"}`)
 	mustPost("/api/participants", `{"participant":"front"}`)
 	mustPost("/api/environments", `{"environment":"production"}`)
-	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.yaml", providerCheckedConsumerContract}))
+	mustPost("/api/contracts", this.publishBody("front", "v1", contractFragment{"api.yaml", providerCheckedConsumerContract}))
 	mustPost("/api/deployments", `{"participant":"front","version":"v1","environment":"production"}`)
-	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.yaml", apiV1ProviderContract}))
+	mustPost("/api/contracts", this.publishBody("api", "v1", contractFragment{"api.yaml", apiV1ProviderContract}))
 
-	status, body := s.post("/api/can-i-deploy", `{"participant":"api","version":"v1","environment":"production"}`)
-	s.Equal(http.StatusOK, status)
+	status, body := this.post("/api/can-i-deploy", `{"participant":"api","version":"v1","environment":"production"}`)
+	this.Equal(http.StatusOK, status)
 
 	var got canIDeployResponse
-	s.Require().NoError(json.Unmarshal([]byte(body), &got))
-	s.False(got.Deployable)
-	s.Equal("api", got.Participant)
-	s.Equal("v1", got.Version)
+	this.Require().NoError(json.Unmarshal([]byte(body), &got))
+	this.False(got.Deployable)
+	this.Equal("api", got.Participant)
+	this.Equal("v1", got.Version)
 
-	s.Require().Len(got.Results, 1)
+	this.Require().Len(got.Results, 1)
 	front := got.Results["front"]
-	s.False(front.Deployable)
-	s.Require().NotNil(front.ParticipantVersion)
-	s.Equal("v1", *front.ParticipantVersion)
+	this.False(front.Deployable)
+	this.Require().NotNil(front.ParticipantVersion)
+	this.Equal("v1", *front.ParticipantVersion)
 
 	breaks := front.Endpoints["/things"]["get"]["200"]
-	s.Require().Len(breaks, 1)
+	this.Require().Len(breaks, 1)
 
 	b := breaks[0]
-	s.Equal("property_type_mismatch", b.Reason)
-	s.Equal("provider", b.Role)
+	this.Equal("property_type_mismatch", b.Reason)
+	this.Equal("provider", b.Role)
 	// types resolved by role even though the provider is the checked side
-	s.Equal(map[string]string{
+	this.Equal(map[string]string{
 		"property":             "$.id",
 		"consumerName":         "front",
 		"providerName":         "api",
@@ -339,60 +339,60 @@ const appV1ThreeDependenciesContract = `
   }
 }`
 
-func (s *IntegrationSuite) TestCanIDeploy_RecordsOneRowPerDependency() {
-	status, _ := s.post("/api/participants", `{"participant":"app"}`)
-	s.Require().Equal(http.StatusOK, status)
+func (this *IntegrationSuite) TestCanIDeploy_RecordsOneRowPerDependency() {
+	status, _ := this.post("/api/participants", `{"participant":"app"}`)
+	this.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/environments", `{"environment":"production"}`)
-	s.Require().Equal(http.StatusOK, status)
+	status, _ = this.post("/api/environments", `{"environment":"production"}`)
+	this.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/contracts",
-		s.publishBody("app", "v1", contractFragment{"api.yaml", appV1ThreeDependenciesContract}))
-	s.Require().Equal(http.StatusOK, status)
+	status, _ = this.post("/api/contracts",
+		this.publishBody("app", "v1", contractFragment{"api.yaml", appV1ThreeDependenciesContract}))
+	this.Require().Equal(http.StatusOK, status)
 
-	status, body := s.post("/api/can-i-deploy",
+	status, body := this.post("/api/can-i-deploy",
 		`{"participant":"app","version":"v1","environment":"production"}`)
-	s.Equal(http.StatusOK, status)
+	this.Equal(http.StatusOK, status)
 
 	var got canIDeployResponse
-	s.Require().NoError(json.Unmarshal([]byte(body), &got))
-	s.False(got.Deployable)
-	s.Equal("app", got.Participant)
-	s.Equal("v1", got.Version)
+	this.Require().NoError(json.Unmarshal([]byte(body), &got))
+	this.False(got.Deployable)
+	this.Equal("app", got.Participant)
+	this.Equal("v1", got.Version)
 
 	// a never_published provider has no version to report
-	s.Contains(body, `"participantVersion":null`)
+	this.Contains(body, `"participantVersion":null`)
 
-	s.Require().Len(got.Results, 3)
+	this.Require().Len(got.Results, 3)
 	for _, provider := range []string{"users", "auth", "catalog"} {
 		result, ok := got.Results[provider]
-		s.Require().Truef(ok, "missing result for %s", provider)
-		s.False(result.Deployable)
-		s.Nil(result.ParticipantVersion)
+		this.Require().Truef(ok, "missing result for %s", provider)
+		this.False(result.Deployable)
+		this.Nil(result.ParticipantVersion)
 		breaks := result.Endpoints["/"+provider]["get"]["200"]
-		s.Require().Lenf(breaks, 1, "missing break for %s", provider)
+		this.Require().Lenf(breaks, 1, "missing break for %s", provider)
 		b := breaks[0]
-		s.Equal("provider_resource_not_found", b.Reason)
-		s.Equal("consumer", b.Role)
-		s.Empty(b.Details)
+		this.Equal("provider_resource_not_found", b.Reason)
+		this.Equal("consumer", b.Role)
+		this.Empty(b.Details)
 	}
 
-	s.Equal(1, s.countRows("compatibility_checks"))
-	s.Equal(3, s.countRows("compatibility_check_results"))
-	s.Equal(0, s.countRows("compatibility_verdicts"))
+	this.Equal(1, this.countRows("compatibility_checks"))
+	this.Equal(3, this.countRows("compatibility_check_results"))
+	this.Equal(0, this.countRows("compatibility_verdicts"))
 
 	var checkDeployable bool
-	s.Require().NoError(s.Pool.QueryRow(context.Background(),
+	this.Require().NoError(this.Pool.QueryRow(context.Background(),
 		`SELECT deployable FROM compatibility_checks WHERE version = 'v1'`).Scan(&checkDeployable))
-	s.False(checkDeployable)
+	this.False(checkDeployable)
 
-	rows, err := s.Pool.Query(context.Background(),
+	rows, err := this.Pool.Query(context.Background(),
 		`SELECT r.counterpart_name, r.counterpart_participant_id, r.counterpart_version,
 		        r.verdict_contract_id_one, r.verdict_contract_id_two, r.deployable
 		   FROM compatibility_check_results r
 		   JOIN compatibility_checks ch ON ch.id = r.check_id
 		  WHERE ch.version = 'v1'`)
-	s.Require().NoError(err)
+	this.Require().NoError(err)
 	defer rows.Close()
 
 	var counterpartNames []string
@@ -401,17 +401,17 @@ func (s *IntegrationSuite) TestCanIDeploy_RecordsOneRowPerDependency() {
 		var participantID, verdictOne, verdictTwo *int64
 		var version *string
 		var resultDeployable bool
-		s.Require().NoError(rows.Scan(&name, &participantID, &version, &verdictOne, &verdictTwo, &resultDeployable))
-		s.Nilf(participantID, "counterpart %s", name)
-		s.Nilf(version, "counterpart %s", name)
-		s.Nilf(verdictOne, "counterpart %s", name)
-		s.Nilf(verdictTwo, "counterpart %s", name)
-		s.Falsef(resultDeployable, "counterpart %s", name)
+		this.Require().NoError(rows.Scan(&name, &participantID, &version, &verdictOne, &verdictTwo, &resultDeployable))
+		this.Nilf(participantID, "counterpart %s", name)
+		this.Nilf(version, "counterpart %s", name)
+		this.Nilf(verdictOne, "counterpart %s", name)
+		this.Nilf(verdictTwo, "counterpart %s", name)
+		this.Falsef(resultDeployable, "counterpart %s", name)
 		counterpartNames = append(counterpartNames, name)
 	}
-	s.Require().NoError(rows.Err())
+	this.Require().NoError(rows.Err())
 
-	s.ElementsMatch([]string{"users", "auth", "catalog"}, counterpartNames)
+	this.ElementsMatch([]string{"users", "auth", "catalog"}, counterpartNames)
 }
 
 const usersV1ProviderContract = `
@@ -446,10 +446,10 @@ const appV1MixedDependenciesContract = `
   }
 }`
 
-func (s *IntegrationSuite) TestCanIDeploy_TwoDeployableOneBreaking() {
+func (this *IntegrationSuite) TestCanIDeploy_TwoDeployableOneBreaking() {
 	mustPost := func(path, body string) {
-		status, _ := s.post(path, body)
-		s.Require().Equalf(http.StatusOK, status, "POST %s", path)
+		status, _ := this.post(path, body)
+		this.Require().Equalf(http.StatusOK, status, "POST %s", path)
 	}
 
 	for _, name := range []string{"users", "auth", "catalog", "app"} {
@@ -457,44 +457,44 @@ func (s *IntegrationSuite) TestCanIDeploy_TwoDeployableOneBreaking() {
 	}
 	mustPost("/api/environments", `{"environment":"production"}`)
 
-	mustPost("/api/contracts", s.publishBody("users", "v1", contractFragment{"api.yaml", usersV1ProviderContract}))
+	mustPost("/api/contracts", this.publishBody("users", "v1", contractFragment{"api.yaml", usersV1ProviderContract}))
 	mustPost("/api/deployments", `{"participant":"users","version":"v1","environment":"production"}`)
-	mustPost("/api/contracts", s.publishBody("auth", "v1", contractFragment{"api.yaml", authV1ProviderContract}))
+	mustPost("/api/contracts", this.publishBody("auth", "v1", contractFragment{"api.yaml", authV1ProviderContract}))
 	mustPost("/api/deployments", `{"participant":"auth","version":"v1","environment":"production"}`)
-	mustPost("/api/contracts", s.publishBody("catalog", "v1", contractFragment{"api.yaml", catalogV1ProviderContract}))
+	mustPost("/api/contracts", this.publishBody("catalog", "v1", contractFragment{"api.yaml", catalogV1ProviderContract}))
 	mustPost("/api/deployments", `{"participant":"catalog","version":"v1","environment":"production"}`)
 
-	mustPost("/api/contracts", s.publishBody("app", "v1", contractFragment{"api.yaml", appV1MixedDependenciesContract}))
+	mustPost("/api/contracts", this.publishBody("app", "v1", contractFragment{"api.yaml", appV1MixedDependenciesContract}))
 
-	status, body := s.post("/api/can-i-deploy", `{"participant":"app","version":"v1","environment":"production"}`)
-	s.Equal(http.StatusOK, status)
+	status, body := this.post("/api/can-i-deploy", `{"participant":"app","version":"v1","environment":"production"}`)
+	this.Equal(http.StatusOK, status)
 
 	var got canIDeployResponse
-	s.Require().NoError(json.Unmarshal([]byte(body), &got))
-	s.False(got.Deployable)
-	s.Equal("app", got.Participant)
-	s.Equal("v1", got.Version)
+	this.Require().NoError(json.Unmarshal([]byte(body), &got))
+	this.False(got.Deployable)
+	this.Equal("app", got.Participant)
+	this.Equal("v1", got.Version)
 
-	s.Require().Len(got.Results, 3)
+	this.Require().Len(got.Results, 3)
 	for _, provider := range []string{"users", "auth"} {
 		result := got.Results[provider]
-		s.Truef(result.Deployable, "expected %s to be deployable", provider)
-		s.Require().NotNil(result.ParticipantVersion)
-		s.Equal("v1", *result.ParticipantVersion)
-		s.Require().NotNilf(result.Endpoints, "expected %s endpoints to render as {}", provider)
-		s.Empty(result.Endpoints)
+		this.Truef(result.Deployable, "expected %s to be deployable", provider)
+		this.Require().NotNil(result.ParticipantVersion)
+		this.Equal("v1", *result.ParticipantVersion)
+		this.Require().NotNilf(result.Endpoints, "expected %s endpoints to render as {}", provider)
+		this.Empty(result.Endpoints)
 	}
 
 	catalog := got.Results["catalog"]
-	s.False(catalog.Deployable)
-	s.Require().NotNil(catalog.ParticipantVersion)
-	s.Equal("v1", *catalog.ParticipantVersion)
+	this.False(catalog.Deployable)
+	this.Require().NotNil(catalog.ParticipantVersion)
+	this.Equal("v1", *catalog.ParticipantVersion)
 	breaks := catalog.Endpoints["/catalog"]["get"]["200"]
-	s.Require().Len(breaks, 1)
+	this.Require().Len(breaks, 1)
 	b := breaks[0]
-	s.Equal("property_type_mismatch", b.Reason)
-	s.Equal("consumer", b.Role)
-	s.Equal(map[string]string{
+	this.Equal("property_type_mismatch", b.Reason)
+	this.Equal("consumer", b.Role)
+	this.Equal(map[string]string{
 		"property":             "$.id",
 		"consumerName":         "app",
 		"providerName":         "catalog",
@@ -502,11 +502,11 @@ func (s *IntegrationSuite) TestCanIDeploy_TwoDeployableOneBreaking() {
 		"providerPropertyType": "string",
 	}, b.Details)
 
-	s.Equal(1, s.countRows("compatibility_checks"))
-	s.Equal(3, s.countRows("compatibility_check_results"))
-	s.Equal(3, s.countRows("compatibility_verdicts"))
+	this.Equal(1, this.countRows("compatibility_checks"))
+	this.Equal(3, this.countRows("compatibility_check_results"))
+	this.Equal(3, this.countRows("compatibility_verdicts"))
 
-	rows, err := s.Pool.Query(context.Background(),
+	rows, err := this.Pool.Query(context.Background(),
 		`SELECT p.name, r.deployable, r.counterpart_version, v.deployable, v.breaks::text
 		   FROM compatibility_check_results r
 		   JOIN compatibility_checks ch ON ch.id = r.check_id
@@ -515,7 +515,7 @@ func (s *IntegrationSuite) TestCanIDeploy_TwoDeployableOneBreaking() {
 		     ON v.contract_id_one = r.verdict_contract_id_one
 		    AND v.contract_id_two = r.verdict_contract_id_two
 		  WHERE ch.version = 'v1'`)
-	s.Require().NoError(err)
+	this.Require().NoError(err)
 	defer rows.Close()
 
 	deployableByProvider := map[string]bool{}
@@ -526,19 +526,19 @@ func (s *IntegrationSuite) TestCanIDeploy_TwoDeployableOneBreaking() {
 		var name string
 		var deployable, verdictDeployable bool
 		var counterpartVersion, verdictBreaks string
-		s.Require().NoError(rows.Scan(&name, &deployable, &counterpartVersion, &verdictDeployable, &verdictBreaks))
+		this.Require().NoError(rows.Scan(&name, &deployable, &counterpartVersion, &verdictDeployable, &verdictBreaks))
 		deployableByProvider[name] = deployable
 		versionByProvider[name] = counterpartVersion
 		verdictDeployableByProvider[name] = verdictDeployable
 		verdictBreaksByProvider[name] = verdictBreaks
 	}
-	s.Require().NoError(rows.Err())
+	this.Require().NoError(rows.Err())
 
-	s.Equal(map[string]bool{"users": true, "auth": true, "catalog": false}, deployableByProvider)
-	s.Equal(map[string]string{"users": "v1", "auth": "v1", "catalog": "v1"}, versionByProvider)
-	s.Equal(map[string]bool{"users": true, "auth": true, "catalog": false}, verdictDeployableByProvider)
-	s.Equal("[]", verdictBreaksByProvider["users"])
-	s.Equal("[]", verdictBreaksByProvider["auth"])
+	this.Equal(map[string]bool{"users": true, "auth": true, "catalog": false}, deployableByProvider)
+	this.Equal(map[string]string{"users": "v1", "auth": "v1", "catalog": "v1"}, versionByProvider)
+	this.Equal(map[string]bool{"users": true, "auth": true, "catalog": false}, verdictDeployableByProvider)
+	this.Equal("[]", verdictBreaksByProvider["users"])
+	this.Equal("[]", verdictBreaksByProvider["auth"])
 }
 
 const providerThingContract = `
@@ -553,10 +553,10 @@ const consumerThingContract = `
   "schemas": { "Thing": { "type": "object", "properties": { "id": { "type": "string" } } } }
 }`
 
-func (s *IntegrationSuite) TestCanIDeploy_ProviderExistsButNotDeployedInTargetEnv() {
+func (this *IntegrationSuite) TestCanIDeploy_ProviderExistsButNotDeployedInTargetEnv() {
 	mustPost := func(path, body string) {
-		status, _ := s.post(path, body)
-		s.Require().Equalf(http.StatusOK, status, "POST %s", path)
+		status, _ := this.post(path, body)
+		this.Require().Equalf(http.StatusOK, status, "POST %s", path)
 	}
 
 	mustPost("/api/participants", `{"participant":"api"}`)
@@ -564,36 +564,36 @@ func (s *IntegrationSuite) TestCanIDeploy_ProviderExistsButNotDeployedInTargetEn
 	mustPost("/api/environments", `{"environment":"production"}`)
 	mustPost("/api/environments", `{"environment":"staging"}`)
 
-	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.yaml", providerThingContract}))
+	mustPost("/api/contracts", this.publishBody("api", "v1", contractFragment{"api.yaml", providerThingContract}))
 	mustPost("/api/deployments", `{"participant":"api","version":"v1","environment":"staging"}`)
 
-	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.yaml", consumerThingContract}))
+	mustPost("/api/contracts", this.publishBody("front", "v1", contractFragment{"api.yaml", consumerThingContract}))
 
-	status, body := s.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
-	s.Equal(http.StatusOK, status)
+	status, body := this.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
+	this.Equal(http.StatusOK, status)
 
 	var got canIDeployResponse
-	s.Require().NoError(json.Unmarshal([]byte(body), &got))
+	this.Require().NoError(json.Unmarshal([]byte(body), &got))
 
-	s.False(got.Deployable)
-	s.Equal("front", got.Participant)
-	s.Equal("v1", got.Version)
+	this.False(got.Deployable)
+	this.Equal("front", got.Participant)
+	this.Equal("v1", got.Version)
 
-	s.Require().Len(got.Results, 1)
+	this.Require().Len(got.Results, 1)
 	api := got.Results["api"]
-	s.False(api.Deployable)
-	s.Nil(api.ParticipantVersion)
+	this.False(api.Deployable)
+	this.Nil(api.ParticipantVersion)
 	breaks := api.Endpoints["/things"]["get"]["200"]
-	s.Require().Len(breaks, 1)
+	this.Require().Len(breaks, 1)
 
 	b := breaks[0]
-	s.Equal("provider_resource_not_deployed_in_environment", b.Reason)
-	s.Equal("consumer", b.Role)
-	s.Equal(map[string]string{"deployedEnvironments": "staging"}, b.Details)
+	this.Equal("provider_resource_not_deployed_in_environment", b.Reason)
+	this.Equal("consumer", b.Role)
+	this.Equal(map[string]string{"deployedEnvironments": "staging"}, b.Details)
 
-	s.Equal(1, s.countRows("compatibility_checks"))
-	s.Equal(1, s.countRows("compatibility_check_results"))
-	s.Equal(0, s.countRows("compatibility_verdicts"))
+	this.Equal(1, this.countRows("compatibility_checks"))
+	this.Equal(1, this.countRows("compatibility_check_results"))
+	this.Equal(0, this.countRows("compatibility_verdicts"))
 
 	// the provider participant is known even though it is not deployed in the target
 	// environment: the result keeps its identity with a NULL version and no verdict
@@ -601,18 +601,18 @@ func (s *IntegrationSuite) TestCanIDeploy_ProviderExistsButNotDeployedInTargetEn
 	var counterpartVersion *string
 	var verdictOne, verdictTwo *int64
 	var resultDeployable bool
-	s.Require().NoError(s.Pool.QueryRow(context.Background(),
+	this.Require().NoError(this.Pool.QueryRow(context.Background(),
 		`SELECT r.counterpart_name, p.name, r.counterpart_version,
 		        r.verdict_contract_id_one, r.verdict_contract_id_two, r.deployable
 		   FROM compatibility_check_results r
 		   JOIN participants p ON p.id = r.counterpart_participant_id`).
 		Scan(&counterpartName, &participantName, &counterpartVersion, &verdictOne, &verdictTwo, &resultDeployable))
-	s.Equal("api", counterpartName)
-	s.Equal("api", participantName)
-	s.Nil(counterpartVersion)
-	s.Nil(verdictOne)
-	s.Nil(verdictTwo)
-	s.False(resultDeployable)
+	this.Equal("api", counterpartName)
+	this.Equal("api", participantName)
+	this.Nil(counterpartVersion)
+	this.Nil(verdictOne)
+	this.Nil(verdictTwo)
+	this.False(resultDeployable)
 }
 
 const dualRoleUsersV1Contract = `
@@ -829,22 +829,22 @@ const dualRoleAppV1Contract = `
   }
 }`
 
-func (s *IntegrationSuite) TestCanIDeploy_ConsumerAndProviderSameContract() {
+func (this *IntegrationSuite) TestCanIDeploy_ConsumerAndProviderSameContract() {
 	mustPost := func(path, body string) {
-		status, _ := s.post(path, body)
-		s.Require().Equalf(http.StatusOK, status, "POST %s", path)
+		status, _ := this.post(path, body)
+		this.Require().Equalf(http.StatusOK, status, "POST %s", path)
 	}
 
 	checkDeployableAndDeploy := func(participant, version string) {
-		status, body := s.post("/api/can-i-deploy",
+		status, body := this.post("/api/can-i-deploy",
 			`{"participant":"`+participant+`","version":"`+version+`","environment":"production"}`)
-		s.Require().Equalf(http.StatusOK, status, "can-i-deploy %s %s", participant, version)
+		this.Require().Equalf(http.StatusOK, status, "can-i-deploy %s %s", participant, version)
 		var deployGot canIDeployResponse
-		s.Require().NoErrorf(json.Unmarshal([]byte(body), &deployGot), "can-i-deploy %s %s", participant, version)
-		s.Truef(deployGot.Deployable, "can-i-deploy %s %s", participant, version)
+		this.Require().NoErrorf(json.Unmarshal([]byte(body), &deployGot), "can-i-deploy %s %s", participant, version)
+		this.Truef(deployGot.Deployable, "can-i-deploy %s %s", participant, version)
 		for counterpart, result := range deployGot.Results {
-			s.Truef(result.Deployable, "can-i-deploy %s %s vs %s", participant, version, counterpart)
-			s.Emptyf(result.Endpoints, "can-i-deploy %s %s vs %s", participant, version, counterpart)
+			this.Truef(result.Deployable, "can-i-deploy %s %s vs %s", participant, version, counterpart)
+			this.Emptyf(result.Endpoints, "can-i-deploy %s %s vs %s", participant, version, counterpart)
 		}
 		mustPost("/api/deployments",
 			`{"participant":"`+participant+`","version":"`+version+`","environment":"production"}`)
@@ -855,64 +855,64 @@ func (s *IntegrationSuite) TestCanIDeploy_ConsumerAndProviderSameContract() {
 	}
 	mustPost("/api/environments", `{"environment":"production"}`)
 
-	mustPost("/api/contracts", s.publishBody("users", "v1", contractFragment{"api.yaml", dualRoleUsersV1Contract}))
+	mustPost("/api/contracts", this.publishBody("users", "v1", contractFragment{"api.yaml", dualRoleUsersV1Contract}))
 	checkDeployableAndDeploy("users", "v1")
 
-	mustPost("/api/contracts", s.publishBody("pets", "v1", contractFragment{"api.yaml", dualRolePetsV1Contract}))
+	mustPost("/api/contracts", this.publishBody("pets", "v1", contractFragment{"api.yaml", dualRolePetsV1Contract}))
 	checkDeployableAndDeploy("pets", "v1")
 
-	mustPost("/api/contracts", s.publishBody("app", "v1", contractFragment{"api.yaml", dualRoleAppV1Contract}))
+	mustPost("/api/contracts", this.publishBody("app", "v1", contractFragment{"api.yaml", dualRoleAppV1Contract}))
 	checkDeployableAndDeploy("app", "v1")
 
-	mustPost("/api/contracts", s.publishBody("pets", "v2", contractFragment{"api.yaml", dualRolePetsV2Contract}))
+	mustPost("/api/contracts", this.publishBody("pets", "v2", contractFragment{"api.yaml", dualRolePetsV2Contract}))
 
-	status, body := s.post("/api/can-i-deploy", `{"participant":"pets","version":"v2","environment":"production"}`)
-	s.Equal(http.StatusOK, status)
+	status, body := this.post("/api/can-i-deploy", `{"participant":"pets","version":"v2","environment":"production"}`)
+	this.Equal(http.StatusOK, status)
 
 	// empty versions render as JSON null, never empty strings
-	s.NotContains(body, `"participantVersion":""`)
+	this.NotContains(body, `"participantVersion":""`)
 
 	var got canIDeployResponse
-	s.Require().NoError(json.Unmarshal([]byte(body), &got))
-	s.False(got.Deployable)
-	s.Equal("pets", got.Participant)
-	s.Equal("v2", got.Version)
-	s.Equal("production", got.Environment)
+	this.Require().NoError(json.Unmarshal([]byte(body), &got))
+	this.False(got.Deployable)
+	this.Equal("pets", got.Participant)
+	this.Equal("v2", got.Version)
+	this.Equal("production", got.Environment)
 
-	s.Require().Len(got.Results, 2)
+	this.Require().Len(got.Results, 2)
 
 	// pets v2 acts as a provider (checked against the deployed app consumer) and
 	// as a consumer of users (checked against the deployed users provider).
 	appResult, ok := got.Results["app"]
-	s.Require().True(ok)
-	s.False(appResult.Deployable)
-	s.Require().NotNil(appResult.ParticipantVersion)
-	s.Equal("v1", *appResult.ParticipantVersion)
-	s.Require().Len(appResult.Endpoints, 2)
+	this.Require().True(ok)
+	this.False(appResult.Deployable)
+	this.Require().NotNil(appResult.ParticipantVersion)
+	this.Equal("v1", *appResult.ParticipantVersion)
+	this.Require().Len(appResult.Endpoints, 2)
 
 	requestBreaks := appResult.Endpoints["/pets"]["post"]["request"]
-	s.Require().Len(requestBreaks, 1)
-	s.Equal("property_missing_in_consumer", requestBreaks[0].Reason)
-	s.Equal("provider", requestBreaks[0].Role)
-	s.Equal(map[string]string{"property": "$.breed", "consumerName": "app", "providerName": "pets", "propertyType": "string"}, requestBreaks[0].Details)
+	this.Require().Len(requestBreaks, 1)
+	this.Equal("property_missing_in_consumer", requestBreaks[0].Reason)
+	this.Equal("provider", requestBreaks[0].Role)
+	this.Equal(map[string]string{"property": "$.breed", "consumerName": "app", "providerName": "pets", "propertyType": "string"}, requestBreaks[0].Details)
 
 	responseBreaks := appResult.Endpoints["/pets/*"]["get"]["200"]
-	s.Require().Len(responseBreaks, 1)
-	s.Equal("property_missing_in_provider", responseBreaks[0].Reason)
-	s.Equal("provider", responseBreaks[0].Role)
-	s.Equal(map[string]string{"property": "$.name", "consumerName": "app", "providerName": "pets", "propertyType": "string"}, responseBreaks[0].Details)
+	this.Require().Len(responseBreaks, 1)
+	this.Equal("property_missing_in_provider", responseBreaks[0].Reason)
+	this.Equal("provider", responseBreaks[0].Role)
+	this.Equal(map[string]string{"property": "$.name", "consumerName": "app", "providerName": "pets", "propertyType": "string"}, responseBreaks[0].Details)
 
 	usersResult, ok := got.Results["users"]
-	s.Require().True(ok)
-	s.False(usersResult.Deployable)
-	s.Require().NotNil(usersResult.ParticipantVersion)
-	s.Equal("v1", *usersResult.ParticipantVersion)
+	this.Require().True(ok)
+	this.False(usersResult.Deployable)
+	this.Require().NotNil(usersResult.ParticipantVersion)
+	this.Equal("v1", *usersResult.ParticipantVersion)
 
 	consumerBreaks := usersResult.Endpoints["/users/*"]["get"]["200"]
-	s.Require().Len(consumerBreaks, 1)
-	s.Equal("property_type_mismatch", consumerBreaks[0].Reason)
-	s.Equal("consumer", consumerBreaks[0].Role)
-	s.Equal(map[string]string{
+	this.Require().Len(consumerBreaks, 1)
+	this.Equal("property_type_mismatch", consumerBreaks[0].Reason)
+	this.Equal("consumer", consumerBreaks[0].Role)
+	this.Equal(map[string]string{
 		"property":             "$.userId",
 		"consumerName":         "pets",
 		"providerName":         "users",
@@ -927,7 +927,7 @@ func (s *IntegrationSuite) TestCanIDeploy_ConsumerAndProviderSameContract() {
 		VerdictDeployable bool
 	}
 
-	rows, err := s.Pool.Query(context.Background(),
+	rows, err := this.Pool.Query(context.Background(),
 		`SELECT r.counterpart_name, r.counterpart_version, r.deployable, v.deployable
 		   FROM compatibility_check_results r
 		   JOIN compatibility_checks ch ON ch.id = r.check_id
@@ -936,29 +936,29 @@ func (s *IntegrationSuite) TestCanIDeploy_ConsumerAndProviderSameContract() {
 		     ON v.contract_id_one = r.verdict_contract_id_one
 		    AND v.contract_id_two = r.verdict_contract_id_two
 		  WHERE checked.name = 'pets' AND ch.version = 'v2'`)
-	s.Require().NoError(err)
+	this.Require().NoError(err)
 	defer rows.Close()
 
 	var checkResultRows []checkResultRow
 	for rows.Next() {
 		var row checkResultRow
-		s.Require().NoError(rows.Scan(&row.Counterpart, &row.Version, &row.Deployable, &row.VerdictDeployable))
+		this.Require().NoError(rows.Scan(&row.Counterpart, &row.Version, &row.Deployable, &row.VerdictDeployable))
 		checkResultRows = append(checkResultRows, row)
 	}
-	s.Require().NoError(rows.Err())
+	this.Require().NoError(rows.Err())
 
-	s.ElementsMatch([]checkResultRow{
+	this.ElementsMatch([]checkResultRow{
 		{Counterpart: "users", Version: "v1", Deployable: false, VerdictDeployable: false},
 		{Counterpart: "app", Version: "v1", Deployable: false, VerdictDeployable: false},
 	}, checkResultRows)
 
 	var petsV2CheckDeployable bool
-	s.Require().NoError(s.Pool.QueryRow(context.Background(),
+	this.Require().NoError(this.Pool.QueryRow(context.Background(),
 		`SELECT ch.deployable
 		   FROM compatibility_checks ch
 		   JOIN participants checked ON checked.id = ch.participant_id
 		  WHERE checked.name = 'pets' AND ch.version = 'v2'`).Scan(&petsV2CheckDeployable))
-	s.False(petsV2CheckDeployable)
+	this.False(petsV2CheckDeployable)
 }
 
 const arrayProviderContract = `
@@ -992,29 +992,29 @@ const arrayConsumerContract = `
   }
 }`
 
-func (s *IntegrationSuite) TestCanIDeploy_MissingArrayReportsEveryNestedProperty() {
+func (this *IntegrationSuite) TestCanIDeploy_MissingArrayReportsEveryNestedProperty() {
 	mustPost := func(path, body string) {
-		status, _ := s.post(path, body)
-		s.Require().Equalf(http.StatusOK, status, "POST %s", path)
+		status, _ := this.post(path, body)
+		this.Require().Equalf(http.StatusOK, status, "POST %s", path)
 	}
 
 	mustPost("/api/participants", `{"participant":"api"}`)
 	mustPost("/api/participants", `{"participant":"front"}`)
 	mustPost("/api/environments", `{"environment":"production"}`)
 
-	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.yaml", arrayProviderContract}))
+	mustPost("/api/contracts", this.publishBody("api", "v1", contractFragment{"api.yaml", arrayProviderContract}))
 	mustPost("/api/deployments", `{"participant":"api","version":"v1","environment":"production"}`)
-	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.yaml", arrayConsumerContract}))
+	mustPost("/api/contracts", this.publishBody("front", "v1", contractFragment{"api.yaml", arrayConsumerContract}))
 
-	status, body := s.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
-	s.Equal(http.StatusOK, status)
+	status, body := this.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
+	this.Equal(http.StatusOK, status)
 
 	var got canIDeployResponse
-	s.Require().NoError(json.Unmarshal([]byte(body), &got))
-	s.False(got.Deployable)
+	this.Require().NoError(json.Unmarshal([]byte(body), &got))
+	this.False(got.Deployable)
 
 	breaks := got.Results["api"].Endpoints["/things"]["get"]["200"]
-	s.Require().Len(breaks, 4)
+	this.Require().Len(breaks, 4)
 
 	byProperty := map[string]breakJSON{}
 	for _, b := range breaks {
@@ -1023,65 +1023,65 @@ func (s *IntegrationSuite) TestCanIDeploy_MissingArrayReportsEveryNestedProperty
 
 	// a missing required array reports itself and every property inside it
 	list, ok := byProperty["$.list"]
-	s.Require().True(ok)
-	s.Equal("property_missing_in_provider", list.Reason)
-	s.Equal("consumer", list.Role)
-	s.Equal(map[string]string{"property": "$.list", "consumerName": "front", "providerName": "api", "propertyType": "array<object>"}, list.Details)
+	this.Require().True(ok)
+	this.Equal("property_missing_in_provider", list.Reason)
+	this.Equal("consumer", list.Role)
+	this.Equal(map[string]string{"property": "$.list", "consumerName": "front", "providerName": "api", "propertyType": "array<object>"}, list.Details)
 
 	listItems, ok := byProperty["$.list[]"]
-	s.Require().True(ok)
-	s.Equal("property_missing_in_provider", listItems.Reason)
-	s.Equal("consumer", listItems.Role)
-	s.Equal(map[string]string{"property": "$.list[]", "consumerName": "front", "providerName": "api", "propertyType": "object"}, listItems.Details)
+	this.Require().True(ok)
+	this.Equal("property_missing_in_provider", listItems.Reason)
+	this.Equal("consumer", listItems.Role)
+	this.Equal(map[string]string{"property": "$.list[]", "consumerName": "front", "providerName": "api", "propertyType": "object"}, listItems.Details)
 
 	listItemName, ok := byProperty["$.list[].name"]
-	s.Require().True(ok)
-	s.Equal("property_missing_in_provider", listItemName.Reason)
-	s.Equal("consumer", listItemName.Role)
-	s.Equal(map[string]string{"property": "$.list[].name", "consumerName": "front", "providerName": "api", "propertyType": "string"}, listItemName.Details)
+	this.Require().True(ok)
+	this.Equal("property_missing_in_provider", listItemName.Reason)
+	this.Equal("consumer", listItemName.Role)
+	this.Equal(map[string]string{"property": "$.list[].name", "consumerName": "front", "providerName": "api", "propertyType": "string"}, listItemName.Details)
 
 	// an optional missing array emits no break itself, but its required items still report
 	items, ok := byProperty["$.tags[]"]
-	s.Require().True(ok)
-	s.Equal("property_missing_in_provider", items.Reason)
-	s.Equal("consumer", items.Role)
-	s.Equal(map[string]string{"property": "$.tags[]", "consumerName": "front", "providerName": "api", "propertyType": "string"}, items.Details)
+	this.Require().True(ok)
+	this.Equal("property_missing_in_provider", items.Reason)
+	this.Equal("consumer", items.Role)
+	this.Equal(map[string]string{"property": "$.tags[]", "consumerName": "front", "providerName": "api", "propertyType": "string"}, items.Details)
 }
 
-func (s *IntegrationSuite) TestCanIDeploy_ProviderExistsButDeployedNowhere() {
+func (this *IntegrationSuite) TestCanIDeploy_ProviderExistsButDeployedNowhere() {
 	mustPost := func(path, body string) {
-		status, _ := s.post(path, body)
-		s.Require().Equalf(http.StatusOK, status, "POST %s", path)
+		status, _ := this.post(path, body)
+		this.Require().Equalf(http.StatusOK, status, "POST %s", path)
 	}
 
 	mustPost("/api/participants", `{"participant":"api"}`)
 	mustPost("/api/participants", `{"participant":"front"}`)
 	mustPost("/api/environments", `{"environment":"production"}`)
 
-	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.yaml", providerThingContract}))
-	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.yaml", consumerThingContract}))
+	mustPost("/api/contracts", this.publishBody("api", "v1", contractFragment{"api.yaml", providerThingContract}))
+	mustPost("/api/contracts", this.publishBody("front", "v1", contractFragment{"api.yaml", consumerThingContract}))
 
-	status, body := s.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
-	s.Equal(http.StatusOK, status)
+	status, body := this.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
+	this.Equal(http.StatusOK, status)
 
 	var got canIDeployResponse
-	s.Require().NoError(json.Unmarshal([]byte(body), &got))
+	this.Require().NoError(json.Unmarshal([]byte(body), &got))
 
-	s.False(got.Deployable)
-	s.Equal("front", got.Participant)
-	s.Equal("v1", got.Version)
+	this.False(got.Deployable)
+	this.Equal("front", got.Participant)
+	this.Equal("v1", got.Version)
 
-	s.Require().Len(got.Results, 1)
+	this.Require().Len(got.Results, 1)
 	api := got.Results["api"]
-	s.False(api.Deployable)
-	s.Nil(api.ParticipantVersion)
+	this.False(api.Deployable)
+	this.Nil(api.ParticipantVersion)
 	breaks := api.Endpoints["/things"]["get"]["200"]
-	s.Require().Len(breaks, 1)
+	this.Require().Len(breaks, 1)
 
 	b := breaks[0]
-	s.Equal("provider_resource_not_deployed_in_environment", b.Reason)
-	s.Equal("consumer", b.Role)
-	s.Empty(b.Details)
+	this.Equal("provider_resource_not_deployed_in_environment", b.Reason)
+	this.Equal("consumer", b.Role)
+	this.Empty(b.Details)
 }
 
 const apiV2IncompatibleProviderContract = `
@@ -1090,67 +1090,67 @@ const apiV2IncompatibleProviderContract = `
   "schemas": { "Thing": { "type": "object", "properties": { "id": { "type": "integer" } } } }
 }`
 
-func (s *IntegrationSuite) TestCanIDeploy_ChecksProviderAtItsDeployedVersion() {
+func (this *IntegrationSuite) TestCanIDeploy_ChecksProviderAtItsDeployedVersion() {
 	mustPost := func(path, body string) {
-		status, _ := s.post(path, body)
-		s.Require().Equalf(http.StatusOK, status, "POST %s", path)
+		status, _ := this.post(path, body)
+		this.Require().Equalf(http.StatusOK, status, "POST %s", path)
 	}
 
 	mustPost("/api/participants", `{"participant":"api"}`)
 	mustPost("/api/participants", `{"participant":"front"}`)
 	mustPost("/api/environments", `{"environment":"production"}`)
 
-	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.yaml", apiV1ProviderContract}))
+	mustPost("/api/contracts", this.publishBody("api", "v1", contractFragment{"api.yaml", apiV1ProviderContract}))
 	mustPost("/api/deployments", `{"participant":"api","version":"v1","environment":"production"}`)
 	// published but never deployed — must not influence the verdict
-	mustPost("/api/contracts", s.publishBody("api", "v2", contractFragment{"api.yaml", apiV2IncompatibleProviderContract}))
-	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.yaml", frontV1ConsumerContract}))
+	mustPost("/api/contracts", this.publishBody("api", "v2", contractFragment{"api.yaml", apiV2IncompatibleProviderContract}))
+	mustPost("/api/contracts", this.publishBody("front", "v1", contractFragment{"api.yaml", frontV1ConsumerContract}))
 
-	status, body := s.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
-	s.Equal(http.StatusOK, status)
+	status, body := this.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
+	this.Equal(http.StatusOK, status)
 
 	var got canIDeployResponse
-	s.Require().NoError(json.Unmarshal([]byte(body), &got))
+	this.Require().NoError(json.Unmarshal([]byte(body), &got))
 
-	s.True(got.Deployable)
-	s.Require().Len(got.Results, 1)
+	this.True(got.Deployable)
+	this.Require().Len(got.Results, 1)
 	api := got.Results["api"]
-	s.True(api.Deployable)
-	s.Empty(api.Endpoints)
+	this.True(api.Deployable)
+	this.Empty(api.Endpoints)
 	// the version compared against is the one reported
-	s.Require().NotNil(api.ParticipantVersion)
-	s.Equal("v1", *api.ParticipantVersion)
+	this.Require().NotNil(api.ParticipantVersion)
+	this.Equal("v1", *api.ParticipantVersion)
 }
 
-func (s *IntegrationSuite) TestCanIDeploy_ChecksConsumerAtItsDeployedVersion() {
+func (this *IntegrationSuite) TestCanIDeploy_ChecksConsumerAtItsDeployedVersion() {
 	mustPost := func(path, body string) {
-		status, _ := s.post(path, body)
-		s.Require().Equalf(http.StatusOK, status, "POST %s", path)
+		status, _ := this.post(path, body)
+		this.Require().Equalf(http.StatusOK, status, "POST %s", path)
 	}
 
 	mustPost("/api/participants", `{"participant":"api"}`)
 	mustPost("/api/participants", `{"participant":"front"}`)
 	mustPost("/api/environments", `{"environment":"production"}`)
 
-	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.yaml", frontV1ConsumerContract}))
+	mustPost("/api/contracts", this.publishBody("front", "v1", contractFragment{"api.yaml", frontV1ConsumerContract}))
 	mustPost("/api/deployments", `{"participant":"front","version":"v1","environment":"production"}`)
 	// published but never deployed — must not influence the verdict
-	mustPost("/api/contracts", s.publishBody("front", "v2", contractFragment{"api.yaml", frontV2ConsumerContract}))
-	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.yaml", apiV1ProviderContract}))
+	mustPost("/api/contracts", this.publishBody("front", "v2", contractFragment{"api.yaml", frontV2ConsumerContract}))
+	mustPost("/api/contracts", this.publishBody("api", "v1", contractFragment{"api.yaml", apiV1ProviderContract}))
 
-	status, body := s.post("/api/can-i-deploy", `{"participant":"api","version":"v1","environment":"production"}`)
-	s.Equal(http.StatusOK, status)
+	status, body := this.post("/api/can-i-deploy", `{"participant":"api","version":"v1","environment":"production"}`)
+	this.Equal(http.StatusOK, status)
 
 	var got canIDeployResponse
-	s.Require().NoError(json.Unmarshal([]byte(body), &got))
+	this.Require().NoError(json.Unmarshal([]byte(body), &got))
 
-	s.True(got.Deployable)
-	s.Require().Len(got.Results, 1)
+	this.True(got.Deployable)
+	this.Require().Len(got.Results, 1)
 	front := got.Results["front"]
-	s.True(front.Deployable)
-	s.Empty(front.Endpoints)
-	s.Require().NotNil(front.ParticipantVersion)
-	s.Equal("v1", *front.ParticipantVersion)
+	this.True(front.Deployable)
+	this.Empty(front.Endpoints)
+	this.Require().NotNil(front.ParticipantVersion)
+	this.Equal("v1", *front.ParticipantVersion)
 }
 
 const removedRequestProviderV1Contract = `
@@ -1183,34 +1183,34 @@ const removedRequestConsumerContract = `
   }
 }`
 
-func (s *IntegrationSuite) TestCanIDeploy_RemovedProviderPropertyIsNotChecked() {
+func (this *IntegrationSuite) TestCanIDeploy_RemovedProviderPropertyIsNotChecked() {
 	mustPost := func(path, body string) {
-		status, _ := s.post(path, body)
-		s.Require().Equalf(http.StatusOK, status, "POST %s", path)
+		status, _ := this.post(path, body)
+		this.Require().Equalf(http.StatusOK, status, "POST %s", path)
 	}
 
 	mustPost("/api/participants", `{"participant":"api"}`)
 	mustPost("/api/participants", `{"participant":"front"}`)
 	mustPost("/api/environments", `{"environment":"production"}`)
 
-	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.yaml", removedRequestProviderV1Contract}))
-	mustPost("/api/contracts", s.publishBody("api", "v2", contractFragment{"api.yaml", removedRequestProviderV2Contract}))
+	mustPost("/api/contracts", this.publishBody("api", "v1", contractFragment{"api.yaml", removedRequestProviderV1Contract}))
+	mustPost("/api/contracts", this.publishBody("api", "v2", contractFragment{"api.yaml", removedRequestProviderV2Contract}))
 	mustPost("/api/deployments", `{"participant":"api","version":"v2","environment":"production"}`)
-	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.yaml", removedRequestConsumerContract}))
+	mustPost("/api/contracts", this.publishBody("front", "v1", contractFragment{"api.yaml", removedRequestConsumerContract}))
 
-	status, body := s.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
-	s.Equal(http.StatusOK, status)
+	status, body := this.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
+	this.Equal(http.StatusOK, status)
 
 	var got canIDeployResponse
-	s.Require().NoError(json.Unmarshal([]byte(body), &got))
+	this.Require().NoError(json.Unmarshal([]byte(body), &got))
 
 	// $.coupon was removed in api v2, so it is no longer part of the provider resource
-	s.True(got.Deployable)
-	s.Require().Len(got.Results, 1)
+	this.True(got.Deployable)
+	this.Require().Len(got.Results, 1)
 	api := got.Results["api"]
-	s.True(api.Deployable)
-	s.Empty(api.Endpoints)
-	s.NotContains(body, "$.coupon")
+	this.True(api.Deployable)
+	this.Empty(api.Endpoints)
+	this.NotContains(body, "$.coupon")
 }
 
 const removedResponseConsumerV1Contract = `
@@ -1235,46 +1235,46 @@ const removedResponseConsumerV2Contract = `
   }
 }`
 
-func (s *IntegrationSuite) TestCanIDeploy_RemovedConsumerPropertyIsNotChecked() {
+func (this *IntegrationSuite) TestCanIDeploy_RemovedConsumerPropertyIsNotChecked() {
 	mustPost := func(path, body string) {
-		status, _ := s.post(path, body)
-		s.Require().Equalf(http.StatusOK, status, "POST %s", path)
+		status, _ := this.post(path, body)
+		this.Require().Equalf(http.StatusOK, status, "POST %s", path)
 	}
 
 	mustPost("/api/participants", `{"participant":"api"}`)
 	mustPost("/api/participants", `{"participant":"front"}`)
 	mustPost("/api/environments", `{"environment":"production"}`)
 
-	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.yaml", removedResponseConsumerV1Contract}))
-	mustPost("/api/contracts", s.publishBody("front", "v2", contractFragment{"api.yaml", removedResponseConsumerV2Contract}))
+	mustPost("/api/contracts", this.publishBody("front", "v1", contractFragment{"api.yaml", removedResponseConsumerV1Contract}))
+	mustPost("/api/contracts", this.publishBody("front", "v2", contractFragment{"api.yaml", removedResponseConsumerV2Contract}))
 	mustPost("/api/deployments", `{"participant":"front","version":"v2","environment":"production"}`)
-	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.yaml", apiV1ProviderContract}))
+	mustPost("/api/contracts", this.publishBody("api", "v1", contractFragment{"api.yaml", apiV1ProviderContract}))
 
-	status, body := s.post("/api/can-i-deploy", `{"participant":"api","version":"v1","environment":"production"}`)
-	s.Equal(http.StatusOK, status)
+	status, body := this.post("/api/can-i-deploy", `{"participant":"api","version":"v1","environment":"production"}`)
+	this.Equal(http.StatusOK, status)
 
 	var got canIDeployResponse
-	s.Require().NoError(json.Unmarshal([]byte(body), &got))
+	this.Require().NoError(json.Unmarshal([]byte(body), &got))
 
 	// $.legacy was removed in front v2, so the deployed consumer no longer requires it
-	s.True(got.Deployable)
-	s.Require().Len(got.Results, 1)
+	this.True(got.Deployable)
+	this.Require().Len(got.Results, 1)
 	front := got.Results["front"]
-	s.True(front.Deployable)
-	s.Empty(front.Endpoints)
-	s.NotContains(body, "$.legacy")
+	this.True(front.Deployable)
+	this.Empty(front.Endpoints)
+	this.NotContains(body, "$.legacy")
 }
 
-func (s *IntegrationSuite) TestCanIDeploy_UnknownEnvironmentReturns404() {
-	status, _ := s.post("/api/participants", `{"participant":"api"}`)
-	s.Require().Equal(http.StatusOK, status)
+func (this *IntegrationSuite) TestCanIDeploy_UnknownEnvironmentReturns404() {
+	status, _ := this.post("/api/participants", `{"participant":"api"}`)
+	this.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.yaml", apiV1ProviderContract}))
-	s.Require().Equal(http.StatusOK, status)
+	status, _ = this.post("/api/contracts", this.publishBody("api", "v1", contractFragment{"api.yaml", apiV1ProviderContract}))
+	this.Require().Equal(http.StatusOK, status)
 
-	status, body := s.post("/api/can-i-deploy", `{"participant":"api","version":"v1","environment":"production"}`)
-	s.Equal(http.StatusNotFound, status)
-	s.JSONEq(`{"message":"environment not found"}`, body)
+	status, body := this.post("/api/can-i-deploy", `{"participant":"api","version":"v1","environment":"production"}`)
+	this.Equal(http.StatusNotFound, status)
+	this.JSONEq(`{"message":"environment not found"}`, body)
 
-	s.Equal(0, s.countRows("compatibility_checks"))
+	this.Equal(0, this.countRows("compatibility_checks"))
 }

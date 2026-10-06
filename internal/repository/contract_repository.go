@@ -357,20 +357,20 @@ func NewContractRepository(pool *pgxpool.Pool) *ContractRepository {
 	return &ContractRepository{pool: pool}
 }
 
-func (r *ContractRepository) HasContractForVersion(ctx context.Context, participantID int64, version string) bool {
+func (this *ContractRepository) HasContractForVersion(ctx context.Context, participantID int64, version string) bool {
 	var exists bool
 
-	if err := r.pool.QueryRow(ctx, hasContractForVersionQuery, participantID, version).Scan(&exists); err != nil {
+	if err := this.pool.QueryRow(ctx, hasContractForVersionQuery, participantID, version).Scan(&exists); err != nil {
 		panic(fmt.Errorf("error checking contract version: %w", err))
 	}
 
 	return exists
 }
 
-func (r *ContractRepository) LoadChecksumForVersion(ctx context.Context, participantID int64, version string) (string, bool) {
+func (this *ContractRepository) LoadChecksumForVersion(ctx context.Context, participantID int64, version string) (string, bool) {
 	var checksum string
 
-	err := r.pool.QueryRow(ctx, loadChecksumForVersionQuery, participantID, version).Scan(&checksum)
+	err := this.pool.QueryRow(ctx, loadChecksumForVersionQuery, participantID, version).Scan(&checksum)
 	if err == nil {
 		return checksum, true
 	}
@@ -380,27 +380,27 @@ func (r *ContractRepository) LoadChecksumForVersion(ctx context.Context, partici
 	panic(fmt.Errorf("error loading checksum for version: %w", err))
 }
 
-func (r *ContractRepository) Create(
+func (this *ContractRepository) Create(
 	ctx context.Context,
 	contract *model.UploadedContract,
 ) {
-	tx, err := r.pool.Begin(ctx)
+	tx, err := this.pool.Begin(ctx)
 	if err != nil {
 		panic(fmt.Errorf("error starting transaction: %w", err))
 	}
 
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	r.insertContract(ctx, tx, contract)
-	r.insertContractVersion(ctx, tx, contract)
+	this.insertContract(ctx, tx, contract)
+	this.insertContractVersion(ctx, tx, contract)
 
 	for _, resource := range contract.Resources {
-		resourceID := r.insertResource(ctx, tx, contract.ParticipantID, &resource)
-		r.insertResourceVersion(ctx, tx, newInsertResourceVersionRowAdded(contract.ID, resourceID))
+		resourceID := this.insertResource(ctx, tx, contract.ParticipantID, &resource)
+		this.insertResourceVersion(ctx, tx, newInsertResourceVersionRowAdded(contract.ID, resourceID))
 
 		for _, property := range resource.Properties {
-			propertyID := r.insertNewProperty(ctx, tx, resourceID, &property)
-			r.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowAdded(contract.ID, propertyID, property))
+			propertyID := this.insertNewProperty(ctx, tx, resourceID, &property)
+			this.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowAdded(contract.ID, propertyID, property))
 		}
 	}
 
@@ -409,66 +409,66 @@ func (r *ContractRepository) Create(
 	}
 }
 
-func (r *ContractRepository) Update(
+func (this *ContractRepository) Update(
 	ctx context.Context,
 	next *model.UploadedContract,
 	current *model.PersistedContract,
 	diff model.ContractDiff,
 ) {
-	tx, err := r.pool.Begin(ctx)
+	tx, err := this.pool.Begin(ctx)
 	if err != nil {
 		panic(fmt.Errorf("error starting transaction: %w", err))
 	}
 
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	r.insertContract(ctx, tx, next)
-	r.insertContractVersion(ctx, tx, next)
+	this.insertContract(ctx, tx, next)
+	this.insertContractVersion(ctx, tx, next)
 
 	for key, resourceChange := range diff.Resources {
 		switch resourceChange.Kind {
 		case model.ChangeAdded:
 			resource := next.Resources[key]
-			resourceID := r.insertResource(ctx, tx, next.ParticipantID, &resource)
-			r.insertResourceVersion(ctx, tx, newInsertResourceVersionRowAdded(next.ID, resourceID))
+			resourceID := this.insertResource(ctx, tx, next.ParticipantID, &resource)
+			this.insertResourceVersion(ctx, tx, newInsertResourceVersionRowAdded(next.ID, resourceID))
 
 			for _, property := range resource.Properties {
-				propertyID := r.insertNewProperty(ctx, tx, resourceID, &property)
-				r.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowAdded(next.ID, propertyID, property))
+				propertyID := this.insertNewProperty(ctx, tx, resourceID, &property)
+				this.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowAdded(next.ID, propertyID, property))
 			}
 
 		case model.ChangeModified:
 			resource := next.Resources[key]
-			resourceID, _ := r.findResourceIDByHash(ctx, tx, key, resource.Direction)
+			resourceID, _ := this.findResourceIDByHash(ctx, tx, key, resource.Direction)
 
 			for _, propertyChange := range resourceChange.Properties {
 				switch propertyChange.Kind {
 				case model.ChangeAdded:
 					property := propertyChange.After
-					propertyID := r.insertNewProperty(ctx, tx, resourceID, &property)
-					r.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowAdded(next.ID, propertyID, property))
+					propertyID := this.insertNewProperty(ctx, tx, resourceID, &property)
+					this.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowAdded(next.ID, propertyID, property))
 
 				case model.ChangeModified:
 					property := propertyChange.After
-					propertyID, _ := r.getPropertyIDByResourceIDAndPropertyPath(ctx, tx, resourceID, property.Path)
-					r.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowModified(next.ID, propertyID, property))
+					propertyID, _ := this.getPropertyIDByResourceIDAndPropertyPath(ctx, tx, resourceID, property.Path)
+					this.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowModified(next.ID, propertyID, property))
 
 				case model.ChangeRemoved:
 					property := propertyChange.Before
-					propertyID, _ := r.getPropertyIDByResourceIDAndPropertyPath(ctx, tx, resourceID, property.Path)
-					r.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowRemoved(next.ID, propertyID, property))
+					propertyID, _ := this.getPropertyIDByResourceIDAndPropertyPath(ctx, tx, resourceID, property.Path)
+					this.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowRemoved(next.ID, propertyID, property))
 				}
 			}
 
 		case model.ChangeRemoved:
 			resource := current.Resources[key]
-			resourceID, _ := r.findResourceIDByHash(ctx, tx, key, resource.Direction)
-			r.insertResourceVersion(ctx, tx, newInsertResourceVersionRowRemoved(next.ID, resourceID))
+			resourceID, _ := this.findResourceIDByHash(ctx, tx, key, resource.Direction)
+			this.insertResourceVersion(ctx, tx, newInsertResourceVersionRowRemoved(next.ID, resourceID))
 
 			for _, propertyChange := range resourceChange.Properties {
 				property := propertyChange.Before
-				propertyID, _ := r.getPropertyIDByResourceIDAndPropertyPath(ctx, tx, resourceID, property.Path)
-				r.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowRemoved(next.ID, propertyID, property))
+				propertyID, _ := this.getPropertyIDByResourceIDAndPropertyPath(ctx, tx, resourceID, property.Path)
+				this.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowRemoved(next.ID, propertyID, property))
 			}
 		}
 	}
@@ -481,11 +481,11 @@ func (r *ContractRepository) Update(
 // AliasVersionToSnapshot points a new version at an existing snapshot with the same
 // content, reporting whether one matched. The alias still stamps its own contract content:
 // the files are a property of the version, not of the snapshot they resolve to.
-func (r *ContractRepository) AliasVersionToSnapshot(
+func (this *ContractRepository) AliasVersionToSnapshot(
 	ctx context.Context,
 	contract *model.UploadedContract,
 ) bool {
-	tag, err := r.pool.Exec(
+	tag, err := this.pool.Exec(
 		ctx,
 		aliasVersionToSnapshotQuery,
 		contract.ParticipantID,
@@ -500,7 +500,7 @@ func (r *ContractRepository) AliasVersionToSnapshot(
 	return tag.RowsAffected() > 0
 }
 
-func (r *ContractRepository) insertContractVersion(
+func (this *ContractRepository) insertContractVersion(
 	ctx context.Context,
 	tx pgx.Tx,
 	contract *model.UploadedContract,
@@ -517,7 +517,7 @@ func (r *ContractRepository) insertContractVersion(
 	}
 }
 
-func (r *ContractRepository) insertContract(
+func (this *ContractRepository) insertContract(
 	ctx context.Context,
 	tx pgx.Tx,
 	contract *model.UploadedContract,
@@ -532,13 +532,13 @@ func (r *ContractRepository) insertContract(
 	}
 }
 
-func (r *ContractRepository) insertResource(
+func (this *ContractRepository) insertResource(
 	ctx context.Context,
 	tx pgx.Tx,
 	participantID int64,
 	resource *model.UploadedResource,
 ) int64 {
-	if id, ok := r.findResourceIDByHash(ctx, tx, resource.PrimaryHash(), resource.Direction); ok {
+	if id, ok := this.findResourceIDByHash(ctx, tx, resource.PrimaryHash(), resource.Direction); ok {
 		return id
 	}
 
@@ -582,7 +582,7 @@ func (r *ContractRepository) insertResource(
 	return id
 }
 
-func (r *ContractRepository) findResourceIDByHash(
+func (this *ContractRepository) findResourceIDByHash(
 	ctx context.Context,
 	tx pgx.Tx,
 	hash string,
@@ -604,13 +604,13 @@ func (r *ContractRepository) findResourceIDByHash(
 	panic(fmt.Errorf("error looking up existing resource: %w", err))
 }
 
-func (r *ContractRepository) insertNewProperty(
+func (this *ContractRepository) insertNewProperty(
 	ctx context.Context,
 	tx pgx.Tx,
 	resourceID int64,
 	property *model.Property,
 ) int64 {
-	if id, ok := r.getPropertyIDByResourceIDAndPropertyPath(ctx, tx, resourceID, property.Path); ok {
+	if id, ok := this.getPropertyIDByResourceIDAndPropertyPath(ctx, tx, resourceID, property.Path); ok {
 		return id
 	}
 
@@ -627,7 +627,7 @@ func (r *ContractRepository) insertNewProperty(
 	return id
 }
 
-func (r *ContractRepository) getPropertyIDByResourceIDAndPropertyPath(
+func (this *ContractRepository) getPropertyIDByResourceIDAndPropertyPath(
 	ctx context.Context,
 	tx pgx.Tx,
 	resourceID int64,
@@ -646,7 +646,7 @@ func (r *ContractRepository) getPropertyIDByResourceIDAndPropertyPath(
 	panic(fmt.Errorf("error looking up existing property: %w", err))
 }
 
-func (r *ContractRepository) insertPropertyVersion(
+func (this *ContractRepository) insertPropertyVersion(
 	ctx context.Context,
 	tx pgx.Tx,
 	row *insertPropertyVersionRow,
@@ -664,7 +664,7 @@ func (r *ContractRepository) insertPropertyVersion(
 	}
 }
 
-func (r *ContractRepository) insertResourceVersion(
+func (this *ContractRepository) insertResourceVersion(
 	ctx context.Context,
 	tx pgx.Tx,
 	row *insertResourceVersionRow,
@@ -680,11 +680,11 @@ func (r *ContractRepository) insertResourceVersion(
 	}
 }
 
-func (r *ContractRepository) GetLatestContractByName(
+func (this *ContractRepository) GetLatestContractByName(
 	ctx context.Context,
 	participantName string,
 ) (*model.PersistedContract, bool) {
-	rows, err := r.pool.Query(ctx, getLatestContractByName, participantName)
+	rows, err := this.pool.Query(ctx, getLatestContractByName, participantName)
 
 	if err != nil {
 		panic(fmt.Errorf("error loading contract tree: %w", err))
@@ -695,12 +695,12 @@ func (r *ContractRepository) GetLatestContractByName(
 	return scanPersistedContractTree(rows)
 }
 
-func (r *ContractRepository) GetContractByNameAndVersion(
+func (this *ContractRepository) GetContractByNameAndVersion(
 	ctx context.Context,
 	participantName string,
 	version string,
 ) (*model.PersistedContract, bool) {
-	rows, err := r.pool.Query(ctx, getContractByNameAndVersion, participantName, version)
+	rows, err := this.pool.Query(ctx, getContractByNameAndVersion, participantName, version)
 	if err != nil {
 		panic(fmt.Errorf("error loading contract tree by name and version: %w", err))
 	}
@@ -783,12 +783,12 @@ type CurrentConsumerInEnv struct {
 	Version         string
 }
 
-func (r *ContractRepository) GetProviderResourceByConsumerResource(
+func (this *ContractRepository) GetProviderResourceByConsumerResource(
 	ctx context.Context,
 	providerHash string,
 	environmentID int64,
 ) (model.PersistedResource, error) {
-	rows, err := r.pool.Query(
+	rows, err := this.pool.Query(
 		ctx,
 		loadProviderResourceWithDeploymentsQuery,
 		string(model.Provides),
@@ -851,12 +851,12 @@ func (r *ContractRepository) GetProviderResourceByConsumerResource(
 	return provider, nil
 }
 
-func (r *ContractRepository) GetConsumersResourcesByProviderHashAndEnvironmentID(
+func (this *ContractRepository) GetConsumersResourcesByProviderHashAndEnvironmentID(
 	ctx context.Context,
 	providerHash string,
 	environmentID int64,
 ) []model.PersistedResource {
-	rows, err := r.pool.Query(
+	rows, err := this.pool.Query(
 		ctx,
 		consumersByProviderHashAndEnvironmentQuery,
 		string(model.Consumes),

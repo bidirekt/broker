@@ -6,37 +6,37 @@ import (
 
 const productionEnvironmentBody = `{"environment":"production"}`
 
-func (s *IntegrationSuite) TestHappyPath_CreateEnvironment() {
-	status, body := s.post("/api/environments", productionEnvironmentBody)
-	s.Equal(http.StatusOK, status)
-	s.JSONEq(`{"message":"environment created"}`, body)
+func (this *IntegrationSuite) TestHappyPath_CreateEnvironment() {
+	status, body := this.post("/api/environments", productionEnvironmentBody)
+	this.Equal(http.StatusOK, status)
+	this.JSONEq(`{"message":"environment created"}`, body)
 
-	s.Equal(1, s.countRows("environments"))
+	this.Equal(1, this.countRows("environments"))
 }
 
-func (s *IntegrationSuite) TestIdempotent_DuplicateEnvironmentName() {
-	status, _ := s.post("/api/environments", productionEnvironmentBody)
-	s.Equal(http.StatusOK, status)
+func (this *IntegrationSuite) TestIdempotent_DuplicateEnvironmentName() {
+	status, _ := this.post("/api/environments", productionEnvironmentBody)
+	this.Equal(http.StatusOK, status)
 
-	status, body := s.post("/api/environments", productionEnvironmentBody)
-	s.Equal(http.StatusOK, status)
-	s.JSONEq(`{"message":"environment already exists"}`, body)
+	status, body := this.post("/api/environments", productionEnvironmentBody)
+	this.Equal(http.StatusOK, status)
+	this.JSONEq(`{"message":"environment already exists"}`, body)
 
-	s.Equal(1, s.countRows("environments"))
+	this.Equal(1, this.countRows("environments"))
 }
 
-func (s *IntegrationSuite) TestUnhappyPath_MissingEnvironmentName() {
-	status, body := s.post("/api/environments", `{}`)
-	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"environment invalid input"}`, body)
+func (this *IntegrationSuite) TestUnhappyPath_MissingEnvironmentName() {
+	status, body := this.post("/api/environments", `{}`)
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(`{"message":"environment invalid input"}`, body)
 
-	s.Equal(0, s.countRows("environments"))
+	this.Equal(0, this.countRows("environments"))
 }
 
-func (s *IntegrationSuite) TestUnhappyPath_EnvironmentNameUnderParticipantKey() {
-	status, body := s.post("/api/environments", `{"participant":"production"}`)
-	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"environment invalid input"}`, body)
+func (this *IntegrationSuite) TestUnhappyPath_EnvironmentNameUnderParticipantKey() {
+	status, body := this.post("/api/environments", `{"participant":"production"}`)
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(`{"message":"environment invalid input"}`, body)
 
-	s.Equal(0, s.countRows("environments"))
+	this.Equal(0, this.countRows("environments"))
 }

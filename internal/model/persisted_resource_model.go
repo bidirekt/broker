@@ -24,31 +24,31 @@ type PersistedResource struct {
 	Removed            bool                `json:"-"`
 }
 
-func (r *PersistedResource) IsConsumer() bool {
-	return r.Direction == Consumes
+func (this *PersistedResource) IsConsumer() bool {
+	return this.Direction == Consumes
 }
 
-func (r *PersistedResource) IsProvider() bool {
-	return r.Direction == Provides
+func (this *PersistedResource) IsProvider() bool {
+	return this.Direction == Provides
 }
 
-func (r *PersistedResource) DeployedVersionIn(environment string) (string, bool) {
-	version, ok := r.DeployedVersions[environment]
+func (this *PersistedResource) DeployedVersionIn(environment string) (string, bool) {
+	version, ok := this.DeployedVersions[environment]
 	return version, ok
 }
 
-func (r *PersistedResource) PrimaryHash() string {
-	if r.Direction == Provides {
-		return r.ProviderHash
+func (this *PersistedResource) PrimaryHash() string {
+	if this.Direction == Provides {
+		return this.ProviderHash
 	}
 
-	return r.ConsumerHash.String
+	return this.ConsumerHash.String
 }
 
-func (r *PersistedResource) DeployedEnvironments() []string {
-	environments := make([]string, 0, len(r.DeployedVersions))
+func (this *PersistedResource) DeployedEnvironments() []string {
+	environments := make([]string, 0, len(this.DeployedVersions))
 
-	for environment := range r.DeployedVersions {
+	for environment := range this.DeployedVersions {
 		environments = append(environments, environment)
 	}
 

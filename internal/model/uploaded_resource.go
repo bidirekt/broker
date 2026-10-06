@@ -17,27 +17,27 @@ type UploadedResource struct {
 	Properties         map[string]Property
 }
 
-func (r *UploadedResource) IsConsumer() bool {
-	return r.Direction == Consumes
+func (this *UploadedResource) IsConsumer() bool {
+	return this.Direction == Consumes
 }
 
-func (r *UploadedResource) IsProvider() bool {
-	return r.Direction == Provides
+func (this *UploadedResource) IsProvider() bool {
+	return this.Direction == Provides
 }
 
 // Describe names the resource the way publish errors quote it: the same parts that
 // make up its hash, in reading order.
-func (r *UploadedResource) Describe() string {
-	parts := []string{r.Direction.String()}
+func (this *UploadedResource) Describe() string {
+	parts := []string{this.Direction.String()}
 
-	if r.IsConsumer() && r.ConsumedProvider.String != "" {
-		parts = append(parts, r.ConsumedProvider.String)
+	if this.IsConsumer() && this.ConsumedProvider.String != "" {
+		parts = append(parts, this.ConsumedProvider.String)
 	}
 
-	parts = append(parts, strings.ToUpper(r.Method), r.Endpoint)
+	parts = append(parts, strings.ToUpper(this.Method), this.Endpoint)
 
-	if r.Interaction == RestResponse {
-		parts = append(parts, r.ResponseStatusCode.String)
+	if this.Interaction == RestResponse {
+		parts = append(parts, this.ResponseStatusCode.String)
 	} else {
 		parts = append(parts, "request")
 	}
@@ -45,39 +45,39 @@ func (r *UploadedResource) Describe() string {
 	return strings.Join(parts, " ")
 }
 
-func (r *UploadedResource) ProviderHash() string {
-	providerName := r.ParticipantName
-	if r.IsConsumer() {
-		providerName = r.ConsumedProvider.String
+func (this *UploadedResource) ProviderHash() string {
+	providerName := this.ParticipantName
+	if this.IsConsumer() {
+		providerName = this.ConsumedProvider.String
 	}
 
-	parts := []string{providerName, r.Endpoint, r.Method}
-	if r.Interaction == RestResponse {
-		parts = append(parts, r.ResponseStatusCode.String)
+	parts := []string{providerName, this.Endpoint, this.Method}
+	if this.Interaction == RestResponse {
+		parts = append(parts, this.ResponseStatusCode.String)
 	}
 
 	return Hash(parts...)
 }
 
-func (r *UploadedResource) ConsumerHash() string {
-	if !r.IsConsumer() {
+func (this *UploadedResource) ConsumerHash() string {
+	if !this.IsConsumer() {
 		return ""
 	}
 
-	parts := []string{r.ParticipantName, r.ConsumedProvider.String, r.Endpoint, r.Method}
-	if r.Interaction == RestResponse {
-		parts = append(parts, r.ResponseStatusCode.String)
+	parts := []string{this.ParticipantName, this.ConsumedProvider.String, this.Endpoint, this.Method}
+	if this.Interaction == RestResponse {
+		parts = append(parts, this.ResponseStatusCode.String)
 	}
 
 	return Hash(parts...)
 }
 
-func (r *UploadedResource) PrimaryHash() string {
-	if r.IsProvider() {
-		return r.ProviderHash()
+func (this *UploadedResource) PrimaryHash() string {
+	if this.IsProvider() {
+		return this.ProviderHash()
 	}
 
-	return r.ConsumerHash()
+	return this.ConsumerHash()
 }
 
 func NewRestRequestConsumer(

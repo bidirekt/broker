@@ -41,68 +41,68 @@ schemas:
         type: string
 `
 
-func (s *IntegrationSuite) contractContentForVersion(version string) []contractFragment {
+func (this *IntegrationSuite) contractContentForVersion(version string) []contractFragment {
 	var content string
-	s.Require().NoError(s.Pool.QueryRow(context.Background(),
+	this.Require().NoError(this.Pool.QueryRow(context.Background(),
 		"SELECT contract_content FROM contract_versions WHERE version = $1", version,
 	).Scan(&content))
 
 	var fragments []contractFragment
-	s.Require().NoError(json.Unmarshal([]byte(content), &fragments))
+	this.Require().NoError(json.Unmarshal([]byte(content), &fragments))
 
 	return fragments
 }
 
-func (s *IntegrationSuite) TestPublish_EachVersionStampsItsOwnFiles() {
-	status, _ := s.post("/api/participants", contentParticipantBody)
-	s.Require().Equal(http.StatusOK, status)
+func (this *IntegrationSuite) TestPublish_EachVersionStampsItsOwnFiles() {
+	status, _ := this.post("/api/participants", contentParticipantBody)
+	this.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/contracts", s.publishBody("content_service", "v42",
+	status, _ = this.post("/api/contracts", this.publishBody("content_service", "v42",
 		contractFragment{"api.yaml", singleFileYAML},
 	))
-	s.Require().Equal(http.StatusOK, status)
+	this.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/contracts", s.publishBody("content_service", "v43",
+	status, _ = this.post("/api/contracts", this.publishBody("content_service", "v43",
 		contractFragment{".contracts/api/pets.yaml", endpointsYAML},
 		contractFragment{".contracts/api/schemas.yaml", schemasYAML},
 	))
-	s.Require().Equal(http.StatusOK, status)
+	this.Require().Equal(http.StatusOK, status)
 
 	// same hydrated resources: v43 aliases the snapshot of v42
-	s.Equal(1, s.countRows("contracts"))
-	s.Equal(2, s.countRows("contract_versions"))
+	this.Equal(1, this.countRows("contracts"))
+	this.Equal(2, this.countRows("contract_versions"))
 
-	s.Equal(
+	this.Equal(
 		[]contractFragment{{"api.yaml", singleFileYAML}},
-		s.contractContentForVersion("v42"),
+		this.contractContentForVersion("v42"),
 	)
-	s.Equal(
+	this.Equal(
 		[]contractFragment{
 			{".contracts/api/pets.yaml", endpointsYAML},
 			{".contracts/api/schemas.yaml", schemasYAML},
 		},
-		s.contractContentForVersion("v43"),
+		this.contractContentForVersion("v43"),
 	)
 }
 
-func (s *IntegrationSuite) TestPublish_RepublishingTheSameVersionKeepsTheFirstFiles() {
-	status, _ := s.post("/api/participants", contentParticipantBody)
-	s.Require().Equal(http.StatusOK, status)
+func (this *IntegrationSuite) TestPublish_RepublishingTheSameVersionKeepsTheFirstFiles() {
+	status, _ := this.post("/api/participants", contentParticipantBody)
+	this.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/contracts", s.publishBody("content_service", "v42",
+	status, _ = this.post("/api/contracts", this.publishBody("content_service", "v42",
 		contractFragment{"api.yaml", singleFileYAML},
 	))
-	s.Require().Equal(http.StatusOK, status)
+	this.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/contracts", s.publishBody("content_service", "v42",
+	status, _ = this.post("/api/contracts", this.publishBody("content_service", "v42",
 		contractFragment{".contracts/api/pets.yaml", endpointsYAML},
 		contractFragment{".contracts/api/schemas.yaml", schemasYAML},
 	))
-	s.Require().Equal(http.StatusOK, status)
+	this.Require().Equal(http.StatusOK, status)
 
-	s.Equal(1, s.countRows("contract_versions"))
-	s.Equal(
+	this.Equal(1, this.countRows("contract_versions"))
+	this.Equal(
 		[]contractFragment{{"api.yaml", singleFileYAML}},
-		s.contractContentForVersion("v42"),
+		this.contractContentForVersion("v42"),
 	)
 }

@@ -31,17 +31,17 @@ func largeContractFragments(paddingBytes int) []contractFragment {
 	}
 }
 
-func (s *IntegrationSuite) TestPublish_BodyOverFiberDefaultLimit_IsAccepted() {
-	status, _ := s.post("/api/participants", limitParticipantBody)
-	s.Require().Equal(http.StatusOK, status)
+func (this *IntegrationSuite) TestPublish_BodyOverFiberDefaultLimit_IsAccepted() {
+	status, _ := this.post("/api/participants", limitParticipantBody)
+	this.Require().Equal(http.StatusOK, status)
 
-	body := s.publishBody("limit_service", "v1", largeContractFragments(5*1024*1024)...)
-	s.Require().Greater(len(body), 4*1024*1024)
-	s.Require().Less(len(body), 8*1024*1024)
+	body := this.publishBody("limit_service", "v1", largeContractFragments(5*1024*1024)...)
+	this.Require().Greater(len(body), 4*1024*1024)
+	this.Require().Less(len(body), 8*1024*1024)
 
-	status, response := s.post("/api/contracts", body)
-	s.Equal(http.StatusOK, status)
-	s.JSONEq(`{"message":"contract publish successful"}`, response)
+	status, response := this.post("/api/contracts", body)
+	this.Equal(http.StatusOK, status)
+	this.JSONEq(`{"message":"contract publish successful"}`, response)
 
-	s.Equal(limitEndpointCount, s.countRows("resources"))
+	this.Equal(limitEndpointCount, this.countRows("resources"))
 }

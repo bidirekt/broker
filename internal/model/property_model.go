@@ -7,10 +7,10 @@ type Property struct {
 	Optional bool
 }
 
-func (p *Property) IsSame(other *Property) bool {
-	return p.Path == other.Path &&
-		p.Type == other.Type &&
-		p.Optional == other.Optional
+func (this *Property) IsSame(other *Property) bool {
+	return this.Path == other.Path &&
+		this.Type == other.Type &&
+		this.Optional == other.Optional
 }
 
 func NewProperty(

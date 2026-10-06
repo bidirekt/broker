@@ -7,7 +7,7 @@ import (
 	"github.com/guregu/null"
 )
 
-func (c *CompatibilityChecker) checkConsumer(
+func (this *CompatibilityChecker) checkConsumer(
 	ctx context.Context,
 	consumerResource model.PersistedResource,
 	environment *model.Environment,

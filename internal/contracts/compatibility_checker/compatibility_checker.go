@@ -18,7 +18,7 @@ func NewCompatibilityChecker(verdicts VerdictReader) *CompatibilityChecker {
 	return &CompatibilityChecker{verdicts: verdicts}
 }
 
-func (c *CompatibilityChecker) Check(
+func (this *CompatibilityChecker) Check(
 	ctx context.Context,
 	contract *model.PersistedContract,
 	environment *model.Environment,
@@ -31,7 +31,7 @@ func (c *CompatibilityChecker) Check(
 	)
 
 	pairs := &checkedPairs{
-		verdicts:   c.verdicts,
+		verdicts:   this.verdicts,
 		contractID: contract.ID,
 		states:     make(map[[2]int64]*pairState),
 	}
@@ -39,7 +39,7 @@ func (c *CompatibilityChecker) Check(
 	for _, resource := range contract.Resources {
 		if resource.Removed {
 			if resource.Direction == model.Provides {
-				c.checkRemovedProvider(resource, counterparts, report)
+				this.checkRemovedProvider(resource, counterparts, report)
 			}
 
 			continue
@@ -47,9 +47,9 @@ func (c *CompatibilityChecker) Check(
 
 		switch resource.Direction {
 		case model.Consumes:
-			c.checkConsumer(ctx, resource, environment, counterparts, pairs, report)
+			this.checkConsumer(ctx, resource, environment, counterparts, pairs, report)
 		case model.Provides:
-			c.checkProvider(ctx, resource, counterparts, pairs, report)
+			this.checkProvider(ctx, resource, counterparts, pairs, report)
 		}
 	}
 
@@ -70,38 +70,38 @@ type pairState struct {
 	injected bool
 }
 
-func (p *checkedPairs) resolve(ctx context.Context, counterpartContractID int64) *pairState {
-	one, two := model.OrderContractPair(p.contractID, counterpartContractID)
+func (this *checkedPairs) resolve(ctx context.Context, counterpartContractID int64) *pairState {
+	one, two := model.OrderContractPair(this.contractID, counterpartContractID)
 
-	state, seen := p.states[[2]int64{one, two}]
+	state, seen := this.states[[2]int64{one, two}]
 	if seen {
 		return state
 	}
 
 	state = &pairState{}
-	if verdict, found := p.verdicts.GetVerdict(ctx, one, two); found {
+	if verdict, found := this.verdicts.GetVerdict(ctx, one, two); found {
 		state.verdict = verdict
 	}
 
-	p.states[[2]int64{one, two}] = state
+	this.states[[2]int64{one, two}] = state
 
 	return state
 }
 
-func (s *pairState) hit() bool {
-	return s.verdict != nil
+func (this *pairState) hit() bool {
+	return this.verdict != nil
 }
 
 // replay injects the stored breaks once per pair: a verdict already aggregates every resource
 // of the pair, so the remaining resources contribute nothing.
-func (s *pairState) replay(item *IncompatibleItem) {
-	if s.injected {
+func (this *pairState) replay(item *IncompatibleItem) {
+	if this.injected {
 		return
 	}
 
-	s.injected = true
+	this.injected = true
 
-	for _, verdictBreak := range s.verdict.Breaks {
+	for _, verdictBreak := range this.verdict.Breaks {
 		item.AppendCachedBreakChange(verdictBreak)
 	}
 }

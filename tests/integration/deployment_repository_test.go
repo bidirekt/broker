@@ -9,8 +9,8 @@ import (
 
 const stagingEnvBody = `{"environment":"staging"}`
 
-func (s *IntegrationSuite) insertDeploymentAt(participantID int64, version string, environmentID int64, deployedAt string) {
-	_, err := s.Pool.Exec(context.Background(),
+func (this *IntegrationSuite) insertDeploymentAt(participantID int64, version string, environmentID int64, deployedAt string) {
+	_, err := this.Pool.Exec(context.Background(),
 		`WITH prior AS (
 		     SELECT version FROM deployments
 		     WHERE participant_id = $1 AND environment_id = $3
@@ -21,57 +21,57 @@ func (s *IntegrationSuite) insertDeploymentAt(participantID int64, version strin
 		        $4::timestamptz`,
 		participantID, version, environmentID, deployedAt,
 	)
-	s.Require().NoError(err)
+	this.Require().NoError(err)
 }
 
-func (s *IntegrationSuite) TestCurrentVersionInEnv_RollbackPicksLatestRowEvenIfOlderVersion() {
-	s.seedApiParticipantContractAndProductionEnv()
+func (this *IntegrationSuite) TestCurrentVersionInEnv_RollbackPicksLatestRowEvenIfOlderVersion() {
+	this.seedApiParticipantContractAndProductionEnv()
 
-	participantID := s.lookupParticipantID("api")
-	productionID := s.lookupEnvironmentID("production")
+	participantID := this.lookupParticipantID("api")
+	productionID := this.lookupEnvironmentID("production")
 
-	s.insertDeploymentAt(participantID, "v1", productionID, "2026-05-01T00:00:00Z")
-	s.insertDeploymentAt(participantID, "v2", productionID, "2026-05-10T00:00:00Z")
-	s.insertDeploymentAt(participantID, "v1", productionID, "2026-05-15T00:00:00Z")
+	this.insertDeploymentAt(participantID, "v1", productionID, "2026-05-01T00:00:00Z")
+	this.insertDeploymentAt(participantID, "v2", productionID, "2026-05-10T00:00:00Z")
+	this.insertDeploymentAt(participantID, "v1", productionID, "2026-05-15T00:00:00Z")
 
-	repo := repository.NewDeploymentRepository(s.Pool)
+	repo := repository.NewDeploymentRepository(this.Pool)
 	version, ok := repo.CurrentVersionInEnv(context.Background(), participantID, productionID)
-	s.True(ok)
-	s.Equal("v1", version)
+	this.True(ok)
+	this.Equal("v1", version)
 }
 
-func (s *IntegrationSuite) TestCurrentVersionInEnv_NoRowsReturnsNotFound() {
-	s.seedApiParticipantContractAndProductionEnv()
+func (this *IntegrationSuite) TestCurrentVersionInEnv_NoRowsReturnsNotFound() {
+	this.seedApiParticipantContractAndProductionEnv()
 
-	participantID := s.lookupParticipantID("api")
-	productionID := s.lookupEnvironmentID("production")
+	participantID := this.lookupParticipantID("api")
+	productionID := this.lookupEnvironmentID("production")
 
-	repo := repository.NewDeploymentRepository(s.Pool)
+	repo := repository.NewDeploymentRepository(this.Pool)
 	version, ok := repo.CurrentVersionInEnv(context.Background(), participantID, productionID)
-	s.False(ok)
-	s.Equal("", version)
+	this.False(ok)
+	this.Equal("", version)
 }
 
-func (s *IntegrationSuite) TestCurrentVersionInEnv_ScopedPerEnvironment() {
-	s.seedApiParticipantContractAndProductionEnv()
+func (this *IntegrationSuite) TestCurrentVersionInEnv_ScopedPerEnvironment() {
+	this.seedApiParticipantContractAndProductionEnv()
 
-	status, _ := s.post("/api/environments", stagingEnvBody)
-	s.Require().Equal(http.StatusOK, status)
+	status, _ := this.post("/api/environments", stagingEnvBody)
+	this.Require().Equal(http.StatusOK, status)
 
-	participantID := s.lookupParticipantID("api")
-	productionID := s.lookupEnvironmentID("production")
-	stagingID := s.lookupEnvironmentID("staging")
+	participantID := this.lookupParticipantID("api")
+	productionID := this.lookupEnvironmentID("production")
+	stagingID := this.lookupEnvironmentID("staging")
 
-	s.insertDeploymentAt(participantID, "v1", productionID, "2026-05-01T00:00:00Z")
-	s.insertDeploymentAt(participantID, "v2", stagingID, "2026-05-02T00:00:00Z")
+	this.insertDeploymentAt(participantID, "v1", productionID, "2026-05-01T00:00:00Z")
+	this.insertDeploymentAt(participantID, "v2", stagingID, "2026-05-02T00:00:00Z")
 
-	repo := repository.NewDeploymentRepository(s.Pool)
+	repo := repository.NewDeploymentRepository(this.Pool)
 
 	prodVersion, prodOk := repo.CurrentVersionInEnv(context.Background(), participantID, productionID)
-	s.True(prodOk)
-	s.Equal("v1", prodVersion)
+	this.True(prodOk)
+	this.Equal("v1", prodVersion)
 
 	stagingVersion, stagingOk := repo.CurrentVersionInEnv(context.Background(), participantID, stagingID)
-	s.True(stagingOk)
-	s.Equal("v2", stagingVersion)
+	this.True(stagingOk)
+	this.Equal("v2", stagingVersion)
 }

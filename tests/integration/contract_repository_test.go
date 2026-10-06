@@ -33,20 +33,20 @@ const ordersContractBody = `{
   }
 }`
 
-func (s *IntegrationSuite) publishOrdersContract() {
-	status, _ := s.post("/api/participants", ordersParticipantBody)
-	s.Require().Equal(http.StatusOK, status)
+func (this *IntegrationSuite) publishOrdersContract() {
+	status, _ := this.post("/api/participants", ordersParticipantBody)
+	this.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/contracts", s.publishBody("orders_service", "1", contractFragment{"api.yaml", ordersContractBody}))
-	s.Require().Equal(http.StatusOK, status)
+	status, _ = this.post("/api/contracts", this.publishBody("orders_service", "1", contractFragment{"api.yaml", ordersContractBody}))
+	this.Require().Equal(http.StatusOK, status)
 }
 
-func (s *IntegrationSuite) loadOrdersResource() model.PersistedResource {
-	repo := repository.NewContractRepository(s.Pool)
+func (this *IntegrationSuite) loadOrdersResource() model.PersistedResource {
+	repo := repository.NewContractRepository(this.Pool)
 
 	contract, found := repo.GetContractByNameAndVersion(context.Background(), "orders_service", "1")
-	s.Require().True(found)
-	s.Require().Len(contract.Resources, 1)
+	this.Require().True(found)
+	this.Require().Len(contract.Resources, 1)
 
 	for _, resource := range contract.Resources {
 		return resource
@@ -54,49 +54,49 @@ func (s *IntegrationSuite) loadOrdersResource() model.PersistedResource {
 	return model.PersistedResource{}
 }
 
-func (s *IntegrationSuite) TestLoadContract_AbsentOptionalFieldsMarshalAsNull() {
-	s.publishOrdersContract()
+func (this *IntegrationSuite) TestLoadContract_AbsentOptionalFieldsMarshalAsNull() {
+	this.publishOrdersContract()
 
-	resource := s.loadOrdersResource()
+	resource := this.loadOrdersResource()
 
-	s.False(resource.ConsumedProvider.Valid, "expected ConsumedProvider to be null for a provided resource")
-	s.Empty(resource.ParticipantVersion, "expected ParticipantVersion to be empty when not deployed")
+	this.False(resource.ConsumedProvider.Valid, "expected ConsumedProvider to be null for a provided resource")
+	this.Empty(resource.ParticipantVersion, "expected ParticipantVersion to be empty when not deployed")
 
 	provider, err := json.Marshal(resource.ConsumedProvider)
-	s.Require().NoError(err)
-	s.Equal("null", string(provider))
+	this.Require().NoError(err)
+	this.Equal("null", string(provider))
 }
 
-func (s *IntegrationSuite) TestLoadContract_LegacyEmptyStringFieldsSurfaceAsNull() {
-	s.publishOrdersContract()
+func (this *IntegrationSuite) TestLoadContract_LegacyEmptyStringFieldsSurfaceAsNull() {
+	this.publishOrdersContract()
 
-	_, err := s.Pool.Exec(context.Background(),
+	_, err := this.Pool.Exec(context.Background(),
 		`UPDATE resources SET consumed_provider = '', response_status_code = ''`,
 	)
-	s.Require().NoError(err)
+	this.Require().NoError(err)
 
-	resource := s.loadOrdersResource()
+	resource := this.loadOrdersResource()
 
-	s.False(resource.ConsumedProvider.Valid, "expected ConsumedProvider to be null for empty value")
-	s.False(resource.ResponseStatusCode.Valid, "expected ResponseStatusCode to be null for empty value")
+	this.False(resource.ConsumedProvider.Valid, "expected ConsumedProvider to be null for empty value")
+	this.False(resource.ResponseStatusCode.Valid, "expected ResponseStatusCode to be null for empty value")
 
 	statusCode, err := json.Marshal(resource.ResponseStatusCode)
-	s.Require().NoError(err)
-	s.Equal("null", string(statusCode))
+	this.Require().NoError(err)
+	this.Equal("null", string(statusCode))
 }
 
-func (s *IntegrationSuite) TestLoadContract_PopulatedOptionalFieldsArePreserved() {
-	s.publishOrdersContract()
+func (this *IntegrationSuite) TestLoadContract_PopulatedOptionalFieldsArePreserved() {
+	this.publishOrdersContract()
 
-	_, err := s.Pool.Exec(context.Background(),
+	_, err := this.Pool.Exec(context.Background(),
 		`UPDATE resources SET consumed_provider = 'pets'`,
 	)
-	s.Require().NoError(err)
+	this.Require().NoError(err)
 
-	resource := s.loadOrdersResource()
+	resource := this.loadOrdersResource()
 
-	s.True(resource.ConsumedProvider.Valid)
-	s.Equal("pets", resource.ConsumedProvider.String)
-	s.True(resource.ResponseStatusCode.Valid)
-	s.Equal("200", resource.ResponseStatusCode.String)
+	this.True(resource.ConsumedProvider.Valid)
+	this.Equal("pets", resource.ConsumedProvider.String)
+	this.True(resource.ResponseStatusCode.Valid)
+	this.Equal("200", resource.ResponseStatusCode.String)
 }

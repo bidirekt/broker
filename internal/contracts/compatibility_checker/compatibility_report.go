@@ -18,23 +18,23 @@ type IncompatibleCounterpart struct {
 
 // InteractionKey is the wire spelling of the checked resource's interaction: "request"
 // for requests, the raw status code for responses.
-func (b *ContractBreakingChange) InteractionKey() string {
-	switch b.CheckedResource.Interaction {
+func (this *ContractBreakingChange) InteractionKey() string {
+	switch this.CheckedResource.Interaction {
 	case model.RestRequest:
 		return "request"
 	case model.RestResponse:
-		return b.CheckedResource.ResponseStatusCode.String
+		return this.CheckedResource.ResponseStatusCode.String
 	default:
-		return b.CheckedResource.Interaction.String()
+		return this.CheckedResource.Interaction.String()
 	}
 }
 
 // IsPropertyBreak reports whether the break comes from a property diff, as opposed to the
 // environment checks that depend on deployments and never become a stored verdict.
-func (b *ContractBreakingChange) IsPropertyBreak() bool {
-	return b.Reason != ReasonProviderResourceNotFound &&
-		b.Reason != ReasonProviderResourceNotDeployedInEnvironment &&
-		b.Reason != ReasonProviderResourceRemovedButStillConsumed
+func (this *ContractBreakingChange) IsPropertyBreak() bool {
+	return this.Reason != ReasonProviderResourceNotFound &&
+		this.Reason != ReasonProviderResourceNotDeployedInEnvironment &&
+		this.Reason != ReasonProviderResourceRemovedButStillConsumed
 }
 
 type IncompatibleItem struct {
@@ -53,14 +53,14 @@ func NewIncompatibleItem() *IncompatibleItem {
 	}
 }
 
-func (r *IncompatibleItem) AppendContractBreakChange(b ContractBreakingChange) {
-	r.Breaks = append(r.Breaks, b)
-	r.Deployable = false
+func (this *IncompatibleItem) AppendContractBreakChange(b ContractBreakingChange) {
+	this.Breaks = append(this.Breaks, b)
+	this.Deployable = false
 }
 
-func (r *IncompatibleItem) AppendCachedBreakChange(b model.VerdictBreak) {
-	r.CachedBreaks = append(r.CachedBreaks, b)
-	r.Deployable = false
+func (this *IncompatibleItem) AppendCachedBreakChange(b model.VerdictBreak) {
+	this.CachedBreaks = append(this.CachedBreaks, b)
+	this.Deployable = false
 }
 
 type HierarchicalInteraction map[string][]ContractBreakingChange
@@ -95,9 +95,9 @@ func NewContractCompatibilityReport(
 	}
 }
 
-func (r *ContractCompatibilityReport) AppendResult(dependency string, result *IncompatibleItem) {
+func (this *ContractCompatibilityReport) AppendResult(dependency string, result *IncompatibleItem) {
 
-	hierarchical, exists := r.Hierarchical[dependency]
+	hierarchical, exists := this.Hierarchical[dependency]
 	if !exists {
 		hierarchical = Hierarchical{
 			Deployable: true,
@@ -125,7 +125,7 @@ func (r *ContractCompatibilityReport) AppendResult(dependency string, result *In
 
 	for _, cachedBreak := range result.CachedBreaks {
 		role := RoleProvider
-		if cachedBreak.Details["consumerName"] == r.ParticipantName {
+		if cachedBreak.Details["consumerName"] == this.ParticipantName {
 			role = RoleConsumer
 		}
 
@@ -141,9 +141,9 @@ func (r *ContractCompatibilityReport) AppendResult(dependency string, result *In
 		)
 	}
 
-	r.Hierarchical[dependency] = hierarchical
+	this.Hierarchical[dependency] = hierarchical
 
-	existing := r.Results[dependency]
+	existing := this.Results[dependency]
 
 	if existing.Breaks == nil {
 		existing.Breaks = []ContractBreakingChange{}
@@ -171,7 +171,7 @@ func (r *ContractCompatibilityReport) AppendResult(dependency string, result *In
 
 	existing.Deployable = len(existing.Breaks)+len(existing.CachedBreaks) == 0
 
-	r.Results[dependency] = existing
+	this.Results[dependency] = existing
 }
 
 func (this *ContractCompatibilityReport) Deployable() bool {
@@ -184,26 +184,26 @@ func (this *ContractCompatibilityReport) Deployable() bool {
 	return true
 }
 
-func (h *Hierarchical) appendBreak(
+func (this *Hierarchical) appendBreak(
 	endpoint, method, interaction string,
 	breakChange ContractBreakingChange,
 ) {
-	if _, ok := h.Endpoints[endpoint]; !ok {
-		h.Endpoints[endpoint] = make(HierarchicalMethod)
+	if _, ok := this.Endpoints[endpoint]; !ok {
+		this.Endpoints[endpoint] = make(HierarchicalMethod)
 	}
 
-	if _, ok := h.Endpoints[endpoint][method]; !ok {
-		h.Endpoints[endpoint][method] = make(HierarchicalInteraction)
+	if _, ok := this.Endpoints[endpoint][method]; !ok {
+		this.Endpoints[endpoint][method] = make(HierarchicalInteraction)
 	}
 
-	breaks := append(h.Endpoints[endpoint][method][interaction], breakChange)
+	breaks := append(this.Endpoints[endpoint][method][interaction], breakChange)
 	slices.SortStableFunc(breaks, func(a, b ContractBreakingChange) int {
 		return cmp.Or(
 			strings.Compare(a.Details["property"], b.Details["property"]),
 			strings.Compare(string(a.Reason), string(b.Reason)),
 		)
 	})
-	h.Endpoints[endpoint][method][interaction] = breaks
+	this.Endpoints[endpoint][method][interaction] = breaks
 
-	h.Deployable = false
+	this.Deployable = false
 }
