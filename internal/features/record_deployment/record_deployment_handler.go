@@ -27,56 +27,56 @@ func NewRecordDeploymentHandler(
 	}
 }
 
-func (h *RecordDeploymentHandler) Handle(ctx fiber.Ctx) error {
+func (this *RecordDeploymentHandler) Handle(ctx fiber.Ctx) error {
 	requestBody := &RecordDeploymentRequestBody{}
 	if err := ctx.Bind().JSON(requestBody); err != nil {
-		return h.respondInvalidInput(ctx)
+		return this.respondInvalidInput(ctx)
 	}
 
 	if requestBody.Participant == "" || requestBody.Version == "" || requestBody.Environment == "" {
-		return h.respondInvalidInput(ctx)
+		return this.respondInvalidInput(ctx)
 	}
 
-	participant, exists := h.participantRepository.FindByName(ctx.Context(), requestBody.Participant)
+	participant, exists := this.participantRepository.FindByName(ctx.Context(), requestBody.Participant)
 	if !exists {
-		return h.respondParticipantNotFound(ctx)
+		return this.respondParticipantNotFound(ctx)
 	}
 
-	if !h.contractRepository.HasContractForVersion(ctx.Context(), participant.ID, requestBody.Version) {
-		return h.respondVersionNotFound(ctx)
+	if !this.contractRepository.HasContractForVersion(ctx.Context(), participant.ID, requestBody.Version) {
+		return this.respondVersionNotFound(ctx)
 	}
 
-	environment, exists := h.environmentRepository.FindByName(ctx.Context(), requestBody.Environment)
+	environment, exists := this.environmentRepository.FindByName(ctx.Context(), requestBody.Environment)
 	if !exists {
-		return h.respondEnvironmentNotFound(ctx)
+		return this.respondEnvironmentNotFound(ctx)
 	}
 
-	h.deploymentRepository.Insert(ctx.Context(), model.NewDeployment(participant, requestBody.Version, environment))
+	this.deploymentRepository.Insert(ctx.Context(), model.NewDeployment(participant, requestBody.Version, environment))
 
 	return ctx.Status(fiber.StatusOK).JSON(RecordDeploymentResponseBody{
 		Message: DeploymentRecorded,
 	})
 }
 
-func (h *RecordDeploymentHandler) respondInvalidInput(ctx fiber.Ctx) error {
+func (this *RecordDeploymentHandler) respondInvalidInput(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(RecordDeploymentResponseBody{
 		Message: DeploymentInvalidInput,
 	})
 }
 
-func (h *RecordDeploymentHandler) respondEnvironmentNotFound(ctx fiber.Ctx) error {
+func (this *RecordDeploymentHandler) respondEnvironmentNotFound(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusNotFound).JSON(RecordDeploymentResponseBody{
 		Message: EnvironmentNotFound,
 	})
 }
 
-func (h *RecordDeploymentHandler) respondParticipantNotFound(ctx fiber.Ctx) error {
+func (this *RecordDeploymentHandler) respondParticipantNotFound(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusNotFound).JSON(RecordDeploymentResponseBody{
 		Message: ParticipantNotFound,
 	})
 }
 
-func (h *RecordDeploymentHandler) respondVersionNotFound(ctx fiber.Ctx) error {
+func (this *RecordDeploymentHandler) respondVersionNotFound(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusNotFound).JSON(RecordDeploymentResponseBody{
 		Message: VersionNotFound,
 	})

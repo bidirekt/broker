@@ -55,28 +55,28 @@ func NewCompatibilityRepository(pool *pgxpool.Pool) *CompatibilityRepository {
 	return &CompatibilityRepository{pool: pool}
 }
 
-func (r *CompatibilityRepository) RecordCheck(
+func (this *CompatibilityRepository) RecordCheck(
 	ctx context.Context,
 	check *model.CompatibilityCheck,
 	results []model.CompatibilityCheckResult,
 	newVerdicts []model.CompatibilityVerdict,
 ) {
-	tx, err := r.pool.Begin(ctx)
+	tx, err := this.pool.Begin(ctx)
 	if err != nil {
 		panic(fmt.Errorf("error starting transaction: %w", err))
 	}
 
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	r.insertCheck(ctx, tx, check)
+	this.insertCheck(ctx, tx, check)
 
 	for i := range newVerdicts {
-		r.insertVerdict(ctx, tx, &newVerdicts[i])
+		this.insertVerdict(ctx, tx, &newVerdicts[i])
 	}
 
 	for i := range results {
 		results[i].CheckID = check.ID
-		r.insertCheckResult(ctx, tx, &results[i])
+		this.insertCheckResult(ctx, tx, &results[i])
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -84,7 +84,7 @@ func (r *CompatibilityRepository) RecordCheck(
 	}
 }
 
-func (r *CompatibilityRepository) GetVerdict(
+func (this *CompatibilityRepository) GetVerdict(
 	ctx context.Context,
 	one, two int64,
 ) (*model.CompatibilityVerdict, bool) {
@@ -93,7 +93,7 @@ func (r *CompatibilityRepository) GetVerdict(
 	verdict := &model.CompatibilityVerdict{}
 	var breaks []byte
 
-	err := r.pool.QueryRow(ctx, findCompatibilityVerdictQuery, contractIDOne, contractIDTwo).Scan(
+	err := this.pool.QueryRow(ctx, findCompatibilityVerdictQuery, contractIDOne, contractIDTwo).Scan(
 		&verdict.ContractIDOne,
 		&verdict.ContractIDTwo,
 		&breaks,
@@ -114,7 +114,7 @@ func (r *CompatibilityRepository) GetVerdict(
 	return verdict, true
 }
 
-func (r *CompatibilityRepository) insertCheck(
+func (this *CompatibilityRepository) insertCheck(
 	ctx context.Context,
 	tx pgx.Tx,
 	check *model.CompatibilityCheck,
@@ -132,7 +132,7 @@ func (r *CompatibilityRepository) insertCheck(
 	}
 }
 
-func (r *CompatibilityRepository) insertCheckResult(
+func (this *CompatibilityRepository) insertCheckResult(
 	ctx context.Context,
 	tx pgx.Tx,
 	result *model.CompatibilityCheckResult,
@@ -152,7 +152,7 @@ func (r *CompatibilityRepository) insertCheckResult(
 	}
 }
 
-func (r *CompatibilityRepository) insertVerdict(
+func (this *CompatibilityRepository) insertVerdict(
 	ctx context.Context,
 	tx pgx.Tx,
 	verdict *model.CompatibilityVerdict,

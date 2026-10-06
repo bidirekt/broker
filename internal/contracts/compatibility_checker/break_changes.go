@@ -34,20 +34,20 @@ type ContractBreakingChange struct {
 	Details             map[string]string        `json:"details,omitempty"`
 }
 
-func (b *ContractBreakingChange) ConsumerResource() *model.PersistedResource {
-	if b.CheckedResource.IsConsumer() {
-		return b.CheckedResource
+func (this *ContractBreakingChange) ConsumerResource() *model.PersistedResource {
+	if this.CheckedResource.IsConsumer() {
+		return this.CheckedResource
 	}
 
-	return b.CounterpartResource
+	return this.CounterpartResource
 }
 
-func (b *ContractBreakingChange) ConsumerName() string {
-	return b.ConsumerResource().ParticipantName
+func (this *ContractBreakingChange) ConsumerName() string {
+	return this.ConsumerResource().ParticipantName
 }
 
-func (b *ContractBreakingChange) ProviderName() string {
-	return b.ConsumerResource().ConsumedProvider.String
+func (this *ContractBreakingChange) ProviderName() string {
+	return this.ConsumerResource().ConsumedProvider.String
 }
 
 func NewContractBreakingChange(

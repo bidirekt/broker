@@ -6,7 +6,7 @@ import (
 	"github.com/bidirekt/broker/internal/model"
 )
 
-func (c *CompatibilityChecker) checkProvider(
+func (this *CompatibilityChecker) checkProvider(
 	ctx context.Context,
 	providerResource model.PersistedResource,
 	counterparts model.ResourceCounterparts,
