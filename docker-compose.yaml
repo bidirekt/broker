@@ -15,7 +15,7 @@ services:
       retries: 15
 
   broker:
-    image: ghcr.io/bidirekt/broker:latest
+    image: ghcr.io/bidirekt/broker:0.1.0-rc.1
     environment:
       BIDIREKT_DATABASE_URL: postgres://bidirekt:bidirekt@postgres:5432/bidirekt?sslmode=disable
     ports:
