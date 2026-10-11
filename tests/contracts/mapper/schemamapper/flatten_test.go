@@ -52,3 +52,16 @@ func TestToPropertyModels_RequiredRefSite_ToOptionalTarget_StaysOptional(t *test
 	require.Contains(t, properties, "$.address")
 	assert.Equal(t, model.Property{Path: "$.address", Type: "object", Optional: true}, properties["$.address"])
 }
+
+func TestToPropertyModels_NumberProperty_KeepsTheNumberType(t *testing.T) {
+	priced := contract.Schema{
+		Type: "object",
+		Properties: map[string]contract.Schema{
+			"price": {Type: "number"},
+		},
+	}
+
+	properties := schemamapper.ToPropertyModels(contract.SchemasMap{}, priced)
+
+	assert.Equal(t, model.Property{Path: "$.price", Type: "number"}, properties["$.price"])
+}

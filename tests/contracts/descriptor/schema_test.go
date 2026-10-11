@@ -25,14 +25,14 @@ func TestSchema_RecursaoDesceEmProfundidade(t *testing.T) {
 		"  tags:\n" +
 		"    type: array\n" +
 		"    items:\n" +
-		"      type: number\n"
+		"      type: decimal\n"
 
 	violations := descriptor.Validate(descriptor.Schema(), schemaDocument(t, source), "api.yaml")
 
 	require.Len(t, violations, 1)
 	assert.Equal(t, "schema.invalid_type", violations[0].ErrorCode)
 	assert.Equal(t, "properties;tags;items;type", violations[0].Path)
-	assert.Equal(t, "number", violations[0].Details["value"])
+	assert.Equal(t, "decimal", violations[0].Details["value"])
 }
 
 func TestSchema_ArrayDeArrayDeObjetoValido(t *testing.T) {
@@ -72,7 +72,7 @@ func TestSchema_VazioEhTipoInvalido(t *testing.T) {
 	assert.Equal(t, "", violations[0].Path)
 	assert.Equal(t, map[string]string{
 		"value":   "",
-		"allowed": "object, array, string, integer, float, boolean",
+		"allowed": "object, array, string, integer, float, number, boolean",
 	}, violations[0].Details)
 }
 
@@ -91,7 +91,7 @@ func TestSchema_SoRefEhValido(t *testing.T) {
 }
 
 func TestSchema_TipoForaDoConjuntoContaComoForma(t *testing.T) {
-	violations := descriptor.Validate(descriptor.Schema(), map[string]any{"type": "number"}, "api.yaml")
+	violations := descriptor.Validate(descriptor.Schema(), map[string]any{"type": "decimal"}, "api.yaml")
 
 	require.Len(t, violations, 1)
 	assert.Equal(t, "schema.invalid_type", violations[0].ErrorCode)

@@ -26,8 +26,8 @@ func checkRequestResource(
 			continue
 		}
 
-		// If the property is present in the consumer and the type is different, it is a breaking change.
-		if consumerProperty.Type != providerProperty.Type {
+		// If the property is present in the consumer with a type the provider does not accept, it is a breaking change.
+		if !acceptsType(providerProperty.Type, consumerProperty.Type) {
 			breaks = append(breaks, NewPropertyBreakChange(
 				checked,
 				counterpart,
