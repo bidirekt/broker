@@ -29,6 +29,10 @@ func propertyModelsFromSchema(
 			propertyModelsFromSchema(schemas, properties, path.Append(name), property, trail)
 		}
 
+		if schema.Values != nil {
+			propertyModelsFromSchema(schemas, properties, path.AppendMap(), *schema.Values, trail)
+		}
+
 	case schema.IsArray():
 		properties[path.String()] = model.NewProperty(path.String(), "array", schema.Optional, schema.Nullable)
 

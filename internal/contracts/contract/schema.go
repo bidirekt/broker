@@ -7,6 +7,7 @@ type Schema struct {
 	Description string
 	Properties  map[string]Schema
 	Items       *Schema
+	Values      *Schema
 	Ref         string
 	Optional    bool
 	Nullable    bool
@@ -34,6 +35,11 @@ func SchemaFromDocument(document Document) Schema {
 		schema.Items = &itemsSchema
 	}
 
+	if values, written := document["values"].(map[string]any); written {
+		valuesSchema := SchemaFromDocument(values)
+		schema.Values = &valuesSchema
+	}
+
 	return schema
 }
 
@@ -42,7 +48,7 @@ func (this *Schema) IsObject() bool {
 		return this.Type == "object"
 	}
 
-	return this.Properties != nil
+	return this.Properties != nil || this.Values != nil
 }
 
 func (this *Schema) IsArray() bool {
@@ -70,7 +76,7 @@ func isPrimitiveType(schemaType string) bool {
 }
 
 func (this *Schema) IsRef() bool {
-	if this.Type != "" || this.Properties != nil || this.Items != nil {
+	if this.Type != "" || this.Properties != nil || this.Items != nil || this.Values != nil {
 		return false
 	}
 

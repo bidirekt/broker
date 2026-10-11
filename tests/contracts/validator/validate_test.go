@@ -112,6 +112,16 @@ const selfReferencingCommentYAML = `schemas:
           ref: Comment
 `
 
+const nodeChildrenMapCycleYAML = `schemas:
+  Node:
+    type: object
+    properties:
+      children:
+        type: object
+        values:
+          ref: Node
+`
+
 const postUserCycleYAML = `schemas:
   Post:
     type: object
@@ -386,6 +396,19 @@ func TestValidate_SelfReferenceThroughArray_ReportsCycle(t *testing.T) {
 			Path:      "schemas;Comment",
 			Source:    "schemas.yaml",
 			Details:   map[string]string{"schema": "Comment", "cycle": "Comment → Comment"},
+		},
+	}, violations)
+}
+
+func TestValidate_SelfReferenceThroughMapValues_ReportsCycle(t *testing.T) {
+	violations := validateFiles(t, validatedFile{"schemas.yaml", nodeChildrenMapCycleYAML})
+
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "schema.cycle",
+			Path:      "schemas;Node",
+			Source:    "schemas.yaml",
+			Details:   map[string]string{"schema": "Node", "cycle": "Node → Node"},
 		},
 	}, violations)
 }

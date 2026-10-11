@@ -167,3 +167,54 @@ func TestToPropertyModels_SameSchemaOnSiblingBranches_FlattensBoth(t *testing.T)
 	assert.Contains(t, properties, "$.author.name")
 	assert.Contains(t, properties, "$.editor.name")
 }
+
+func TestToPropertyModels_MapOfRefs_FlattensTheValuesUnderBraces(t *testing.T) {
+	schemas := contract.SchemasMap{
+		"Pet": {
+			Type: "object",
+			Properties: map[string]contract.Schema{
+				"name": {Type: "string"},
+			},
+		},
+		"Pets": {Type: "object", Values: &contract.Schema{Ref: "Pet"}},
+	}
+
+	properties := schemamapper.ToPropertyModels(schemas, contract.Schema{Ref: "Pets"})
+
+	assert.Equal(t, map[string]model.Property{
+		"$":        {Path: "$", Type: "object"},
+		"${}":      {Path: "${}", Type: "object"},
+		"${}.name": {Path: "${}.name", Type: "string"},
+	}, properties)
+}
+
+func TestToPropertyModels_MapValues_CarryTypeOptionalAndNullable(t *testing.T) {
+	root := contract.Schema{
+		Type: "object",
+		Properties: map[string]contract.Schema{
+			"scores": {Type: "object", Values: &contract.Schema{Type: "integer", Optional: true, Nullable: true}},
+		},
+	}
+
+	properties := schemamapper.ToPropertyModels(contract.SchemasMap{}, root)
+
+	assert.Equal(t, model.Property{Path: "$.scores{}", Type: "integer", Optional: true, Nullable: true}, properties["$.scores{}"])
+}
+
+func TestToPropertyModels_CycleThroughMapValues_Terminates(t *testing.T) {
+	schemas := contract.SchemasMap{
+		"Node": {
+			Type: "object",
+			Properties: map[string]contract.Schema{
+				"children": {Type: "object", Values: &contract.Schema{Ref: "Node"}},
+			},
+		},
+	}
+
+	properties := schemamapper.ToPropertyModels(schemas, contract.Schema{Ref: "Node"})
+
+	assert.Equal(t, map[string]model.Property{
+		"$":          {Path: "$", Type: "object"},
+		"$.children": {Path: "$.children", Type: "object"},
+	}, properties)
+}

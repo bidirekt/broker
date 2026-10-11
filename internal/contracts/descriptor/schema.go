@@ -12,14 +12,15 @@ func Schema() Node {
 		"description": Text,
 		"properties":  Map(PropertyName, Lazy(Schema)),
 		"items":       Lazy(Schema),
+		"values":      Lazy(Schema),
 		"ref":         SchemaRef,
 		"optional":    Flag,
 		"nullable":    Flag,
-	}).Rules(schemaHasShape, arrayRequiresItems)
+	}).Rules(schemaHasShape, arrayRequiresItems, valuesExcludeProperties, valuesRequireObject)
 }
 
 func schemaHasShape(present PresentFields) *violation.Violation {
-	if present.HasAny("type", "properties", "items", "ref") {
+	if present.HasAny("type", "properties", "items", "values", "ref") {
 		return nil
 	}
 
@@ -38,4 +39,20 @@ func arrayRequiresItems(present PresentFields) *violation.Violation {
 	}
 
 	return &violation.Violation{ErrorCode: "schema.array_without_items"}
+}
+
+func valuesExcludeProperties(present PresentFields) *violation.Violation {
+	if present["values"] == nil || present["properties"] == nil {
+		return nil
+	}
+
+	return &violation.Violation{ErrorCode: "schema.values_with_properties"}
+}
+
+func valuesRequireObject(present PresentFields) *violation.Violation {
+	if present["values"] == nil || present["type"] == nil || present["type"] == "object" {
+		return nil
+	}
+
+	return &violation.Violation{ErrorCode: "schema.values_without_object"}
 }

@@ -160,6 +160,46 @@ func TestPropertyTypeRendersArrayItemType(t *testing.T) {
 	assert.Equal(t, "array<string>", mismatch.Details["consumerPropertyType"])
 }
 
+func TestPropertyTypeRendersMapValueType(t *testing.T) {
+	consumer := consumerResource()
+	consumer.Properties = map[string]model.Property{
+		"$.pets":        {Path: "$.pets", Type: "object"},
+		"$.pets{}":      {Path: "$.pets{}", Type: "object"},
+		"$.pets{}.name": {Path: "$.pets{}.name", Type: "string"},
+		"$.tags":        {Path: "$.tags", Type: "object"},
+		"$.tags{}":      {Path: "$.tags{}", Type: "array"},
+		"$.tags{}[]":    {Path: "$.tags{}[]", Type: "string"},
+		"$.owner":       {Path: "$.owner", Type: "object"},
+		"$.owner.name":  {Path: "$.owner.name", Type: "string"},
+		"$.scores":      {Path: "$.scores", Type: "object"},
+		"$.scores{}":    {Path: "$.scores{}", Type: "integer"},
+	}
+	provider := providerResource()
+	provider.Properties = map[string]model.Property{
+		"$.scores":   {Path: "$.scores", Type: "array"},
+		"$.scores[]": {Path: "$.scores[]", Type: "integer"},
+	}
+
+	missingPets := compatibility_checker.NewPropertyBreakChange(
+		consumer, provider, compatibility_checker.ReasonPropertyMissingInProvider, "$.pets",
+	)
+	missingTags := compatibility_checker.NewPropertyBreakChange(
+		consumer, provider, compatibility_checker.ReasonPropertyMissingInProvider, "$.tags",
+	)
+	missingOwner := compatibility_checker.NewPropertyBreakChange(
+		consumer, provider, compatibility_checker.ReasonPropertyMissingInProvider, "$.owner",
+	)
+	mismatch := compatibility_checker.NewPropertyBreakChange(
+		consumer, provider, compatibility_checker.ReasonPropertyTypeMismatch, "$.scores",
+	)
+
+	assert.Equal(t, "map<object>", missingPets.Details["propertyType"])
+	assert.Equal(t, "map<array<string>>", missingTags.Details["propertyType"])
+	assert.Equal(t, "object", missingOwner.Details["propertyType"])
+	assert.Equal(t, "map<integer>", mismatch.Details["consumerPropertyType"])
+	assert.Equal(t, "array<integer>", mismatch.Details["providerPropertyType"])
+}
+
 func TestTypeMismatchTypesResolvedByRole(t *testing.T) {
 	consumerRes := consumerResource()
 	providerRes := providerResource()
