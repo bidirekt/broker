@@ -285,6 +285,16 @@ schemas:
           state: { type: string }
 `
 
+const groupUndescribedBodyYAML = `consumes:
+  api:
+    rest:
+      /api/groups:
+        post:
+          request: ~
+          responses:
+            "201": ~
+`
+
 const profileNullableModuleYAML = `consumes:
   api:
     rest:
@@ -499,6 +509,44 @@ func TestMerge_ResponsePathOfOneReader_KeepsItsDeclaration(t *testing.T) {
 			}, response.Properties)
 		})
 	}
+}
+
+func TestMerge_RequestUndescribedByOneSender_MakesTheBodyOptional(t *testing.T) {
+	for _, order := range bothModuleOrders(groupUndescribedBodyYAML, groupNameYAML) {
+		t.Run(order.name, func(t *testing.T) {
+			request := mergedResource(t, mergeResources(t, order.files...), model.RestRequest)
+
+			assert.Equal(t, map[string]model.Property{
+				"$":      {Path: "$", Type: "object", Optional: true},
+				"$.name": {Path: "$.name", Type: "string"},
+			}, request.Properties)
+		})
+	}
+}
+
+func TestMerge_ResponseUndescribedByOneReader_KeepsTheOtherReadersDeclaration(t *testing.T) {
+	for _, order := range bothModuleOrders(groupUndescribedBodyYAML, groupNameYAML) {
+		t.Run(order.name, func(t *testing.T) {
+			response := mergedResource(t, mergeResources(t, order.files...), model.RestResponse)
+
+			assert.Equal(t, map[string]model.Property{
+				"$":      {Path: "$", Type: "object"},
+				"$.name": {Path: "$.name", Type: "string"},
+			}, response.Properties)
+		})
+	}
+}
+
+func TestMerge_UndescribedBodyInEveryModule_BuildsResourcesWithoutProperties(t *testing.T) {
+	resources := mergeResources(t,
+		mergedFile{"a.yaml", groupUndescribedBodyYAML},
+		mergedFile{"b.yaml", groupUndescribedBodyYAML},
+	)
+
+	assert.Equal(t, []model.UploadedResource{
+		*model.NewRestRequestConsumer("api", "/api/groups", "post", map[string]model.Property{}),
+		*model.NewRestResponseConsumer("api", "/api/groups", "post", "201", map[string]model.Property{}),
+	}, resources)
 }
 
 func TestMerge_IdenticalDeclarationInTwoFiles_BuildsOneResource(t *testing.T) {

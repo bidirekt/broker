@@ -713,3 +713,82 @@ func TestValidate_ConsumedResourceWithNumberAndIntegerTypes_IsATypeConflict(t *t
 		},
 	}, violations)
 }
+
+const undescribedBodiesYAML = `provides:
+  rest:
+    /files/*:
+      get:
+        responses:
+          200: ~
+      delete:
+        responses:
+          204:
+    /files:
+      post:
+        request: ~
+consumes:
+  storage:
+    rest:
+      /files:
+        post:
+          request: ~
+          responses:
+            201:
+`
+
+const emptySchemaNamesYAML = `provides:
+  rest:
+    /files:
+      post:
+        request: ""
+        responses:
+          204: ""
+`
+
+const undescribedUploadYAML = `provides:
+  rest:
+    /files:
+      post:
+        request: ~
+`
+
+func TestValidate_UndescribedBodies_ReportNothing(t *testing.T) {
+	violations := validateFiles(t, validatedFile{"files.yaml", undescribedBodiesYAML})
+
+	assert.Empty(t, violations)
+}
+
+func TestValidate_EmptySchemaNames_ReportUnresolvedName(t *testing.T) {
+	violations := validateFiles(t, validatedFile{"files.yaml", emptySchemaNamesYAML})
+
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "schema.unresolved_name",
+			Path:      "provides;rest;/files;post;request",
+			Source:    "files.yaml",
+			Details:   map[string]string{"schema": "", "resource": "provides POST /files request"},
+		},
+		{
+			ErrorCode: "schema.unresolved_name",
+			Path:      "provides;rest;/files;post;responses;204",
+			Source:    "files.yaml",
+			Details:   map[string]string{"schema": "", "resource": "provides POST /files 204"},
+		},
+	}, violations)
+}
+
+func TestValidate_UndescribedProvidedRequestDeclaredTwice_ReportsDuplicateResource(t *testing.T) {
+	violations := validateFiles(t,
+		validatedFile{"a.yaml", undescribedUploadYAML},
+		validatedFile{"b.yaml", undescribedUploadYAML},
+	)
+
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "resource.duplicate",
+			Path:      "provides;rest;/files;post;request",
+			Source:    "b.yaml",
+			Details:   map[string]string{"resource": "provides POST /files request", "declaredIn": "a.yaml"},
+		},
+	}, violations)
+}

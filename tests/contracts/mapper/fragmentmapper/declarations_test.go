@@ -183,6 +183,40 @@ const everyMethodYAML = `provides:
           "200": Pet
 `
 
+const undescribedBodiesYAML = `provides:
+  rest:
+    "/files/*":
+      get:
+        responses:
+          "200": ~
+      delete:
+        responses:
+          "204":
+    "/files":
+      post:
+        request: ~
+        responses:
+          "201": File
+      put:
+        responses:
+          "200": File
+schemas:
+  File:
+    type: object
+    properties:
+      id:
+        type: string
+`
+
+const emptySchemaNamesYAML = `provides:
+  rest:
+    "/files":
+      post:
+        request: ""
+        responses:
+          "204": ""
+`
+
 type declaredFile struct {
 	source string
 	raw    string
@@ -313,6 +347,53 @@ func TestToDeclarations_NomeNaoResolvidoGeraPropriedadeDoSchemaZero(t *testing.T
 	assert.Equal(t, "Ghost", declarations.Resources[0].SchemaName)
 	assert.NotContains(t, declarations.Catalog, "Ghost")
 	assert.Equal(t, map[string]model.Property{"$": {Path: "$"}}, declarations.Resources[0].Resource.Properties)
+}
+
+func TestToDeclarations_NullBodyDeclaresResourceWithoutSchemaOrProperties(t *testing.T) {
+	declarations := declarationsOf(t, declaredFile{"files.yaml", undescribedBodiesYAML})
+
+	assert.Equal(t, []string{
+		"provides;rest;/files;post;request",
+		"provides;rest;/files;post;responses;201",
+		"provides;rest;/files;put;responses;200",
+		"provides;rest;/files/*;get;responses;200",
+		"provides;rest;/files/*;delete;responses;204",
+	}, resourcePaths(declarations))
+
+	withoutSchema := map[string]bool{}
+	for _, declaration := range declarations.Resources {
+		withoutSchema[declaration.Path.String()] = declaration.WithoutSchema
+	}
+
+	assert.Equal(t, map[string]bool{
+		"provides;rest;/files;post;request":           true,
+		"provides;rest;/files;post;responses;201":     false,
+		"provides;rest;/files;put;responses;200":      false,
+		"provides;rest;/files/*;get;responses;200":    true,
+		"provides;rest;/files/*;delete;responses;204": true,
+	}, withoutSchema)
+
+	assert.Equal(t, *model.NewRestRequestProvider("/files", "post", map[string]model.Property{}), declarations.Resources[0].Resource)
+	assert.Empty(t, declarations.Resources[0].SchemaName)
+	assert.Equal(t, *model.NewRestResponseProvider("/files/*", "get", "200", map[string]model.Property{}), declarations.Resources[3].Resource)
+	assert.Equal(t, *model.NewRestResponseProvider("/files/*", "delete", "204", map[string]model.Property{}), declarations.Resources[4].Resource)
+}
+
+func TestToDeclarations_EmptyStringBodyIsAnUnresolvedSchemaName(t *testing.T) {
+	declarations := declarationsOf(t, declaredFile{"files.yaml", emptySchemaNamesYAML})
+
+	require.Len(t, declarations.Resources, 2)
+
+	for _, declaration := range declarations.Resources {
+		assert.False(t, declaration.WithoutSchema, declaration.Path.String())
+		assert.Empty(t, declaration.SchemaName, declaration.Path.String())
+		assert.Equal(t, map[string]model.Property{"$": {Path: "$"}}, declaration.Resource.Properties, declaration.Path.String())
+	}
+
+	assert.Equal(t, []string{
+		"provides;rest;/files;post;request",
+		"provides;rest;/files;post;responses;204",
+	}, resourcePaths(declarations))
 }
 
 func TestToDeclarations_PatchRoute_DeclaresRequestAndResponseInProvidesAndConsumes(t *testing.T) {

@@ -119,12 +119,11 @@ const (
 			r.consumer_hash,
 			r.created_at,
 			rv.change_type,
-			p.id,
-			p.path,
-			pv.type,
-			pv.optional,
-			pv.nullable,
-			pv.change_type
+			live.id,
+			live.path,
+			live.type,
+			live.optional,
+			live.nullable
 		FROM contracts c
 		JOIN participants pa ON pa.id = c.participant_id
 		JOIN resources r ON r.participant_id = c.participant_id
@@ -135,14 +134,19 @@ const (
 			ORDER BY contract_id DESC
 			LIMIT 1
 		) rv ON true
-		JOIN properties p ON p.resource_id = r.id
-		JOIN LATERAL (
-			SELECT type, optional, nullable, change_type
-			FROM property_versions
-			WHERE property_id = p.id AND contract_id <= c.id
-			ORDER BY contract_id DESC
-			LIMIT 1
-		) pv ON true
+		LEFT JOIN LATERAL (
+			SELECT p.id, p.path, pv.type, pv.optional, pv.nullable
+			FROM properties p
+			JOIN LATERAL (
+				SELECT type, optional, nullable, change_type
+				FROM property_versions
+				WHERE property_id = p.id AND contract_id <= c.id
+				ORDER BY contract_id DESC
+				LIMIT 1
+			) pv ON true
+			WHERE p.resource_id = r.id
+			  AND pv.change_type <> 'removed'
+		) live ON true
 		WHERE pa.name = $1
 		  AND c.id = (SELECT MAX(id) FROM contracts WHERE participant_id = pa.id)
 		  AND rv.change_type = 'added'
@@ -168,12 +172,11 @@ const (
 			r.consumer_hash,
 			r.created_at,
 			rv.change_type,
-			p.id,
-			p.path,
-			pv.type,
-			pv.optional,
-			pv.nullable,
-			pv.change_type
+			live.id,
+			live.path,
+			live.type,
+			live.optional,
+			live.nullable
 		FROM contract_versions cv
 		JOIN contracts c ON c.id = cv.contract_id
 		JOIN participants pa ON pa.id = cv.participant_id
@@ -185,14 +188,19 @@ const (
 			ORDER BY contract_id DESC
 			LIMIT 1
 		) rv ON true
-		JOIN properties p ON p.resource_id = r.id
-		JOIN LATERAL (
-			SELECT type, optional, nullable, change_type
-			FROM property_versions
-			WHERE property_id = p.id AND contract_id <= c.id
-			ORDER BY contract_id DESC
-			LIMIT 1
-		) pv ON true
+		LEFT JOIN LATERAL (
+			SELECT p.id, p.path, pv.type, pv.optional, pv.nullable
+			FROM properties p
+			JOIN LATERAL (
+				SELECT type, optional, nullable, change_type
+				FROM property_versions
+				WHERE property_id = p.id AND contract_id <= c.id
+				ORDER BY contract_id DESC
+				LIMIT 1
+			) pv ON true
+			WHERE p.resource_id = r.id
+			  AND pv.change_type <> 'removed'
+		) live ON true
 		WHERE pa.name = $1
 		  AND cv.version = $2
 		ORDER BY r.id
@@ -212,11 +220,10 @@ const (
 			r.provider_hash,
 			r.consumer_hash,
 			r.created_at,
-			p.path,
-			pv.type,
-			pv.optional,
-			pv.nullable,
-			pv.change_type,
+			live.path,
+			live.type,
+			live.optional,
+			live.nullable,
 			dep.version,
 			anchor.contract_id
 		FROM
@@ -247,28 +254,25 @@ const (
 			ORDER BY contract_id DESC
 			LIMIT 1
 		) rv ON true
-		LEFT JOIN
-			properties p ON p.resource_id = r.id
 		LEFT JOIN LATERAL (
-			SELECT
-				type, optional, nullable, change_type
-			FROM
-				property_versions
-			WHERE
-				property_id = p.id
-			AND
-				contract_id <= anchor.contract_id
-			ORDER BY contract_id DESC
-			LIMIT 1
-		) pv ON true
+			SELECT p.path, pv.type, pv.optional, pv.nullable
+			FROM properties p
+			JOIN LATERAL (
+				SELECT type, optional, nullable, change_type
+				FROM property_versions
+				WHERE property_id = p.id AND contract_id <= anchor.contract_id
+				ORDER BY contract_id DESC
+				LIMIT 1
+			) pv ON true
+			WHERE p.resource_id = r.id
+			  AND pv.change_type <> 'removed'
+		) live ON true
 		WHERE
 			r.direction = $1
 		AND
 			r.provider_hash = $2
 		AND
 			rv.change_type = 'added'
-		AND
-			(p.id IS NULL OR (pv.change_type IS NOT NULL AND pv.change_type <> 'removed'))
 	`
 
 	loadProviderResourceWithDeploymentsQuery = `
@@ -285,11 +289,10 @@ const (
 			r.provider_hash,
 			r.consumer_hash,
 			r.created_at,
-			p.path,
-			pv.type,
-			pv.optional,
-			pv.nullable,
-			pv.change_type,
+			live.path,
+			live.type,
+			live.optional,
+			live.nullable,
 			e.name,
 			dep.version,
 			anchor.contract_id
@@ -320,20 +323,19 @@ const (
 			ORDER BY contract_id DESC
 			LIMIT 1
 		) rv ON true
-		LEFT JOIN
-			properties p ON p.resource_id = r.id
 		LEFT JOIN LATERAL (
-			SELECT
-				type, optional, nullable, change_type
-			FROM
-				property_versions
-			WHERE
-				property_id = p.id
-			AND
-				contract_id <= anchor.contract_id
-			ORDER BY contract_id DESC
-			LIMIT 1
-		) pv ON true
+			SELECT p.path, pv.type, pv.optional, pv.nullable
+			FROM properties p
+			JOIN LATERAL (
+				SELECT type, optional, nullable, change_type
+				FROM property_versions
+				WHERE property_id = p.id AND contract_id <= anchor.contract_id
+				ORDER BY contract_id DESC
+				LIMIT 1
+			) pv ON true
+			WHERE p.resource_id = r.id
+			  AND pv.change_type <> 'removed'
+		) live ON true
 		LEFT JOIN LATERAL (
 			SELECT DISTINCT ON (environment_id) environment_id, version
 			FROM deployments
@@ -348,8 +350,6 @@ const (
 			r.provider_hash = $2
 		AND
 			rv.change_type = 'added'
-		AND
-			(p.id IS NULL OR (pv.change_type IS NOT NULL AND pv.change_type <> 'removed'))
 	`
 )
 
@@ -745,17 +745,8 @@ func scanPersistedContractTree(rows pgx.Rows) (*model.PersistedContract, bool) {
 			&row.PropertyVersionType,
 			&row.PropertyVersionOptional,
 			&row.PropertyVersionNullable,
-			&row.PropertyVersionChangeType,
 		); err != nil {
 			panic(fmt.Errorf("error scanning contract tree row: %w", err))
-		}
-
-		// A removed resource has all its properties removed too, so it has to be taken
-		// before the property skip: only its existence matters, no property is attached.
-		removedResource := row.ResourceVersionChangeType == string(model.ChangeRemoved)
-
-		if !removedResource && row.PropertyVersionChangeType == string(model.ChangeRemoved) {
-			continue
 		}
 
 		if !found {
@@ -770,7 +761,7 @@ func scanPersistedContractTree(rows pgx.Rows) (*model.PersistedContract, bool) {
 			contract.Resources[primaryHash] = resource
 		}
 
-		if removedResource {
+		if !row.PropertyPath.Valid {
 			continue
 		}
 
@@ -831,7 +822,6 @@ func (this *ContractRepository) GetProviderResourceByConsumerResource(
 			&row.PropertyVersionType,
 			&row.PropertyVersionOptional,
 			&row.PropertyVersionNullable,
-			&row.PropertyVersionChangeType,
 			&row.DeploymentEnvironment,
 			&row.DeploymentVersion,
 			&row.ContractID,
@@ -844,7 +834,9 @@ func (this *ContractRepository) GetProviderResourceByConsumerResource(
 			found = true
 		}
 
-		provider.Properties[row.PropertyPath] = row.toPropertyModel()
+		if row.PropertyPath.Valid {
+			provider.Properties[row.PropertyPath.String] = row.toPropertyModel()
+		}
 
 		if row.DeploymentEnvironment.Valid {
 			provider.DeployedVersions[row.DeploymentEnvironment.String] = row.DeploymentVersion.String
@@ -899,7 +891,6 @@ func (this *ContractRepository) GetConsumersResourcesByProviderHashAndEnvironmen
 			&row.PropertyVersionType,
 			&row.PropertyVersionOptional,
 			&row.PropertyVersionNullable,
-			&row.PropertyVersionChangeType,
 			&row.ResourceVersion,
 			&row.ContractID,
 		); err != nil {
@@ -910,7 +901,9 @@ func (this *ContractRepository) GetConsumersResourcesByProviderHashAndEnvironmen
 			consumersMap[row.ResourceID] = row.toResourceModel()
 		}
 
-		consumersMap[row.ResourceID].Properties[row.PropertyPath] = row.toPropertyModel()
+		if row.PropertyPath.Valid {
+			consumersMap[row.ResourceID].Properties[row.PropertyPath.String] = row.toPropertyModel()
+		}
 	}
 
 	consumers := make([]model.PersistedResource, 0, len(consumersMap))
