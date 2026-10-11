@@ -198,8 +198,8 @@ func (this *IntegrationSuite) TestPublishContract_CyclicSchema_RejectedBrokerSta
 	))
 	this.Equal(http.StatusBadRequest, status)
 	this.JSONEq(`{"message":"contract validation failed","violations":[`+
-		`{"code":"schema.too_deep","path":"schemas;Owner","source":"schemas.yaml","details":{"schema":"Owner","maxDepth":"10"}},`+
-		`{"code":"schema.too_deep","path":"schemas;Pet","source":"schemas.yaml","details":{"schema":"Pet","maxDepth":"10"}}`+
+		`{"code":"schema.cycle","path":"schemas;Owner","source":"schemas.yaml","details":{"schema":"Owner","cycle":"Owner → Pet → Owner"}},`+
+		`{"code":"schema.cycle","path":"schemas;Pet","source":"schemas.yaml","details":{"schema":"Pet","cycle":"Pet → Owner → Pet"}}`+
 		`]}`, body)
 
 	this.Equal(0, this.countRows("contracts"))

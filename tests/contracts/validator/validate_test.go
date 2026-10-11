@@ -102,6 +102,96 @@ const cyclicSchemasYAML = `schemas:
         ref: Pet
 `
 
+const selfReferencingCommentYAML = `schemas:
+  Comment:
+    type: object
+    properties:
+      replies:
+        type: array
+        items:
+          ref: Comment
+`
+
+const postUserCycleYAML = `schemas:
+  Post:
+    type: object
+    properties:
+      author:
+        ref: User
+  User:
+    type: object
+    properties:
+      posts:
+        type: array
+        items:
+          ref: Post
+`
+
+const feedReachingCommentCycleYAML = `schemas:
+  Feed:
+    type: object
+    properties:
+      comment:
+        ref: Comment
+  Comment:
+    type: object
+    properties:
+      reply:
+        ref: Reply
+  Reply:
+    type: object
+    properties:
+      parent:
+        ref: Comment
+`
+
+const longRefChainYAML = `schemas:
+  Feed:
+    type: object
+    properties:
+      posts:
+        type: array
+        items:
+          ref: Post
+  Post:
+    type: object
+    properties:
+      author:
+        ref: Author
+  Author:
+    type: object
+    properties:
+      details:
+        ref: Details
+  Details:
+    type: object
+    properties:
+      avatars:
+        type: array
+        items:
+          ref: Avatar
+  Avatar:
+    type: object
+    properties:
+      url:
+        type: string
+`
+
+const siblingBranchesYAML = `schemas:
+  Post:
+    type: object
+    properties:
+      author:
+        ref: User
+      editor:
+        ref: User
+  User:
+    type: object
+    properties:
+      name:
+        type: string
+`
+
 const petsResponseYAML = `provides:
   rest:
     /pets:
@@ -177,7 +267,7 @@ func validateFiles(t *testing.T, files ...validatedFile) []violation.Violation {
 	return validator.Validate(fragmentmapper.ToDeclarations(fragments))
 }
 
-func nestedPetYAML(levels int) string {
+func deepInlinePetYAML(levels int) string {
 	var source strings.Builder
 
 	source.WriteString("schemas:\n  Pet:\n")
@@ -268,42 +358,92 @@ func TestValidate_UnresolvedRefBehindAResolvedRef_ReportedOnceWhereWritten(t *te
 	}, violations)
 }
 
-func TestValidate_CyclicSchemas_ReportOneTooDeepPerRoot(t *testing.T) {
+func TestValidate_CyclicSchemas_ReportOneCyclePerSchemaInTheCycle(t *testing.T) {
 	violations := validateFiles(t, validatedFile{"schemas.yaml", cyclicSchemasYAML})
 
 	assert.Equal(t, []violation.Violation{
 		{
-			ErrorCode: "schema.too_deep",
+			ErrorCode: "schema.cycle",
 			Path:      "schemas;Owner",
 			Source:    "schemas.yaml",
-			Details:   map[string]string{"schema": "Owner", "maxDepth": "10"},
+			Details:   map[string]string{"schema": "Owner", "cycle": "Owner → Pet → Owner"},
 		},
 		{
-			ErrorCode: "schema.too_deep",
+			ErrorCode: "schema.cycle",
 			Path:      "schemas;Pet",
 			Source:    "schemas.yaml",
-			Details:   map[string]string{"schema": "Pet", "maxDepth": "10"},
+			Details:   map[string]string{"schema": "Pet", "cycle": "Pet → Owner → Pet"},
 		},
 	}, violations)
 }
 
-func TestValidate_NestingAtMaxDepth_ReportsNothing(t *testing.T) {
-	violations := validateFiles(t, validatedFile{"schemas.yaml", nestedPetYAML(9)})
+func TestValidate_SelfReferenceThroughArray_ReportsCycle(t *testing.T) {
+	violations := validateFiles(t, validatedFile{"schemas.yaml", selfReferencingCommentYAML})
+
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "schema.cycle",
+			Path:      "schemas;Comment",
+			Source:    "schemas.yaml",
+			Details:   map[string]string{"schema": "Comment", "cycle": "Comment → Comment"},
+		},
+	}, violations)
+}
+
+func TestValidate_CycleThroughArrayBackToTheParent_ReportsBothSchemas(t *testing.T) {
+	violations := validateFiles(t, validatedFile{"schemas.yaml", postUserCycleYAML})
+
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "schema.cycle",
+			Path:      "schemas;Post",
+			Source:    "schemas.yaml",
+			Details:   map[string]string{"schema": "Post", "cycle": "Post → User → Post"},
+		},
+		{
+			ErrorCode: "schema.cycle",
+			Path:      "schemas;User",
+			Source:    "schemas.yaml",
+			Details:   map[string]string{"schema": "User", "cycle": "User → Post → User"},
+		},
+	}, violations)
+}
+
+func TestValidate_SchemaThatOnlyReachesACycle_IsNotMarked(t *testing.T) {
+	violations := validateFiles(t, validatedFile{"schemas.yaml", feedReachingCommentCycleYAML})
+
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "schema.cycle",
+			Path:      "schemas;Comment",
+			Source:    "schemas.yaml",
+			Details:   map[string]string{"schema": "Comment", "cycle": "Comment → Reply → Comment"},
+		},
+		{
+			ErrorCode: "schema.cycle",
+			Path:      "schemas;Reply",
+			Source:    "schemas.yaml",
+			Details:   map[string]string{"schema": "Reply", "cycle": "Reply → Comment → Reply"},
+		},
+	}, violations)
+}
+
+func TestValidate_LongRefChainWithoutLoop_ReportsNothing(t *testing.T) {
+	violations := validateFiles(t, validatedFile{"schemas.yaml", longRefChainYAML})
 
 	assert.Empty(t, violations)
 }
 
-func TestValidate_NestingPastMaxDepth_ReportsTooDeep(t *testing.T) {
-	violations := validateFiles(t, validatedFile{"schemas.yaml", nestedPetYAML(10)})
+func TestValidate_SameSchemaOnSiblingBranches_ReportsNothing(t *testing.T) {
+	violations := validateFiles(t, validatedFile{"schemas.yaml", siblingBranchesYAML})
 
-	assert.Equal(t, []violation.Violation{
-		{
-			ErrorCode: "schema.too_deep",
-			Path:      "schemas;Pet",
-			Source:    "schemas.yaml",
-			Details:   map[string]string{"schema": "Pet", "maxDepth": "10"},
-		},
-	}, violations)
+	assert.Empty(t, violations)
+}
+
+func TestValidate_DeepInlineNesting_ReportsNothing(t *testing.T) {
+	violations := validateFiles(t, validatedFile{"schemas.yaml", deepInlinePetYAML(50)})
+
+	assert.Empty(t, violations)
 }
 
 func TestValidate_DuplicateSchema_NamesBothSources(t *testing.T) {
@@ -656,16 +796,16 @@ func TestValidate_SameInputTwice_ReportsTheSameOrder(t *testing.T) {
 			Details:   map[string]string{"schema": "Payment", "property": "Invoice.payment"},
 		},
 		{
-			ErrorCode: "schema.too_deep",
+			ErrorCode: "schema.cycle",
 			Path:      "schemas;Owner",
 			Source:    "schemas.yaml",
-			Details:   map[string]string{"schema": "Owner", "maxDepth": "10"},
+			Details:   map[string]string{"schema": "Owner", "cycle": "Owner → Pet → Owner"},
 		},
 		{
-			ErrorCode: "schema.too_deep",
+			ErrorCode: "schema.cycle",
 			Path:      "schemas;Pet",
 			Source:    "schemas.yaml",
-			Details:   map[string]string{"schema": "Pet", "maxDepth": "10"},
+			Details:   map[string]string{"schema": "Pet", "cycle": "Pet → Owner → Pet"},
 		},
 	}, first)
 	assert.Equal(t, first, second)

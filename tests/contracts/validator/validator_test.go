@@ -158,10 +158,10 @@ func TestValidator_EveryRule_FiresAtItsLocationSortedBySourceThenPath(t *testing
 			Details:   map[string]string{"schema": "Missing", "resource": "provides GET /pets 200"},
 		},
 		{
-			ErrorCode: "schema.too_deep",
+			ErrorCode: "schema.cycle",
 			Path:      "schemas;Loop",
 			Source:    "a.yaml",
-			Details:   map[string]string{"schema": "Loop", "maxDepth": "10"},
+			Details:   map[string]string{"schema": "Loop", "cycle": "Loop → Loop"},
 		},
 		{
 			ErrorCode: "schema.unresolved_ref",
