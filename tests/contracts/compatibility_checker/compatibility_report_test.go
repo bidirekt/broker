@@ -82,9 +82,9 @@ func checkFrom(
 }
 
 func TestFreshPropertyBreaksCarryTheRoleOfTheCheckedSide(t *testing.T) {
-	required := map[string]model.Property{"$.name": model.NewProperty("$.name", "string", false)}
-	optional := map[string]model.Property{"$.name": model.NewProperty("$.name", "string", true)}
-	integer := map[string]model.Property{"$.name": model.NewProperty("$.name", "integer", false)}
+	required := map[string]model.Property{"$.name": model.NewProperty("$.name", "string", false, false)}
+	optional := map[string]model.Property{"$.name": model.NewProperty("$.name", "string", true, false)}
+	integer := map[string]model.Property{"$.name": model.NewProperty("$.name", "integer", false, false)}
 	absent := map[string]model.Property{"$": {Path: "$", Type: "object"}}
 
 	cases := []struct {
@@ -129,7 +129,7 @@ func TestFreshPropertyBreaksCarryTheRoleOfTheCheckedSide(t *testing.T) {
 }
 
 func TestFreshResourceBreaksCarryTheirFixedRole(t *testing.T) {
-	properties := map[string]model.Property{"$.name": model.NewProperty("$.name", "string", false)}
+	properties := map[string]model.Property{"$.name": model.NewProperty("$.name", "string", false, false)}
 	consumer, provider := postPetsResources("201", properties, properties)
 
 	undeployed := provider

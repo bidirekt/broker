@@ -14,8 +14,8 @@ const participantName = "pets-service"
 func newContractWithOnePetsResource() *model.UploadedContract {
 	contract := model.NewUploadedContract(0, participantName, "1", "raw")
 	_ = contract.AddResource(model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
-		"$":    model.NewProperty("$", "object", false),
-		"$.id": model.NewProperty("$.id", "string", false),
+		"$":    model.NewProperty("$", "object", false, false),
+		"$.id": model.NewProperty("$.id", "string", false, false),
 	}))
 	return contract
 }
@@ -40,8 +40,8 @@ func TestDiff_ReportsAddedResource(t *testing.T) {
 	prev := newContractWithOnePetsResource()
 	next := newContractWithOnePetsResource()
 	added := model.NewRestResponseProvider("/pets/*", "get", "200", map[string]model.Property{
-		"$":    model.NewProperty("$", "object", false),
-		"$.id": model.NewProperty("$.id", "string", false),
+		"$":    model.NewProperty("$", "object", false, false),
+		"$.id": model.NewProperty("$.id", "string", false, false),
 	})
 	_ = next.AddResource(added)
 	key := added.PrimaryHash()
@@ -64,8 +64,8 @@ func TestDiff_NextNil_AllResourcesRemoved(t *testing.T) {
 func TestDiff_RemovedResource(t *testing.T) {
 	oldContract := newContractWithOnePetsResource()
 	removed := model.NewRestResponseProvider("/pets/*", "get", "200", map[string]model.Property{
-		"$":    model.NewProperty("$", "object", false),
-		"$.id": model.NewProperty("$.id", "string", false),
+		"$":    model.NewProperty("$", "object", false, false),
+		"$.id": model.NewProperty("$.id", "string", false, false),
 	})
 	_ = oldContract.AddResource(removed)
 	key := removed.PrimaryHash()
@@ -85,9 +85,9 @@ func TestDiff_ModifiedResource_PropertyAdded(t *testing.T) {
 	oldContract := newContractWithOnePetsResource()
 	newContract := model.NewUploadedContract(0, participantName, "1", "raw")
 	_ = newContract.AddResource(model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
-		"$":      model.NewProperty("$", "object", false),
-		"$.id":   model.NewProperty("$.id", "string", false),
-		"$.name": model.NewProperty("$.name", "string", false),
+		"$":      model.NewProperty("$", "object", false, false),
+		"$.id":   model.NewProperty("$.id", "string", false, false),
+		"$.name": model.NewProperty("$.name", "string", false, false),
 	}))
 
 	diff := contract_differ.DiffResourceProperties(props(oldContract), props(newContract))
@@ -104,9 +104,9 @@ func TestDiff_ModifiedResource_PropertyRemoved(t *testing.T) {
 	oldContract := model.NewUploadedContract(0, participantName, "1", "raw")
 	_ = oldContract.AddResource(
 		model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
-			"$":      model.NewProperty("$", "object", false),
-			"$.id":   model.NewProperty("$.id", "string", false),
-			"$.name": model.NewProperty("$.name", "string", false),
+			"$":      model.NewProperty("$", "object", false, false),
+			"$.id":   model.NewProperty("$.id", "string", false, false),
+			"$.name": model.NewProperty("$.name", "string", false, false),
 		}),
 	)
 	newContract := newContractWithOnePetsResource()
@@ -125,8 +125,8 @@ func TestDiff_ModifiedResource_PropertyTypeChanged(t *testing.T) {
 	oldContract := newContractWithOnePetsResource()
 	newContract := model.NewUploadedContract(0, participantName, "1", "raw")
 	_ = newContract.AddResource(model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
-		"$":    model.NewProperty("$", "object", false),
-		"$.id": model.NewProperty("$.id", "int", false),
+		"$":    model.NewProperty("$", "object", false, false),
+		"$.id": model.NewProperty("$.id", "int", false, false),
 	}))
 
 	diff := contract_differ.DiffResourceProperties(props(oldContract), props(newContract))
@@ -140,8 +140,28 @@ func TestDiff_ModifiedResource_PropertyTypeChanged(t *testing.T) {
 	}
 }
 
+func TestDiff_ModifiedResource_OnlyNullabilityChanged(t *testing.T) {
+	oldContract := newContractWithOnePetsResource()
+	newContract := model.NewUploadedContract(0, participantName, "1", "raw")
+	_ = newContract.AddResource(model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
+		"$":    model.NewProperty("$", "object", false, false),
+		"$.id": model.NewProperty("$.id", "string", false, true),
+	}))
+
+	diff := contract_differ.DiffResourceProperties(props(oldContract), props(newContract))
+
+	assert.Len(t, diff.Resources, 1)
+	for _, resourceChange := range diff.Resources {
+		assert.Equal(t, model.ChangeModified, resourceChange.Kind)
+		assert.Len(t, resourceChange.Properties, 1)
+		assert.Equal(t, model.ChangeModified, resourceChange.Properties["$.id"].Kind)
+		assert.False(t, resourceChange.Properties["$.id"].Before.Nullable)
+		assert.True(t, resourceChange.Properties["$.id"].After.Nullable)
+	}
+}
+
 func TestRemovedSinceDeployed_ResourceGoneFromTheFiles_Counts(t *testing.T) {
-	properties := map[string]model.Property{"$.id": model.NewProperty("$.id", "string", false)}
+	properties := map[string]model.Property{"$.id": model.NewProperty("$.id", "string", false, false)}
 	gone := model.PersistedResource{
 		ParticipantName:    participantName,
 		Direction:          model.Provides,
@@ -175,8 +195,8 @@ func TestRemovedSinceDeployed_ResourceThatOnlyLostProperties_DoesNotCount(t *tes
 		ParticipantName: participantName,
 		Resources: map[string]model.PersistedResource{
 			"list-pets": {Properties: map[string]model.Property{
-				"$.id":   model.NewProperty("$.id", "string", false),
-				"$.name": model.NewProperty("$.name", "string", false),
+				"$.id":   model.NewProperty("$.id", "string", false, false),
+				"$.name": model.NewProperty("$.name", "string", false, false),
 			}},
 		},
 	}
@@ -184,7 +204,7 @@ func TestRemovedSinceDeployed_ResourceThatOnlyLostProperties_DoesNotCount(t *tes
 		ParticipantName: participantName,
 		Resources: map[string]model.UploadedResource{
 			"list-pets": {Properties: map[string]model.Property{
-				"$.id": model.NewProperty("$.id", "string", false),
+				"$.id": model.NewProperty("$.id", "string", false, false),
 			}},
 		},
 	}
@@ -193,7 +213,7 @@ func TestRemovedSinceDeployed_ResourceThatOnlyLostProperties_DoesNotCount(t *tes
 }
 
 func TestRemovedSinceDeployed_ResourceAlreadyRemovedInTheDeployedVersion_DoesNotCount(t *testing.T) {
-	properties := map[string]model.Property{"$.id": model.NewProperty("$.id", "string", false)}
+	properties := map[string]model.Property{"$.id": model.NewProperty("$.id", "string", false, false)}
 	deployed := &model.PersistedContract{
 		ParticipantName: participantName,
 		Resources: map[string]model.PersistedResource{

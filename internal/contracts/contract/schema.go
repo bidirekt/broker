@@ -9,6 +9,7 @@ type Schema struct {
 	Items       *Schema
 	Ref         string
 	Optional    bool
+	Nullable    bool
 }
 
 func SchemaFromDocument(document Document) Schema {
@@ -17,6 +18,7 @@ func SchemaFromDocument(document Document) Schema {
 		Description: document.Text("description"),
 		Ref:         document.Text("ref"),
 		Optional:    document.Flag("optional"),
+		Nullable:    document.Flag("nullable"),
 	}
 
 	if properties, written := document["properties"].(map[string]any); written {

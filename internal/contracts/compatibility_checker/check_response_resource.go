@@ -48,6 +48,15 @@ func checkResponseResource(
 				consumerPropertyPath,
 			))
 		}
+
+		if providerProperty.Nullable && !consumerProperty.Nullable {
+			breaks = append(breaks, NewPropertyBreakChange(
+				checked,
+				counterpart,
+				ReasonPropertyNullableInProviderNotNullableInConsumer,
+				consumerPropertyPath,
+			))
+		}
 	}
 
 	return breaks

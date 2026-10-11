@@ -11,8 +11,8 @@ import (
 func newContractWithOnePetsResource(participantName string) *model.UploadedContract {
 	contract := model.NewUploadedContract(0, participantName, "1", "raw")
 	_ = contract.AddResource(model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
-		"$":    model.NewProperty("$", "object", false),
-		"$.id": model.NewProperty("$.id", "string", false),
+		"$":    model.NewProperty("$", "object", false, false),
+		"$.id": model.NewProperty("$.id", "string", false, false),
 	}))
 	return contract
 }
@@ -29,7 +29,7 @@ func TestContract_Checksum_DiffersWhenResourceAdded(t *testing.T) {
 
 	b := newContractWithOnePetsResource("pets-service")
 	require.NoError(t, b.AddResource(model.NewRestResponseProvider("/pets/*", "get", "200", map[string]model.Property{
-		"$": model.NewProperty("$", "object", false),
+		"$": model.NewProperty("$", "object", false, false),
 	})))
 
 	assert.NotEqual(t, a.Checksum(), b.Checksum())
@@ -37,11 +37,11 @@ func TestContract_Checksum_DiffersWhenResourceAdded(t *testing.T) {
 
 func TestContract_Checksum_IsOrderIndependent(t *testing.T) {
 	first := model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
-		"$":    model.NewProperty("$", "object", false),
-		"$.id": model.NewProperty("$.id", "string", false),
+		"$":    model.NewProperty("$", "object", false, false),
+		"$.id": model.NewProperty("$.id", "string", false, false),
 	})
 	second := model.NewRestResponseProvider("/pets/*", "get", "200", map[string]model.Property{
-		"$": model.NewProperty("$", "object", false),
+		"$": model.NewProperty("$", "object", false, false),
 	})
 
 	a := model.NewUploadedContract(0, "pets-service", "1", "raw")
@@ -59,7 +59,7 @@ func TestContract_AddResource_RejectsAlreadyAddedHash(t *testing.T) {
 	contract := newContractWithOnePetsResource("pets-service")
 
 	err := contract.AddResource(model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
-		"$": model.NewProperty("$", "object", false),
+		"$": model.NewProperty("$", "object", false, false),
 	}))
 
 	require.EqualError(

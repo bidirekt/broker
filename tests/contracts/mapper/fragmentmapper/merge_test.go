@@ -285,7 +285,41 @@ schemas:
           state: { type: string }
 `
 
-const fourModulesChecksum = "d55e2d0621975b40535271dc6fa098aa237646bb87924674e6b700a5fef23563"
+const profileNullableModuleYAML = `consumes:
+  api:
+    rest:
+      /api/profiles:
+        post:
+          request: ProfileNullable
+          responses:
+            "201": ProfileNullable
+schemas:
+  ProfileNullable:
+    type: object
+    properties:
+      avatar:   { type: string, nullable: true }
+      bio:      { type: string, nullable: true }
+      nickname: { type: string, nullable: true }
+`
+
+const profileNotNullableModuleYAML = `consumes:
+  api:
+    rest:
+      /api/profiles:
+        post:
+          request: ProfileNotNullable
+          responses:
+            "201": ProfileNotNullable
+schemas:
+  ProfileNotNullable:
+    type: object
+    properties:
+      avatar: { type: string, nullable: true }
+      bio:    { type: string }
+      tag:    { type: string }
+`
+
+const fourModulesChecksum = "d8797318ef8cc44c85fdf4be10027abd32da9c8f578247a6c4652b1b149fdd54"
 
 type mergedFile struct {
 	source string
@@ -508,4 +542,36 @@ func TestMerge_ProvidedResourceDeclaredTwice_FirstSourceWins(t *testing.T) {
 		"$":    {Path: "$", Type: "object"},
 		"$.id": {Path: "$.id", Type: "string"},
 	}, resources[0].Properties)
+}
+
+func TestMerge_RequestNullableForOneSender_IsNullable(t *testing.T) {
+	for _, order := range bothModuleOrders(profileNullableModuleYAML, profileNotNullableModuleYAML) {
+		t.Run(order.name, func(t *testing.T) {
+			request := mergedResource(t, mergeResources(t, order.files...), model.RestRequest)
+
+			assert.Equal(t, map[string]model.Property{
+				"$":          {Path: "$", Type: "object"},
+				"$.avatar":   {Path: "$.avatar", Type: "string", Nullable: true},
+				"$.bio":      {Path: "$.bio", Type: "string", Nullable: true},
+				"$.nickname": {Path: "$.nickname", Type: "string", Optional: true, Nullable: true},
+				"$.tag":      {Path: "$.tag", Type: "string", Optional: true},
+			}, request.Properties)
+		})
+	}
+}
+
+func TestMerge_ResponseNullableOnlyWhenEveryReaderAllowsNull(t *testing.T) {
+	for _, order := range bothModuleOrders(profileNullableModuleYAML, profileNotNullableModuleYAML) {
+		t.Run(order.name, func(t *testing.T) {
+			response := mergedResource(t, mergeResources(t, order.files...), model.RestResponse)
+
+			assert.Equal(t, map[string]model.Property{
+				"$":          {Path: "$", Type: "object"},
+				"$.avatar":   {Path: "$.avatar", Type: "string", Nullable: true},
+				"$.bio":      {Path: "$.bio", Type: "string"},
+				"$.nickname": {Path: "$.nickname", Type: "string", Nullable: true},
+				"$.tag":      {Path: "$.tag", Type: "string"},
+			}, response.Properties)
+		})
+	}
 }

@@ -39,6 +39,7 @@ type tableRow struct {
 	PropertyPath              string
 	PropertyVersionType       sql.NullString
 	PropertyVersionOptional   sql.NullBool
+	PropertyVersionNullable   sql.NullBool
 	PropertyVersionChangeType string
 
 	// Deploy & Environment
@@ -97,6 +98,7 @@ func (this *tableRow) toPropertyModel() model.Property {
 		Path:     this.PropertyPath,
 		Type:     this.PropertyVersionType.String,
 		Optional: this.PropertyVersionOptional.Bool,
+		Nullable: this.PropertyVersionNullable.Bool,
 	}
 }
 
@@ -105,6 +107,7 @@ type insertPropertyVersionRow struct {
 	ContractID int64
 	Type       sql.NullString
 	Optional   sql.NullBool
+	Nullable   bool
 	ChangeType string
 }
 
@@ -126,6 +129,7 @@ func newInsertPropertyVersionRow(contractID, propertyID int64, p model.Property,
 		ContractID: contractID,
 		Type:       sql.NullString{String: p.Type, Valid: p.Type != ""},
 		Optional:   sql.NullBool{Bool: p.Optional, Valid: true},
+		Nullable:   p.Nullable,
 		ChangeType: string(change),
 	}
 }

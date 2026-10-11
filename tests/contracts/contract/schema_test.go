@@ -233,3 +233,39 @@ func TestSchemaFromDocument_DocumentoNilOuVazioDaSchemaZero(t *testing.T) {
 	assert.False(t, zero.IsPrimitive())
 	assert.False(t, zero.IsRef())
 }
+
+func TestSchemaFromDocument_Nullable(t *testing.T) {
+	assert.True(t, contract.SchemaFromDocument(contract.Document{"type": "string", "nullable": true}).Nullable)
+	assert.False(t, contract.SchemaFromDocument(contract.Document{"type": "string", "nullable": false}).Nullable)
+	assert.False(t, contract.SchemaFromDocument(contract.Document{"type": "string", "nullable": "true"}).Nullable)
+	assert.False(t, contract.SchemaFromDocument(contract.Document{"type": "string"}).Nullable)
+}
+
+func TestSchemaFromDocument_NullableAndOptionalAreIndependent(t *testing.T) {
+	schema := contract.SchemaFromDocument(schemaDocument(t, `type: object
+properties:
+  avatar:
+    type: string
+    nullable: true
+  nickname:
+    type: string
+    optional: true
+  bio:
+    type: string
+    optional: true
+    nullable: true
+  manager:
+    ref: User
+    nullable: true
+`))
+
+	assert.Equal(t, contract.Schema{
+		Type: "object",
+		Properties: map[string]contract.Schema{
+			"avatar":   {Type: "string", Nullable: true},
+			"nickname": {Type: "string", Optional: true},
+			"bio":      {Type: "string", Optional: true, Nullable: true},
+			"manager":  {Ref: "User", Nullable: true},
+		},
+	}, schema)
+}

@@ -30,14 +30,14 @@ func propertyModelsFromSchema(
 
 	switch {
 	case schema.IsObject():
-		properties[path.String()] = model.NewProperty(path.String(), "object", schema.Optional)
+		properties[path.String()] = model.NewProperty(path.String(), "object", schema.Optional, schema.Nullable)
 
 		for name, property := range schema.Properties {
 			propertyModelsFromSchema(schemas, properties, path.Append(name), property, depth+1)
 		}
 
 	case schema.IsArray():
-		properties[path.String()] = model.NewProperty(path.String(), "array", schema.Optional)
+		properties[path.String()] = model.NewProperty(path.String(), "array", schema.Optional, schema.Nullable)
 
 		if schema.Items == nil {
 			return
@@ -46,15 +46,16 @@ func propertyModelsFromSchema(
 		propertyModelsFromSchema(schemas, properties, path.AppendArray(), *schema.Items, depth+1)
 
 	case schema.IsPrimitive():
-		properties[path.String()] = model.NewProperty(path.String(), schema.Type, schema.Optional)
+		properties[path.String()] = model.NewProperty(path.String(), schema.Type, schema.Optional, schema.Nullable)
 
 	case schema.IsRef():
 		target := schemas[schema.Ref]
 		target.Optional = target.Optional || schema.Optional
+		target.Nullable = target.Nullable || schema.Nullable
 
 		propertyModelsFromSchema(schemas, properties, path, target, depth+1)
 
 	default:
-		properties[path.String()] = model.NewProperty(path.String(), schema.Type, schema.Optional)
+		properties[path.String()] = model.NewProperty(path.String(), schema.Type, schema.Optional, schema.Nullable)
 	}
 }

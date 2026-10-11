@@ -14,6 +14,7 @@ func Schema() Node {
 		"items":       Lazy(Schema),
 		"ref":         SchemaRef,
 		"optional":    Flag,
+		"nullable":    Flag,
 	}).Rules(schemaHasShape, arrayRequiresItems)
 }
 

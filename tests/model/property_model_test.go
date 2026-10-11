@@ -8,15 +8,29 @@ import (
 )
 
 func TestProperty_IsSame_Identical(t *testing.T) {
-	a := model.NewProperty("$.id", "string", false)
-	b := model.NewProperty("$.id", "string", false)
+	a := model.NewProperty("$.id", "string", false, false)
+	b := model.NewProperty("$.id", "string", false, false)
 
 	assert.True(t, a.IsSame(&b))
 }
 
 func TestProperty_IsSame_FalseOnTypeMismatch(t *testing.T) {
-	a := model.NewProperty("$.id", "string", false)
-	b := model.NewProperty("$.id", "int", false)
+	a := model.NewProperty("$.id", "string", false, false)
+	b := model.NewProperty("$.id", "int", false, false)
+
+	assert.False(t, a.IsSame(&b))
+}
+
+func TestProperty_IsSame_FalseOnOptionalMismatch(t *testing.T) {
+	a := model.NewProperty("$.id", "string", false, false)
+	b := model.NewProperty("$.id", "string", true, false)
+
+	assert.False(t, a.IsSame(&b))
+}
+
+func TestProperty_IsSame_FalseOnNullableMismatch(t *testing.T) {
+	a := model.NewProperty("$.id", "string", false, false)
+	b := model.NewProperty("$.id", "string", false, true)
 
 	assert.False(t, a.IsSame(&b))
 }
