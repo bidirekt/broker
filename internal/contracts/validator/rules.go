@@ -13,7 +13,7 @@ var rules = []rule{
 	duplicateSchemas,
 	unresolvedSchemaNames,
 	unresolvedSchemaRefs,
-	schemasTooDeep,
+	schemasInCycle,
 }
 
 func schemaPath(name string) string {

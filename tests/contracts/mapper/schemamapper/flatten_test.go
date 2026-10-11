@@ -109,3 +109,61 @@ func TestToPropertyModels_NullableRef_OrsWithTheTarget(t *testing.T) {
 	assert.Equal(t, model.Property{Path: "$.nullableTarget", Type: "object", Nullable: true}, properties["$.nullableTarget"])
 	assert.Equal(t, model.Property{Path: "$.neither", Type: "object"}, properties["$.neither"])
 }
+
+func TestToPropertyModels_CyclicSchemas_StopsAtTheRepeatedRef(t *testing.T) {
+	schemas := contract.SchemasMap{
+		"Comment": {
+			Type: "object",
+			Properties: map[string]contract.Schema{
+				"text":    {Type: "string"},
+				"replies": {Type: "array", Items: &contract.Schema{Ref: "Reply"}},
+			},
+		},
+		"Reply": {
+			Type: "object",
+			Properties: map[string]contract.Schema{
+				"parent": {Ref: "Comment"},
+			},
+		},
+	}
+
+	properties := schemamapper.ToPropertyModels(schemas, contract.Schema{Ref: "Comment"})
+
+	assert.Equal(t, map[string]model.Property{
+		"$":           {Path: "$", Type: "object"},
+		"$.text":      {Path: "$.text", Type: "string"},
+		"$.replies":   {Path: "$.replies", Type: "array"},
+		"$.replies[]": {Path: "$.replies[]", Type: "object"},
+	}, properties)
+}
+
+func TestToPropertyModels_SelfRef_Terminates(t *testing.T) {
+	schemas := contract.SchemasMap{"Loop": {Ref: "Loop"}}
+
+	properties := schemamapper.ToPropertyModels(schemas, contract.Schema{Ref: "Loop"})
+
+	assert.Empty(t, properties)
+}
+
+func TestToPropertyModels_SameSchemaOnSiblingBranches_FlattensBoth(t *testing.T) {
+	schemas := contract.SchemasMap{
+		"User": {
+			Type: "object",
+			Properties: map[string]contract.Schema{
+				"name": {Type: "string"},
+			},
+		},
+	}
+	post := contract.Schema{
+		Type: "object",
+		Properties: map[string]contract.Schema{
+			"author": {Ref: "User"},
+			"editor": {Ref: "User"},
+		},
+	}
+
+	properties := schemamapper.ToPropertyModels(schemas, post)
+
+	assert.Contains(t, properties, "$.author.name")
+	assert.Contains(t, properties, "$.editor.name")
+}
