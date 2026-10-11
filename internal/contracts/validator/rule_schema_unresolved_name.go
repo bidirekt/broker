@@ -9,6 +9,10 @@ func unresolvedSchemaNames(declarations fragmentmapper.Declarations) []violation
 	var violations []violation.Violation
 
 	for _, declaration := range declarations.Resources {
+		if declaration.WithoutSchema {
+			continue
+		}
+
 		if _, declared := declarations.Catalog[declaration.SchemaName]; declared {
 			continue
 		}

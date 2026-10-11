@@ -35,12 +35,11 @@ type tableRow struct {
 	ResourceVersionChangeType  string
 
 	// Property
-	PropertyID                int64
-	PropertyPath              string
-	PropertyVersionType       sql.NullString
-	PropertyVersionOptional   sql.NullBool
-	PropertyVersionNullable   sql.NullBool
-	PropertyVersionChangeType string
+	PropertyID              sql.NullInt64
+	PropertyPath            sql.NullString
+	PropertyVersionType     sql.NullString
+	PropertyVersionOptional sql.NullBool
+	PropertyVersionNullable sql.NullBool
 
 	// Deploy & Environment
 	DeploymentEnvironment sql.NullString
@@ -94,8 +93,8 @@ func (this *tableRow) toResourceModel() model.PersistedResource {
 
 func (this *tableRow) toPropertyModel() model.Property {
 	return model.Property{
-		ID:       this.PropertyID,
-		Path:     this.PropertyPath,
+		ID:       this.PropertyID.Int64,
+		Path:     this.PropertyPath.String,
 		Type:     this.PropertyVersionType.String,
 		Optional: this.PropertyVersionOptional.Bool,
 		Nullable: this.PropertyVersionNullable.Bool,

@@ -14,10 +14,11 @@ type Declarations struct {
 }
 
 type ResourceDeclaration struct {
-	Source     string
-	Path       contract.ResourcePath
-	SchemaName string
-	Resource   model.UploadedResource
+	Source        string
+	Path          contract.ResourcePath
+	SchemaName    string
+	WithoutSchema bool
+	Resource      model.UploadedResource
 }
 
 type SchemaDeclaration struct {
@@ -98,13 +99,13 @@ func resourceDeclarationsFromRest(source string, rest contract.Document, resourc
 			operation := methods.Mapping(method)
 			methodPath := endpointPath.Append(method)
 
-			if request := operation.Text("request"); request != "" {
+			if request, present := operation["request"]; present {
 				declarations = append(declarations, resourceDeclaration(source, request, methodPath.Append("request"), catalog))
 			}
 
 			responses := operation.Mapping("responses")
 			for _, status := range responses.Keys() {
-				declarations = append(declarations, resourceDeclaration(source, responses.Text(status), methodPath.Append("responses", status), catalog))
+				declarations = append(declarations, resourceDeclaration(source, responses[status], methodPath.Append("responses", status), catalog))
 			}
 		}
 	}
@@ -112,7 +113,17 @@ func resourceDeclarationsFromRest(source string, rest contract.Document, resourc
 	return declarations
 }
 
-func resourceDeclaration(source string, schemaName string, resourcePath contract.ResourcePath, catalog contract.SchemasMap) ResourceDeclaration {
+func resourceDeclaration(source string, schemaRef any, resourcePath contract.ResourcePath, catalog contract.SchemasMap) ResourceDeclaration {
+	if schemaRef == nil {
+		return ResourceDeclaration{
+			Source:        source,
+			Path:          resourcePath,
+			WithoutSchema: true,
+			Resource:      resourcepathmapper.ToResourceModel(resourcePath, map[string]model.Property{}),
+		}
+	}
+
+	schemaName, _ := schemaRef.(string)
 	properties := schemamapper.ToPropertyModels(catalog, catalog[schemaName])
 
 	return ResourceDeclaration{
