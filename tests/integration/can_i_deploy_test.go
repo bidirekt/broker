@@ -992,7 +992,7 @@ const arrayConsumerContract = `
   }
 }`
 
-func (this *IntegrationSuite) TestCanIDeploy_MissingArrayReportsEveryNestedProperty() {
+func (this *IntegrationSuite) TestCanIDeploy_MissingArrayReportsOnlyItselfAndOnlyWhenRequired() {
 	mustPost := func(path, body string) {
 		status, _ := this.post(path, body)
 		this.Require().Equalf(http.StatusOK, status, "POST %s", path)
@@ -1013,39 +1013,11 @@ func (this *IntegrationSuite) TestCanIDeploy_MissingArrayReportsEveryNestedPrope
 	this.Require().NoError(json.Unmarshal([]byte(body), &got))
 	this.False(got.Deployable)
 
-	breaks := got.Results["api"].Endpoints["/things"]["get"]["200"]
-	this.Require().Len(breaks, 4)
-
-	byProperty := map[string]breakJSON{}
-	for _, b := range breaks {
-		byProperty[b.Details["property"]] = b
-	}
-
-	// a missing required array reports itself and every property inside it
-	list, ok := byProperty["$.list"]
-	this.Require().True(ok)
-	this.Equal("property_missing_in_provider", list.Reason)
-	this.Equal("consumer", list.Role)
-	this.Equal(map[string]string{"property": "$.list", "consumerName": "front", "providerName": "api", "propertyType": "array<object>"}, list.Details)
-
-	listItems, ok := byProperty["$.list[]"]
-	this.Require().True(ok)
-	this.Equal("property_missing_in_provider", listItems.Reason)
-	this.Equal("consumer", listItems.Role)
-	this.Equal(map[string]string{"property": "$.list[]", "consumerName": "front", "providerName": "api", "propertyType": "object"}, listItems.Details)
-
-	listItemName, ok := byProperty["$.list[].name"]
-	this.Require().True(ok)
-	this.Equal("property_missing_in_provider", listItemName.Reason)
-	this.Equal("consumer", listItemName.Role)
-	this.Equal(map[string]string{"property": "$.list[].name", "consumerName": "front", "providerName": "api", "propertyType": "string"}, listItemName.Details)
-
-	// an optional missing array emits no break itself, but its required items still report
-	items, ok := byProperty["$.tags[]"]
-	this.Require().True(ok)
-	this.Equal("property_missing_in_provider", items.Reason)
-	this.Equal("consumer", items.Role)
-	this.Equal(map[string]string{"property": "$.tags[]", "consumerName": "front", "providerName": "api", "propertyType": "string"}, items.Details)
+	this.Equal([]breakJSON{{
+		Reason:  "property_missing_in_provider",
+		Role:    "consumer",
+		Details: map[string]string{"property": "$.list", "consumerName": "front", "providerName": "api", "propertyType": "array<object>"},
+	}}, got.Results["api"].Endpoints["/things"]["get"]["200"])
 }
 
 func (this *IntegrationSuite) TestCanIDeploy_ProviderExistsButDeployedNowhere() {

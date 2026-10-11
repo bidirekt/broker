@@ -43,13 +43,17 @@ func unionResourceModels(a, b model.UploadedResource) model.UploadedResource {
 	return union
 }
 
-// What two senders send: a path is required only if both require it.
+// What two senders send: a path is required only if every sender that sends its parent requires it.
 func unionRequestProperties(a, b map[string]model.Property) map[string]model.Property {
 	union := make(map[string]model.Property, len(a)+len(b))
 
 	for path, property := range a {
-		other, declared := b[path]
-		property.Optional = !declared || property.Optional || other.Optional
+		if other, declared := b[path]; declared {
+			property.Optional = property.Optional || other.Optional
+		} else {
+			property.Optional = property.Optional || parentDeclaredIn(b, path)
+		}
+
 		union[path] = property
 	}
 
@@ -58,11 +62,22 @@ func unionRequestProperties(a, b map[string]model.Property) map[string]model.Pro
 			continue
 		}
 
-		property.Optional = true
+		property.Optional = property.Optional || parentDeclaredIn(a, path)
 		union[path] = property
 	}
 
 	return union
+}
+
+func parentDeclaredIn(properties map[string]model.Property, path string) bool {
+	parent, hasParent := model.ParentPath(path)
+	if !hasParent {
+		return true
+	}
+
+	_, declared := properties[parent]
+
+	return declared
 }
 
 // What two readers need: a path is optional only if every reader that mentions it allows it.

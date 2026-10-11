@@ -13,9 +13,9 @@ func checkResponseResource(
 	for consumerPropertyPath, consumerProperty := range consumer.Properties {
 		providerProperty, propertyExists := provider.Properties[consumerPropertyPath]
 
-		// If the property is not present in the provider and is required in the consumer, it is a breaking change.
+		// If the property is not present in the provider, is required in the consumer and its parent is present in the provider, it is a breaking change.
 		if !propertyExists {
-			if !consumerProperty.Optional {
+			if !consumerProperty.Optional && parentPresentIn(provider, consumerPropertyPath) {
 				breaks = append(breaks, NewPropertyBreakChange(
 					checked,
 					counterpart,
