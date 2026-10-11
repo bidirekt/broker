@@ -135,6 +135,54 @@ const unresolvedSchemaYAML = `provides:
           "200": Ghost
 `
 
+const patchRoutesYAML = `consumes:
+  pets_api:
+    rest:
+      "/pets/*":
+        patch:
+          request: PetPatch
+          responses:
+            "200": Pet
+provides:
+  rest:
+    "/pets/*":
+      patch:
+        request: PetPatch
+        responses:
+          "200": Pet
+schemas:
+  PetPatch:
+    type: object
+    properties:
+      name:
+        type: string
+  Pet:
+    type: object
+    properties:
+      id:
+        type: string
+`
+
+const everyMethodYAML = `provides:
+  rest:
+    "/pets/*":
+      delete:
+        responses:
+          "204": Pet
+      patch:
+        responses:
+          "200": Pet
+      put:
+        responses:
+          "200": Pet
+      post:
+        responses:
+          "201": Pet
+      get:
+        responses:
+          "200": Pet
+`
+
 type declaredFile struct {
 	source string
 	raw    string
@@ -265,6 +313,50 @@ func TestToDeclarations_NomeNaoResolvidoGeraPropriedadeDoSchemaZero(t *testing.T
 	assert.Equal(t, "Ghost", declarations.Resources[0].SchemaName)
 	assert.NotContains(t, declarations.Catalog, "Ghost")
 	assert.Equal(t, map[string]model.Property{"$": {Path: "$"}}, declarations.Resources[0].Resource.Properties)
+}
+
+func TestToDeclarations_PatchRoute_DeclaresRequestAndResponseInProvidesAndConsumes(t *testing.T) {
+	declarations := declarationsOf(t, declaredFile{"pets.yaml", patchRoutesYAML})
+
+	assert.Equal(t, []string{
+		"consumes;pets_api;rest;/pets/*;patch;request",
+		"consumes;pets_api;rest;/pets/*;patch;responses;200",
+		"provides;rest;/pets/*;patch;request",
+		"provides;rest;/pets/*;patch;responses;200",
+	}, resourcePaths(declarations))
+
+	requestProperties := map[string]model.Property{
+		"$":      {Path: "$", Type: "object"},
+		"$.name": {Path: "$.name", Type: "string"},
+	}
+	responseProperties := map[string]model.Property{
+		"$":    {Path: "$", Type: "object"},
+		"$.id": {Path: "$.id", Type: "string"},
+	}
+
+	resources := make([]model.UploadedResource, 0, len(declarations.Resources))
+	for _, declaration := range declarations.Resources {
+		resources = append(resources, declaration.Resource)
+	}
+
+	assert.Equal(t, []model.UploadedResource{
+		*model.NewRestRequestConsumer("pets_api", "/pets/*", "patch", requestProperties),
+		*model.NewRestResponseConsumer("pets_api", "/pets/*", "patch", "200", responseProperties),
+		*model.NewRestRequestProvider("/pets/*", "patch", requestProperties),
+		*model.NewRestResponseProvider("/pets/*", "patch", "200", responseProperties),
+	}, resources)
+}
+
+func TestToDeclarations_PatchSortsBetweenPutAndDelete(t *testing.T) {
+	declarations := declarationsOf(t, declaredFile{"pets.yaml", everyMethodYAML})
+
+	assert.Equal(t, []string{
+		"provides;rest;/pets/*;get;responses;200",
+		"provides;rest;/pets/*;post;responses;201",
+		"provides;rest;/pets/*;put;responses;200",
+		"provides;rest;/pets/*;patch;responses;200",
+		"provides;rest;/pets/*;delete;responses;204",
+	}, resourcePaths(declarations))
 }
 
 func TestToDeclarations_FragmentoSemDocumentoNaoDeclaraNada(t *testing.T) {

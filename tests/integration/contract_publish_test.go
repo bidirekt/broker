@@ -701,7 +701,7 @@ func (this *IntegrationSuite) TestPublishContract_ShapeViolation_ReportedBeforeC
 const unknownMethodYAML = `provides:
   rest:
     /pets:
-      patch:
+      options:
         responses:
           200: Pet
 schemas:
@@ -788,7 +788,7 @@ func (this *IntegrationSuite) TestPublishContract_UnknownMethod_Rejected() {
 	))
 	this.Equal(http.StatusBadRequest, status)
 	this.JSONEq(`{"message":"contract validation failed","violations":[`+
-		`{"code":"key.unknown","path":"provides;rest;/pets;patch","source":"api.yaml","details":{"key":"patch"}}`+
+		`{"code":"key.unknown","path":"provides;rest;/pets;options","source":"api.yaml","details":{"key":"options"}}`+
 		`]}`, body)
 
 	this.Equal(0, this.countRows("contracts"))
