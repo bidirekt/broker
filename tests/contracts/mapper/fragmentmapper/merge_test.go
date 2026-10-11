@@ -233,11 +233,75 @@ const providedPetsDetailJSON = `{
   }
 }`
 
+const groupWithAddressYAML = `consumes:
+  api:
+    rest:
+      /api/groups:
+        post:
+          request: GroupWithAddress
+          responses:
+            "201": GroupWithAddress
+schemas:
+  GroupWithAddress:
+    type: object
+    properties:
+      name: { type: string }
+      address:
+        type: object
+        properties:
+          city: { type: string }
+`
+
+const groupNameYAML = `consumes:
+  api:
+    rest:
+      /api/groups:
+        post:
+          request: GroupName
+          responses:
+            "201": GroupName
+schemas:
+  GroupName:
+    type: object
+    properties:
+      name: { type: string }
+`
+
+const groupWithCityAndStateYAML = `consumes:
+  api:
+    rest:
+      /api/groups:
+        post:
+          request: GroupWithCityAndState
+schemas:
+  GroupWithCityAndState:
+    type: object
+    properties:
+      name: { type: string }
+      address:
+        type: object
+        properties:
+          city:  { type: string }
+          state: { type: string }
+`
+
 const fourModulesChecksum = "d55e2d0621975b40535271dc6fa098aa237646bb87924674e6b700a5fef23563"
 
 type mergedFile struct {
 	source string
 	raw    string
+}
+
+type moduleOrder struct {
+	name  string
+	files []mergedFile
+}
+
+func bothModuleOrders(first, last string) []moduleOrder {
+	return []moduleOrder{
+		{"given order", []mergedFile{{"a.yaml", first}, {"b.yaml", last}}},
+		{"reversed order", []mergedFile{{"a.yaml", last}, {"b.yaml", first}}},
+	}
 }
 
 func mergeFragments(t *testing.T, files ...mergedFile) []contract.Fragment {
@@ -355,6 +419,52 @@ func TestMerge_RequestOptionalForOneSender_IsOptionalForAll(t *testing.T) {
 
 	assert.False(t, request.Properties["$.id"].Optional)
 	assert.True(t, request.Properties["$.note"].Optional)
+}
+
+func TestMerge_RequestPathWhoseParentAnotherSenderOmits_KeepsItsOwnOptional(t *testing.T) {
+	for _, order := range bothModuleOrders(groupWithAddressYAML, groupNameYAML) {
+		t.Run(order.name, func(t *testing.T) {
+			request := mergedResource(t, mergeResources(t, order.files...), model.RestRequest)
+
+			assert.Equal(t, map[string]model.Property{
+				"$":              {Path: "$", Type: "object"},
+				"$.name":         {Path: "$.name", Type: "string"},
+				"$.address":      {Path: "$.address", Type: "object", Optional: true},
+				"$.address.city": {Path: "$.address.city", Type: "string"},
+			}, request.Properties)
+		})
+	}
+}
+
+func TestMerge_RequestPathWhoseParentAnotherSenderSends_IsOptional(t *testing.T) {
+	for _, order := range bothModuleOrders(groupWithCityAndStateYAML, groupWithAddressYAML) {
+		t.Run(order.name, func(t *testing.T) {
+			request := mergedResource(t, mergeResources(t, order.files...), model.RestRequest)
+
+			assert.Equal(t, map[string]model.Property{
+				"$":               {Path: "$", Type: "object"},
+				"$.name":          {Path: "$.name", Type: "string"},
+				"$.address":       {Path: "$.address", Type: "object"},
+				"$.address.city":  {Path: "$.address.city", Type: "string"},
+				"$.address.state": {Path: "$.address.state", Type: "string", Optional: true},
+			}, request.Properties)
+		})
+	}
+}
+
+func TestMerge_ResponsePathOfOneReader_KeepsItsDeclaration(t *testing.T) {
+	for _, order := range bothModuleOrders(groupWithAddressYAML, groupNameYAML) {
+		t.Run(order.name, func(t *testing.T) {
+			response := mergedResource(t, mergeResources(t, order.files...), model.RestResponse)
+
+			assert.Equal(t, map[string]model.Property{
+				"$":              {Path: "$", Type: "object"},
+				"$.name":         {Path: "$.name", Type: "string"},
+				"$.address":      {Path: "$.address", Type: "object"},
+				"$.address.city": {Path: "$.address.city", Type: "string"},
+			}, response.Properties)
+		})
+	}
 }
 
 func TestMerge_IdenticalDeclarationInTwoFiles_BuildsOneResource(t *testing.T) {

@@ -1,5 +1,7 @@
 package model
 
+import "strings"
+
 type Property struct {
 	ID       int64 `json:"-"`
 	Path     string
@@ -23,4 +25,21 @@ func NewProperty(
 		Type:     propertyType,
 		Optional: optional,
 	}
+}
+
+func ParentPath(path string) (string, bool) {
+	if parent, isArrayItem := strings.CutSuffix(path, "[]"); isArrayItem {
+		return parent, true
+	}
+
+	if parent, isMapValue := strings.CutSuffix(path, "{}"); isMapValue {
+		return parent, true
+	}
+
+	separator := strings.LastIndex(path, ".")
+	if separator < 0 {
+		return "", false
+	}
+
+	return path[:separator], true
 }

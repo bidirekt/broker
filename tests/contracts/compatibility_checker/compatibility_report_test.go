@@ -85,7 +85,7 @@ func TestFreshPropertyBreaksCarryTheRoleOfTheCheckedSide(t *testing.T) {
 	required := map[string]model.Property{"$.name": model.NewProperty("$.name", "string", false)}
 	optional := map[string]model.Property{"$.name": model.NewProperty("$.name", "string", true)}
 	integer := map[string]model.Property{"$.name": model.NewProperty("$.name", "integer", false)}
-	absent := map[string]model.Property{}
+	absent := map[string]model.Property{"$": {Path: "$", Type: "object"}}
 
 	cases := []struct {
 		reason      compatibility_checker.BreakingReason
@@ -246,7 +246,7 @@ func TestFreshBreaksOfAnInteractionAreSortedByProperty(t *testing.T) {
 		consumerProperties[property] = model.Property{Type: "string"}
 	}
 
-	consumer, provider := postPetsResources("201", consumerProperties, map[string]model.Property{})
+	consumer, provider := postPetsResources("201", consumerProperties, map[string]model.Property{"$": {Type: "object"}})
 
 	report := checkFrom(consumer, model.ResourceCounterparts{
 		Providers: map[string]model.PersistedResource{postPetsHash: provider},
