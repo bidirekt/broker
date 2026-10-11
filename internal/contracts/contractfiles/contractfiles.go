@@ -1,7 +1,7 @@
 package contractfiles
 
 import (
-	"errors"
+	"slices"
 	"strings"
 
 	"github.com/bidirekt/broker/internal/contracts/contract"
@@ -12,20 +12,20 @@ import (
 	"github.com/bidirekt/broker/internal/model"
 )
 
-var ErrBlankSource = errors.New("blank contract file source")
-
 type File struct {
 	Source  string `json:"source"`
 	Content string `json:"content"`
 }
 
+func HasBlankSource(files []File) bool {
+	return slices.ContainsFunc(files, func(file File) bool {
+		return strings.TrimSpace(file.Source) == ""
+	})
+}
+
 func ToFragments(files []File) ([]contract.Fragment, []violation.Violation, error) {
 	fragments := make([]contract.Fragment, 0, len(files))
 	for _, file := range files {
-		if strings.TrimSpace(file.Source) == "" {
-			return nil, nil, ErrBlankSource
-		}
-
 		fragment, err := contract.DecodeFragment(file.Source, file.Content)
 		if err != nil {
 			return nil, nil, err

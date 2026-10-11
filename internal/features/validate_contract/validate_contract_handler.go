@@ -3,7 +3,6 @@ package validate_contract
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -47,21 +46,8 @@ func (this *ValidateContractHandler) Handle(ctx fiber.Ctx) error {
 
 	participantName := strings.TrimSpace(requestBody.Participant)
 	environmentName := strings.TrimSpace(requestBody.Environment)
-	if participantName == "" || environmentName == "" || len(requestBody.Contracts) == 0 {
+	if participantName == "" || environmentName == "" || len(requestBody.Contracts) == 0 || contractfiles.HasBlankSource(requestBody.Contracts) {
 		return this.respondInvalidInput(ctx)
-	}
-
-	fragments, shapeViolations, err := contractfiles.ToFragments(requestBody.Contracts)
-	if errors.Is(err, contractfiles.ErrBlankSource) {
-		return this.respondInvalidInput(ctx)
-	}
-
-	if err != nil {
-		return this.respondBadRequest(ctx, err)
-	}
-
-	if len(shapeViolations) > 0 {
-		return this.respondValidationFailed(ctx, shapeViolations)
 	}
 
 	participant, exists := this.participantRepository.FindByName(ctx.Context(), participantName)
@@ -72,6 +58,15 @@ func (this *ValidateContractHandler) Handle(ctx fiber.Ctx) error {
 	environment, exists := this.environmentRepository.FindByName(ctx.Context(), environmentName)
 	if !exists {
 		return this.respondNotFound(ctx, EnvironmentNotFound)
+	}
+
+	fragments, shapeViolations, err := contractfiles.ToFragments(requestBody.Contracts)
+	if err != nil {
+		return this.respondBadRequest(ctx, err)
+	}
+
+	if len(shapeViolations) > 0 {
+		return this.respondValidationFailed(ctx, shapeViolations)
 	}
 
 	uploadedContract, violations, err := contractfiles.ToUploadedContract(fragments, participant, "", "")
