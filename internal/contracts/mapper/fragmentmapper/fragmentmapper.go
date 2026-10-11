@@ -26,7 +26,7 @@ type SchemaDeclaration struct {
 	Schema contract.Schema
 }
 
-var methodsInOrder = []string{"get", "post", "put", "delete"}
+var methodsInOrder = []string{"get", "post", "put", "patch", "delete"}
 
 func ToDeclarations(fragments []contract.Fragment) Declarations {
 	sorted := contract.SortedBySource(fragments)

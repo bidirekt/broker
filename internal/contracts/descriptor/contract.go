@@ -14,6 +14,7 @@ var methods = Object(Fields{
 	"get":    Object(Fields{"responses": responses}),
 	"post":   Object(Fields{"request": SchemaRef, "responses": responses}),
 	"put":    Object(Fields{"request": SchemaRef, "responses": responses}),
+	"patch":  Object(Fields{"request": SchemaRef, "responses": responses}),
 	"delete": Object(Fields{"responses": responses}),
 })
 

@@ -78,11 +78,45 @@ schemas:
 	assert.Empty(t, violations)
 }
 
-func TestContract_CincoErrosNumPasseSo(t *testing.T) {
+func TestContract_PatchWithRequestAndResponses_IsAcceptedInProvidesAndConsumes(t *testing.T) {
+	source := `provides:
+  rest:
+    /pets/*:
+      patch:
+        request: PetPatch
+        responses:
+          200: Pet
+consumes:
+  pets_api:
+    rest:
+      /pets/*:
+        patch:
+          request: PetPatch
+          responses:
+            200: Pet
+schemas:
+  PetPatch:
+    type: object
+    properties:
+      name:
+        type: string
+  Pet:
+    type: object
+    properties:
+      id:
+        type: string
+`
+
+	violations := descriptor.Validate(descriptor.Contract, contractDocument(t, source), "api.yaml")
+
+	assert.Empty(t, violations)
+}
+
+func TestContract_FiveErrorsInOnePass(t *testing.T) {
 	source := `provides:
   rest:
     /pets:
-      patch:
+      options:
         responses:
           200: Pet
     "/users/{id}":
@@ -116,8 +150,8 @@ schemas:
 	assert.Equal(t, "600", violations[0].Details["key"])
 
 	assert.Equal(t, "key.unknown", violations[1].ErrorCode)
-	assert.Equal(t, "provides;rest;/pets;patch", violations[1].Path)
-	assert.Equal(t, map[string]string{"key": "patch"}, violations[1].Details)
+	assert.Equal(t, "provides;rest;/pets;options", violations[1].Path)
+	assert.Equal(t, map[string]string{"key": "options"}, violations[1].Details)
 
 	assert.Equal(t, "endpoint.syntax", violations[2].ErrorCode)
 	assert.Equal(t, "provides;rest;/users/{id}", violations[2].Path)
