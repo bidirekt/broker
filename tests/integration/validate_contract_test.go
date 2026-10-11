@@ -207,6 +207,8 @@ func (this *IntegrationSuite) TestValidateContract_InvalidInput() {
 		"empty contracts":     this.validateBody("catalog", "production"),
 		"blank source":        this.validateBody("catalog", "production", validateFile{"  ", validateCatalogStockYAML}),
 		"blank unknown names": this.validateBody("ghost", "nowhere", validateFile{"", ""}, validateFile{"notes.txt", "x"}),
+		"blank after malformed": this.validateBody("catalog", "production",
+			validateFile{"broken.yaml", "provides: {"}, validateFile{"  ", validateCatalogStockYAML}),
 	}
 
 	for name, body := range cases {
@@ -216,26 +218,48 @@ func (this *IntegrationSuite) TestValidateContract_InvalidInput() {
 	}
 }
 
-func (this *IntegrationSuite) TestValidateContract_DecodeErrorComesBeforeParticipantNotFound() {
+func (this *IntegrationSuite) TestValidateContract_ParticipantNotFoundComesBeforeDecodeError() {
 	status, body := this.post("/api/contracts/validate",
 		this.validateBody("ghost", "nowhere", validateFile{"notes.txt", validateCatalogStockYAML}))
-	this.Equal(http.StatusBadRequest, status)
-	this.JSONEq(`{"message":"unsupported contract file: notes.txt (expected .yaml or .yml)"}`, body)
+	this.Equal(http.StatusNotFound, status)
+	this.JSONEq(`{"message":"participant not found"}`, body)
 
 	status, body = this.post("/api/contracts/validate",
 		this.validateBody("ghost", "nowhere", validateFile{"broken.yaml", "provides: {"}))
-	this.Equal(http.StatusBadRequest, status)
-	this.Contains(body, `"message":"malformed contract file: broken.yaml:`)
+	this.Equal(http.StatusNotFound, status)
+	this.JSONEq(`{"message":"participant not found"}`, body)
 }
 
-func (this *IntegrationSuite) TestValidateContract_ShapeViolationComesBeforeParticipantNotFound() {
+func (this *IntegrationSuite) TestValidateContract_ParticipantNotFoundComesBeforeShapeViolation() {
 	status, body := this.post("/api/contracts/validate",
 		this.validateBody("ghost", "nowhere", validateFile{"api.yaml", validateUnknownKeyYAML}))
 
-	this.Equal(http.StatusBadRequest, status)
-	this.JSONEq(`{"message":"contract validation failed","violations":[`+
-		`{"code":"key.unknown","path":"provides;message","source":"api.yaml","details":{"key":"message"}}`+
-		`]}`, body)
+	this.Equal(http.StatusNotFound, status)
+	this.JSONEq(`{"message":"participant not found"}`, body)
+}
+
+func (this *IntegrationSuite) TestValidateContract_EnvironmentNotFoundComesBeforeDecodeError() {
+	this.setupForValidate("catalog")
+
+	status, body := this.post("/api/contracts/validate",
+		this.validateBody("catalog", "nowhere", validateFile{"notes.txt", validateCatalogStockYAML}))
+	this.Equal(http.StatusNotFound, status)
+	this.JSONEq(`{"message":"environment not found"}`, body)
+
+	status, body = this.post("/api/contracts/validate",
+		this.validateBody("catalog", "nowhere", validateFile{"broken.yaml", "provides: {"}))
+	this.Equal(http.StatusNotFound, status)
+	this.JSONEq(`{"message":"environment not found"}`, body)
+}
+
+func (this *IntegrationSuite) TestValidateContract_EnvironmentNotFoundComesBeforeShapeViolation() {
+	this.setupForValidate("catalog")
+
+	status, body := this.post("/api/contracts/validate",
+		this.validateBody("catalog", "nowhere", validateFile{"api.yaml", validateUnknownKeyYAML}))
+
+	this.Equal(http.StatusNotFound, status)
+	this.JSONEq(`{"message":"environment not found"}`, body)
 }
 
 func (this *IntegrationSuite) TestValidateContract_ParticipantNotFoundComesBeforeEnvironmentNotFound() {

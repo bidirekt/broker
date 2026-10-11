@@ -56,6 +56,26 @@ func decodeFragments(t *testing.T, files ...contractfiles.File) []contract.Fragm
 	return fragments
 }
 
+func TestHasBlankSource_BlankSourceInAnyFile_ReturnsTrue(t *testing.T) {
+	for _, source := range []string{"", "   "} {
+		assert.True(t, contractfiles.HasBlankSource([]contractfiles.File{
+			{Source: source, Content: petsEndpointYAML},
+			{Source: "broken.yaml", Content: malformedYAML},
+		}))
+		assert.True(t, contractfiles.HasBlankSource([]contractfiles.File{
+			{Source: "broken.yaml", Content: malformedYAML},
+			{Source: source, Content: petsEndpointYAML},
+		}))
+	}
+}
+
+func TestHasBlankSource_EverySourceSet_ReturnsFalse(t *testing.T) {
+	assert.False(t, contractfiles.HasBlankSource([]contractfiles.File{
+		{Source: "schemas.yaml", Content: petSchemaYAML},
+		{Source: "endpoints.yaml", Content: petsEndpointYAML},
+	}))
+}
+
 func TestToFragments_ValidFiles_DecodedInRequestOrder(t *testing.T) {
 	fragments, violations, err := contractfiles.ToFragments([]contractfiles.File{
 		{Source: "schemas.yaml", Content: petSchemaYAML},
@@ -69,18 +89,6 @@ func TestToFragments_ValidFiles_DecodedInRequestOrder(t *testing.T) {
 	assert.NotNil(t, fragments[0].Root().Mapping("schemas").Mapping("Pet"))
 	assert.Equal(t, "endpoints.yaml", fragments[1].Source)
 	assert.NotNil(t, fragments[1].Root().Mapping("provides").Mapping("rest").Mapping("/pets"))
-}
-
-func TestToFragments_BlankSource_ReturnsErrBlankSource(t *testing.T) {
-	for _, source := range []string{"", "   "} {
-		fragments, violations, err := contractfiles.ToFragments([]contractfiles.File{
-			{Source: source, Content: petsEndpointYAML},
-		})
-
-		assert.ErrorIs(t, err, contractfiles.ErrBlankSource)
-		assert.Nil(t, fragments)
-		assert.Nil(t, violations)
-	}
 }
 
 func TestToFragments_UnsupportedExtension_ReturnsTheDecodeError(t *testing.T) {
@@ -106,15 +114,15 @@ func TestToFragments_MalformedYAML_ReturnsTheDecodeError(t *testing.T) {
 func TestToFragments_FirstFailingFileInRequestOrder_DecidesTheError(t *testing.T) {
 	_, _, err := contractfiles.ToFragments([]contractfiles.File{
 		{Source: "broken.yaml", Content: malformedYAML},
-		{Source: " ", Content: petsEndpointYAML},
+		{Source: "notes.txt", Content: petsEndpointYAML},
 	})
 	assert.EqualError(t, err, malformedYAMLError)
 
 	_, _, err = contractfiles.ToFragments([]contractfiles.File{
-		{Source: " ", Content: petsEndpointYAML},
+		{Source: "notes.txt", Content: petsEndpointYAML},
 		{Source: "broken.yaml", Content: malformedYAML},
 	})
-	assert.ErrorIs(t, err, contractfiles.ErrBlankSource)
+	assert.EqualError(t, err, "unsupported contract file: notes.txt (expected .yaml or .yml)")
 }
 
 func TestToFragments_DecodeErrorInAnyFile_WinsOverShapeViolations(t *testing.T) {

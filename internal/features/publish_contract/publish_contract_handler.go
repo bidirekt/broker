@@ -2,7 +2,6 @@ package publish_contract
 
 import (
 	"encoding/json"
-	"errors"
 	"strings"
 
 	"github.com/bidirekt/broker/internal/contracts/contract_differ"
@@ -36,26 +35,22 @@ func (this *PublishContractHandler) Handle(ctx fiber.Ctx) error {
 
 	serviceName := strings.TrimSpace(requestBody.ServiceName)
 	version := strings.TrimSpace(requestBody.Version)
-	if serviceName == "" || version == "" || len(requestBody.Contracts) == 0 {
+	if serviceName == "" || version == "" || len(requestBody.Contracts) == 0 || contractfiles.HasBlankSource(requestBody.Contracts) {
 		return this.respondInvalidInput(ctx)
+	}
+
+	participant, exists := this.participantRepository.FindByName(ctx.Context(), serviceName)
+	if !exists {
+		return this.respondParticipantNotFound(ctx)
 	}
 
 	fragments, shapeViolations, err := contractfiles.ToFragments(requestBody.Contracts)
-	if errors.Is(err, contractfiles.ErrBlankSource) {
-		return this.respondInvalidInput(ctx)
-	}
-
 	if err != nil {
 		return this.respondBadRequest(ctx, err)
 	}
 
 	if len(shapeViolations) > 0 {
 		return this.respondValidationFailed(ctx, shapeViolations)
-	}
-
-	participant, exists := this.participantRepository.FindByName(ctx.Context(), serviceName)
-	if !exists {
-		return this.respondParticipantNotFound(ctx)
 	}
 
 	contractContent, _ := json.Marshal(requestBody.Contracts)

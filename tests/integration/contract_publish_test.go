@@ -868,12 +868,27 @@ func (this *IntegrationSuite) TestPublishContract_ShapeViolations_KeepDocumentOr
 	this.Equal(0, this.countRows("contracts"))
 }
 
-func (this *IntegrationSuite) TestPublishContract_ShapeViolation_ReportedBeforeParticipantLookup() {
-	status, body := this.post("/api/contracts", this.publishBody("ghost_service", "1", contractFragment{"api.yaml", contractBodyParamEndpoint}))
+func (this *IntegrationSuite) TestPublishContract_BlankSourceInAnyFile_ReportedBeforeUnknownParticipant() {
+	status, body := this.post("/api/contracts", this.publishBody("ghost_service", "1",
+		contractFragment{"broken.yaml", "provides: {"},
+		contractFragment{"  ", contractBody},
+	))
 	this.Equal(http.StatusBadRequest, status)
-	this.JSONEq(`{"message":"contract validation failed","violations":[`+
-		`{"code":"endpoint.syntax","path":"provides;rest;/users/{userId}","source":"api.yaml","details":{"key":"/users/{userId}","error":"dynamic path segments must use *"}}`+
-		`]}`, body)
+	this.JSONEq(`{"message":"contract invalid input"}`, body)
+}
 
-	this.Equal(0, this.countRows("participants"))
+func (this *IntegrationSuite) TestPublishContract_UnknownParticipant_ReportedBeforeDecodeError() {
+	status, body := this.post("/api/contracts", this.publishBody("ghost_service", "1", contractFragment{"notes.txt", contractBody}))
+	this.Equal(http.StatusNotFound, status)
+	this.JSONEq(`{"message":"contract participant not found"}`, body)
+
+	status, body = this.post("/api/contracts", this.publishBody("ghost_service", "1", contractFragment{"broken.yaml", "provides: {"}))
+	this.Equal(http.StatusNotFound, status)
+	this.JSONEq(`{"message":"contract participant not found"}`, body)
+}
+
+func (this *IntegrationSuite) TestPublishContract_UnknownParticipant_ReportedBeforeShapeViolation() {
+	status, body := this.post("/api/contracts", this.publishBody("ghost_service", "1", contractFragment{"api.yaml", contractBodyParamEndpoint}))
+	this.Equal(http.StatusNotFound, status)
+	this.JSONEq(`{"message":"contract participant not found"}`, body)
 }
