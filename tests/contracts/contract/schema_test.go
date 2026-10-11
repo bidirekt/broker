@@ -31,7 +31,7 @@ description: nome do pet
 }
 
 func TestSchemaFromDocument_CadaTipoPrimitivo(t *testing.T) {
-	for _, primitive := range []string{"string", "integer", "float", "boolean"} {
+	for _, primitive := range []string{"string", "integer", "float", "number", "boolean"} {
 		t.Run(primitive, func(t *testing.T) {
 			schema := contract.SchemaFromDocument(contract.Document{"type": primitive})
 

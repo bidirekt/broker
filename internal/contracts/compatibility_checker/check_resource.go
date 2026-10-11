@@ -26,3 +26,11 @@ func parentPresentIn(resource *model.PersistedResource, path string) bool {
 
 	return present
 }
+
+func acceptsType(reader, producer string) bool {
+	if reader == producer {
+		return true
+	}
+
+	return reader == "number" && (producer == "integer" || producer == "float")
+}

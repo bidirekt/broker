@@ -670,3 +670,46 @@ func TestValidate_SameInputTwice_ReportsTheSameOrder(t *testing.T) {
 	}, first)
 	assert.Equal(t, first, second)
 }
+
+const invoiceNumberConsumerYAML = `consumes:
+  payments:
+    rest:
+      /invoices:
+        get:
+          responses:
+            200: InvoiceNumber
+schemas:
+  InvoiceNumber:
+    type: object
+    properties:
+      id:
+        type: number
+`
+
+func TestValidate_NumberProperty_ReportsNothing(t *testing.T) {
+	violations := validateFiles(t, validatedFile{"invoices.yaml", invoiceNumberConsumerYAML})
+
+	assert.Empty(t, violations)
+}
+
+func TestValidate_ConsumedResourceWithNumberAndIntegerTypes_IsATypeConflict(t *testing.T) {
+	violations := validateFiles(t,
+		validatedFile{"b.yaml", invoiceNumberConsumerYAML},
+		validatedFile{"a.yaml", invoiceIntegerConsumerYAML},
+	)
+
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "resource.type_conflict",
+			Path:      "consumes;payments;rest;/invoices;get;responses;200",
+			Source:    "b.yaml",
+			Details: map[string]string{
+				"resource":     "consumes payments GET /invoices 200",
+				"property":     "$.id",
+				"type":         "number",
+				"declaredIn":   "a.yaml",
+				"declaredType": "integer",
+			},
+		},
+	}, violations)
+}

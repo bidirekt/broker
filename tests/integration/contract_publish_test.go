@@ -626,8 +626,8 @@ func (this *IntegrationSuite) TestPublishContract_InvalidSchemaType_Rejected() {
 	))
 	this.Equal(http.StatusBadRequest, status)
 	this.JSONEq(`{"message":"contract validation failed","violations":[`+
-		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;id;type","source":"api.yaml","details":{"value":"strng","allowed":"object, array, string, integer, float, boolean"}},`+
-		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;tags;items","source":"api.yaml","details":{"value":"","allowed":"object, array, string, integer, float, boolean"}}`+
+		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;id;type","source":"api.yaml","details":{"value":"strng","allowed":"object, array, string, integer, float, number, boolean"}},`+
+		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;tags;items","source":"api.yaml","details":{"value":"","allowed":"object, array, string, integer, float, number, boolean"}}`+
 		`]}`, body)
 
 	this.Equal(0, this.countRows("contracts"))

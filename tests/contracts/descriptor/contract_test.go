@@ -132,7 +132,7 @@ consumes:
             600: Invoice
 schemas:
   Pet:
-    type: number
+    type: decimal
   Tags:
     type: array
 `
@@ -159,7 +159,7 @@ schemas:
 
 	assert.Equal(t, "schema.invalid_type", violations[3].ErrorCode)
 	assert.Equal(t, "schemas;Pet;type", violations[3].Path)
-	assert.Equal(t, "number", violations[3].Details["value"])
+	assert.Equal(t, "decimal", violations[3].Details["value"])
 
 	assert.Equal(t, "schema.array_without_items", violations[4].ErrorCode)
 	assert.Equal(t, "schemas;Tags", violations[4].Path)
@@ -180,7 +180,7 @@ func TestContract_SchemaVazioEhTipoInvalido(t *testing.T) {
 	assert.Equal(t, "schema.invalid_type", violations[0].ErrorCode)
 	assert.Equal(t, "schemas;Pet", violations[0].Path)
 	assert.Equal(t, "", violations[0].Details["value"])
-	assert.Equal(t, "object, array, string, integer, float, boolean", violations[0].Details["allowed"])
+	assert.Equal(t, "object, array, string, integer, float, number, boolean", violations[0].Details["allowed"])
 }
 
 func TestContract_SchemaNuloEhTipoInvalido(t *testing.T) {

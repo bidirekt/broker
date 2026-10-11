@@ -63,6 +63,7 @@ func isPrimitiveType(schemaType string) bool {
 	return schemaType == "string" ||
 		schemaType == "integer" ||
 		schemaType == "float" ||
+		schemaType == "number" ||
 		schemaType == "boolean"
 }
 

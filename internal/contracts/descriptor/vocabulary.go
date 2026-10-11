@@ -15,7 +15,7 @@ var (
 
 	SchemaType = Enum{
 		ErrorCode: "schema.invalid_type",
-		Allowed:   []string{"object", "array", "string", "integer", "float", "boolean"},
+		Allowed:   []string{"object", "array", "string", "integer", "float", "number", "boolean"},
 	}
 
 	Endpoint     = Key{ErrorCode: "endpoint.syntax", Check: endpointSyntax}

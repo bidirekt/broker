@@ -81,20 +81,20 @@ func TestStatusCode_RejeitaSinalMesmoDentroDaFaixa(t *testing.T) {
 	assert.Equal(t, "-1", violations[1].Details["key"])
 }
 
-func TestSchemaType_AceitaOsSeisTipos(t *testing.T) {
-	for _, allowed := range []string{"object", "array", "string", "integer", "float", "boolean"} {
+func TestSchemaType_AcceptsTheSevenTypes(t *testing.T) {
+	for _, allowed := range []string{"object", "array", "string", "integer", "float", "number", "boolean"} {
 		assert.Empty(t, descriptor.Validate(descriptor.SchemaType, allowed, "api.yaml"), allowed)
 	}
 }
 
 func TestSchemaType_RejeitaTipoForaDoConjunto(t *testing.T) {
-	violations := descriptor.Validate(descriptor.SchemaType, "number", "api.yaml")
+	violations := descriptor.Validate(descriptor.SchemaType, "decimal", "api.yaml")
 
 	require.Len(t, violations, 1)
 	assert.Equal(t, "schema.invalid_type", violations[0].ErrorCode)
 	assert.Equal(t, map[string]string{
-		"value":   "number",
-		"allowed": "object, array, string, integer, float, boolean",
+		"value":   "decimal",
+		"allowed": "object, array, string, integer, float, number, boolean",
 	}, violations[0].Details)
 }
 
