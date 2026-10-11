@@ -79,6 +79,7 @@ CREATE TABLE property_versions (
   contract_id  BIGINT NOT NULL REFERENCES contracts(id),
   type         text,
   optional     boolean,
+  nullable     boolean NOT NULL DEFAULT false,
   change_type  text NOT NULL CHECK (change_type IN ('added', 'modified', 'removed')),
   created_at   timestamptz NOT NULL DEFAULT now(),
   UNIQUE (property_id, contract_id)

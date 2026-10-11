@@ -97,3 +97,25 @@ func TestSchema_TipoForaDoConjuntoContaComoForma(t *testing.T) {
 	assert.Equal(t, "schema.invalid_type", violations[0].ErrorCode)
 	assert.Equal(t, "type", violations[0].Path)
 }
+
+func TestSchema_NullableIsAcceptedOnEveryNode(t *testing.T) {
+	source := "type: object\n" +
+		"nullable: true\n" +
+		"properties:\n" +
+		"  avatar:\n" +
+		"    type: string\n" +
+		"    nullable: true\n" +
+		"  tags:\n" +
+		"    type: array\n" +
+		"    items:\n" +
+		"      type: string\n" +
+		"      nullable: true\n" +
+		"  manager:\n" +
+		"    ref: User\n" +
+		"    optional: true\n" +
+		"    nullable: true\n"
+
+	violations := descriptor.Validate(descriptor.Schema(), schemaDocument(t, source), "api.yaml")
+
+	assert.Empty(t, violations)
+}

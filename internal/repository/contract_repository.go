@@ -88,9 +88,9 @@ const (
 
 	insertPropertyVersionQuery = `
 		INSERT INTO property_versions
-			(property_id, contract_id, type, optional, change_type)
+			(property_id, contract_id, type, optional, nullable, change_type)
 		VALUES
-			($1, $2, $3, $4, $5)
+			($1, $2, $3, $4, $5, $6)
 	`
 
 	insertResourceVersionQuery = `
@@ -123,6 +123,7 @@ const (
 			p.path,
 			pv.type,
 			pv.optional,
+			pv.nullable,
 			pv.change_type
 		FROM contracts c
 		JOIN participants pa ON pa.id = c.participant_id
@@ -136,7 +137,7 @@ const (
 		) rv ON true
 		JOIN properties p ON p.resource_id = r.id
 		JOIN LATERAL (
-			SELECT type, optional, change_type
+			SELECT type, optional, nullable, change_type
 			FROM property_versions
 			WHERE property_id = p.id AND contract_id <= c.id
 			ORDER BY contract_id DESC
@@ -171,6 +172,7 @@ const (
 			p.path,
 			pv.type,
 			pv.optional,
+			pv.nullable,
 			pv.change_type
 		FROM contract_versions cv
 		JOIN contracts c ON c.id = cv.contract_id
@@ -185,7 +187,7 @@ const (
 		) rv ON true
 		JOIN properties p ON p.resource_id = r.id
 		JOIN LATERAL (
-			SELECT type, optional, change_type
+			SELECT type, optional, nullable, change_type
 			FROM property_versions
 			WHERE property_id = p.id AND contract_id <= c.id
 			ORDER BY contract_id DESC
@@ -213,6 +215,7 @@ const (
 			p.path,
 			pv.type,
 			pv.optional,
+			pv.nullable,
 			pv.change_type,
 			dep.version,
 			anchor.contract_id
@@ -248,7 +251,7 @@ const (
 			properties p ON p.resource_id = r.id
 		LEFT JOIN LATERAL (
 			SELECT
-				type, optional, change_type
+				type, optional, nullable, change_type
 			FROM
 				property_versions
 			WHERE
@@ -285,6 +288,7 @@ const (
 			p.path,
 			pv.type,
 			pv.optional,
+			pv.nullable,
 			pv.change_type,
 			e.name,
 			dep.version,
@@ -320,7 +324,7 @@ const (
 			properties p ON p.resource_id = r.id
 		LEFT JOIN LATERAL (
 			SELECT
-				type, optional, change_type
+				type, optional, nullable, change_type
 			FROM
 				property_versions
 			WHERE
@@ -658,6 +662,7 @@ func (this *ContractRepository) insertPropertyVersion(
 		row.ContractID,
 		row.Type,
 		row.Optional,
+		row.Nullable,
 		row.ChangeType,
 	); err != nil {
 		panic(fmt.Errorf("error inserting property version: %w", err))
@@ -739,6 +744,7 @@ func scanPersistedContractTree(rows pgx.Rows) (*model.PersistedContract, bool) {
 			&row.PropertyPath,
 			&row.PropertyVersionType,
 			&row.PropertyVersionOptional,
+			&row.PropertyVersionNullable,
 			&row.PropertyVersionChangeType,
 		); err != nil {
 			panic(fmt.Errorf("error scanning contract tree row: %w", err))
@@ -824,6 +830,7 @@ func (this *ContractRepository) GetProviderResourceByConsumerResource(
 			&row.PropertyPath,
 			&row.PropertyVersionType,
 			&row.PropertyVersionOptional,
+			&row.PropertyVersionNullable,
 			&row.PropertyVersionChangeType,
 			&row.DeploymentEnvironment,
 			&row.DeploymentVersion,
@@ -891,6 +898,7 @@ func (this *ContractRepository) GetConsumersResourcesByProviderHashAndEnvironmen
 			&row.PropertyPath,
 			&row.PropertyVersionType,
 			&row.PropertyVersionOptional,
+			&row.PropertyVersionNullable,
 			&row.PropertyVersionChangeType,
 			&row.ResourceVersion,
 			&row.ContractID,
