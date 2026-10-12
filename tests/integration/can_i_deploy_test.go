@@ -211,6 +211,8 @@ func (this *IntegrationSuite) TestCanIDeploy_HappyPath() {
 	this.Equal("consumer", typeMismatch.Role)
 	this.Equal(map[string]string{
 		"property":             "$.id",
+		"consumerField":        "Thing.id",
+		"providerField":        "Thing.id",
 		"consumerName":         "front",
 		"providerName":         "api",
 		"consumerPropertyType": "integer",
@@ -220,7 +222,7 @@ func (this *IntegrationSuite) TestCanIDeploy_HappyPath() {
 	missing, ok := byReason["property_missing_in_provider"]
 	this.Require().True(ok)
 	this.Equal("consumer", missing.Role)
-	this.Equal(map[string]string{"property": "$.name", "consumerName": "front", "providerName": "api", "propertyType": "string"}, missing.Details)
+	this.Equal(map[string]string{"property": "$.name", "consumerField": "Thing.name", "consumerName": "front", "providerName": "api", "propertyType": "string"}, missing.Details)
 
 	this.Equal(2, this.countRows("compatibility_checks"))
 	this.Equal(2, this.countRows("compatibility_check_results"))
@@ -318,6 +320,8 @@ func (this *IntegrationSuite) TestCanIDeploy_ProviderCheckedAgainstDeployedConsu
 	// types resolved by role even though the provider is the checked side
 	this.Equal(map[string]string{
 		"property":             "$.id",
+		"consumerField":        "Thing.id",
+		"providerField":        "Thing.id",
 		"consumerName":         "front",
 		"providerName":         "api",
 		"consumerPropertyType": "integer",
@@ -496,6 +500,8 @@ func (this *IntegrationSuite) TestCanIDeploy_TwoDeployableOneBreaking() {
 	this.Equal("consumer", b.Role)
 	this.Equal(map[string]string{
 		"property":             "$.id",
+		"consumerField":        "Product.id",
+		"providerField":        "Product.id",
 		"consumerName":         "app",
 		"providerName":         "catalog",
 		"consumerPropertyType": "integer",
@@ -894,13 +900,13 @@ func (this *IntegrationSuite) TestCanIDeploy_ConsumerAndProviderSameContract() {
 	this.Require().Len(requestBreaks, 1)
 	this.Equal("property_missing_in_consumer", requestBreaks[0].Reason)
 	this.Equal("provider", requestBreaks[0].Role)
-	this.Equal(map[string]string{"property": "$.breed", "consumerName": "app", "providerName": "pets", "propertyType": "string"}, requestBreaks[0].Details)
+	this.Equal(map[string]string{"property": "$.breed", "providerField": "CreatePetRequest.breed", "consumerName": "app", "providerName": "pets", "propertyType": "string"}, requestBreaks[0].Details)
 
 	responseBreaks := appResult.Endpoints["/pets/*"]["get"]["200"]
 	this.Require().Len(responseBreaks, 1)
 	this.Equal("property_missing_in_provider", responseBreaks[0].Reason)
 	this.Equal("provider", responseBreaks[0].Role)
-	this.Equal(map[string]string{"property": "$.name", "consumerName": "app", "providerName": "pets", "propertyType": "string"}, responseBreaks[0].Details)
+	this.Equal(map[string]string{"property": "$.name", "consumerField": "Pet.name", "consumerName": "app", "providerName": "pets", "propertyType": "string"}, responseBreaks[0].Details)
 
 	usersResult, ok := got.Results["users"]
 	this.Require().True(ok)
@@ -914,6 +920,8 @@ func (this *IntegrationSuite) TestCanIDeploy_ConsumerAndProviderSameContract() {
 	this.Equal("consumer", consumerBreaks[0].Role)
 	this.Equal(map[string]string{
 		"property":             "$.userId",
+		"consumerField":        "User.userId",
+		"providerField":        "User.userId",
 		"consumerName":         "pets",
 		"providerName":         "users",
 		"consumerPropertyType": "string",
@@ -1016,7 +1024,7 @@ func (this *IntegrationSuite) TestCanIDeploy_MissingArrayReportsOnlyItselfAndOnl
 	this.Equal([]breakJSON{{
 		Reason:  "property_missing_in_provider",
 		Role:    "consumer",
-		Details: map[string]string{"property": "$.list", "consumerName": "front", "providerName": "api", "propertyType": "array<object>"},
+		Details: map[string]string{"property": "$.list", "consumerField": "Thing.list", "consumerName": "front", "providerName": "api", "propertyType": "array<object>"},
 	}}, got.Results["api"].Endpoints["/things"]["get"]["200"])
 }
 

@@ -181,10 +181,11 @@ func (this *IntegrationSuite) TestCanIDeploy_UndescribedResponseReadAsDescribed_
 	this.publishAndDeployProviderForUndescribedBody(undescribedDownloadProviderYAML, describedDownloadConsumerYAML)
 
 	details := map[string]string{
-		"property":     "$",
-		"consumerName": "files_web",
-		"providerName": "files_api",
-		"propertyType": "object",
+		"property":      "$",
+		"consumerField": "Pet",
+		"consumerName":  "files_web",
+		"providerName":  "files_api",
+		"propertyType":  "object",
 	}
 
 	fromConsumer, validatedConsumer := this.canIDeployAndValidateForUndescribedBody("files_web", describedDownloadConsumerYAML)

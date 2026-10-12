@@ -200,10 +200,11 @@ func (this *IntegrationSuite) TestSelfConsumptionToday_ReplayedSelfBreakFlipsFro
 	this.publishForSelfConsumption("2.0.0", selfConsumingPetSummaryContract)
 
 	details := map[string]string{
-		"property":     "$.name",
-		"consumerName": "petstore_bff",
-		"providerName": "petstore_bff",
-		"propertyType": "string",
+		"property":      "$.name",
+		"consumerField": "Pet.name",
+		"consumerName":  "petstore_bff",
+		"providerName":  "petstore_bff",
+		"propertyType":  "string",
 	}
 
 	fresh := this.canIDeployForSelfConsumption("2.0.0")

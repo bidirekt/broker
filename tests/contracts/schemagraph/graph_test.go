@@ -172,3 +172,29 @@ func TestSegments_OfARecursiveSchema_FollowTheRefBackToTheSchema(t *testing.T) {
 	assert.Equal(t, graphRoot(catalog, "Comment").ShapeKey(), reply.ShapeKey())
 	assert.NotEqual(t, graphRoot(catalog, "Comment").SiteKey(), reply.SiteKey())
 }
+
+func TestField_NamesTheSchemaAndThePathTheNodeWasReachedAt(t *testing.T) {
+	catalog := model.Schemas{
+		"Order": {
+			"":            {Type: "object"},
+			"billing":     {Ref: "Address"},
+			"items":       {Type: "array"},
+			"items[]":     {Type: "object"},
+			"items[].sku": {Type: "string"},
+		},
+		"Address": {"": {Type: "object"}, "city": {Type: "string"}},
+		"Pets":    {"": {Type: "object"}, "{}": {Type: "object"}, "{}.name": {Type: "string"}},
+		"Tags":    {"": {Type: "array"}, "[]": {Type: "string"}},
+	}
+
+	order := graphRoot(catalog, "Order")
+
+	assert.Equal(t, "Order", order.Field())
+	assert.Equal(t, "Order.billing", order.Child("billing").Field())
+	assert.Equal(t, "Address.city", order.Child("billing").Child("city").Field())
+	assert.Equal(t, "Order.items[]", order.Child("items").Child("[]").Field())
+	assert.Equal(t, "Order.items[].sku", order.Child("items").Child("[]").Child("sku").Field())
+	assert.Equal(t, "Pets{}.name", graphRoot(catalog, "Pets").Child("{}").Child("name").Field())
+	assert.Equal(t, "Tags[]", graphRoot(catalog, "Tags").Child("[]").Field())
+	assert.Empty(t, order.Child("total").Field())
+}

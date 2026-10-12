@@ -296,6 +296,8 @@ func (this *IntegrationSuite) TestCompatibilityPersistence_IncompatiblePairStore
 		Reason:      "property_type_mismatch",
 		Details: map[string]string{
 			"property":             "$.id",
+			"consumerField":        "Widget.id",
+			"providerField":        "Widget.id",
 			"consumerName":         "front",
 			"providerName":         "widgets",
 			"consumerPropertyType": "integer",
@@ -309,10 +311,11 @@ func (this *IntegrationSuite) TestCompatibilityPersistence_IncompatiblePairStore
 		Interaction: "200",
 		Reason:      "property_missing_in_provider",
 		Details: map[string]string{
-			"property":     "$.label",
-			"consumerName": "front",
-			"providerName": "widgets",
-			"propertyType": "string",
+			"property":      "$.label",
+			"consumerField": "Widget.label",
+			"consumerName":  "front",
+			"providerName":  "widgets",
+			"propertyType":  "string",
 		},
 	}, byReason["property_missing_in_provider"])
 }

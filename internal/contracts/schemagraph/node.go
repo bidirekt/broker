@@ -73,6 +73,25 @@ func (this Node) Members() []Member {
 	return members
 }
 
+// Field names the first body's field the node was reached at: "Address.city", "Order.items[].sku",
+// "Pets{}.name", or the schema alone at its root.
+func (this Node) Field() string {
+	if !this.Exists() {
+		return ""
+	}
+
+	site := this.members[0].site
+
+	switch {
+	case site.Path == "":
+		return site.Schema
+	case strings.HasPrefix(site.Path, model.ItemsSegment) || strings.HasPrefix(site.Path, model.ValuesSegment):
+		return site.Schema + site.Path
+	default:
+		return site.Schema + "." + site.Path
+	}
+}
+
 func (this Node) Segments() []string {
 	var segments []string
 	for _, member := range this.members {

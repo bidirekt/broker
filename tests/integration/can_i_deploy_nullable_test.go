@@ -89,20 +89,30 @@ func (this *IntegrationSuite) TestCanIDeploy_NullabilityBreaksCarryTheReasonAndT
 	this.mustPostForNullableBreak("/api/contracts",
 		this.publishBody("profiles_spa", "1.0.0", contractFragment{"spa.yaml", nullableProfilesSPAContract}))
 
-	details := map[string]string{
-		"property":     "$.avatar",
-		"consumerName": "profiles_spa",
-		"providerName": "profiles_api",
-		"propertyType": "string",
+	responseDetails := map[string]string{
+		"property":      "$.avatar",
+		"consumerField": "Profile.avatar",
+		"providerField": "Profile.avatar",
+		"consumerName":  "profiles_spa",
+		"providerName":  "profiles_api",
+		"propertyType":  "string",
+	}
+	requestDetails := map[string]string{
+		"property":      "$.avatar",
+		"consumerField": "ProfileChanges.avatar",
+		"providerField": "ProfileChanges.avatar",
+		"consumerName":  "profiles_spa",
+		"providerName":  "profiles_api",
+		"propertyType":  "string",
 	}
 
 	fromTheConsumer := this.canIDeployForNullableBreak("profiles_spa", "1.0.0").
 		Results["profiles_api"].Endpoints["/profiles/*"]["put"]
 	this.Equal([]nullableBreakLeaf{{
-		Reason: "property_nullable_in_provider_not_nullable_in_consumer", Role: "consumer", Details: details,
+		Reason: "property_nullable_in_provider_not_nullable_in_consumer", Role: "consumer", Details: responseDetails,
 	}}, fromTheConsumer["200"])
 	this.Equal([]nullableBreakLeaf{{
-		Reason: "property_nullable_in_consumer_not_nullable_in_provider", Role: "consumer", Details: details,
+		Reason: "property_nullable_in_consumer_not_nullable_in_provider", Role: "consumer", Details: requestDetails,
 	}}, fromTheConsumer["request"])
 
 	this.mustPostForNullableBreak("/api/deployments",
@@ -111,9 +121,9 @@ func (this *IntegrationSuite) TestCanIDeploy_NullabilityBreaksCarryTheReasonAndT
 	fromTheProvider := this.canIDeployForNullableBreak("profiles_api", "1.0.0").
 		Results["profiles_spa"].Endpoints["/profiles/*"]["put"]
 	this.Equal([]nullableBreakLeaf{{
-		Reason: "property_nullable_in_provider_not_nullable_in_consumer", Role: "provider", Details: details,
+		Reason: "property_nullable_in_provider_not_nullable_in_consumer", Role: "provider", Details: responseDetails,
 	}}, fromTheProvider["200"])
 	this.Equal([]nullableBreakLeaf{{
-		Reason: "property_nullable_in_consumer_not_nullable_in_provider", Role: "provider", Details: details,
+		Reason: "property_nullable_in_consumer_not_nullable_in_provider", Role: "provider", Details: requestDetails,
 	}}, fromTheProvider["request"])
 }

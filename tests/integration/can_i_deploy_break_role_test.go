@@ -79,10 +79,11 @@ func (this *IntegrationSuite) TestBreakRole_ReplayedVerdictTakesTheRoleOfTheCurr
 		this.publishBody("petstore_web", "2.0.0", contractFragment{"web.yaml", breakRoleWebContract}))
 
 	details := map[string]string{
-		"property":     "$.photoUrl",
-		"consumerName": "petstore_web",
-		"providerName": "petstore_api",
-		"propertyType": "string",
+		"property":      "$.photoUrl",
+		"consumerName":  "petstore_web",
+		"providerName":  "petstore_api",
+		"propertyType":  "string",
+		"consumerField": "Pet.photoUrl",
 	}
 
 	fromTheConsumer := this.canIDeployForBreakRole("petstore_web", "2.0.0")
@@ -108,6 +109,7 @@ func (this *IntegrationSuite) TestBreakRole_ReplayedVerdictTakesTheRoleOfTheCurr
 		"reason": "property_missing_in_provider",
 		"details": {
 			"property": "$.photoUrl",
+			"consumerField": "Pet.photoUrl",
 			"consumerName": "petstore_web",
 			"providerName": "petstore_api",
 			"propertyType": "string"
