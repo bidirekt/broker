@@ -212,7 +212,7 @@ func (this *IntegrationSuite) TestHappyPath_PublishContract() {
 	this.Equal(1, this.countRows("contracts"))
 	this.Equal(1, this.countRows("contract_versions"))
 	this.Equal(1, this.countRows("resources"))
-	this.GreaterOrEqual(this.countRows("properties"), 1)
+	this.GreaterOrEqual(this.countRows("fields"), 1)
 
 	var version string
 	err := this.Pool.QueryRow(context.Background(),
@@ -382,7 +382,9 @@ func (this *IntegrationSuite) TestPublishContract_RefCrossesFragments() {
 
 	this.Equal(1, this.countRows("resources"))
 
-	rows, err := this.Pool.Query(context.Background(), "SELECT path FROM properties ORDER BY path")
+	rows, err := this.Pool.Query(context.Background(),
+		`SELECT schemas.name || '.' || fields.path FROM fields JOIN schemas ON schemas.id = fields.schema_id
+		  ORDER BY schemas.name || '.' || fields.path COLLATE "C"`)
 	this.Require().NoError(err)
 	defer rows.Close()
 
@@ -392,7 +394,7 @@ func (this *IntegrationSuite) TestPublishContract_RefCrossesFragments() {
 		this.Require().NoError(rows.Scan(&path))
 		paths = append(paths, path)
 	}
-	this.Equal([]string{"$", "$[]", "$[].petId"}, paths)
+	this.Equal([]string{"Pet.", "Pet.petId", "Pets.", "Pets.[]"}, paths)
 }
 
 func (this *IntegrationSuite) TestPublishContract_EmptyFragmentContributesNothing() {

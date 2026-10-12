@@ -23,13 +23,13 @@ var (
 	)
 )
 
-func ToResourceModel(path contract.ResourcePath, properties map[string]model.Property) model.UploadedResource {
+func ToResourceModel(path contract.ResourcePath, bodies []model.ResourceBody) model.UploadedResource {
 	if args, ok := path.ExtractNamedArgs(consumerRestRequestRegex); ok {
 		return *model.NewRestRequestConsumer(
 			args["provider"],
 			args["endpoint"],
 			args["method"],
-			properties,
+			bodies,
 		)
 	}
 
@@ -39,7 +39,7 @@ func ToResourceModel(path contract.ResourcePath, properties map[string]model.Pro
 			args["endpoint"],
 			args["method"],
 			args["status"],
-			properties,
+			bodies,
 		)
 	}
 
@@ -47,7 +47,7 @@ func ToResourceModel(path contract.ResourcePath, properties map[string]model.Pro
 		return *model.NewRestRequestProvider(
 			args["endpoint"],
 			args["method"],
-			properties,
+			bodies,
 		)
 	}
 
@@ -56,7 +56,7 @@ func ToResourceModel(path contract.ResourcePath, properties map[string]model.Pro
 			args["endpoint"],
 			args["method"],
 			args["status"],
-			properties,
+			bodies,
 		)
 	}
 

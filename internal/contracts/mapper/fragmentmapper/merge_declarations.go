@@ -1,9 +1,5 @@
 package fragmentmapper
 
-import (
-	"github.com/bidirekt/broker/internal/model"
-)
-
 // A provider declared twice is a violation the validator reports before this runs, so the first one wins here.
 func mergeByResourcePath(declarations []ResourceDeclaration) []ResourceDeclaration {
 	merged := make([]ResourceDeclaration, 0, len(declarations))
@@ -24,83 +20,8 @@ func mergeByResourcePath(declarations []ResourceDeclaration) []ResourceDeclarati
 			continue
 		}
 
-		merged[index].Resource = unionResourceModels(merged[index].Resource, declaration.Resource)
+		merged[index].Resource.Bodies = append(merged[index].Resource.Bodies, declaration.Resource.Bodies...)
 	}
 
 	return merged
-}
-
-func unionResourceModels(a, b model.UploadedResource) model.UploadedResource {
-	union := a
-
-	switch a.Interaction {
-	case model.RestRequest:
-		union.Properties = unionRequestProperties(a.Properties, b.Properties)
-	case model.RestResponse:
-		union.Properties = unionResponseProperties(a.Properties, b.Properties)
-	}
-
-	return union
-}
-
-// What two senders send: a path is required only if every sender that sends its parent requires it, and nullable if any sender may send null.
-func unionRequestProperties(a, b map[string]model.Property) map[string]model.Property {
-	union := make(map[string]model.Property, len(a)+len(b))
-
-	for path, property := range a {
-		if other, declared := b[path]; declared {
-			property.Optional = property.Optional || other.Optional
-			property.Nullable = property.Nullable || other.Nullable
-		} else {
-			property.Optional = property.Optional || parentDeclaredIn(b, path)
-		}
-
-		union[path] = property
-	}
-
-	for path, property := range b {
-		if _, declared := a[path]; declared {
-			continue
-		}
-
-		property.Optional = property.Optional || parentDeclaredIn(a, path)
-		union[path] = property
-	}
-
-	return union
-}
-
-func parentDeclaredIn(properties map[string]model.Property, path string) bool {
-	parent, hasParent := model.ParentPath(path)
-	if !hasParent {
-		return true
-	}
-
-	_, declared := properties[parent]
-
-	return declared
-}
-
-// What two readers need: a path is optional only if every reader that mentions it allows it, and nullable only if every reader that mentions it accepts null.
-func unionResponseProperties(a, b map[string]model.Property) map[string]model.Property {
-	union := make(map[string]model.Property, len(a)+len(b))
-
-	for path, property := range a {
-		if other, declared := b[path]; declared {
-			property.Optional = property.Optional && other.Optional
-			property.Nullable = property.Nullable && other.Nullable
-		}
-
-		union[path] = property
-	}
-
-	for path, property := range b {
-		if _, declared := a[path]; declared {
-			continue
-		}
-
-		union[path] = property
-	}
-
-	return union
 }

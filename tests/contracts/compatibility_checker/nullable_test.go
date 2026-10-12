@@ -31,18 +31,18 @@ type avatarsBreak struct {
 	details map[string]string
 }
 
-func avatarsProperties(properties ...model.Property) map[string]model.Property {
-	byPath := map[string]model.Property{"$": {Path: "$", Type: "object"}}
-	for _, property := range properties {
-		byPath[property.Path] = property
+func avatarsSchema(fields model.Schema) model.Schema {
+	schema := model.Schema{"": {Type: "object"}}
+	for path, field := range fields {
+		schema[path] = field
 	}
 
-	return byPath
+	return schema
 }
 
 func avatarsResources(
 	interaction string,
-	consumerProperties, providerProperties map[string]model.Property,
+	consumerSchema, providerSchema model.Schema,
 ) (consumer, provider model.PersistedResource) {
 	kind, status := model.RestResponse, null.StringFrom(interaction)
 	if interaction == "request" {
@@ -59,7 +59,8 @@ func avatarsResources(
 		Endpoint:           avatarsEndpoint,
 		Method:             avatarsMethod,
 		ResponseStatusCode: status,
-		Properties:         consumerProperties,
+		Bodies:             []model.ResourceBody{{Source: "spa.yaml", SchemaName: null.StringFrom("Profile")}},
+		Schemas:            model.Schemas{"Profile": consumerSchema},
 	}
 
 	provider = model.PersistedResource{
@@ -70,7 +71,8 @@ func avatarsResources(
 		Endpoint:           avatarsEndpoint,
 		Method:             avatarsMethod,
 		ResponseStatusCode: status,
-		Properties:         providerProperties,
+		Bodies:             []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Profile")}},
+		Schemas:            model.Schemas{"Profile": providerSchema},
 		DeployedVersions:   map[string]string{avatarsEnvironment: "1.0.0"},
 	}
 
@@ -125,12 +127,12 @@ func noAvatarsBreak(compatibility_checker.BreakRole) []avatarsBreak {
 func assertAvatarsBreaks(
 	t *testing.T,
 	interaction string,
-	consumerProperties, providerProperties map[string]model.Property,
+	consumerSchema, providerSchema model.Schema,
 	expected avatarsExpectation,
 ) {
 	t.Helper()
 
-	consumer, provider := avatarsResources(interaction, consumerProperties, providerProperties)
+	consumer, provider := avatarsResources(interaction, consumerSchema, providerSchema)
 
 	t.Run("checked from the consumer", func(t *testing.T) {
 		assert.Equal(t, expected(compatibility_checker.RoleConsumer), avatarsBreaksCheckedFrom(consumer, model.ResourceCounterparts{
@@ -145,8 +147,8 @@ func assertAvatarsBreaks(
 	})
 }
 
-func avatarProperty(nullable bool) map[string]model.Property {
-	return avatarsProperties(model.Property{Path: "$.avatar", Type: "string", Nullable: nullable})
+func avatarProperty(nullable bool) model.Schema {
+	return avatarsSchema(model.Schema{"avatar": {Type: "string", Nullable: nullable}})
 }
 
 func TestNullableResponse_ProviderNullableConsumerNot_Breaks(t *testing.T) {
@@ -182,20 +184,20 @@ func TestNullableRequest_BothNullable_IsCompatible(t *testing.T) {
 }
 
 func TestNullable_PathMissingOnOneSide_IsNotANullabilityBreak(t *testing.T) {
-	optionalAvatar := avatarsProperties(model.Property{Path: "$.avatar", Type: "string", Optional: true, Nullable: true})
+	optionalAvatar := avatarsSchema(model.Schema{"avatar": {Type: "string", Optional: true, Nullable: true}})
 
 	t.Run("response", func(t *testing.T) {
-		assertAvatarsBreaks(t, "200", optionalAvatar, avatarsProperties(), noAvatarsBreak)
+		assertAvatarsBreaks(t, "200", optionalAvatar, avatarsSchema(nil), noAvatarsBreak)
 	})
 
 	t.Run("request", func(t *testing.T) {
-		assertAvatarsBreaks(t, "request", avatarsProperties(), optionalAvatar, noAvatarsBreak)
+		assertAvatarsBreaks(t, "request", avatarsSchema(nil), optionalAvatar, noAvatarsBreak)
 	})
 }
 
 func TestNullable_TypeNotAccepted_ReportsOnlyTheTypeMismatch(t *testing.T) {
-	stringAvatar := avatarsProperties(model.Property{Path: "$.avatar", Type: "string", Nullable: true})
-	integerAvatar := avatarsProperties(model.Property{Path: "$.avatar", Type: "integer"})
+	stringAvatar := avatarsSchema(model.Schema{"avatar": {Type: "string", Nullable: true}})
+	integerAvatar := avatarsSchema(model.Schema{"avatar": {Type: "integer"}})
 
 	typeMismatch := func(role compatibility_checker.BreakRole) []avatarsBreak {
 		return []avatarsBreak{{compatibility_checker.ReasonPropertyTypeMismatch, role, map[string]string{
@@ -217,8 +219,8 @@ func TestNullable_TypeNotAccepted_ReportsOnlyTheTypeMismatch(t *testing.T) {
 }
 
 func TestNullableResponse_IsIndependentFromOptional(t *testing.T) {
-	required := avatarsProperties(model.Property{Path: "$.avatar", Type: "string"})
-	optionalAndNullable := avatarsProperties(model.Property{Path: "$.avatar", Type: "string", Optional: true, Nullable: true})
+	required := avatarsSchema(model.Schema{"avatar": {Type: "string"}})
+	optionalAndNullable := avatarsSchema(model.Schema{"avatar": {Type: "string", Optional: true, Nullable: true}})
 
 	assertAvatarsBreaks(t, "200", required, optionalAndNullable,
 		func(role compatibility_checker.BreakRole) []avatarsBreak {
@@ -230,15 +232,15 @@ func TestNullableResponse_IsIndependentFromOptional(t *testing.T) {
 }
 
 func TestNullableResponse_ChildrenOfANullableParent_AreComparedNormally(t *testing.T) {
-	consumerManager := avatarsProperties(
-		model.Property{Path: "$.manager", Type: "object", Nullable: true},
-		model.Property{Path: "$.manager.name", Type: "string"},
-		model.Property{Path: "$.manager.email", Type: "string"},
-	)
-	providerManager := avatarsProperties(
-		model.Property{Path: "$.manager", Type: "object", Nullable: true},
-		model.Property{Path: "$.manager.name", Type: "string"},
-	)
+	consumerManager := avatarsSchema(model.Schema{
+		"manager":       {Type: "object", Nullable: true},
+		"manager.name":  {Type: "string"},
+		"manager.email": {Type: "string"},
+	})
+	providerManager := avatarsSchema(model.Schema{
+		"manager":      {Type: "object", Nullable: true},
+		"manager.name": {Type: "string"},
+	})
 
 	assertAvatarsBreaks(t, "200", consumerManager, providerManager,
 		func(role compatibility_checker.BreakRole) []avatarsBreak {
@@ -248,15 +250,15 @@ func TestNullableResponse_ChildrenOfANullableParent_AreComparedNormally(t *testi
 }
 
 func TestNullableRequest_ChildrenOfANullableParent_AreComparedNormally(t *testing.T) {
-	consumerManager := avatarsProperties(
-		model.Property{Path: "$.manager", Type: "object", Nullable: true},
-		model.Property{Path: "$.manager.name", Type: "string"},
-	)
-	providerManager := avatarsProperties(
-		model.Property{Path: "$.manager", Type: "object", Nullable: true},
-		model.Property{Path: "$.manager.name", Type: "string"},
-		model.Property{Path: "$.manager.email", Type: "string"},
-	)
+	consumerManager := avatarsSchema(model.Schema{
+		"manager":      {Type: "object", Nullable: true},
+		"manager.name": {Type: "string"},
+	})
+	providerManager := avatarsSchema(model.Schema{
+		"manager":       {Type: "object", Nullable: true},
+		"manager.name":  {Type: "string"},
+		"manager.email": {Type: "string"},
+	})
 
 	assertAvatarsBreaks(t, "request", consumerManager, providerManager,
 		func(role compatibility_checker.BreakRole) []avatarsBreak {

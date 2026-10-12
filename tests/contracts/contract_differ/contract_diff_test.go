@@ -11,157 +11,194 @@ import (
 
 const participantName = "pets-service"
 
-func newContractWithOnePetsResource() *model.UploadedContract {
-	contract := model.NewUploadedContract(0, participantName, "1", "raw")
-	_ = contract.AddResource(model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
-		"$":    model.NewProperty("$", "object", false, false),
-		"$.id": model.NewProperty("$.id", "string", false, false),
-	}))
+func petBody() []model.ResourceBody {
+	return []model.ResourceBody{{Source: "pets.yaml", SchemaName: null.StringFrom("Pet")}}
+}
+
+func petSchemas() model.Schemas {
+	return model.Schemas{
+		"Pet": {
+			"":   {Type: "object"},
+			"id": {Type: "string"},
+		},
+	}
+}
+
+func persistedPets(schemas model.Schemas, resources ...*model.UploadedResource) *model.PersistedContract {
+	contract := &model.PersistedContract{
+		ParticipantName: participantName,
+		Resources:       map[string]model.PersistedResource{},
+		Schemas:         schemas,
+	}
+
+	for _, resource := range resources {
+		resource.ParticipantName = participantName
+		contract.Resources[resource.PrimaryHash()] = model.PersistedResource{
+			ParticipantName:    participantName,
+			Direction:          resource.Direction,
+			Interaction:        resource.Interaction,
+			ProviderHash:       resource.ProviderHash(),
+			Endpoint:           resource.Endpoint,
+			Method:             resource.Method,
+			ResponseStatusCode: resource.ResponseStatusCode,
+			Bodies:             resource.Bodies,
+			Schemas:            schemas,
+		}
+	}
+
 	return contract
 }
 
-// props projects a contract's resources to the properties-by-hash shape the differ consumes.
-func props(contract *model.UploadedContract) map[string]model.ResourceProperties {
-	out := make(map[string]model.ResourceProperties, len(contract.Resources))
-	for key, resource := range contract.Resources {
-		out[key] = resource.Properties
+func uploadedPets(schemas model.Schemas, resources ...*model.UploadedResource) *model.UploadedContract {
+	contract := model.NewUploadedContract(0, participantName, "1", "raw")
+	contract.Schemas = schemas
+
+	for _, resource := range resources {
+		_ = contract.AddResource(resource)
 	}
-	return out
+
+	return contract
 }
 
-func TestDiff_NoChanges_BetweenEquivalentContracts(t *testing.T) {
-	prev := newContractWithOnePetsResource()
-	next := newContractWithOnePetsResource()
-	diff := contract_differ.DiffResourceProperties(props(prev), props(next))
+func listPets() *model.UploadedResource {
+	return model.NewRestResponseProvider("/pets", "get", "200", petBody())
+}
+
+func getPet() *model.UploadedResource {
+	return model.NewRestResponseProvider("/pets/*", "get", "200", petBody())
+}
+
+func TestDiff_EquivalentContracts_HaveNoChanges(t *testing.T) {
+	diff := contract_differ.DiffContracts(persistedPets(petSchemas(), listPets()), uploadedPets(petSchemas(), listPets()))
+
 	assert.Empty(t, diff.Resources)
+	assert.Empty(t, diff.Schemas)
 }
 
-func TestDiff_ReportsAddedResource(t *testing.T) {
-	prev := newContractWithOnePetsResource()
-	next := newContractWithOnePetsResource()
-	added := model.NewRestResponseProvider("/pets/*", "get", "200", map[string]model.Property{
-		"$":    model.NewProperty("$", "object", false, false),
-		"$.id": model.NewProperty("$.id", "string", false, false),
-	})
-	_ = next.AddResource(added)
-	key := added.PrimaryHash()
+func TestDiff_AddedResource_IsAdded(t *testing.T) {
+	added := getPet()
 
-	diff := contract_differ.DiffResourceProperties(props(prev), props(next))
+	diff := contract_differ.DiffContracts(persistedPets(petSchemas(), listPets()), uploadedPets(petSchemas(), listPets(), added))
 
-	assert.Len(t, diff.Resources, 1)
-	assert.Equal(t, model.ChangeAdded, diff.Resources[key].Kind)
+	assert.Equal(t, map[string]model.ChangeKind{added.PrimaryHash(): model.ChangeAdded}, diff.Resources)
+	assert.Empty(t, diff.Schemas)
 }
 
-func TestDiff_NextNil_AllResourcesRemoved(t *testing.T) {
-	prev := newContractWithOnePetsResource()
-	diff := contract_differ.DiffResourceProperties(props(prev), nil)
-	assert.Len(t, diff.Resources, 1)
-	for _, change := range diff.Resources {
-		assert.Equal(t, model.ChangeRemoved, change.Kind)
+func TestDiff_RemovedResource_IsRemoved(t *testing.T) {
+	removed := getPet()
+	current := persistedPets(petSchemas(), listPets(), removed)
+
+	diff := contract_differ.DiffContracts(current, uploadedPets(petSchemas(), listPets()))
+
+	assert.Equal(t, map[string]model.ChangeKind{removed.PrimaryHash(): model.ChangeRemoved}, diff.Resources)
+}
+
+func TestDiff_ResourceWhoseBodyChanged_IsNotAResourceChange(t *testing.T) {
+	undescribed := model.NewRestResponseProvider("/pets", "get", "200", []model.ResourceBody{{Source: "pets.yaml"}})
+
+	diff := contract_differ.DiffContracts(persistedPets(petSchemas(), listPets()), uploadedPets(model.Schemas{}, undescribed))
+
+	assert.Empty(t, diff.Resources)
+	assert.Equal(t, model.ChangeRemoved, diff.Schemas["Pet"].Kind)
+}
+
+func TestDiff_NewSchema_IsAddedWithEveryField(t *testing.T) {
+	next := petSchemas()
+	next["Owner"] = model.Schema{
+		"":     {Type: "object"},
+		"name": {Type: "string", Optional: true},
+	}
+
+	diff := contract_differ.DiffContracts(persistedPets(petSchemas(), listPets()), uploadedPets(next, listPets()))
+
+	assert.Equal(t, map[string]model.SchemaChange{
+		"Owner": {Kind: model.ChangeAdded, Fields: map[string]model.FieldChange{
+			"":     {Kind: model.ChangeAdded, After: model.Field{Type: "object"}},
+			"name": {Kind: model.ChangeAdded, After: model.Field{Type: "string", Optional: true}},
+		}},
+	}, diff.Schemas)
+}
+
+func TestDiff_SchemaNoLongerReachable_IsRemovedWithEveryField(t *testing.T) {
+	diff := contract_differ.DiffContracts(persistedPets(petSchemas(), listPets()), uploadedPets(model.Schemas{}))
+
+	assert.Equal(t, map[string]model.SchemaChange{
+		"Pet": {Kind: model.ChangeRemoved, Fields: map[string]model.FieldChange{
+			"":   {Kind: model.ChangeRemoved, Before: model.Field{Type: "object"}},
+			"id": {Kind: model.ChangeRemoved, Before: model.Field{Type: "string"}},
+		}},
+	}, diff.Schemas)
+}
+
+func TestDiff_RenamedSchema_IsRemovedAndAdded(t *testing.T) {
+	current := model.Schemas{"Address": {"": {Type: "object"}, "city": {Type: "string"}}}
+	next := model.Schemas{"PostalAddress": {"": {Type: "object"}, "city": {Type: "string"}}}
+
+	diff := contract_differ.DiffContracts(persistedPets(current), uploadedPets(next))
+
+	assert.Len(t, diff.Schemas, 2)
+	assert.Equal(t, model.ChangeRemoved, diff.Schemas["Address"].Kind)
+	assert.Equal(t, model.ChangeAdded, diff.Schemas["PostalAddress"].Kind)
+}
+
+func TestDiff_FieldAddedAndRemoved_ModifyTheSchema(t *testing.T) {
+	next := model.Schemas{"Pet": {"": {Type: "object"}, "name": {Type: "string"}}}
+
+	diff := contract_differ.DiffContracts(persistedPets(petSchemas()), uploadedPets(next))
+
+	assert.Equal(t, map[string]model.SchemaChange{
+		"Pet": {Kind: model.ChangeModified, Fields: map[string]model.FieldChange{
+			"id":   {Kind: model.ChangeRemoved, Before: model.Field{Type: "string"}},
+			"name": {Kind: model.ChangeAdded, After: model.Field{Type: "string"}},
+		}},
+	}, diff.Schemas)
+}
+
+func TestDiff_FieldWhoseAttributeChanged_IsModified(t *testing.T) {
+	cases := []struct {
+		name  string
+		after model.Field
+	}{
+		{name: "type", after: model.Field{Type: "integer"}},
+		{name: "optional", after: model.Field{Type: "string", Optional: true}},
+		{name: "nullable", after: model.Field{Type: "string", Nullable: true}},
+		{name: "ref", after: model.Field{Ref: "PetId"}},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			next := petSchemas()
+			next["Pet"]["id"] = testCase.after
+
+			diff := contract_differ.DiffContracts(persistedPets(petSchemas()), uploadedPets(next))
+
+			assert.Equal(t, map[string]model.SchemaChange{
+				"Pet": {Kind: model.ChangeModified, Fields: map[string]model.FieldChange{
+					"id": {Kind: model.ChangeModified, Before: model.Field{Type: "string"}, After: testCase.after},
+				}},
+			}, diff.Schemas)
+		})
 	}
 }
 
-func TestDiff_RemovedResource(t *testing.T) {
-	oldContract := newContractWithOnePetsResource()
-	removed := model.NewRestResponseProvider("/pets/*", "get", "200", map[string]model.Property{
-		"$":    model.NewProperty("$", "object", false, false),
-		"$.id": model.NewProperty("$.id", "string", false, false),
-	})
-	_ = oldContract.AddResource(removed)
-	key := removed.PrimaryHash()
-
-	newContract := newContractWithOnePetsResource()
-	diff := contract_differ.DiffResourceProperties(props(oldContract), props(newContract))
-
-	assert.Len(t, diff.Resources, 1)
-	assert.Equal(t, model.ChangeRemoved, diff.Resources[key].Kind)
-	assert.Len(t, diff.Resources[key].Properties, 2)
-	for _, propChange := range diff.Resources[key].Properties {
-		assert.Equal(t, model.ChangeRemoved, propChange.Kind)
+func TestDiff_RefTargetRenamed_ModifiesTheRefField(t *testing.T) {
+	current := model.Schemas{
+		"Order":   {"": {Type: "object"}, "billing": {Ref: "Address"}},
+		"Address": {"": {Type: "object"}},
 	}
-}
-
-func TestDiff_ModifiedResource_PropertyAdded(t *testing.T) {
-	oldContract := newContractWithOnePetsResource()
-	newContract := model.NewUploadedContract(0, participantName, "1", "raw")
-	_ = newContract.AddResource(model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
-		"$":      model.NewProperty("$", "object", false, false),
-		"$.id":   model.NewProperty("$.id", "string", false, false),
-		"$.name": model.NewProperty("$.name", "string", false, false),
-	}))
-
-	diff := contract_differ.DiffResourceProperties(props(oldContract), props(newContract))
-
-	assert.Len(t, diff.Resources, 1)
-	for _, change := range diff.Resources {
-		assert.Equal(t, model.ChangeModified, change.Kind)
-		assert.Len(t, change.Properties, 1)
-		assert.Equal(t, model.ChangeAdded, change.Properties["$.name"].Kind)
+	next := model.Schemas{
+		"Order":         {"": {Type: "object"}, "billing": {Ref: "PostalAddress"}},
+		"PostalAddress": {"": {Type: "object"}},
 	}
-}
 
-func TestDiff_ModifiedResource_PropertyRemoved(t *testing.T) {
-	oldContract := model.NewUploadedContract(0, participantName, "1", "raw")
-	_ = oldContract.AddResource(
-		model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
-			"$":      model.NewProperty("$", "object", false, false),
-			"$.id":   model.NewProperty("$.id", "string", false, false),
-			"$.name": model.NewProperty("$.name", "string", false, false),
-		}),
-	)
-	newContract := newContractWithOnePetsResource()
+	diff := contract_differ.DiffContracts(persistedPets(current), uploadedPets(next))
 
-	diff := contract_differ.DiffResourceProperties(props(oldContract), props(newContract))
-
-	assert.Len(t, diff.Resources, 1)
-	for _, change := range diff.Resources {
-		assert.Equal(t, model.ChangeModified, change.Kind)
-		assert.Len(t, change.Properties, 1)
-		assert.Equal(t, model.ChangeRemoved, change.Properties["$.name"].Kind)
-	}
-}
-
-func TestDiff_ModifiedResource_PropertyTypeChanged(t *testing.T) {
-	oldContract := newContractWithOnePetsResource()
-	newContract := model.NewUploadedContract(0, participantName, "1", "raw")
-	_ = newContract.AddResource(model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
-		"$":    model.NewProperty("$", "object", false, false),
-		"$.id": model.NewProperty("$.id", "int", false, false),
-	}))
-
-	diff := contract_differ.DiffResourceProperties(props(oldContract), props(newContract))
-
-	assert.Len(t, diff.Resources, 1)
-	for _, resourceChange := range diff.Resources {
-		assert.Equal(t, model.ChangeModified, resourceChange.Kind)
-		assert.Equal(t, model.ChangeModified, resourceChange.Properties["$.id"].Kind)
-		assert.Equal(t, "string", resourceChange.Properties["$.id"].Before.Type)
-		assert.Equal(t, "int", resourceChange.Properties["$.id"].After.Type)
-	}
-}
-
-func TestDiff_ModifiedResource_OnlyNullabilityChanged(t *testing.T) {
-	oldContract := newContractWithOnePetsResource()
-	newContract := model.NewUploadedContract(0, participantName, "1", "raw")
-	_ = newContract.AddResource(model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
-		"$":    model.NewProperty("$", "object", false, false),
-		"$.id": model.NewProperty("$.id", "string", false, true),
-	}))
-
-	diff := contract_differ.DiffResourceProperties(props(oldContract), props(newContract))
-
-	assert.Len(t, diff.Resources, 1)
-	for _, resourceChange := range diff.Resources {
-		assert.Equal(t, model.ChangeModified, resourceChange.Kind)
-		assert.Len(t, resourceChange.Properties, 1)
-		assert.Equal(t, model.ChangeModified, resourceChange.Properties["$.id"].Kind)
-		assert.False(t, resourceChange.Properties["$.id"].Before.Nullable)
-		assert.True(t, resourceChange.Properties["$.id"].After.Nullable)
-	}
+	assert.Equal(t, model.SchemaChange{Kind: model.ChangeModified, Fields: map[string]model.FieldChange{
+		"billing": {Kind: model.ChangeModified, Before: model.Field{Ref: "Address"}, After: model.Field{Ref: "PostalAddress"}},
+	}}, diff.Schemas["Order"])
 }
 
 func TestRemovedSinceDeployed_ResourceGoneFromTheFiles_Counts(t *testing.T) {
-	properties := map[string]model.Property{"$.id": model.NewProperty("$.id", "string", false, false)}
 	gone := model.PersistedResource{
 		ParticipantName:    participantName,
 		Direction:          model.Provides,
@@ -170,18 +207,18 @@ func TestRemovedSinceDeployed_ResourceGoneFromTheFiles_Counts(t *testing.T) {
 		Endpoint:           "/pets/*",
 		Method:             "get",
 		ResponseStatusCode: null.StringFrom("200"),
-		Properties:         properties,
+		Bodies:             petBody(),
 	}
 	deployed := &model.PersistedContract{
 		ParticipantName: participantName,
 		Resources: map[string]model.PersistedResource{
-			"list-pets": {Properties: properties},
+			"list-pets": {Bodies: petBody()},
 			"get-pet":   gone,
 		},
 	}
 	next := &model.UploadedContract{
 		ParticipantName: participantName,
-		Resources:       map[string]model.UploadedResource{"list-pets": {Properties: properties}},
+		Resources:       map[string]model.UploadedResource{"list-pets": {Bodies: petBody()}},
 	}
 
 	removed := contract_differ.RemovedSinceDeployed(deployed, next)
@@ -190,40 +227,32 @@ func TestRemovedSinceDeployed_ResourceGoneFromTheFiles_Counts(t *testing.T) {
 	assert.Equal(t, map[string]model.PersistedResource{"get-pet": gone}, removed)
 }
 
-func TestRemovedSinceDeployed_ResourceThatOnlyLostProperties_DoesNotCount(t *testing.T) {
+func TestRemovedSinceDeployed_ResourceThatOnlyLostFields_DoesNotCount(t *testing.T) {
 	deployed := &model.PersistedContract{
 		ParticipantName: participantName,
-		Resources: map[string]model.PersistedResource{
-			"list-pets": {Properties: map[string]model.Property{
-				"$.id":   model.NewProperty("$.id", "string", false, false),
-				"$.name": model.NewProperty("$.name", "string", false, false),
-			}},
-		},
+		Resources:       map[string]model.PersistedResource{"list-pets": {Bodies: petBody()}},
+		Schemas:         petSchemas(),
 	}
 	next := &model.UploadedContract{
 		ParticipantName: participantName,
-		Resources: map[string]model.UploadedResource{
-			"list-pets": {Properties: map[string]model.Property{
-				"$.id": model.NewProperty("$.id", "string", false, false),
-			}},
-		},
+		Resources:       map[string]model.UploadedResource{"list-pets": {Bodies: petBody()}},
+		Schemas:         model.Schemas{"Pet": {"": {Type: "object"}}},
 	}
 
 	assert.Empty(t, contract_differ.RemovedSinceDeployed(deployed, next))
 }
 
 func TestRemovedSinceDeployed_ResourceAlreadyRemovedInTheDeployedVersion_DoesNotCount(t *testing.T) {
-	properties := map[string]model.Property{"$.id": model.NewProperty("$.id", "string", false, false)}
 	deployed := &model.PersistedContract{
 		ParticipantName: participantName,
 		Resources: map[string]model.PersistedResource{
-			"list-pets": {Properties: properties},
-			"get-pet":   {Properties: map[string]model.Property{}, Removed: true},
+			"list-pets": {Bodies: petBody()},
+			"get-pet":   {Removed: true},
 		},
 	}
 	next := &model.UploadedContract{
 		ParticipantName: participantName,
-		Resources:       map[string]model.UploadedResource{"list-pets": {Properties: properties}},
+		Resources:       map[string]model.UploadedResource{"list-pets": {Bodies: petBody()}},
 	}
 
 	assert.Empty(t, contract_differ.RemovedSinceDeployed(deployed, next))

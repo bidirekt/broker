@@ -34,12 +34,9 @@ type tableRow struct {
 	ResourceVersion            string
 	ResourceVersionChangeType  string
 
-	// Property
-	PropertyID              sql.NullInt64
-	PropertyPath            sql.NullString
-	PropertyVersionType     sql.NullString
-	PropertyVersionOptional sql.NullBool
-	PropertyVersionNullable sql.NullBool
+	// Bodies, aligned by index
+	BodySources     []string
+	BodySchemaNames []null.String
 
 	// Deploy & Environment
 	DeploymentEnvironment sql.NullString
@@ -63,7 +60,7 @@ func (this *tableRow) toResourceModel() model.PersistedResource {
 		Interaction:      model.Interaction(this.ResourceInteraction),
 		Endpoint:         this.ResourceEndpoint,
 		Method:           this.ResourceMethod,
-		Properties:       make(map[string]model.Property),
+		Bodies:           this.toResourceBodies(),
 		DeployedVersions: make(map[string]string),
 		ParticipantName:  this.ParticipantName,
 		ParticipantID:    this.ParticipantID,
@@ -91,66 +88,11 @@ func (this *tableRow) toResourceModel() model.PersistedResource {
 	return resource
 }
 
-func (this *tableRow) toPropertyModel() model.Property {
-	return model.Property{
-		ID:       this.PropertyID.Int64,
-		Path:     this.PropertyPath.String,
-		Type:     this.PropertyVersionType.String,
-		Optional: this.PropertyVersionOptional.Bool,
-		Nullable: this.PropertyVersionNullable.Bool,
+func (this *tableRow) toResourceBodies() []model.ResourceBody {
+	bodies := make([]model.ResourceBody, len(this.BodySources))
+	for index, source := range this.BodySources {
+		bodies[index] = model.ResourceBody{Source: source, SchemaName: this.BodySchemaNames[index]}
 	}
-}
 
-type insertPropertyVersionRow struct {
-	PropertyID int64
-	ContractID int64
-	Type       sql.NullString
-	Optional   sql.NullBool
-	Nullable   bool
-	ChangeType string
-}
-
-func newInsertPropertyVersionRowAdded(contractID, propertyID int64, p model.Property) *insertPropertyVersionRow {
-	return newInsertPropertyVersionRow(contractID, propertyID, p, model.ChangeAdded)
-}
-
-func newInsertPropertyVersionRowModified(contractID, propertyID int64, p model.Property) *insertPropertyVersionRow {
-	return newInsertPropertyVersionRow(contractID, propertyID, p, model.ChangeModified)
-}
-
-func newInsertPropertyVersionRowRemoved(contractID, propertyID int64, p model.Property) *insertPropertyVersionRow {
-	return newInsertPropertyVersionRow(contractID, propertyID, p, model.ChangeRemoved)
-}
-
-func newInsertPropertyVersionRow(contractID, propertyID int64, p model.Property, change model.ChangeKind) *insertPropertyVersionRow {
-	return &insertPropertyVersionRow{
-		PropertyID: propertyID,
-		ContractID: contractID,
-		Type:       sql.NullString{String: p.Type, Valid: p.Type != ""},
-		Optional:   sql.NullBool{Bool: p.Optional, Valid: true},
-		Nullable:   p.Nullable,
-		ChangeType: string(change),
-	}
-}
-
-type insertResourceVersionRow struct {
-	ResourceID int64
-	ContractID int64
-	ChangeType string
-}
-
-func newInsertResourceVersionRowAdded(contractID, resourceID int64) *insertResourceVersionRow {
-	return &insertResourceVersionRow{
-		ResourceID: resourceID,
-		ContractID: contractID,
-		ChangeType: string(model.ChangeAdded),
-	}
-}
-
-func newInsertResourceVersionRowRemoved(contractID, resourceID int64) *insertResourceVersionRow {
-	return &insertResourceVersionRow{
-		ResourceID: resourceID,
-		ContractID: contractID,
-		ChangeType: string(model.ChangeRemoved),
-	}
+	return bodies
 }

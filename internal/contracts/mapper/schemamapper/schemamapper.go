@@ -5,58 +5,63 @@ import (
 	"github.com/bidirekt/broker/internal/model"
 )
 
-// ToPropertyModels resolves a schema into its property models keyed by $-rooted path.
-func ToPropertyModels(schemas contract.SchemasMap, root contract.Schema) map[string]model.Property {
-	properties := map[string]model.Property{}
+func ToSchemaModels(catalog contract.SchemasMap, roots []string) model.Schemas {
+	schemas := model.Schemas{}
 
-	propertyModelsFromSchema(schemas, properties, propertyPath("$"), root, contract.RefTrail{})
+	for _, root := range roots {
+		schemaModelsReachableFrom(catalog, root, schemas)
+	}
 
-	return properties
+	return schemas
 }
 
-func propertyModelsFromSchema(
-	schemas contract.SchemasMap,
-	properties map[string]model.Property,
-	path propertyPath,
-	schema contract.Schema,
-	trail contract.RefTrail,
-) {
+// An undeclared name is the validator's to report, so it is skipped here.
+func schemaModelsReachableFrom(catalog contract.SchemasMap, name string, schemas model.Schemas) {
+	schema, declared := catalog[name]
+	if _, converted := schemas[name]; converted || !declared {
+		return
+	}
+
+	fields := model.Schema{}
+	fieldModelsFromSchema(fields, fieldPath(""), schema)
+	schemas[name] = fields
+
+	for _, field := range fields {
+		if field.Ref != "" {
+			schemaModelsReachableFrom(catalog, field.Ref, schemas)
+		}
+	}
+}
+
+func fieldModelsFromSchema(fields model.Schema, path fieldPath, schema contract.Schema) {
 	switch {
 	case schema.IsObject():
-		properties[path.String()] = model.NewProperty(path.String(), "object", schema.Optional, schema.Nullable)
+		fields[path.String()] = model.Field{Type: "object", Optional: schema.Optional, Nullable: schema.Nullable}
 
 		for name, property := range schema.Properties {
-			propertyModelsFromSchema(schemas, properties, path.Append(name), property, trail)
+			fieldModelsFromSchema(fields, path.Append(name), property)
 		}
 
 		if schema.Values != nil {
-			propertyModelsFromSchema(schemas, properties, path.AppendMap(), *schema.Values, trail)
+			fieldModelsFromSchema(fields, path.AppendMap(), *schema.Values)
 		}
 
 	case schema.IsArray():
-		properties[path.String()] = model.NewProperty(path.String(), "array", schema.Optional, schema.Nullable)
+		fields[path.String()] = model.Field{Type: "array", Optional: schema.Optional, Nullable: schema.Nullable}
 
 		if schema.Items == nil {
 			return
 		}
 
-		propertyModelsFromSchema(schemas, properties, path.AppendArray(), *schema.Items, trail)
+		fieldModelsFromSchema(fields, path.AppendArray(), *schema.Items)
 
 	case schema.IsPrimitive():
-		properties[path.String()] = model.NewProperty(path.String(), schema.Type, schema.Optional, schema.Nullable)
+		fields[path.String()] = model.Field{Type: schema.Type, Optional: schema.Optional, Nullable: schema.Nullable}
 
 	case schema.IsRef():
-		if trail.Contains(schema.Ref) {
-			return
-		}
-
-		target := schemas[schema.Ref]
-		target.Optional = target.Optional || schema.Optional
-		target.Nullable = target.Nullable || schema.Nullable
-
-		propertyModelsFromSchema(schemas, properties, path, target, trail.Enter(schema.Ref))
+		fields[path.String()] = model.Field{Optional: schema.Optional, Nullable: schema.Nullable, Ref: schema.Ref}
 
 	default:
-		properties[path.String()] = model.NewProperty(path.String(), schema.Type, schema.Optional, schema.Nullable)
+		fields[path.String()] = model.Field{Type: schema.Type, Optional: schema.Optional, Nullable: schema.Nullable}
 	}
 }

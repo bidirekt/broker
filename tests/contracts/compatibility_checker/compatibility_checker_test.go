@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/bidirekt/broker/internal/contracts/compatibility_checker"
+	"github.com/bidirekt/broker/internal/contracts/schemagraph"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/guregu/null"
 	"github.com/stretchr/testify/assert"
@@ -19,10 +20,12 @@ func consumerResource() *model.PersistedResource {
 		Method:             "get",
 		ResponseStatusCode: null.StringFrom("200"),
 		ParticipantName:    "front",
-		Properties: map[string]model.Property{
-			"$.id":   {Path: "$.id", Type: "integer"},
-			"$.name": {Path: "$.name", Type: "string"},
-		},
+		Bodies:             thingsBodies("FrontThing"),
+		Schemas: model.Schemas{"FrontThing": {
+			"":     {Type: "object"},
+			"id":   {Type: "integer"},
+			"name": {Type: "string"},
+		}},
 	}
 }
 
@@ -34,10 +37,45 @@ func providerResource() *model.PersistedResource {
 		Method:             "get",
 		ResponseStatusCode: null.StringFrom("200"),
 		ParticipantName:    "api",
-		Properties: map[string]model.Property{
-			"$.id": {Path: "$.id", Type: "string"},
-		},
+		Bodies:             thingsBodies("ApiThing"),
+		Schemas: model.Schemas{"ApiThing": {
+			"":   {Type: "object"},
+			"id": {Type: "string"},
+		}},
 	}
+}
+
+func thingsBodies(schemaName string) []model.ResourceBody {
+	return []model.ResourceBody{{Source: "things.yaml", SchemaName: null.StringFrom(schemaName)}}
+}
+
+func thingsNode(resource *model.PersistedResource, segments ...string) schemagraph.Node {
+	join := schemagraph.Readers
+	if resource.Interaction == model.RestRequest {
+		join = schemagraph.Senders
+	}
+
+	node := schemagraph.New(resource.Schemas).Root(resource.Bodies, join)
+	for _, segment := range segments {
+		node = node.Child(segment)
+	}
+
+	return node
+}
+
+func thingsBreak(
+	checked, counterpart *model.PersistedResource,
+	reason compatibility_checker.BreakingReason,
+	segment string,
+) compatibility_checker.ContractBreakingChange {
+	consumer, provider := checked, counterpart
+	if !checked.IsConsumer() {
+		consumer, provider = counterpart, checked
+	}
+
+	return compatibility_checker.NewPropertyBreakChange(
+		checked, counterpart, reason, "$."+segment, thingsNode(consumer, segment), thingsNode(provider, segment),
+	)
 }
 
 func TestProviderResourceNotFound(t *testing.T) {
@@ -71,9 +109,11 @@ func TestPropertyBreakDetails(t *testing.T) {
 		Endpoint:         "/things",
 		Method:           "post",
 		ParticipantName:  "front",
-		Properties: map[string]model.Property{
-			"$.flag": {Path: "$.flag", Type: "boolean", Optional: true},
-		},
+		Bodies:           thingsBodies("FrontFlag"),
+		Schemas: model.Schemas{"FrontFlag": {
+			"":     {Type: "object"},
+			"flag": {Type: "boolean", Optional: true},
+		}},
 	}
 	providerRequest := &model.PersistedResource{
 		Direction:       model.Provides,
@@ -81,27 +121,19 @@ func TestPropertyBreakDetails(t *testing.T) {
 		Endpoint:        "/things",
 		Method:          "post",
 		ParticipantName: "api",
-		Properties: map[string]model.Property{
-			"$.user": {Path: "$.user", Type: "string"},
-			"$.flag": {Path: "$.flag", Type: "boolean"},
-		},
+		Bodies:          thingsBodies("ApiFlag"),
+		Schemas: model.Schemas{"ApiFlag": {
+			"":     {Type: "object"},
+			"user": {Type: "string"},
+			"flag": {Type: "boolean"},
+		}},
 	}
 
-	typeMismatch := compatibility_checker.NewPropertyBreakChange(
-		consumerResponse, providerResponse, compatibility_checker.ReasonPropertyTypeMismatch, "$.id",
-	)
-	missingInProvider := compatibility_checker.NewPropertyBreakChange(
-		consumerResponse, providerResponse, compatibility_checker.ReasonPropertyMissingInProvider, "$.name",
-	)
-	optionalInProvider := compatibility_checker.NewPropertyBreakChange(
-		consumerResponse, providerResponse, compatibility_checker.ReasonPropertyOptionalInProviderRequiredInConsumer, "$.id",
-	)
-	missingInConsumer := compatibility_checker.NewPropertyBreakChange(
-		consumerRequest, providerRequest, compatibility_checker.ReasonPropertyMissingInConsumer, "$.user",
-	)
-	optionalInConsumer := compatibility_checker.NewPropertyBreakChange(
-		consumerRequest, providerRequest, compatibility_checker.ReasonPropertyOptionalInConsumerRequiredInProvider, "$.flag",
-	)
+	typeMismatch := thingsBreak(consumerResponse, providerResponse, compatibility_checker.ReasonPropertyTypeMismatch, "id")
+	missingInProvider := thingsBreak(consumerResponse, providerResponse, compatibility_checker.ReasonPropertyMissingInProvider, "name")
+	optionalInProvider := thingsBreak(consumerResponse, providerResponse, compatibility_checker.ReasonPropertyOptionalInProviderRequiredInConsumer, "id")
+	missingInConsumer := thingsBreak(consumerRequest, providerRequest, compatibility_checker.ReasonPropertyMissingInConsumer, "user")
+	optionalInConsumer := thingsBreak(consumerRequest, providerRequest, compatibility_checker.ReasonPropertyOptionalInConsumerRequiredInProvider, "flag")
 
 	assert.Equal(t, compatibility_checker.ReasonPropertyTypeMismatch, typeMismatch.Reason)
 	assert.Equal(t, compatibility_checker.ReasonPropertyMissingInProvider, missingInProvider.Reason)
@@ -130,30 +162,26 @@ func TestPropertyBreakDetails(t *testing.T) {
 
 func TestPropertyTypeRendersArrayItemType(t *testing.T) {
 	consumer := consumerResource()
-	consumer.Properties = map[string]model.Property{
-		"$.list":      {Path: "$.list", Type: "array"},
-		"$.list[]":    {Path: "$.list[]", Type: "object"},
-		"$.list[].id": {Path: "$.list[].id", Type: "string"},
-		"$.tags":      {Path: "$.tags", Type: "array"},
-		"$.tags[]":    {Path: "$.tags[]", Type: "array"},
-		"$.tags[][]":  {Path: "$.tags[][]", Type: "integer"},
-		"$.other":     {Path: "$.other", Type: "array"},
-		"$.other[]":   {Path: "$.other[]", Type: "string"},
-	}
+	consumer.Schemas = model.Schemas{"FrontThing": {
+		"":          {Type: "object"},
+		"list":      {Type: "array"},
+		"list[]":    {Type: "object"},
+		"list[].id": {Type: "string"},
+		"tags":      {Type: "array"},
+		"tags[]":    {Type: "array"},
+		"tags[][]":  {Type: "integer"},
+		"other":     {Type: "array"},
+		"other[]":   {Type: "string"},
+	}}
 	provider := providerResource()
-	provider.Properties = map[string]model.Property{
-		"$.other": {Path: "$.other", Type: "array"},
-	}
+	provider.Schemas = model.Schemas{"ApiThing": {
+		"":      {Type: "object"},
+		"other": {Type: "array"},
+	}}
 
-	missingList := compatibility_checker.NewPropertyBreakChange(
-		consumer, provider, compatibility_checker.ReasonPropertyMissingInProvider, "$.list",
-	)
-	missingTags := compatibility_checker.NewPropertyBreakChange(
-		consumer, provider, compatibility_checker.ReasonPropertyMissingInProvider, "$.tags",
-	)
-	mismatch := compatibility_checker.NewPropertyBreakChange(
-		consumer, provider, compatibility_checker.ReasonPropertyTypeMismatch, "$.other",
-	)
+	missingList := thingsBreak(consumer, provider, compatibility_checker.ReasonPropertyMissingInProvider, "list")
+	missingTags := thingsBreak(consumer, provider, compatibility_checker.ReasonPropertyMissingInProvider, "tags")
+	mismatch := thingsBreak(consumer, provider, compatibility_checker.ReasonPropertyTypeMismatch, "other")
 
 	assert.Equal(t, "array<object>", missingList.Details["propertyType"])
 	assert.Equal(t, "array<array<integer>>", missingTags.Details["propertyType"])
@@ -162,36 +190,30 @@ func TestPropertyTypeRendersArrayItemType(t *testing.T) {
 
 func TestPropertyTypeRendersMapValueType(t *testing.T) {
 	consumer := consumerResource()
-	consumer.Properties = map[string]model.Property{
-		"$.pets":        {Path: "$.pets", Type: "object"},
-		"$.pets{}":      {Path: "$.pets{}", Type: "object"},
-		"$.pets{}.name": {Path: "$.pets{}.name", Type: "string"},
-		"$.tags":        {Path: "$.tags", Type: "object"},
-		"$.tags{}":      {Path: "$.tags{}", Type: "array"},
-		"$.tags{}[]":    {Path: "$.tags{}[]", Type: "string"},
-		"$.owner":       {Path: "$.owner", Type: "object"},
-		"$.owner.name":  {Path: "$.owner.name", Type: "string"},
-		"$.scores":      {Path: "$.scores", Type: "object"},
-		"$.scores{}":    {Path: "$.scores{}", Type: "integer"},
-	}
+	consumer.Schemas = model.Schemas{"FrontThing": {
+		"":            {Type: "object"},
+		"pets":        {Type: "object"},
+		"pets{}":      {Type: "object"},
+		"pets{}.name": {Type: "string"},
+		"tags":        {Type: "object"},
+		"tags{}":      {Type: "array"},
+		"tags{}[]":    {Type: "string"},
+		"owner":       {Type: "object"},
+		"owner.name":  {Type: "string"},
+		"scores":      {Type: "object"},
+		"scores{}":    {Type: "integer"},
+	}}
 	provider := providerResource()
-	provider.Properties = map[string]model.Property{
-		"$.scores":   {Path: "$.scores", Type: "array"},
-		"$.scores[]": {Path: "$.scores[]", Type: "integer"},
-	}
+	provider.Schemas = model.Schemas{"ApiThing": {
+		"":         {Type: "object"},
+		"scores":   {Type: "array"},
+		"scores[]": {Type: "integer"},
+	}}
 
-	missingPets := compatibility_checker.NewPropertyBreakChange(
-		consumer, provider, compatibility_checker.ReasonPropertyMissingInProvider, "$.pets",
-	)
-	missingTags := compatibility_checker.NewPropertyBreakChange(
-		consumer, provider, compatibility_checker.ReasonPropertyMissingInProvider, "$.tags",
-	)
-	missingOwner := compatibility_checker.NewPropertyBreakChange(
-		consumer, provider, compatibility_checker.ReasonPropertyMissingInProvider, "$.owner",
-	)
-	mismatch := compatibility_checker.NewPropertyBreakChange(
-		consumer, provider, compatibility_checker.ReasonPropertyTypeMismatch, "$.scores",
-	)
+	missingPets := thingsBreak(consumer, provider, compatibility_checker.ReasonPropertyMissingInProvider, "pets")
+	missingTags := thingsBreak(consumer, provider, compatibility_checker.ReasonPropertyMissingInProvider, "tags")
+	missingOwner := thingsBreak(consumer, provider, compatibility_checker.ReasonPropertyMissingInProvider, "owner")
+	mismatch := thingsBreak(consumer, provider, compatibility_checker.ReasonPropertyTypeMismatch, "scores")
 
 	assert.Equal(t, "map<object>", missingPets.Details["propertyType"])
 	assert.Equal(t, "map<array<string>>", missingTags.Details["propertyType"])
@@ -204,12 +226,8 @@ func TestTypeMismatchTypesResolvedByRole(t *testing.T) {
 	consumerRes := consumerResource()
 	providerRes := providerResource()
 
-	consumerChecked := compatibility_checker.NewPropertyBreakChange(
-		consumerRes, providerRes, compatibility_checker.ReasonPropertyTypeMismatch, "$.id",
-	)
-	providerChecked := compatibility_checker.NewPropertyBreakChange(
-		providerRes, consumerRes, compatibility_checker.ReasonPropertyTypeMismatch, "$.id",
-	)
+	consumerChecked := thingsBreak(consumerRes, providerRes, compatibility_checker.ReasonPropertyTypeMismatch, "id")
+	providerChecked := thingsBreak(providerRes, consumerRes, compatibility_checker.ReasonPropertyTypeMismatch, "id")
 
 	expected := map[string]string{
 		"property":             "$.id",
@@ -231,9 +249,7 @@ func TestTypeMismatchTypesResolvedByRole(t *testing.T) {
 }
 
 func TestBreakMarshalsOnlyReasonRoleAndDetails(t *testing.T) {
-	change := compatibility_checker.NewPropertyBreakChange(
-		consumerResource(), providerResource(), compatibility_checker.ReasonPropertyTypeMismatch, "$.id",
-	)
+	change := thingsBreak(consumerResource(), providerResource(), compatibility_checker.ReasonPropertyTypeMismatch, "id")
 
 	data, err := json.Marshal(change)
 	assert.NoError(t, err)
@@ -276,12 +292,8 @@ func TestReportAppendMergesResultsPerCounterpart(t *testing.T) {
 	consumerRes := consumerResource()
 	providerRes := providerResource()
 
-	consumerChecked := compatibility_checker.NewPropertyBreakChange(
-		consumerRes, providerRes, compatibility_checker.ReasonPropertyTypeMismatch, "$.id",
-	)
-	providerChecked := compatibility_checker.NewPropertyBreakChange(
-		providerRes, consumerRes, compatibility_checker.ReasonPropertyTypeMismatch, "$.id",
-	)
+	consumerChecked := thingsBreak(consumerRes, providerRes, compatibility_checker.ReasonPropertyTypeMismatch, "id")
+	providerChecked := thingsBreak(providerRes, consumerRes, compatibility_checker.ReasonPropertyTypeMismatch, "id")
 
 	report := compatibility_checker.NewContractCompatibilityReport("unknown", "unknown", "unknwonw")
 
@@ -355,12 +367,8 @@ func TestHierarchicalGroupsBreaksByInteraction(t *testing.T) {
 		ParticipantName:    "front",
 	}
 
-	requestBreak := compatibility_checker.NewPropertyBreakChange(
-		consumerRequest, providerResponse, compatibility_checker.ReasonPropertyMissingInProvider, "$.user",
-	)
-	responseBreak := compatibility_checker.NewPropertyBreakChange(
-		consumerResponse, providerResponse, compatibility_checker.ReasonPropertyTypeMismatch, "$.id",
-	)
+	requestBreak := thingsBreak(consumerRequest, providerResponse, compatibility_checker.ReasonPropertyMissingInProvider, "user")
+	responseBreak := thingsBreak(consumerResponse, providerResponse, compatibility_checker.ReasonPropertyTypeMismatch, "id")
 
 	item := compatibility_checker.NewIncompatibleItem()
 	item.AppendContractBreakChange(requestBreak)
@@ -392,9 +400,7 @@ func TestHierarchicalAccumulatesAcrossAppends(t *testing.T) {
 		ParticipantID:      7,
 		ParticipantVersion: null.StringFrom("3.1.0"),
 	}
-	second.AppendContractBreakChange(compatibility_checker.NewPropertyBreakChange(
-		consumerResponse, providerResponse, compatibility_checker.ReasonPropertyTypeMismatch, "$.id",
-	))
+	second.AppendContractBreakChange(thingsBreak(consumerResponse, providerResponse, compatibility_checker.ReasonPropertyTypeMismatch, "id"))
 	report.AppendResult("api", second)
 
 	node := report.Hierarchical["api"]

@@ -5,7 +5,7 @@ import (
 	"github.com/bidirekt/broker/internal/contracts/violation"
 )
 
-// Only a provider redeclaration is a violation: consumers merge by union in the mapper.
+// Only a provider redeclaration is a violation: each consumer declaration is a body, joined when compared.
 func duplicateResources(declarations fragmentmapper.Declarations) []violation.Violation {
 	var violations []violation.Violation
 

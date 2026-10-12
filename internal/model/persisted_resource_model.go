@@ -7,21 +7,22 @@ import (
 )
 
 type PersistedResource struct {
-	ParticipantID      int64               `json:"-"`
-	ParticipantName    string              `json:"-"`
-	ContractID         int64               `json:"-"`
-	Direction          Direction           `json:"direction"`
-	Interaction        Interaction         `json:"interaction"`
-	ConsumedProvider   null.String         `json:"consumedProvider"`
-	ConsumerHash       null.String         `json:"-"`
-	ProviderHash       string              `json:"-"`
-	Endpoint           string              `json:"endpoint"`
-	Method             string              `json:"method"`
-	ResponseStatusCode null.String         `json:"responseStatusCode"`
-	Properties         map[string]Property `json:"-"`
-	ParticipantVersion null.String         `json:"version"`
-	DeployedVersions   map[string]string   `json:"-"`
-	Removed            bool                `json:"-"`
+	ParticipantID      int64             `json:"-"`
+	ParticipantName    string            `json:"-"`
+	ContractID         int64             `json:"-"`
+	Direction          Direction         `json:"direction"`
+	Interaction        Interaction       `json:"interaction"`
+	ConsumedProvider   null.String       `json:"consumedProvider"`
+	ConsumerHash       null.String       `json:"-"`
+	ProviderHash       string            `json:"-"`
+	Endpoint           string            `json:"endpoint"`
+	Method             string            `json:"method"`
+	ResponseStatusCode null.String       `json:"responseStatusCode"`
+	Bodies             []ResourceBody    `json:"-"`
+	Schemas            Schemas           `json:"-"`
+	ParticipantVersion null.String       `json:"version"`
+	DeployedVersions   map[string]string `json:"-"`
+	Removed            bool              `json:"-"`
 }
 
 func (this *PersistedResource) IsConsumer() bool {

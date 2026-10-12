@@ -7,6 +7,7 @@ import (
 	"github.com/bidirekt/broker/internal/contracts/mapper/fragmentmapper"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/goccy/go-yaml"
+	"github.com/guregu/null"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -95,109 +96,6 @@ const importModuleJSON = `{
   }
 }`
 
-const optionalReaderJSON = `{
-  "consumes": {
-    "payments": {
-      "rest": {
-        "/invoices": {
-          "get": { "responses": { "200": "InvoiceOptional" } }
-        }
-      }
-    }
-  },
-  "schemas": {
-    "InvoiceOptional": {
-      "type": "object",
-      "properties": {
-        "total":  { "type": "integer", "optional": true },
-        "status": { "type": "string", "optional": true }
-      }
-    }
-  }
-}`
-
-const requiredReaderJSON = `{
-  "consumes": {
-    "payments": {
-      "rest": {
-        "/invoices": {
-          "get": { "responses": { "200": "InvoiceRequired" } }
-        }
-      }
-    }
-  },
-  "schemas": {
-    "InvoiceRequired": {
-      "type": "object",
-      "properties": {
-        "total": { "type": "integer" }
-      }
-    }
-  }
-}`
-
-const otherOptionalReaderJSON = `{
-  "consumes": {
-    "payments": {
-      "rest": {
-        "/invoices": {
-          "get": { "responses": { "200": "InvoiceOtherOptional" } }
-        }
-      }
-    }
-  },
-  "schemas": {
-    "InvoiceOtherOptional": {
-      "type": "object",
-      "properties": {
-        "total": { "type": "integer", "optional": true }
-      }
-    }
-  }
-}`
-
-const optionalSenderJSON = `{
-  "consumes": {
-    "payments": {
-      "rest": {
-        "/invoices": {
-          "put": { "request": "PutOptional" }
-        }
-      }
-    }
-  },
-  "schemas": {
-    "PutOptional": {
-      "type": "object",
-      "properties": {
-        "id":   { "type": "string" },
-        "note": { "type": "string", "optional": true }
-      }
-    }
-  }
-}`
-
-const requiredSenderJSON = `{
-  "consumes": {
-    "payments": {
-      "rest": {
-        "/invoices": {
-          "put": { "request": "PutRequired" }
-        }
-      }
-    }
-  },
-  "schemas": {
-    "PutRequired": {
-      "type": "object",
-      "properties": {
-        "id":   { "type": "string" },
-        "note": { "type": "string" }
-      }
-    }
-  }
-}`
-
 const providedPetsJSON = `{
   "provides": {
     "rest": {
@@ -233,25 +131,6 @@ const providedPetsDetailJSON = `{
   }
 }`
 
-const groupWithAddressYAML = `consumes:
-  api:
-    rest:
-      /api/groups:
-        post:
-          request: GroupWithAddress
-          responses:
-            "201": GroupWithAddress
-schemas:
-  GroupWithAddress:
-    type: object
-    properties:
-      name: { type: string }
-      address:
-        type: object
-        properties:
-          city: { type: string }
-`
-
 const groupNameYAML = `consumes:
   api:
     rest:
@@ -267,24 +146,6 @@ schemas:
       name: { type: string }
 `
 
-const groupWithCityAndStateYAML = `consumes:
-  api:
-    rest:
-      /api/groups:
-        post:
-          request: GroupWithCityAndState
-schemas:
-  GroupWithCityAndState:
-    type: object
-    properties:
-      name: { type: string }
-      address:
-        type: object
-        properties:
-          city:  { type: string }
-          state: { type: string }
-`
-
 const groupUndescribedBodyYAML = `consumes:
   api:
     rest:
@@ -295,60 +156,24 @@ const groupUndescribedBodyYAML = `consumes:
             "201": ~
 `
 
-const profileNullableModuleYAML = `consumes:
-  api:
-    rest:
-      /api/profiles:
-        post:
-          request: ProfileNullable
-          responses:
-            "201": ProfileNullable
-schemas:
-  ProfileNullable:
-    type: object
-    properties:
-      avatar:   { type: string, nullable: true }
-      bio:      { type: string, nullable: true }
-      nickname: { type: string, nullable: true }
-`
-
-const profileNotNullableModuleYAML = `consumes:
-  api:
-    rest:
-      /api/profiles:
-        post:
-          request: ProfileNotNullable
-          responses:
-            "201": ProfileNotNullable
-schemas:
-  ProfileNotNullable:
-    type: object
-    properties:
-      avatar: { type: string, nullable: true }
-      bio:    { type: string }
-      tag:    { type: string }
-`
-
-const fourModulesChecksum = "d8797318ef8cc44c85fdf4be10027abd32da9c8f578247a6c4652b1b149fdd54"
-
 type mergedFile struct {
 	source string
 	raw    string
 }
 
-type moduleOrder struct {
+type fileOrder struct {
 	name  string
 	files []mergedFile
 }
 
-func bothModuleOrders(first, last string) []moduleOrder {
-	return []moduleOrder{
-		{"given order", []mergedFile{{"a.yaml", first}, {"b.yaml", last}}},
-		{"reversed order", []mergedFile{{"a.yaml", last}, {"b.yaml", first}}},
+func bothFileOrders(first, second mergedFile) []fileOrder {
+	return []fileOrder{
+		{"given order", []mergedFile{first, second}},
+		{"reversed order", []mergedFile{second, first}},
 	}
 }
 
-func mergeFragments(t *testing.T, files ...mergedFile) []contract.Fragment {
+func mergeDeclarations(t *testing.T, files ...mergedFile) fragmentmapper.Declarations {
 	t.Helper()
 
 	fragments := make([]contract.Fragment, 0, len(files))
@@ -359,20 +184,24 @@ func mergeFragments(t *testing.T, files ...mergedFile) []contract.Fragment {
 		fragments = append(fragments, contract.Fragment{Source: file.source, Document: document})
 	}
 
-	return fragments
+	return fragmentmapper.ToDeclarations(fragments)
 }
 
 func mergeResources(t *testing.T, files ...mergedFile) []model.UploadedResource {
 	t.Helper()
 
-	return fragmentmapper.ToResourceModels(fragmentmapper.ToDeclarations(mergeFragments(t, files...)))
+	return fragmentmapper.ToResourceModels(mergeDeclarations(t, files...))
 }
 
 func mergeContract(t *testing.T, files ...mergedFile) *model.UploadedContract {
 	t.Helper()
 
+	declarations := mergeDeclarations(t, files...)
+
 	uploaded := model.NewUploadedContract(0, "front_app", "1", "")
-	for _, resource := range mergeResources(t, files...) {
+	uploaded.Schemas = fragmentmapper.ToSchemaModels(declarations)
+
+	for _, resource := range fragmentmapper.ToResourceModels(declarations) {
 		require.NoError(t, uploaded.AddResource(&resource))
 	}
 
@@ -393,171 +222,81 @@ func mergedResource(t *testing.T, resources []model.UploadedResource, interactio
 	return model.UploadedResource{}
 }
 
-func TestMerge_TwoConsumerModulesReadingOneResponse_UnionOfProperties(t *testing.T) {
-	resources := mergeResources(t,
-		mergedFile{"list.yaml", listModuleJSON},
-		mergedFile{"detail.yaml", detailModuleJSON},
-	)
-
-	require.Len(t, resources, 1)
-
-	resource := mergedResource(t, resources, model.RestResponse)
-	assert.Equal(t, "/invoices", resource.Endpoint)
-	assert.Equal(t, "200", resource.ResponseStatusCode.String)
-
-	assert.Equal(t, map[string]model.Property{
-		"$":            {Path: "$", Type: "object"},
-		"$.id":         {Path: "$.id", Type: "string"},
-		"$.name":       {Path: "$.name", Type: "string"},
-		"$.created_at": {Path: "$.created_at", Type: "string"},
-	}, resource.Properties)
-}
-
-func TestMerge_TwoConsumerModulesSendingOneRequest_FieldSentByOneIsOptional(t *testing.T) {
-	resources := mergeResources(t,
-		mergedFile{"create.yaml", createModuleJSON},
-		mergedFile{"import.yaml", importModuleJSON},
-	)
-
-	request := mergedResource(t, resources, model.RestRequest)
-
-	assert.Equal(t, map[string]model.Property{
-		"$":       {Path: "$", Type: "object"},
-		"$.id":    {Path: "$.id", Type: "string"},
-		"$.name":  {Path: "$.name", Type: "string", Optional: true},
-		"$.email": {Path: "$.email", Type: "string", Optional: true},
-	}, request.Properties)
-}
-
-func TestMerge_ResponseRequiredByOneReader_StaysRequired(t *testing.T) {
-	resources := mergeResources(t,
-		mergedFile{"optional.yaml", optionalReaderJSON},
-		mergedFile{"required.yaml", requiredReaderJSON},
-	)
-
-	resource := mergedResource(t, resources, model.RestResponse)
-
-	assert.False(t, resource.Properties["$.total"].Optional)
-	assert.True(t, resource.Properties["$.status"].Optional)
-}
-
-func TestMerge_ResponseOptionalForEveryReader_StaysOptional(t *testing.T) {
-	resources := mergeResources(t,
-		mergedFile{"optional.yaml", optionalReaderJSON},
-		mergedFile{"other_optional.yaml", otherOptionalReaderJSON},
-	)
-
-	resource := mergedResource(t, resources, model.RestResponse)
-
-	assert.True(t, resource.Properties["$.total"].Optional)
-	assert.True(t, resource.Properties["$.status"].Optional)
-}
-
-func TestMerge_RequestOptionalForOneSender_IsOptionalForAll(t *testing.T) {
-	resources := mergeResources(t,
-		mergedFile{"optional.yaml", optionalSenderJSON},
-		mergedFile{"required.yaml", requiredSenderJSON},
-	)
-
-	request := mergedResource(t, resources, model.RestRequest)
-
-	assert.False(t, request.Properties["$.id"].Optional)
-	assert.True(t, request.Properties["$.note"].Optional)
-}
-
-func TestMerge_RequestPathWhoseParentAnotherSenderOmits_KeepsItsOwnOptional(t *testing.T) {
-	for _, order := range bothModuleOrders(groupWithAddressYAML, groupNameYAML) {
+func TestMerge_TwoConsumerModulesReadingOneResponse_OneResourceWithABodyPerModuleInSourceOrder(t *testing.T) {
+	for _, order := range bothFileOrders(mergedFile{"list.yaml", listModuleJSON}, mergedFile{"detail.yaml", detailModuleJSON}) {
 		t.Run(order.name, func(t *testing.T) {
-			request := mergedResource(t, mergeResources(t, order.files...), model.RestRequest)
+			resources := mergeResources(t, order.files...)
 
-			assert.Equal(t, map[string]model.Property{
-				"$":              {Path: "$", Type: "object"},
-				"$.name":         {Path: "$.name", Type: "string"},
-				"$.address":      {Path: "$.address", Type: "object", Optional: true},
-				"$.address.city": {Path: "$.address.city", Type: "string"},
-			}, request.Properties)
+			require.Len(t, resources, 1)
+
+			resource := mergedResource(t, resources, model.RestResponse)
+			assert.Equal(t, "/invoices", resource.Endpoint)
+			assert.Equal(t, "200", resource.ResponseStatusCode.String)
+			assert.Equal(t, []model.ResourceBody{
+				{Source: "detail.yaml", SchemaName: null.StringFrom("InvoiceDetail")},
+				{Source: "list.yaml", SchemaName: null.StringFrom("InvoiceList")},
+			}, resource.Bodies)
 		})
 	}
 }
 
-func TestMerge_RequestPathWhoseParentAnotherSenderSends_IsOptional(t *testing.T) {
-	for _, order := range bothModuleOrders(groupWithCityAndStateYAML, groupWithAddressYAML) {
+func TestMerge_TwoConsumerModulesSendingOneRequest_OneResourceWithABodyPerModuleInSourceOrder(t *testing.T) {
+	for _, order := range bothFileOrders(mergedFile{"import.yaml", importModuleJSON}, mergedFile{"create.yaml", createModuleJSON}) {
 		t.Run(order.name, func(t *testing.T) {
-			request := mergedResource(t, mergeResources(t, order.files...), model.RestRequest)
+			resources := mergeResources(t, order.files...)
 
-			assert.Equal(t, map[string]model.Property{
-				"$":               {Path: "$", Type: "object"},
-				"$.name":          {Path: "$.name", Type: "string"},
-				"$.address":       {Path: "$.address", Type: "object"},
-				"$.address.city":  {Path: "$.address.city", Type: "string"},
-				"$.address.state": {Path: "$.address.state", Type: "string", Optional: true},
-			}, request.Properties)
+			require.Len(t, resources, 2)
+
+			request := mergedResource(t, resources, model.RestRequest)
+			assert.Equal(t, []model.ResourceBody{
+				{Source: "create.yaml", SchemaName: null.StringFrom("InvoiceCreate")},
+				{Source: "import.yaml", SchemaName: null.StringFrom("InvoiceImport")},
+			}, request.Bodies)
 		})
 	}
 }
 
-func TestMerge_ResponsePathOfOneReader_KeepsItsDeclaration(t *testing.T) {
-	for _, order := range bothModuleOrders(groupWithAddressYAML, groupNameYAML) {
+func TestMerge_UndescribedBodyInOneModule_IsABodyWithoutSchema(t *testing.T) {
+	for _, order := range bothFileOrders(mergedFile{"a.yaml", groupUndescribedBodyYAML}, mergedFile{"b.yaml", groupNameYAML}) {
 		t.Run(order.name, func(t *testing.T) {
-			response := mergedResource(t, mergeResources(t, order.files...), model.RestResponse)
+			bodies := []model.ResourceBody{
+				{Source: "a.yaml"},
+				{Source: "b.yaml", SchemaName: null.StringFrom("GroupName")},
+			}
 
-			assert.Equal(t, map[string]model.Property{
-				"$":              {Path: "$", Type: "object"},
-				"$.name":         {Path: "$.name", Type: "string"},
-				"$.address":      {Path: "$.address", Type: "object"},
-				"$.address.city": {Path: "$.address.city", Type: "string"},
-			}, response.Properties)
+			assert.Equal(t, []model.UploadedResource{
+				*model.NewRestRequestConsumer("api", "/api/groups", "post", bodies),
+				*model.NewRestResponseConsumer("api", "/api/groups", "post", "201", bodies),
+			}, mergeResources(t, order.files...))
 		})
 	}
 }
 
-func TestMerge_RequestUndescribedByOneSender_MakesTheBodyOptional(t *testing.T) {
-	for _, order := range bothModuleOrders(groupUndescribedBodyYAML, groupNameYAML) {
-		t.Run(order.name, func(t *testing.T) {
-			request := mergedResource(t, mergeResources(t, order.files...), model.RestRequest)
-
-			assert.Equal(t, map[string]model.Property{
-				"$":      {Path: "$", Type: "object", Optional: true},
-				"$.name": {Path: "$.name", Type: "string"},
-			}, request.Properties)
-		})
-	}
-}
-
-func TestMerge_ResponseUndescribedByOneReader_KeepsTheOtherReadersDeclaration(t *testing.T) {
-	for _, order := range bothModuleOrders(groupUndescribedBodyYAML, groupNameYAML) {
-		t.Run(order.name, func(t *testing.T) {
-			response := mergedResource(t, mergeResources(t, order.files...), model.RestResponse)
-
-			assert.Equal(t, map[string]model.Property{
-				"$":      {Path: "$", Type: "object"},
-				"$.name": {Path: "$.name", Type: "string"},
-			}, response.Properties)
-		})
-	}
-}
-
-func TestMerge_UndescribedBodyInEveryModule_BuildsResourcesWithoutProperties(t *testing.T) {
+func TestMerge_UndescribedBodyInEveryModule_BuildsResourcesWithBodiesWithoutSchema(t *testing.T) {
 	resources := mergeResources(t,
 		mergedFile{"a.yaml", groupUndescribedBodyYAML},
 		mergedFile{"b.yaml", groupUndescribedBodyYAML},
 	)
 
+	bodies := []model.ResourceBody{{Source: "a.yaml"}, {Source: "b.yaml"}}
+
 	assert.Equal(t, []model.UploadedResource{
-		*model.NewRestRequestConsumer("api", "/api/groups", "post", map[string]model.Property{}),
-		*model.NewRestResponseConsumer("api", "/api/groups", "post", "201", map[string]model.Property{}),
+		*model.NewRestRequestConsumer("api", "/api/groups", "post", bodies),
+		*model.NewRestResponseConsumer("api", "/api/groups", "post", "201", bodies),
 	}, resources)
 }
 
-func TestMerge_IdenticalDeclarationInTwoFiles_BuildsOneResource(t *testing.T) {
-	merged := mergeResources(t,
+func TestMerge_IdenticalDeclarationInTwoFiles_BuildsOneResourceWithBothBodies(t *testing.T) {
+	resources := mergeResources(t,
 		mergedFile{"a.yaml", listModuleJSON},
 		mergedFile{"b.yaml", listModuleJSON},
 	)
-	single := mergeResources(t, mergedFile{"a.yaml", listModuleJSON})
 
-	require.Len(t, merged, 1)
-	assert.Equal(t, single, merged)
+	require.Len(t, resources, 1)
+	assert.Equal(t, []model.ResourceBody{
+		{Source: "a.yaml", SchemaName: null.StringFrom("InvoiceList")},
+		{Source: "b.yaml", SchemaName: null.StringFrom("InvoiceList")},
+	}, resources[0].Bodies)
 }
 
 func TestMerge_FragmentOrderReversed_ProducesTheSameContract(t *testing.T) {
@@ -574,9 +313,10 @@ func TestMerge_FragmentOrderReversed_ProducesTheSameContract(t *testing.T) {
 		mergedFile{"list.yaml", listModuleJSON},
 	)
 
+	assert.Len(t, forward.Resources, 3)
 	assert.Equal(t, forward.Resources, backward.Resources)
-	assert.Equal(t, fourModulesChecksum, forward.Checksum())
-	assert.Equal(t, fourModulesChecksum, backward.Checksum())
+	assert.Equal(t, forward.Schemas, backward.Schemas)
+	assert.Equal(t, forward.Checksum(), backward.Checksum())
 }
 
 func TestMerge_ProvidedResourceDeclaredTwice_FirstSourceWins(t *testing.T) {
@@ -586,40 +326,5 @@ func TestMerge_ProvidedResourceDeclaredTwice_FirstSourceWins(t *testing.T) {
 	)
 
 	require.Len(t, resources, 1)
-	assert.Equal(t, map[string]model.Property{
-		"$":    {Path: "$", Type: "object"},
-		"$.id": {Path: "$.id", Type: "string"},
-	}, resources[0].Properties)
-}
-
-func TestMerge_RequestNullableForOneSender_IsNullable(t *testing.T) {
-	for _, order := range bothModuleOrders(profileNullableModuleYAML, profileNotNullableModuleYAML) {
-		t.Run(order.name, func(t *testing.T) {
-			request := mergedResource(t, mergeResources(t, order.files...), model.RestRequest)
-
-			assert.Equal(t, map[string]model.Property{
-				"$":          {Path: "$", Type: "object"},
-				"$.avatar":   {Path: "$.avatar", Type: "string", Nullable: true},
-				"$.bio":      {Path: "$.bio", Type: "string", Nullable: true},
-				"$.nickname": {Path: "$.nickname", Type: "string", Optional: true, Nullable: true},
-				"$.tag":      {Path: "$.tag", Type: "string", Optional: true},
-			}, request.Properties)
-		})
-	}
-}
-
-func TestMerge_ResponseNullableOnlyWhenEveryReaderAllowsNull(t *testing.T) {
-	for _, order := range bothModuleOrders(profileNullableModuleYAML, profileNotNullableModuleYAML) {
-		t.Run(order.name, func(t *testing.T) {
-			response := mergedResource(t, mergeResources(t, order.files...), model.RestResponse)
-
-			assert.Equal(t, map[string]model.Property{
-				"$":          {Path: "$", Type: "object"},
-				"$.avatar":   {Path: "$.avatar", Type: "string", Nullable: true},
-				"$.bio":      {Path: "$.bio", Type: "string"},
-				"$.nickname": {Path: "$.nickname", Type: "string", Nullable: true},
-				"$.tag":      {Path: "$.tag", Type: "string"},
-			}, response.Properties)
-		})
-	}
+	assert.Equal(t, []model.ResourceBody{{Source: "a.yaml", SchemaName: null.StringFrom("Pet")}}, resources[0].Bodies)
 }

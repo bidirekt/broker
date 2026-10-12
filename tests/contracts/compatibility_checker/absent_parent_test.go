@@ -62,34 +62,37 @@ type groupsBreak struct {
 	property string
 }
 
-func groupsProperties(properties ...model.Property) map[string]model.Property {
-	byPath := make(map[string]model.Property, len(properties))
-	for _, property := range properties {
-		byPath[property.Path] = property
+type groupsBody struct {
+	bodies  []model.ResourceBody
+	schemas model.Schemas
+}
+
+func groupsSchema(schema model.Schema) groupsBody {
+	return groupsBody{
+		bodies:  []model.ResourceBody{{Source: "groups.yaml", SchemaName: null.StringFrom("Group")}},
+		schemas: model.Schemas{"Group": schema},
 	}
-
-	return byPath
 }
 
-func groupRequestReadByTheProvider() map[string]model.Property {
-	return groupsProperties(
-		model.Property{Path: "$", Type: "object"},
-		model.Property{Path: "$.name", Type: "string"},
-		model.Property{Path: "$.address", Type: "object", Optional: true},
-		model.Property{Path: "$.address.address", Type: "string"},
-		model.Property{Path: "$.address.city", Type: "string"},
-		model.Property{Path: "$.address.state", Type: "string"},
-		model.Property{Path: "$.address.zipCode", Type: "string"},
-		model.Property{Path: "$.categories", Type: "array", Optional: true},
-		model.Property{Path: "$.categories[]", Type: "string"},
-		model.Property{Path: "$.leaders", Type: "array", Optional: true},
-		model.Property{Path: "$.leaders[]", Type: "string"},
-		model.Property{Path: "$.members", Type: "array", Optional: true},
-		model.Property{Path: "$.members[]", Type: "string"},
-	)
+func groupRequestReadByTheProvider() model.Schema {
+	return model.Schema{
+		"":                {Type: "object"},
+		"name":            {Type: "string"},
+		"address":         {Type: "object", Optional: true},
+		"address.address": {Type: "string"},
+		"address.city":    {Type: "string"},
+		"address.state":   {Type: "string"},
+		"address.zipCode": {Type: "string"},
+		"categories":      {Type: "array", Optional: true},
+		"categories[]":    {Type: "string"},
+		"leaders":         {Type: "array", Optional: true},
+		"leaders[]":       {Type: "string"},
+		"members":         {Type: "array", Optional: true},
+		"members[]":       {Type: "string"},
+	}
 }
 
-func groupRequestMergedFrom(t *testing.T, modules ...string) map[string]model.Property {
+func groupRequestMergedFrom(t *testing.T, modules ...string) groupsBody {
 	t.Helper()
 
 	fragments := make([]contract.Fragment, 0, len(modules))
@@ -100,16 +103,14 @@ func groupRequestMergedFrom(t *testing.T, modules ...string) map[string]model.Pr
 		fragments = append(fragments, fragment)
 	}
 
-	resources := fragmentmapper.ToResourceModels(fragmentmapper.ToDeclarations(fragments))
+	declarations := fragmentmapper.ToDeclarations(fragments)
+	resources := fragmentmapper.ToResourceModels(declarations)
 	require.Len(t, resources, 1)
 
-	return resources[0].Properties
+	return groupsBody{bodies: resources[0].Bodies, schemas: fragmentmapper.ToSchemaModels(declarations)}
 }
 
-func groupsResources(
-	interaction string,
-	consumerProperties, providerProperties map[string]model.Property,
-) (consumer, provider model.PersistedResource) {
+func groupsResources(interaction string, consumerBody, providerBody groupsBody) (consumer, provider model.PersistedResource) {
 	kind, status := model.RestResponse, null.StringFrom(interaction)
 	if interaction == "request" {
 		kind, status = model.RestRequest, null.String{}
@@ -125,7 +126,8 @@ func groupsResources(
 		Endpoint:           "/api/groups",
 		Method:             "post",
 		ResponseStatusCode: status,
-		Properties:         consumerProperties,
+		Bodies:             consumerBody.bodies,
+		Schemas:            consumerBody.schemas,
 	}
 
 	provider = model.PersistedResource{
@@ -136,7 +138,8 @@ func groupsResources(
 		Endpoint:           "/api/groups",
 		Method:             "post",
 		ResponseStatusCode: status,
-		Properties:         providerProperties,
+		Bodies:             providerBody.bodies,
+		Schemas:            providerBody.schemas,
 		DeployedVersions:   map[string]string{groupsEnvironment: "1.0.0"},
 	}
 
@@ -172,12 +175,12 @@ func groupsBreaksCheckedFrom(
 func assertGroupsBreaks(
 	t *testing.T,
 	interaction string,
-	consumerProperties, providerProperties map[string]model.Property,
+	consumerBody, providerBody groupsBody,
 	expected []groupsBreak,
 ) {
 	t.Helper()
 
-	consumer, provider := groupsResources(interaction, consumerProperties, providerProperties)
+	consumer, provider := groupsResources(interaction, consumerBody, providerBody)
 
 	t.Run("checked from the consumer", func(t *testing.T) {
 		assert.Equal(t, expected, groupsBreaksCheckedFrom(consumer, model.ResourceCounterparts{
@@ -193,23 +196,23 @@ func assertGroupsBreaks(
 }
 
 func TestRequestWithoutTheOptionalAddressHasNoBreak(t *testing.T) {
-	sentByTheConsumer := groupsProperties(
-		model.Property{Path: "$", Type: "object"},
-		model.Property{Path: "$.name", Type: "string"},
-	)
+	sentByTheConsumer := model.Schema{
+		"":     {Type: "object"},
+		"name": {Type: "string"},
+	}
 
-	assertGroupsBreaks(t, "request", sentByTheConsumer, groupRequestReadByTheProvider(), nil)
+	assertGroupsBreaks(t, "request", groupsSchema(sentByTheConsumer), groupsSchema(groupRequestReadByTheProvider()), nil)
 }
 
 func TestRequestWithAPartialAddressBreaksOnItsMissingChildren(t *testing.T) {
-	sentByTheConsumer := groupsProperties(
-		model.Property{Path: "$", Type: "object"},
-		model.Property{Path: "$.name", Type: "string"},
-		model.Property{Path: "$.address", Type: "object"},
-		model.Property{Path: "$.address.address", Type: "string"},
-	)
+	sentByTheConsumer := model.Schema{
+		"":                {Type: "object"},
+		"name":            {Type: "string"},
+		"address":         {Type: "object"},
+		"address.address": {Type: "string"},
+	}
 
-	assertGroupsBreaks(t, "request", sentByTheConsumer, groupRequestReadByTheProvider(), []groupsBreak{
+	assertGroupsBreaks(t, "request", groupsSchema(sentByTheConsumer), groupsSchema(groupRequestReadByTheProvider()), []groupsBreak{
 		{compatibility_checker.ReasonPropertyMissingInConsumer, "$.address.city"},
 		{compatibility_checker.ReasonPropertyMissingInConsumer, "$.address.state"},
 		{compatibility_checker.ReasonPropertyMissingInConsumer, "$.address.zipCode"},
@@ -217,102 +220,102 @@ func TestRequestWithAPartialAddressBreaksOnItsMissingChildren(t *testing.T) {
 }
 
 func TestRequestWithTheWholeAddressHasNoBreak(t *testing.T) {
-	sentByTheConsumer := groupsProperties(
-		model.Property{Path: "$", Type: "object"},
-		model.Property{Path: "$.name", Type: "string"},
-		model.Property{Path: "$.address", Type: "object"},
-		model.Property{Path: "$.address.address", Type: "string"},
-		model.Property{Path: "$.address.city", Type: "string"},
-		model.Property{Path: "$.address.state", Type: "string"},
-		model.Property{Path: "$.address.zipCode", Type: "string"},
-	)
+	sentByTheConsumer := model.Schema{
+		"":                {Type: "object"},
+		"name":            {Type: "string"},
+		"address":         {Type: "object"},
+		"address.address": {Type: "string"},
+		"address.city":    {Type: "string"},
+		"address.state":   {Type: "string"},
+		"address.zipCode": {Type: "string"},
+	}
 
-	assertGroupsBreaks(t, "request", sentByTheConsumer, groupRequestReadByTheProvider(), nil)
+	assertGroupsBreaks(t, "request", groupsSchema(sentByTheConsumer), groupsSchema(groupRequestReadByTheProvider()), nil)
 }
 
 func TestAbsentRequiredParentBreaksOnlyOnItself(t *testing.T) {
 	t.Run("in a request", func(t *testing.T) {
 		readByTheProvider := groupRequestReadByTheProvider()
-		readByTheProvider["$.address"] = model.Property{Path: "$.address", Type: "object"}
+		readByTheProvider["address"] = model.Field{Type: "object"}
 
-		sentByTheConsumer := groupsProperties(
-			model.Property{Path: "$", Type: "object"},
-			model.Property{Path: "$.name", Type: "string"},
-		)
+		sentByTheConsumer := model.Schema{
+			"":     {Type: "object"},
+			"name": {Type: "string"},
+		}
 
-		assertGroupsBreaks(t, "request", sentByTheConsumer, readByTheProvider, []groupsBreak{
+		assertGroupsBreaks(t, "request", groupsSchema(sentByTheConsumer), groupsSchema(readByTheProvider), []groupsBreak{
 			{compatibility_checker.ReasonPropertyMissingInConsumer, "$.address"},
 		})
 	})
 
 	t.Run("in a response", func(t *testing.T) {
-		readByTheConsumer := groupsProperties(
-			model.Property{Path: "$", Type: "object"},
-			model.Property{Path: "$.address", Type: "object"},
-			model.Property{Path: "$.address.city", Type: "string"},
-		)
+		readByTheConsumer := model.Schema{
+			"":             {Type: "object"},
+			"address":      {Type: "object"},
+			"address.city": {Type: "string"},
+		}
 
-		providedByTheProvider := groupsProperties(model.Property{Path: "$", Type: "object"})
+		providedByTheProvider := model.Schema{"": {Type: "object"}}
 
-		assertGroupsBreaks(t, "201", readByTheConsumer, providedByTheProvider, []groupsBreak{
+		assertGroupsBreaks(t, "201", groupsSchema(readByTheConsumer), groupsSchema(providedByTheProvider), []groupsBreak{
 			{compatibility_checker.ReasonPropertyMissingInProvider, "$.address"},
 		})
 	})
 }
 
 func TestResponseWithoutTheOptionalAddressHasNoBreak(t *testing.T) {
-	readByTheConsumer := groupsProperties(
-		model.Property{Path: "$", Type: "object"},
-		model.Property{Path: "$.address", Type: "object", Optional: true},
-		model.Property{Path: "$.address.city", Type: "string"},
-	)
+	readByTheConsumer := model.Schema{
+		"":             {Type: "object"},
+		"address":      {Type: "object", Optional: true},
+		"address.city": {Type: "string"},
+	}
 
-	providedByTheProvider := groupsProperties(
-		model.Property{Path: "$", Type: "object"},
-		model.Property{Path: "$.name", Type: "string"},
-	)
+	providedByTheProvider := model.Schema{
+		"":     {Type: "object"},
+		"name": {Type: "string"},
+	}
 
-	assertGroupsBreaks(t, "201", readByTheConsumer, providedByTheProvider, nil)
+	assertGroupsBreaks(t, "201", groupsSchema(readByTheConsumer), groupsSchema(providedByTheProvider), nil)
 }
 
 func TestArrayItemsAndMapValuesAreChildrenOfTheirCollection(t *testing.T) {
-	root := model.Property{Path: "$", Type: "object"}
-
 	collections := []struct {
 		segment    string
-		collection model.Property
-		child      model.Property
+		collection model.Schema
+		path       string
 	}{
-		{"[]", model.Property{Path: "$.categories", Type: "array"}, model.Property{Path: "$.categories[]", Type: "string"}},
-		{"{}", model.Property{Path: "$.pets", Type: "object"}, model.Property{Path: "$.pets{}", Type: "object"}},
+		{"[]", model.Schema{"": {Type: "object"}, "categories": {Type: "array"}, "categories[]": {Type: "string"}}, "$.categories"},
+		{"{}", model.Schema{"": {Type: "object"}, "pets": {Type: "object"}, "pets{}": {Type: "object"}}, "$.pets"},
 	}
+
+	root := model.Schema{"": {Type: "object"}}
 
 	for _, tc := range collections {
 		t.Run(tc.segment+" of an absent required collection in a request", func(t *testing.T) {
 			assertGroupsBreaks(t, "request",
-				groupsProperties(root),
-				groupsProperties(root, tc.collection, tc.child),
-				[]groupsBreak{{compatibility_checker.ReasonPropertyMissingInConsumer, tc.collection.Path}},
+				groupsSchema(root),
+				groupsSchema(tc.collection),
+				[]groupsBreak{{compatibility_checker.ReasonPropertyMissingInConsumer, tc.path}},
 			)
 		})
 
 		t.Run(tc.segment+" of an absent required collection in a response", func(t *testing.T) {
 			assertGroupsBreaks(t, "201",
-				groupsProperties(root, tc.collection, tc.child),
-				groupsProperties(root),
-				[]groupsBreak{{compatibility_checker.ReasonPropertyMissingInProvider, tc.collection.Path}},
+				groupsSchema(tc.collection),
+				groupsSchema(root),
+				[]groupsBreak{{compatibility_checker.ReasonPropertyMissingInProvider, tc.path}},
 			)
 		})
 	}
 }
 
 func TestRequestMergedFromModulesSendingTheAddressOnlySometimesHasNoBreak(t *testing.T) {
-	readByTheProvider := groupsProperties(
-		model.Property{Path: "$", Type: "object"},
-		model.Property{Path: "$.name", Type: "string"},
-		model.Property{Path: "$.address", Type: "object", Optional: true},
-		model.Property{Path: "$.address.city", Type: "string"},
-	)
+	readByTheProvider := groupsSchema(model.Schema{
+		"":             {Type: "object"},
+		"name":         {Type: "string"},
+		"address":      {Type: "object", Optional: true},
+		"address.city": {Type: "string"},
+	})
 
 	t.Run("with the address module first", func(t *testing.T) {
 		sentByTheConsumer := groupRequestMergedFrom(t, groupWithAddressModuleYAML, groupNameModuleYAML)

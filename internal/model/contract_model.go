@@ -5,6 +5,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"slices"
+	"strings"
+
+	"github.com/guregu/null"
 )
 
 type UploadedContract struct {
@@ -12,6 +16,7 @@ type UploadedContract struct {
 	Version         string
 	ContractContent string
 	Resources       map[string]UploadedResource
+	Schemas         Schemas
 	ParticipantID   int64
 	ParticipantName string
 }
@@ -48,8 +53,43 @@ func (this *UploadedContract) AddResource(resource *UploadedResource) error {
 	return nil
 }
 
+// Checksum identifies the snapshot's content: the resources, the schema roots of their bodies and the reachable
+// schemas. The sources are left out, like the files themselves: the same content split into other files is the
+// same snapshot. Roots are sorted so the slice order never changes it.
 func (this *UploadedContract) Checksum() string {
-	payload, _ := json.Marshal(this.Resources)
+	resources := make(map[string]UploadedResource, len(this.Resources))
+	roots := make(map[string][]null.String, len(this.Resources))
+	for hash, resource := range this.Resources {
+		roots[hash] = sortedRoots(resource.Bodies)
+		resource.Bodies = nil
+		resources[hash] = resource
+	}
+
+	payload, _ := json.Marshal(struct {
+		Resources map[string]UploadedResource
+		Roots     map[string][]null.String
+		Schemas   Schemas
+	}{resources, roots, this.Schemas})
 	sum := sha256.Sum256(payload)
 	return hex.EncodeToString(sum[:])
+}
+
+func sortedRoots(bodies []ResourceBody) []null.String {
+	roots := make([]null.String, len(bodies))
+	for index, body := range bodies {
+		roots[index] = body.SchemaName
+	}
+
+	slices.SortFunc(roots, func(first, second null.String) int {
+		if first.Valid != second.Valid {
+			if first.Valid {
+				return 1
+			}
+			return -1
+		}
+
+		return strings.Compare(first.String, second.String)
+	})
+
+	return roots
 }

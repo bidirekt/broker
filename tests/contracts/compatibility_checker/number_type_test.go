@@ -30,11 +30,13 @@ type pricesBreak struct {
 	property string
 }
 
-func pricesProperties(amountType string) map[string]model.Property {
-	return map[string]model.Property{
-		"$":        {Path: "$", Type: "object"},
-		"$.amount": {Path: "$.amount", Type: amountType},
-	}
+func pricesBody(amountType string) ([]model.ResourceBody, model.Schemas) {
+	bodies := []model.ResourceBody{{Source: "prices.yaml", SchemaName: null.StringFrom("Price")}}
+
+	return bodies, model.Schemas{"Price": {
+		"":       {Type: "object"},
+		"amount": {Type: amountType},
+	}}
 }
 
 func pricesResources(interaction, consumerType, providerType string) (consumer, provider model.PersistedResource) {
@@ -42,6 +44,9 @@ func pricesResources(interaction, consumerType, providerType string) (consumer, 
 	if interaction == "request" {
 		kind, status = model.RestRequest, null.String{}
 	}
+
+	consumerBodies, consumerSchemas := pricesBody(consumerType)
+	providerBodies, providerSchemas := pricesBody(providerType)
 
 	consumer = model.PersistedResource{
 		ParticipantName:    pricesConsumerName,
@@ -53,7 +58,8 @@ func pricesResources(interaction, consumerType, providerType string) (consumer, 
 		Endpoint:           pricesEndpoint,
 		Method:             pricesMethod,
 		ResponseStatusCode: status,
-		Properties:         pricesProperties(consumerType),
+		Bodies:             consumerBodies,
+		Schemas:            consumerSchemas,
 	}
 
 	provider = model.PersistedResource{
@@ -64,7 +70,8 @@ func pricesResources(interaction, consumerType, providerType string) (consumer, 
 		Endpoint:           pricesEndpoint,
 		Method:             pricesMethod,
 		ResponseStatusCode: status,
-		Properties:         pricesProperties(providerType),
+		Bodies:             providerBodies,
+		Schemas:            providerSchemas,
 		DeployedVersions:   map[string]string{pricesEnvironment: "1.0.0"},
 	}
 

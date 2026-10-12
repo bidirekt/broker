@@ -28,22 +28,13 @@ type petsBreak struct {
 	property string
 }
 
-func petsProperties(properties ...model.Property) map[string]model.Property {
-	byPath := make(map[string]model.Property, len(properties))
-	for _, property := range properties {
-		byPath[property.Path] = property
+func petsMapProvidedByTheProvider() model.Schema {
+	return model.Schema{
+		"":            {Type: "object"},
+		"pets":        {Type: "object"},
+		"pets{}":      {Type: "object"},
+		"pets{}.name": {Type: "string"},
 	}
-
-	return byPath
-}
-
-func petsMapProvidedByTheProvider() map[string]model.Property {
-	return petsProperties(
-		model.Property{Path: "$", Type: "object"},
-		model.Property{Path: "$.pets", Type: "object"},
-		model.Property{Path: "$.pets{}", Type: "object"},
-		model.Property{Path: "$.pets{}.name", Type: "string"},
-	)
 }
 
 func petsBreaksCheckedFrom(
@@ -72,7 +63,7 @@ func petsBreaksCheckedFrom(
 	return breaks
 }
 
-func assertPetsBreaks(t *testing.T, readByTheConsumer, providedByTheProvider map[string]model.Property, expected []petsBreak) {
+func assertPetsBreaks(t *testing.T, readByTheConsumer, providedByTheProvider model.Schema, expected []petsBreak) {
 	t.Helper()
 
 	consumer := model.PersistedResource{
@@ -85,7 +76,8 @@ func assertPetsBreaks(t *testing.T, readByTheConsumer, providedByTheProvider map
 		Endpoint:           "/api/pets",
 		Method:             "get",
 		ResponseStatusCode: null.StringFrom("200"),
-		Properties:         readByTheConsumer,
+		Bodies:             []model.ResourceBody{{Source: "spa.yaml", SchemaName: null.StringFrom("Pets")}},
+		Schemas:            model.Schemas{"Pets": readByTheConsumer},
 	}
 	provider := model.PersistedResource{
 		ParticipantName:    petsProviderName,
@@ -95,7 +87,8 @@ func assertPetsBreaks(t *testing.T, readByTheConsumer, providedByTheProvider map
 		Endpoint:           "/api/pets",
 		Method:             "get",
 		ResponseStatusCode: null.StringFrom("200"),
-		Properties:         providedByTheProvider,
+		Bodies:             []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Pets")}},
+		Schemas:            model.Schemas{"Pets": providedByTheProvider},
 		DeployedVersions:   map[string]string{petsEnvironment: "1.0.0"},
 	}
 
@@ -117,11 +110,11 @@ func TestMapValuesReadAsProvidedHaveNoBreak(t *testing.T) {
 }
 
 func TestMapValuesWithAnotherTypeBreakOnTheValues(t *testing.T) {
-	readByTheConsumer := petsProperties(
-		model.Property{Path: "$", Type: "object"},
-		model.Property{Path: "$.pets", Type: "object"},
-		model.Property{Path: "$.pets{}", Type: "string"},
-	)
+	readByTheConsumer := model.Schema{
+		"":       {Type: "object"},
+		"pets":   {Type: "object"},
+		"pets{}": {Type: "string"},
+	}
 
 	assertPetsBreaks(t, readByTheConsumer, petsMapProvidedByTheProvider(), []petsBreak{
 		{compatibility_checker.ReasonPropertyTypeMismatch, "$.pets{}"},
@@ -130,7 +123,7 @@ func TestMapValuesWithAnotherTypeBreakOnTheValues(t *testing.T) {
 
 func TestOptionalMapValuesBreakAgainstARequiredReader(t *testing.T) {
 	providedByTheProvider := petsMapProvidedByTheProvider()
-	providedByTheProvider["$.pets{}"] = model.Property{Path: "$.pets{}", Type: "object", Optional: true}
+	providedByTheProvider["pets{}"] = model.Field{Type: "object", Optional: true}
 
 	assertPetsBreaks(t, petsMapProvidedByTheProvider(), providedByTheProvider, []petsBreak{
 		{compatibility_checker.ReasonPropertyOptionalInProviderRequiredInConsumer, "$.pets{}"},
@@ -139,7 +132,7 @@ func TestOptionalMapValuesBreakAgainstARequiredReader(t *testing.T) {
 
 func TestNullableMapValuesBreakAgainstANonNullableReader(t *testing.T) {
 	providedByTheProvider := petsMapProvidedByTheProvider()
-	providedByTheProvider["$.pets{}"] = model.Property{Path: "$.pets{}", Type: "object", Nullable: true}
+	providedByTheProvider["pets{}"] = model.Field{Type: "object", Nullable: true}
 
 	assertPetsBreaks(t, petsMapProvidedByTheProvider(), providedByTheProvider, []petsBreak{
 		{compatibility_checker.ReasonPropertyNullableInProviderNotNullableInConsumer, "$.pets{}"},
@@ -148,7 +141,7 @@ func TestNullableMapValuesBreakAgainstANonNullableReader(t *testing.T) {
 
 func TestMapValueChildMissingInTheProviderBreaksOnTheChild(t *testing.T) {
 	readByTheConsumer := petsMapProvidedByTheProvider()
-	readByTheConsumer["$.pets{}.age"] = model.Property{Path: "$.pets{}.age", Type: "integer"}
+	readByTheConsumer["pets{}.age"] = model.Field{Type: "integer"}
 
 	assertPetsBreaks(t, readByTheConsumer, petsMapProvidedByTheProvider(), []petsBreak{
 		{compatibility_checker.ReasonPropertyMissingInProvider, "$.pets{}.age"},
@@ -156,16 +149,16 @@ func TestMapValueChildMissingInTheProviderBreaksOnTheChild(t *testing.T) {
 }
 
 func TestFixedKeyReadAgainstAMapIsMissingInTheProvider(t *testing.T) {
-	readByTheConsumer := petsProperties(
-		model.Property{Path: "$", Type: "object"},
-		model.Property{Path: "$.pets", Type: "object"},
-		model.Property{Path: "$.pets.bob", Type: "object"},
-	)
-	providedByTheProvider := petsProperties(
-		model.Property{Path: "$", Type: "object"},
-		model.Property{Path: "$.pets", Type: "object"},
-		model.Property{Path: "$.pets{}", Type: "object"},
-	)
+	readByTheConsumer := model.Schema{
+		"":         {Type: "object"},
+		"pets":     {Type: "object"},
+		"pets.bob": {Type: "object"},
+	}
+	providedByTheProvider := model.Schema{
+		"":       {Type: "object"},
+		"pets":   {Type: "object"},
+		"pets{}": {Type: "object"},
+	}
 
 	assertPetsBreaks(t, readByTheConsumer, providedByTheProvider, []petsBreak{
 		{compatibility_checker.ReasonPropertyMissingInProvider, "$.pets.bob"},

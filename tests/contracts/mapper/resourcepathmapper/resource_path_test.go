@@ -6,6 +6,7 @@ import (
 	"github.com/bidirekt/broker/internal/contracts/contract"
 	"github.com/bidirekt/broker/internal/contracts/mapper/resourcepathmapper"
 	"github.com/bidirekt/broker/internal/model"
+	"github.com/guregu/null"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,6 +21,24 @@ func TestToResourceModel_ConsumerRestRequest_Parses(t *testing.T) {
 	assert.Equal(t, "/pets", resource.Endpoint)
 	assert.Equal(t, "post", resource.Method)
 	assert.Empty(t, resource.ResponseStatusCode)
+}
+
+func TestToResourceModel_ConsumerRestResponse_ParsesAndCarriesTheBodies(t *testing.T) {
+	path := contract.NewResourcePath("consumes;pets-service;rest;/pets;get;responses;200")
+	bodies := []model.ResourceBody{
+		{Source: "list.yaml", SchemaName: null.StringFrom("PetList")},
+		{Source: "preview.yaml"},
+	}
+
+	resource := resourcepathmapper.ToResourceModel(path, bodies)
+
+	assert.Equal(t, model.Consumes, resource.Direction)
+	assert.Equal(t, model.RestResponse, resource.Interaction)
+	assert.Equal(t, "pets-service", resource.ConsumedProvider.String)
+	assert.Equal(t, "/pets", resource.Endpoint)
+	assert.Equal(t, "get", resource.Method)
+	assert.Equal(t, "200", resource.ResponseStatusCode.String)
+	assert.Equal(t, bodies, resource.Bodies)
 }
 
 func TestToResourceModel_ProviderRestRequest_Parses(t *testing.T) {
