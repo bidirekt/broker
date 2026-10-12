@@ -1,7 +1,8 @@
 package model
 
-// Field is one node of a schema as written. A ref field has no Type: Ref names the schema it points at,
-// which is never copied into it.
+import "strings"
+
+// A ref field has no Type: Ref names the schema it points at, which is never copied into it.
 type Field struct {
 	Type     string
 	Optional bool
@@ -13,4 +14,38 @@ type Field struct {
 // "items[]", "items[].sku", "{}", "{}.name".
 type Schema map[string]Field
 
-type Schemas map[string]Schema // schema name → its fields
+const (
+	ItemsSegment  = "[]"
+	ValuesSegment = "{}"
+)
+
+func ChildPath(parent, segment string) string {
+	switch {
+	case segment == ItemsSegment || segment == ValuesSegment:
+		return parent + segment
+	case parent == "":
+		return segment
+	default:
+		return parent + "." + segment
+	}
+}
+
+func ParentOf(path string) (parent string, segment string, nested bool) {
+	switch {
+	case path == "":
+		return "", "", false
+	case strings.HasSuffix(path, ItemsSegment):
+		return strings.TrimSuffix(path, ItemsSegment), ItemsSegment, true
+	case strings.HasSuffix(path, ValuesSegment):
+		return strings.TrimSuffix(path, ValuesSegment), ValuesSegment, true
+	}
+
+	separator := strings.LastIndex(path, ".")
+	if separator < 0 {
+		return "", path, true
+	}
+
+	return path[:separator], path[separator+1:], true
+}
+
+type Schemas map[string]Schema

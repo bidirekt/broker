@@ -23,7 +23,7 @@ func schemaModelsReachableFrom(catalog contract.SchemasMap, name string, schemas
 	}
 
 	fields := model.Schema{}
-	fieldModelsFromSchema(fields, fieldPath(""), schema)
+	fieldModelsFromSchema(fields, "", schema)
 	schemas[name] = fields
 
 	for _, field := range fields {
@@ -33,35 +33,35 @@ func schemaModelsReachableFrom(catalog contract.SchemasMap, name string, schemas
 	}
 }
 
-func fieldModelsFromSchema(fields model.Schema, path fieldPath, schema contract.Schema) {
+func fieldModelsFromSchema(fields model.Schema, path string, schema contract.Schema) {
 	switch {
 	case schema.IsObject():
-		fields[path.String()] = model.Field{Type: "object", Optional: schema.Optional, Nullable: schema.Nullable}
+		fields[path] = model.Field{Type: "object", Optional: schema.Optional, Nullable: schema.Nullable}
 
 		for name, property := range schema.Properties {
-			fieldModelsFromSchema(fields, path.Append(name), property)
+			fieldModelsFromSchema(fields, model.ChildPath(path, name), property)
 		}
 
 		if schema.Values != nil {
-			fieldModelsFromSchema(fields, path.AppendMap(), *schema.Values)
+			fieldModelsFromSchema(fields, model.ChildPath(path, model.ValuesSegment), *schema.Values)
 		}
 
 	case schema.IsArray():
-		fields[path.String()] = model.Field{Type: "array", Optional: schema.Optional, Nullable: schema.Nullable}
+		fields[path] = model.Field{Type: "array", Optional: schema.Optional, Nullable: schema.Nullable}
 
 		if schema.Items == nil {
 			return
 		}
 
-		fieldModelsFromSchema(fields, path.AppendArray(), *schema.Items)
+		fieldModelsFromSchema(fields, model.ChildPath(path, model.ItemsSegment), *schema.Items)
 
 	case schema.IsPrimitive():
-		fields[path.String()] = model.Field{Type: schema.Type, Optional: schema.Optional, Nullable: schema.Nullable}
+		fields[path] = model.Field{Type: schema.Type, Optional: schema.Optional, Nullable: schema.Nullable}
 
 	case schema.IsRef():
-		fields[path.String()] = model.Field{Optional: schema.Optional, Nullable: schema.Nullable, Ref: schema.Ref}
+		fields[path] = model.Field{Optional: schema.Optional, Nullable: schema.Nullable, Ref: schema.Ref}
 
 	default:
-		fields[path.String()] = model.Field{Type: schema.Type, Optional: schema.Optional, Nullable: schema.Nullable}
+		fields[path] = model.Field{Type: schema.Type, Optional: schema.Optional, Nullable: schema.Nullable}
 	}
 }

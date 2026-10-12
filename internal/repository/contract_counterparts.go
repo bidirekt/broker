@@ -6,8 +6,7 @@ import (
 	"github.com/bidirekt/broker/internal/model"
 )
 
-// LoadCounterparts loads the deployed counterparts of the contract's resources in the environment, once per hash and side;
-// the catalog of each counterpart snapshot loads once for all of them.
+// LoadCounterparts loads the deployed counterparts of the contract's resources in the environment, once per hash and side.
 func (this *ContractRepository) LoadCounterparts(
 	ctx context.Context,
 	contract *model.PersistedContract,

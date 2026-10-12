@@ -53,8 +53,7 @@ func (this *UploadedContract) AddResource(resource *UploadedResource) error {
 	return nil
 }
 
-// Checksum identifies the snapshot's content: the resources, the schema roots of their bodies and the reachable
-// schemas. The sources are left out, like the files themselves: the same content split into other files is the
+// The sources are left out, like the files themselves: the same content split into other files is the
 // same snapshot. Roots are sorted so the slice order never changes it.
 func (this *UploadedContract) Checksum() string {
 	resources := make(map[string]UploadedResource, len(this.Resources))

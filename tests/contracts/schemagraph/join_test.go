@@ -308,7 +308,7 @@ func collectJoinedFields(node schemagraph.Node, path string, fields map[string]j
 	fields[path] = joinedField{Type: node.Type(), Optional: node.Optional(), Nullable: node.Nullable()}
 
 	for _, segment := range node.Segments() {
-		collectJoinedFields(node.Child(segment), schemagraph.ChildPath(path, segment), fields)
+		collectJoinedFields(node.Child(segment), model.ChildPath(path, segment), fields)
 	}
 }
 

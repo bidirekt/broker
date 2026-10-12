@@ -121,7 +121,6 @@ func NewPropertyBreakChange(
 	}
 }
 
-// typeToken renders a node's type with its array items and map values: "array<string>", "map<object>".
 // A shape met again while rendering renders as its bare type, so a self-referencing array ends.
 func typeToken(node schemagraph.Node) string {
 	return typeTokenOf(node, map[string]bool{})
@@ -136,10 +135,10 @@ func typeTokenOf(node schemagraph.Node, rendering map[string]bool) string {
 	rendering[shape] = true
 
 	if node.Type() == "array" {
-		return "array<" + typeTokenOf(node.Child("[]"), rendering) + ">"
+		return "array<" + typeTokenOf(node.Child(model.ItemsSegment), rendering) + ">"
 	}
 
-	if values := node.Child("{}"); values.Exists() && node.Type() == "object" {
+	if values := node.Child(model.ValuesSegment); values.Exists() && node.Type() == "object" {
 		return "map<" + typeTokenOf(values, rendering) + ">"
 	}
 

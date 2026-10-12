@@ -3,20 +3,17 @@ package schemagraph
 import (
 	"slices"
 	"strings"
+
+	"github.com/bidirekt/broker/internal/model"
 )
 
-// Join decides how the bodies of one consumer combine into a single reading of the resource.
 type Join int
 
 const (
-	// Senders: optional when any body may omit it, nullable when any body may send null.
 	Senders Join = iota
-	// Readers: optional only when every body that reads it allows it, nullable only when every one accepts null.
 	Readers
 )
 
-// Node is one position of a resource body, joined over the bodies that declare it, in body order.
-// A body lacks a position when it declares the parent and not the position itself.
 type Node struct {
 	graph   *Graph
 	join    Join
@@ -76,7 +73,6 @@ func (this Node) Members() []Member {
 	return members
 }
 
-// Segments lists the children of every body in byte-wise order: property names, "[]" and "{}".
 func (this Node) Segments() []string {
 	var segments []string
 	for _, member := range this.members {
@@ -92,7 +88,7 @@ func (this Node) Child(segment string) Node {
 	child := Node{graph: this.graph, join: this.join}
 
 	for _, parent := range this.members {
-		site := Site{Schema: parent.shape.Schema, Path: ChildPath(parent.shape.Path, segment)}
+		site := Site{Schema: parent.shape.Schema, Path: model.ChildPath(parent.shape.Path, segment)}
 		if !this.graph.declares(site) {
 			child.lacking = true
 

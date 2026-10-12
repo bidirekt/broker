@@ -2,8 +2,6 @@ package contract_differ
 
 import "github.com/bidirekt/broker/internal/model"
 
-// DiffContracts reports the changes from the persisted current to the uploaded next: resources keyed by hash,
-// schemas by name and their fields by relative path.
 func DiffContracts(current *model.PersistedContract, next *model.UploadedContract) model.ContractDiff {
 	return model.ContractDiff{
 		Resources: diffResources(current.Resources, next.Resources),

@@ -121,8 +121,8 @@ const (
 		) rv ON true
 		JOIN LATERAL (
 			SELECT
-				array_agg(rb.source ORDER BY rb.source COLLATE "C") AS sources,
-				array_agg(s.name ORDER BY rb.source COLLATE "C") AS schema_names
+				array_agg(rb.source ORDER BY rb.source COLLATE "C", rb.id) AS sources,
+				array_agg(s.name ORDER BY rb.source COLLATE "C", rb.id) AS schema_names
 			FROM resource_bodies rb
 			LEFT JOIN schemas s ON s.id = rb.schema_id
 			WHERE rb.resource_id = r.id AND rb.contract_id = c.id
@@ -167,8 +167,8 @@ const (
 		) rv ON true
 		JOIN LATERAL (
 			SELECT
-				array_agg(rb.source ORDER BY rb.source COLLATE "C") AS sources,
-				array_agg(s.name ORDER BY rb.source COLLATE "C") AS schema_names
+				array_agg(rb.source ORDER BY rb.source COLLATE "C", rb.id) AS sources,
+				array_agg(s.name ORDER BY rb.source COLLATE "C", rb.id) AS schema_names
 			FROM resource_bodies rb
 			LEFT JOIN schemas s ON s.id = rb.schema_id
 			WHERE rb.resource_id = r.id AND rb.contract_id = c.id
@@ -226,8 +226,8 @@ const (
 		) rv ON true
 		JOIN LATERAL (
 			SELECT
-				array_agg(rb.source ORDER BY rb.source COLLATE "C") AS sources,
-				array_agg(s.name ORDER BY rb.source COLLATE "C") AS schema_names
+				array_agg(rb.source ORDER BY rb.source COLLATE "C", rb.id) AS sources,
+				array_agg(s.name ORDER BY rb.source COLLATE "C", rb.id) AS schema_names
 			FROM resource_bodies rb
 			LEFT JOIN schemas s ON s.id = rb.schema_id
 			WHERE rb.resource_id = r.id AND rb.contract_id = anchor.contract_id
@@ -288,8 +288,8 @@ const (
 		) rv ON true
 		JOIN LATERAL (
 			SELECT
-				array_agg(rb.source ORDER BY rb.source COLLATE "C") AS sources,
-				array_agg(s.name ORDER BY rb.source COLLATE "C") AS schema_names
+				array_agg(rb.source ORDER BY rb.source COLLATE "C", rb.id) AS sources,
+				array_agg(s.name ORDER BY rb.source COLLATE "C", rb.id) AS schema_names
 			FROM resource_bodies rb
 			LEFT JOIN schemas s ON s.id = rb.schema_id
 			WHERE rb.resource_id = r.id AND rb.contract_id = anchor.contract_id

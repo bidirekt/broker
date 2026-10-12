@@ -77,8 +77,6 @@ const (
 	`
 )
 
-// schemaCatalogs keeps the catalog live at each anchor snapshot, keyed by contract id, so the reads that share it
-// load each catalog once.
 type schemaCatalogs map[int64]model.Schemas
 
 func (this *ContractRepository) loadSchemasAt(

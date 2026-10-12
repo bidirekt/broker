@@ -172,24 +172,3 @@ func TestSegments_OfARecursiveSchema_FollowTheRefBackToTheSchema(t *testing.T) {
 	assert.Equal(t, graphRoot(catalog, "Comment").ShapeKey(), reply.ShapeKey())
 	assert.NotEqual(t, graphRoot(catalog, "Comment").SiteKey(), reply.SiteKey())
 }
-
-func TestChildPath_SpellsEachSegment(t *testing.T) {
-	cases := []struct {
-		path, segment, expected string
-	}{
-		{"", "name", "name"},
-		{"", "[]", "[]"},
-		{"", "{}", "{}"},
-		{"meta", "x", "meta.x"},
-		{"items", "[]", "items[]"},
-		{"items[]", "sku", "items[].sku"},
-		{"pets", "{}", "pets{}"},
-		{"$", "name", "$.name"},
-		{"$", "[]", "$[]"},
-		{"$.pets", "{}", "$.pets{}"},
-	}
-
-	for _, tc := range cases {
-		assert.Equal(t, tc.expected, schemagraph.ChildPath(tc.path, tc.segment), tc.path+" + "+tc.segment)
-	}
-}

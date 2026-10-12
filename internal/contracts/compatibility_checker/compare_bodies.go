@@ -12,10 +12,9 @@ type readingRules struct {
 	nullable         BreakingReason
 }
 
-// bodyComparison descends the reader and the producer together. Optional and nullable belong to the fields a
-// node is reached through, so each pair of them is compared once; the type and the children belong to the
-// shapes the refs lead to, so each pair of shapes is compared once. A schema used in many places breaks once,
-// and recursion ends.
+// Optional and nullable belong to the fields a node is reached through, so each pair of them is compared once;
+// the type and the children belong to the shapes the refs lead to, so each pair of shapes is compared once.
+// A schema used in many places breaks once, and recursion ends.
 type bodyComparison struct {
 	checked        *model.PersistedResource
 	counterpart    *model.PersistedResource
@@ -90,7 +89,7 @@ func (this *bodyComparison) compareRead(reader, producer schemagraph.Node, path 
 	this.comparedShapes[shapes] = true
 
 	for _, segment := range reader.Segments() {
-		this.compareRead(reader.Child(segment), producer.Child(segment), schemagraph.ChildPath(path, segment))
+		this.compareRead(reader.Child(segment), producer.Child(segment), model.ChildPath(path, segment))
 	}
 }
 

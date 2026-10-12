@@ -2,12 +2,10 @@ package schemagraph
 
 import (
 	"slices"
-	"strings"
 
 	"github.com/bidirekt/broker/internal/model"
 )
 
-// Site is a field as written: the schema that declares it and its path relative to that schema.
 type Site struct {
 	Schema string
 	Path   string
@@ -22,8 +20,7 @@ func New(catalog model.Schemas) *Graph {
 	return &Graph{catalog: catalog, segments: map[string]map[string][]string{}}
 }
 
-// Root joins the bodies of one resource in their order. A `~` body declares nothing, so for senders it
-// leaves the body itself optional.
+// A `~` body declares nothing, so for senders it leaves the body itself optional.
 func (this *Graph) Root(bodies []model.ResourceBody, join Join) Node {
 	root := Node{graph: this, join: join}
 
@@ -40,21 +37,7 @@ func (this *Graph) Root(bodies []model.ResourceBody, join Join) Node {
 	return root
 }
 
-// ChildPath appends a segment the way paths are spelled: "" + "name" → "name", "$" + "name" → "$.name",
-// "items" + "[]" → "items[]", "pets" + "{}" → "pets{}".
-func ChildPath(path, segment string) string {
-	switch {
-	case segment == "[]" || segment == "{}":
-		return path + segment
-	case path == "":
-		return segment
-	default:
-		return path + "." + segment
-	}
-}
-
-// member follows the refs of a site down to the field that gives it a shape, OR-ing optional and nullable
-// along the chain. An undeclared schema or a schema met twice ends the chain on a field without a type.
+// An undeclared schema or a schema met twice ends the chain on a field without a type.
 func (this *Graph) member(source string, site Site) member {
 	field, declared := this.catalog[site.Schema][site.Path]
 	resolved := member{source: source, site: site, shape: site, fieldType: field.Type, optional: field.Optional, nullable: field.Nullable}
@@ -98,7 +81,7 @@ func segmentsByParent(schema model.Schema) map[string][]string {
 	byParent := map[string][]string{}
 
 	for path := range schema {
-		if parent, segment, nested := parentOf(path); nested {
+		if parent, segment, nested := model.ParentOf(path); nested {
 			byParent[parent] = append(byParent[parent], segment)
 		}
 	}
@@ -108,22 +91,4 @@ func segmentsByParent(schema model.Schema) map[string][]string {
 	}
 
 	return byParent
-}
-
-func parentOf(path string) (parent string, segment string, nested bool) {
-	switch {
-	case path == "":
-		return "", "", false
-	case strings.HasSuffix(path, "[]"):
-		return strings.TrimSuffix(path, "[]"), "[]", true
-	case strings.HasSuffix(path, "{}"):
-		return strings.TrimSuffix(path, "{}"), "{}", true
-	}
-
-	separator := strings.LastIndex(path, ".")
-	if separator < 0 {
-		return "", path, true
-	}
-
-	return path[:separator], path[separator+1:], true
 }

@@ -52,7 +52,7 @@ func ToDeclarations(fragments []contract.Fragment) Declarations {
 }
 
 func ToResourceModels(declarations Declarations) []model.UploadedResource {
-	merged := mergeByResourcePath(declarations.Resources)
+	merged := ToMergedResourceDeclarations(declarations)
 
 	resources := make([]model.UploadedResource, 0, len(merged))
 	for _, declaration := range merged {
