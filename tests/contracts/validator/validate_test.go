@@ -155,6 +155,11 @@ const feedReachingCommentCycleYAML = `schemas:
         ref: Comment
 `
 
+const loopYAML = `schemas:
+  Loop:
+    ref: Loop
+`
+
 const longRefChainYAML = `schemas:
   Feed:
     type: object
@@ -368,87 +373,21 @@ func TestValidate_UnresolvedRefBehindAResolvedRef_ReportedOnceWhereWritten(t *te
 	}, violations)
 }
 
-func TestValidate_CyclicSchemas_ReportOneCyclePerSchemaInTheCycle(t *testing.T) {
-	violations := validateFiles(t, validatedFile{"schemas.yaml", cyclicSchemasYAML})
+func TestValidate_RecursiveSchemas_ReportNothing(t *testing.T) {
+	cases := map[string]string{
+		"two schemas pointing at each other": cyclicSchemasYAML,
+		"a comment replying to comments":     selfReferencingCommentYAML,
+		"a node whose map values are nodes":  nodeChildrenMapCycleYAML,
+		"a post and its author":              postUserCycleYAML,
+		"a schema reaching a recursive pair": feedReachingCommentCycleYAML,
+		"a ref to itself":                    loopYAML,
+	}
 
-	assert.Equal(t, []violation.Violation{
-		{
-			ErrorCode: "schema.cycle",
-			Path:      "schemas;Owner",
-			Source:    "schemas.yaml",
-			Details:   map[string]string{"schema": "Owner", "cycle": "Owner → Pet → Owner"},
-		},
-		{
-			ErrorCode: "schema.cycle",
-			Path:      "schemas;Pet",
-			Source:    "schemas.yaml",
-			Details:   map[string]string{"schema": "Pet", "cycle": "Pet → Owner → Pet"},
-		},
-	}, violations)
-}
-
-func TestValidate_SelfReferenceThroughArray_ReportsCycle(t *testing.T) {
-	violations := validateFiles(t, validatedFile{"schemas.yaml", selfReferencingCommentYAML})
-
-	assert.Equal(t, []violation.Violation{
-		{
-			ErrorCode: "schema.cycle",
-			Path:      "schemas;Comment",
-			Source:    "schemas.yaml",
-			Details:   map[string]string{"schema": "Comment", "cycle": "Comment → Comment"},
-		},
-	}, violations)
-}
-
-func TestValidate_SelfReferenceThroughMapValues_ReportsCycle(t *testing.T) {
-	violations := validateFiles(t, validatedFile{"schemas.yaml", nodeChildrenMapCycleYAML})
-
-	assert.Equal(t, []violation.Violation{
-		{
-			ErrorCode: "schema.cycle",
-			Path:      "schemas;Node",
-			Source:    "schemas.yaml",
-			Details:   map[string]string{"schema": "Node", "cycle": "Node → Node"},
-		},
-	}, violations)
-}
-
-func TestValidate_CycleThroughArrayBackToTheParent_ReportsBothSchemas(t *testing.T) {
-	violations := validateFiles(t, validatedFile{"schemas.yaml", postUserCycleYAML})
-
-	assert.Equal(t, []violation.Violation{
-		{
-			ErrorCode: "schema.cycle",
-			Path:      "schemas;Post",
-			Source:    "schemas.yaml",
-			Details:   map[string]string{"schema": "Post", "cycle": "Post → User → Post"},
-		},
-		{
-			ErrorCode: "schema.cycle",
-			Path:      "schemas;User",
-			Source:    "schemas.yaml",
-			Details:   map[string]string{"schema": "User", "cycle": "User → Post → User"},
-		},
-	}, violations)
-}
-
-func TestValidate_SchemaThatOnlyReachesACycle_IsNotMarked(t *testing.T) {
-	violations := validateFiles(t, validatedFile{"schemas.yaml", feedReachingCommentCycleYAML})
-
-	assert.Equal(t, []violation.Violation{
-		{
-			ErrorCode: "schema.cycle",
-			Path:      "schemas;Comment",
-			Source:    "schemas.yaml",
-			Details:   map[string]string{"schema": "Comment", "cycle": "Comment → Reply → Comment"},
-		},
-		{
-			ErrorCode: "schema.cycle",
-			Path:      "schemas;Reply",
-			Source:    "schemas.yaml",
-			Details:   map[string]string{"schema": "Reply", "cycle": "Reply → Comment → Reply"},
-		},
-	}, violations)
+	for name, schemas := range cases {
+		t.Run(name, func(t *testing.T) {
+			assert.Empty(t, validateFiles(t, validatedFile{"schemas.yaml", schemas}))
+		})
+	}
 }
 
 func TestValidate_LongRefChainWithoutLoop_ReportsNothing(t *testing.T) {
@@ -817,18 +756,6 @@ func TestValidate_SameInputTwice_ReportsTheSameOrder(t *testing.T) {
 			Path:      "schemas;Invoice;properties;payment",
 			Source:    "billing.yaml",
 			Details:   map[string]string{"schema": "Payment", "property": "Invoice.payment"},
-		},
-		{
-			ErrorCode: "schema.cycle",
-			Path:      "schemas;Owner",
-			Source:    "schemas.yaml",
-			Details:   map[string]string{"schema": "Owner", "cycle": "Owner → Pet → Owner"},
-		},
-		{
-			ErrorCode: "schema.cycle",
-			Path:      "schemas;Pet",
-			Source:    "schemas.yaml",
-			Details:   map[string]string{"schema": "Pet", "cycle": "Pet → Owner → Pet"},
 		},
 	}, first)
 	assert.Equal(t, first, second)

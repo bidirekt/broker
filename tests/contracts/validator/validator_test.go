@@ -40,8 +40,6 @@ schemas:
     properties:
       id:
         type: string
-  Loop:
-    ref: Loop
   Pet:
     type: object
     properties:
@@ -156,12 +154,6 @@ func TestValidator_EveryRule_FiresAtItsLocationSortedBySourceThenPath(t *testing
 			Path:      "provides;rest;/pets;get;responses;200",
 			Source:    "a.yaml",
 			Details:   map[string]string{"schema": "Missing", "resource": "provides GET /pets 200"},
-		},
-		{
-			ErrorCode: "schema.cycle",
-			Path:      "schemas;Loop",
-			Source:    "a.yaml",
-			Details:   map[string]string{"schema": "Loop", "cycle": "Loop → Loop"},
 		},
 		{
 			ErrorCode: "schema.unresolved_ref",
