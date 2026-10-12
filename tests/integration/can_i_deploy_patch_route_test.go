@@ -114,12 +114,12 @@ func (this *IntegrationSuite) TestPatchRoute_PublishesOnBothSidesAndCanIDeployRe
 							"request": [{
 								"reason": "property_missing_in_consumer",
 								"role": "consumer",
-								"details": {"property": "$.name", "consumerName": "pets_web", "providerName": "pets_api", "propertyType": "string"}
+								"details": {"property": "$.name", "providerField": "PetChanges.name", "consumerName": "pets_web", "providerName": "pets_api", "propertyType": "string"}
 							}],
 							"200": [{
 								"reason": "property_missing_in_provider",
 								"role": "consumer",
-								"details": {"property": "$.photoUrl", "consumerName": "pets_web", "providerName": "pets_api", "propertyType": "string"}
+								"details": {"property": "$.photoUrl", "consumerField": "Pet.photoUrl", "consumerName": "pets_web", "providerName": "pets_api", "propertyType": "string"}
 							}]
 						}
 					}

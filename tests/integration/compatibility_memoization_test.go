@@ -156,10 +156,11 @@ func (this *IntegrationSuite) TestMemoization_IdenticalChecksReplayTheStoredVerd
 		Reason: "property_missing_in_provider",
 		Role:   "consumer",
 		Details: map[string]string{
-			"property":     "$.total",
-			"consumerName": "cart",
-			"providerName": "orders",
-			"propertyType": "integer",
+			"property":      "$.total",
+			"consumerField": "Order.total",
+			"consumerName":  "cart",
+			"providerName":  "orders",
+			"propertyType":  "integer",
 		},
 	}
 	this.Equal([]memoizationBreak{expectedBreak},
@@ -264,10 +265,11 @@ func (this *IntegrationSuite) TestMemoization_CachedVerdictKeepsLiveEnvironmentB
 		Reason: "property_missing_in_provider",
 		Role:   "consumer",
 		Details: map[string]string{
-			"property":     "$.total",
-			"consumerName": "cart",
-			"providerName": "orders",
-			"propertyType": "integer",
+			"property":      "$.total",
+			"consumerField": "Order.total",
+			"consumerName":  "cart",
+			"providerName":  "orders",
+			"propertyType":  "integer",
 		},
 	}
 	this.Equal([]memoizationBreak{expectedBreak},

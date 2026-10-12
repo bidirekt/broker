@@ -2,6 +2,7 @@ package compatibility_checker_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/bidirekt/broker/internal/contracts/compatibility_checker"
@@ -109,13 +110,21 @@ func avatarsBreakAt(
 	reason compatibility_checker.BreakingReason,
 	role compatibility_checker.BreakRole,
 	property, propertyType string,
+	declaredBy ...string,
 ) avatarsBreak {
-	return avatarsBreak{reason, role, map[string]string{
+	details := map[string]string{
 		"property":     property,
 		"consumerName": avatarsConsumerName,
 		"providerName": avatarsProviderName,
 		"propertyType": propertyType,
-	}}
+	}
+
+	field := "Profile." + strings.TrimPrefix(property, "$.")
+	for _, side := range declaredBy {
+		details[side+"Field"] = field
+	}
+
+	return avatarsBreak{reason, role, details}
 }
 
 type avatarsExpectation func(role compatibility_checker.BreakRole) []avatarsBreak
@@ -155,7 +164,7 @@ func TestNullableResponse_ProviderNullableConsumerNot_Breaks(t *testing.T) {
 	assertAvatarsBreaks(t, "200", avatarProperty(false), avatarProperty(true),
 		func(role compatibility_checker.BreakRole) []avatarsBreak {
 			return []avatarsBreak{avatarsBreakAt(
-				compatibility_checker.ReasonPropertyNullableInProviderNotNullableInConsumer, role, "$.avatar", "string")}
+				compatibility_checker.ReasonPropertyNullableInProviderNotNullableInConsumer, role, "$.avatar", "string", "consumer", "provider")}
 		})
 }
 
@@ -171,7 +180,7 @@ func TestNullableRequest_ConsumerNullableProviderNot_Breaks(t *testing.T) {
 	assertAvatarsBreaks(t, "request", avatarProperty(true), avatarProperty(false),
 		func(role compatibility_checker.BreakRole) []avatarsBreak {
 			return []avatarsBreak{avatarsBreakAt(
-				compatibility_checker.ReasonPropertyNullableInConsumerNotNullableInProvider, role, "$.avatar", "string")}
+				compatibility_checker.ReasonPropertyNullableInConsumerNotNullableInProvider, role, "$.avatar", "string", "consumer", "provider")}
 		})
 }
 
@@ -206,6 +215,8 @@ func TestNullable_TypeNotAccepted_ReportsOnlyTheTypeMismatch(t *testing.T) {
 			"providerName":         avatarsProviderName,
 			"consumerPropertyType": "integer",
 			"providerPropertyType": "string",
+			"consumerField":        "Profile.avatar",
+			"providerField":        "Profile.avatar",
 		}}}
 	}
 
@@ -225,8 +236,8 @@ func TestNullableResponse_IsIndependentFromOptional(t *testing.T) {
 	assertAvatarsBreaks(t, "200", required, optionalAndNullable,
 		func(role compatibility_checker.BreakRole) []avatarsBreak {
 			return []avatarsBreak{
-				avatarsBreakAt(compatibility_checker.ReasonPropertyNullableInProviderNotNullableInConsumer, role, "$.avatar", "string"),
-				avatarsBreakAt(compatibility_checker.ReasonPropertyOptionalInProviderRequiredInConsumer, role, "$.avatar", "string"),
+				avatarsBreakAt(compatibility_checker.ReasonPropertyNullableInProviderNotNullableInConsumer, role, "$.avatar", "string", "consumer", "provider"),
+				avatarsBreakAt(compatibility_checker.ReasonPropertyOptionalInProviderRequiredInConsumer, role, "$.avatar", "string", "consumer", "provider"),
 			}
 		})
 }
@@ -245,7 +256,7 @@ func TestNullableResponse_ChildrenOfANullableParent_AreComparedNormally(t *testi
 	assertAvatarsBreaks(t, "200", consumerManager, providerManager,
 		func(role compatibility_checker.BreakRole) []avatarsBreak {
 			return []avatarsBreak{avatarsBreakAt(
-				compatibility_checker.ReasonPropertyMissingInProvider, role, "$.manager.email", "string")}
+				compatibility_checker.ReasonPropertyMissingInProvider, role, "$.manager.email", "string", "consumer")}
 		})
 }
 
@@ -263,6 +274,6 @@ func TestNullableRequest_ChildrenOfANullableParent_AreComparedNormally(t *testin
 	assertAvatarsBreaks(t, "request", consumerManager, providerManager,
 		func(role compatibility_checker.BreakRole) []avatarsBreak {
 			return []avatarsBreak{avatarsBreakAt(
-				compatibility_checker.ReasonPropertyMissingInConsumer, role, "$.manager.email", "string")}
+				compatibility_checker.ReasonPropertyMissingInConsumer, role, "$.manager.email", "string", "provider")}
 		})
 }

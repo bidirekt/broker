@@ -123,9 +123,9 @@ func ordersBreaks(t *testing.T, interaction string, consumerSide, providerSide o
 	return fromTheConsumer
 }
 
-func ordersDetails(property string, types map[string]string) map[string]string {
+func ordersDetails(property string, specific map[string]string) map[string]string {
 	details := map[string]string{"property": property, "consumerName": ordersConsumerName, "providerName": ordersProviderName}
-	for key, value := range types {
+	for key, value := range specific {
 		details[key] = value
 	}
 
@@ -154,10 +154,10 @@ func TestTypeMismatch_StopsTheDescentAtThatField(t *testing.T) {
 	t.Run("in a response", func(t *testing.T) {
 		assert.Equal(t, []ordersBreak{
 			{compatibility_checker.ReasonPropertyTypeMismatch, ordersDetails("$.address", map[string]string{
-				"consumerPropertyType": "object", "providerPropertyType": "string",
+				"consumerField": "Order.address", "providerField": "Order.address", "consumerPropertyType": "object", "providerPropertyType": "string",
 			})},
 			{compatibility_checker.ReasonPropertyTypeMismatch, ordersDetails("$.items", map[string]string{
-				"consumerPropertyType": "array<object>", "providerPropertyType": "map<integer>",
+				"consumerField": "Order.items", "providerField": "Order.items", "consumerPropertyType": "array<object>", "providerPropertyType": "map<integer>",
 			})},
 		}, ordersBreaks(t, "201", ordersBody("Order", readByTheConsumer), ordersBody("Order", providedByTheProvider)))
 	})
@@ -165,10 +165,10 @@ func TestTypeMismatch_StopsTheDescentAtThatField(t *testing.T) {
 	t.Run("in a request", func(t *testing.T) {
 		assert.Equal(t, []ordersBreak{
 			{compatibility_checker.ReasonPropertyTypeMismatch, ordersDetails("$.address", map[string]string{
-				"consumerPropertyType": "string", "providerPropertyType": "object",
+				"consumerField": "Order.address", "providerField": "Order.address", "consumerPropertyType": "string", "providerPropertyType": "object",
 			})},
 			{compatibility_checker.ReasonPropertyTypeMismatch, ordersDetails("$.items", map[string]string{
-				"consumerPropertyType": "map<integer>", "providerPropertyType": "array<object>",
+				"consumerField": "Order.items", "providerField": "Order.items", "consumerPropertyType": "map<integer>", "providerPropertyType": "array<object>",
 			})},
 		}, ordersBreaks(t, "request", ordersBody("Order", providedByTheProvider), ordersBody("Order", readByTheConsumer)))
 	})
@@ -198,10 +198,10 @@ func addressCatalog(cityType string, withZip bool) model.Schemas {
 func TestBreakInsideASchemaUsedInManyPlaces_ComesOutOncePerPair(t *testing.T) {
 	assert.Equal(t, []ordersBreak{
 		{compatibility_checker.ReasonPropertyTypeMismatch, ordersDetails("$.billing.city", map[string]string{
-			"consumerPropertyType": "string", "providerPropertyType": "integer",
+			"consumerField": "Address.city", "providerField": "Address.city", "consumerPropertyType": "string", "providerPropertyType": "integer",
 		})},
 		{compatibility_checker.ReasonPropertyMissingInProvider, ordersDetails("$.billing.zip", map[string]string{
-			"propertyType": "string",
+			"consumerField": "Address.zip", "propertyType": "string",
 		})},
 	}, ordersBreaks(t, "201",
 		ordersBody("Order", addressCatalog("string", true)),
@@ -216,7 +216,7 @@ func TestSameSchemaReachedThroughFieldsWithOtherFlags_ChecksEachField(t *testing
 
 	assert.Equal(t, []ordersBreak{
 		{compatibility_checker.ReasonPropertyNullableInProviderNotNullableInConsumer, ordersDetails("$.shipping", map[string]string{
-			"propertyType": "object",
+			"consumerField": "Order.shipping", "providerField": "Order.shipping", "propertyType": "object",
 		})},
 	}, ordersBreaks(t, "201", ordersBody("Order", readByTheConsumer), ordersBody("Order", providedByTheProvider)))
 }
@@ -262,7 +262,7 @@ func TestExponentialSchema_ComparesFastAndBreaksOnce(t *testing.T) {
 
 		assert.Equal(t, []ordersBreak{
 			{compatibility_checker.ReasonPropertyTypeMismatch, ordersDetails("$"+strings.Repeat(".left", 22), map[string]string{
-				"consumerPropertyType": "string", "providerPropertyType": "integer",
+				"consumerField": "S21.left", "providerField": "S21.left", "consumerPropertyType": "string", "providerPropertyType": "integer",
 			})},
 		}, breaks)
 		assert.Less(t, time.Since(started), 500*time.Millisecond)
@@ -342,7 +342,7 @@ func TestRecursiveSchemas_OneDifferenceInside_BreaksOnce(t *testing.T) {
 	t.Run("a comment replying to comments", func(t *testing.T) {
 		assert.Equal(t, []ordersBreak{
 			{compatibility_checker.ReasonPropertyTypeMismatch, ordersDetails("$.text", map[string]string{
-				"consumerPropertyType": "string", "providerPropertyType": "integer",
+				"consumerField": "Comment.text", "providerField": "Comment.text", "consumerPropertyType": "string", "providerPropertyType": "integer",
 			})},
 		}, ordersBreaks(t, "201", ordersBody("Comment", commentCatalog("string")), ordersBody("Comment", commentCatalog("integer"))))
 	})
@@ -350,7 +350,7 @@ func TestRecursiveSchemas_OneDifferenceInside_BreaksOnce(t *testing.T) {
 	t.Run("a post and its author", func(t *testing.T) {
 		assert.Equal(t, []ordersBreak{
 			{compatibility_checker.ReasonPropertyTypeMismatch, ordersDetails("$.author.name", map[string]string{
-				"consumerPropertyType": "string", "providerPropertyType": "integer",
+				"consumerField": "User.name", "providerField": "User.name", "consumerPropertyType": "string", "providerPropertyType": "integer",
 			})},
 		}, ordersBreaks(t, "201", ordersBody("Post", postCatalog("string")), ordersBody("Post", postCatalog("integer"))))
 	})
@@ -364,7 +364,7 @@ func TestRecursiveArray_RendersItsTypeWithoutLooping(t *testing.T) {
 
 	assert.Equal(t, []ordersBreak{
 		{compatibility_checker.ReasonPropertyMissingInProvider, ordersDetails("$.nested", map[string]string{
-			"propertyType": "array<array>",
+			"consumerField": "Order.nested", "propertyType": "array<array>",
 		})},
 	}, ordersBreaks(t, "201", ordersBody("Order", readByTheConsumer), ordersBody("Order", model.Schemas{"Order": {"": {Type: "object"}}})))
 }
@@ -374,7 +374,7 @@ func TestUndescribedBody_BreaksOnlyWhereTheReaderNeedsABody(t *testing.T) {
 
 	t.Run("provider undescribed, consumer reads a schema", func(t *testing.T) {
 		assert.Equal(t, []ordersBreak{
-			{compatibility_checker.ReasonPropertyMissingInProvider, ordersDetails("$", map[string]string{"propertyType": "object"})},
+			{compatibility_checker.ReasonPropertyMissingInProvider, ordersDetails("$", map[string]string{"propertyType": "object", "consumerField": "Order"})},
 		}, ordersBreaks(t, "201", ordersBody("Order", order), ordersUndescribedBody()))
 	})
 
@@ -393,7 +393,7 @@ func TestUndescribedBody_BreaksOnlyWhereTheReaderNeedsABody(t *testing.T) {
 
 	t.Run("consumer sends an undescribed request the provider reads", func(t *testing.T) {
 		assert.Equal(t, []ordersBreak{
-			{compatibility_checker.ReasonPropertyMissingInConsumer, ordersDetails("$", map[string]string{"propertyType": "object"})},
+			{compatibility_checker.ReasonPropertyMissingInConsumer, ordersDetails("$", map[string]string{"propertyType": "object", "providerField": "Order"})},
 		}, ordersBreaks(t, "request", ordersUndescribedBody(), ordersBody("Order", order)))
 	})
 
@@ -407,7 +407,9 @@ func TestUndescribedBody_BreaksOnlyWhereTheReaderNeedsABody(t *testing.T) {
 		}
 
 		assert.Equal(t, []ordersBreak{
-			{compatibility_checker.ReasonPropertyOptionalInConsumerRequiredInProvider, ordersDetails("$", map[string]string{"propertyType": "object"})},
+			{compatibility_checker.ReasonPropertyOptionalInConsumerRequiredInProvider, ordersDetails("$", map[string]string{
+				"propertyType": "object", "consumerField": "Order", "providerField": "Order",
+			})},
 		}, ordersBreaks(t, "request", oneUndescribed, ordersBody("Order", order)))
 	})
 }

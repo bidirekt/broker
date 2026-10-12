@@ -147,12 +147,14 @@ func TestPropertyBreakDetails(t *testing.T) {
 		"providerName":         "api",
 		"consumerPropertyType": "integer",
 		"providerPropertyType": "string",
+		"consumerField":        "FrontThing.id",
+		"providerField":        "ApiThing.id",
 	}, typeMismatch.Details)
 
-	assert.Equal(t, map[string]string{"property": "$.name", "consumerName": "front", "providerName": "api", "propertyType": "string"}, missingInProvider.Details)
-	assert.Equal(t, map[string]string{"property": "$.id", "consumerName": "front", "providerName": "api", "propertyType": "integer"}, optionalInProvider.Details)
-	assert.Equal(t, map[string]string{"property": "$.user", "consumerName": "front", "providerName": "api", "propertyType": "string"}, missingInConsumer.Details)
-	assert.Equal(t, map[string]string{"property": "$.flag", "consumerName": "front", "providerName": "api", "propertyType": "boolean"}, optionalInConsumer.Details)
+	assert.Equal(t, map[string]string{"property": "$.name", "consumerName": "front", "providerName": "api", "propertyType": "string", "consumerField": "FrontThing.name"}, missingInProvider.Details)
+	assert.Equal(t, map[string]string{"property": "$.id", "consumerName": "front", "providerName": "api", "propertyType": "integer", "consumerField": "FrontThing.id", "providerField": "ApiThing.id"}, optionalInProvider.Details)
+	assert.Equal(t, map[string]string{"property": "$.user", "consumerName": "front", "providerName": "api", "propertyType": "string", "providerField": "ApiFlag.user"}, missingInConsumer.Details)
+	assert.Equal(t, map[string]string{"property": "$.flag", "consumerName": "front", "providerName": "api", "propertyType": "boolean", "consumerField": "FrontFlag.flag", "providerField": "ApiFlag.flag"}, optionalInConsumer.Details)
 
 	assert.Equal(t, "front", typeMismatch.ConsumerName())
 	assert.Equal(t, "api", typeMismatch.ProviderName())
@@ -235,6 +237,8 @@ func TestTypeMismatchTypesResolvedByRole(t *testing.T) {
 		"providerName":         "api",
 		"consumerPropertyType": "integer",
 		"providerPropertyType": "string",
+		"consumerField":        "FrontThing.id",
+		"providerField":        "ApiThing.id",
 	}
 	assert.Equal(t, expected, consumerChecked.Details)
 	assert.Equal(t, expected, providerChecked.Details)

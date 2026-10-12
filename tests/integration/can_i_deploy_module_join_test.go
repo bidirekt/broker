@@ -146,10 +146,12 @@ func (this *IntegrationSuite) TestCanIDeploy_ModuleSendingANullableName_BreaksOn
 			Reason: "property_nullable_in_consumer_not_nullable_in_provider",
 			Role:   "consumer",
 			Details: map[string]string{
-				"property":     "$.name",
-				"consumerName": "groups_spa",
-				"providerName": "groups_api",
-				"propertyType": "string",
+				"property":      "$.name",
+				"consumerField": "GroupWithAddress.name",
+				"providerField": "GroupInput.name",
+				"consumerName":  "groups_spa",
+				"providerName":  "groups_api",
+				"propertyType":  "string",
 			},
 		}}}},
 	}

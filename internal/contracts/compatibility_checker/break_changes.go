@@ -102,6 +102,14 @@ func NewPropertyBreakChange(
 		"providerName": consumerResource.ConsumedProvider.String,
 	}
 
+	if consumerNode.Exists() {
+		details["consumerField"] = consumerNode.Field()
+	}
+
+	if providerNode.Exists() {
+		details["providerField"] = providerNode.Field()
+	}
+
 	if reason == ReasonPropertyTypeMismatch {
 		details["consumerPropertyType"] = typeToken(consumerNode)
 		details["providerPropertyType"] = typeToken(providerNode)
