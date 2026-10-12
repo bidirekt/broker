@@ -955,3 +955,180 @@ func TestValidate_UndescribedProvidedRequestDeclaredTwice_ReportsDuplicateResour
 		},
 	}, violations)
 }
+
+const orderWithStringCitiesYAML = `consumes:
+  shop:
+    rest:
+      /orders:
+        get:
+          responses:
+            200: OrderRead
+schemas:
+  OrderRead:
+    type: object
+    properties:
+      billing: { ref: AddressRead }
+      shipping: { ref: AddressRead }
+      history:
+        type: array
+        items: { ref: AddressRead }
+  AddressRead:
+    type: object
+    properties:
+      city: { type: string }
+`
+
+const orderWithIntegerCitiesYAML = `consumes:
+  shop:
+    rest:
+      /orders:
+        get:
+          responses:
+            200: OrderSummary
+schemas:
+  OrderSummary:
+    type: object
+    properties:
+      billing: { ref: AddressSummary }
+      shipping: { ref: AddressSummary }
+  AddressSummary:
+    type: object
+    properties:
+      city: { type: integer }
+`
+
+func TestValidate_ConflictInsideASchemaUsedInManyPlaces_ReportedOnceAtItsFirstPath(t *testing.T) {
+	violations := validateFiles(t,
+		validatedFile{"a.yaml", orderWithStringCitiesYAML},
+		validatedFile{"b.yaml", orderWithIntegerCitiesYAML},
+	)
+
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "resource.type_conflict",
+			Path:      "consumes;shop;rest;/orders;get;responses;200",
+			Source:    "b.yaml",
+			Details: map[string]string{
+				"resource":     "consumes shop GET /orders 200",
+				"property":     "$.billing.city",
+				"type":         "integer",
+				"declaredIn":   "a.yaml",
+				"declaredType": "string",
+			},
+		},
+	}, violations)
+}
+
+func TestValidate_ConflictingCollections_ReportedOnTheCollectionOnly(t *testing.T) {
+	listOfLines := `consumes:
+  payments:
+    rest:
+      /invoices:
+        get:
+          responses:
+            200: InvoiceLines
+schemas:
+  InvoiceLines:
+    type: object
+    properties:
+      lines:
+        type: array
+        items:
+          type: object
+          properties:
+            total: { type: integer }
+`
+	mapOfLines := `consumes:
+  payments:
+    rest:
+      /invoices:
+        get:
+          responses:
+            200: InvoiceLineMap
+schemas:
+  InvoiceLineMap:
+    type: object
+    properties:
+      lines:
+        type: object
+        properties:
+          total: { type: string }
+`
+
+	violations := validateFiles(t,
+		validatedFile{"a.yaml", listOfLines},
+		validatedFile{"b.yaml", mapOfLines},
+	)
+
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "resource.type_conflict",
+			Path:      "consumes;payments;rest;/invoices;get;responses;200",
+			Source:    "b.yaml",
+			Details: map[string]string{
+				"resource":     "consumes payments GET /invoices 200",
+				"property":     "$.lines",
+				"type":         "object",
+				"declaredIn":   "a.yaml",
+				"declaredType": "array",
+			},
+		},
+	}, violations)
+}
+
+func TestValidate_ConflictInsideRecursiveSchemas_EndsAndIsReportedOnce(t *testing.T) {
+	stringText := `consumes:
+  blog:
+    rest:
+      /comments:
+        get:
+          responses:
+            200: Comment
+schemas:
+  Comment:
+    type: object
+    properties:
+      text: { type: string }
+      replies:
+        type: array
+        items: { ref: Comment }
+`
+	integerText := `consumes:
+  blog:
+    rest:
+      /comments:
+        get:
+          responses:
+            200: Reply
+schemas:
+  Reply:
+    type: object
+    properties:
+      text: { type: integer }
+      replies:
+        type: array
+        items: { ref: Reply }
+`
+
+	var conflicts []violation.Violation
+	for _, found := range validateFiles(t, validatedFile{"a.yaml", stringText}, validatedFile{"b.yaml", integerText}) {
+		if found.ErrorCode == "resource.type_conflict" {
+			conflicts = append(conflicts, found)
+		}
+	}
+
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "resource.type_conflict",
+			Path:      "consumes;blog;rest;/comments;get;responses;200",
+			Source:    "b.yaml",
+			Details: map[string]string{
+				"resource":     "consumes blog GET /comments 200",
+				"property":     "$.text",
+				"type":         "integer",
+				"declaredIn":   "a.yaml",
+				"declaredType": "string",
+			},
+		},
+	}, conflicts)
+}

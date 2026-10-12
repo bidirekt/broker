@@ -3,6 +3,7 @@ package compatibility_checker
 import (
 	"strings"
 
+	"github.com/bidirekt/broker/internal/contracts/schemagraph"
 	"github.com/bidirekt/broker/internal/model"
 )
 
@@ -82,15 +83,17 @@ func NewProviderResourceRemovedButStillConsumed(
 	}
 }
 
+// consumerNode and providerNode are where each side stands at propertyPath; either may not exist.
 func NewPropertyBreakChange(
 	checkedResource *model.PersistedResource,
 	counterpartResource *model.PersistedResource,
 	reason BreakingReason,
 	propertyPath string,
+	consumerNode, providerNode schemagraph.Node,
 ) ContractBreakingChange {
-	consumerResource, providerResource := checkedResource, counterpartResource
+	consumerResource := checkedResource
 	if !checkedResource.IsConsumer() {
-		consumerResource, providerResource = counterpartResource, checkedResource
+		consumerResource = counterpartResource
 	}
 
 	details := map[string]string{
@@ -100,14 +103,14 @@ func NewPropertyBreakChange(
 	}
 
 	if reason == ReasonPropertyTypeMismatch {
-		details["consumerPropertyType"] = typeToken(consumerResource, propertyPath)
-		details["providerPropertyType"] = typeToken(providerResource, propertyPath)
+		details["consumerPropertyType"] = typeToken(consumerNode)
+		details["providerPropertyType"] = typeToken(providerNode)
 	} else {
-		typed := consumerResource
-		if _, exists := consumerResource.Properties[propertyPath]; !exists {
-			typed = providerResource
+		typed := consumerNode
+		if !consumerNode.Exists() {
+			typed = providerNode
 		}
-		details["propertyType"] = typeToken(typed, propertyPath)
+		details["propertyType"] = typeToken(typed)
 	}
 
 	return ContractBreakingChange{
@@ -118,19 +121,28 @@ func NewPropertyBreakChange(
 	}
 }
 
-// typeToken renders a property's type, resolving array item and map value types
-// from the flat property map: $.list (array) + $.list[] (string) → "array<string>",
-// $.pets (object) + $.pets{} (object) → "map<object>".
-func typeToken(resource *model.PersistedResource, propertyPath string) string {
-	if resource.Properties[propertyPath].Type == "array" {
-		return "array<" + typeToken(resource, propertyPath+"[]") + ">"
+// A shape met again while rendering renders as its bare type, so a self-referencing array ends.
+func typeToken(node schemagraph.Node) string {
+	return typeTokenOf(node, map[string]bool{})
+}
+
+func typeTokenOf(node schemagraph.Node, rendering map[string]bool) string {
+	shape := node.ShapeKey()
+	if rendering[shape] {
+		return node.Type()
 	}
 
-	if _, isMap := resource.Properties[propertyPath+"{}"]; isMap && resource.Properties[propertyPath].Type == "object" {
-		return "map<" + typeToken(resource, propertyPath+"{}") + ">"
+	rendering[shape] = true
+
+	if node.Type() == "array" {
+		return "array<" + typeTokenOf(node.Child(model.ItemsSegment), rendering) + ">"
 	}
 
-	return resource.Properties[propertyPath].Type
+	if values := node.Child(model.ValuesSegment); values.Exists() && node.Type() == "object" {
+		return "map<" + typeTokenOf(values, rendering) + ">"
+	}
+
+	return node.Type()
 }
 
 func NewProviderResourceNotDeployed(

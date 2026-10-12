@@ -130,34 +130,55 @@ schemas:
         type: integer
 `
 
-func (this *IntegrationSuite) mergedProperties() []string {
+func (this *IntegrationSuite) mergedModuleBodies() []string {
 	rows, err := this.Pool.Query(context.Background(),
-		`SELECT properties.path, property_versions.type, property_versions.optional
-		   FROM properties
-		   JOIN property_versions ON property_versions.property_id = properties.id
-		  ORDER BY properties.path`,
+		`SELECT resource_bodies.source, schemas.name
+		   FROM resource_bodies
+		   JOIN schemas ON schemas.id = resource_bodies.schema_id
+		  ORDER BY resource_bodies.source COLLATE "C", schemas.name COLLATE "C"`,
 	)
 	this.Require().NoError(err)
 	defer rows.Close()
 
 	var stored []string
 	for rows.Next() {
-		var path, propertyType string
+		var source, schema string
+		this.Require().NoError(rows.Scan(&source, &schema))
+		stored = append(stored, fmt.Sprintf("%s %s", source, schema))
+	}
+
+	return stored
+}
+
+func (this *IntegrationSuite) mergedModuleFields() []string {
+	rows, err := this.Pool.Query(context.Background(),
+		`SELECT schemas.name, fields.path, field_versions.type, field_versions.optional
+		   FROM fields
+		   JOIN schemas ON schemas.id = fields.schema_id
+		   JOIN field_versions ON field_versions.field_id = fields.id
+		  ORDER BY schemas.name COLLATE "C", fields.path COLLATE "C"`,
+	)
+	this.Require().NoError(err)
+	defer rows.Close()
+
+	var stored []string
+	for rows.Next() {
+		var schema, path, fieldType string
 		var optional bool
-		this.Require().NoError(rows.Scan(&path, &propertyType, &optional))
+		this.Require().NoError(rows.Scan(&schema, &path, &fieldType, &optional))
 
 		presence := "required"
 		if optional {
 			presence = "optional"
 		}
 
-		stored = append(stored, fmt.Sprintf("%s %s %s", path, propertyType, presence))
+		stored = append(stored, fmt.Sprintf("%s.%s %s %s", schema, path, fieldType, presence))
 	}
 
 	return stored
 }
 
-func (this *IntegrationSuite) TestPublishContract_ConsumerModulesReadTheSameResponse_MergesByUnion() {
+func (this *IntegrationSuite) TestPublishContract_ConsumerModulesReadTheSameResponse_StoredAsDeclared() {
 	status, _ := this.post("/api/participants", frontParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
@@ -169,15 +190,18 @@ func (this *IntegrationSuite) TestPublishContract_ConsumerModulesReadTheSameResp
 	this.JSONEq(`{"message":"contract publish successful"}`, body)
 
 	this.Equal(1, this.countRows("resources"))
+	this.Equal([]string{"detail.yaml InvoiceDetail", "list.yaml InvoiceList"}, this.mergedModuleBodies())
 	this.Equal([]string{
-		"$ object required",
-		"$.created_at string required",
-		"$.id string required",
-		"$.name string required",
-	}, this.mergedProperties())
+		"InvoiceDetail. object required",
+		"InvoiceDetail.created_at string required",
+		"InvoiceDetail.id string required",
+		"InvoiceList. object required",
+		"InvoiceList.id string required",
+		"InvoiceList.name string required",
+	}, this.mergedModuleFields())
 }
 
-func (this *IntegrationSuite) TestPublishContract_ConsumerModulesSendTheSameRequest_PartialFieldsTurnOptional() {
+func (this *IntegrationSuite) TestPublishContract_ConsumerModulesSendTheSameRequest_StoredAsDeclared() {
 	status, _ := this.post("/api/participants", frontParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
@@ -189,12 +213,15 @@ func (this *IntegrationSuite) TestPublishContract_ConsumerModulesSendTheSameRequ
 	this.JSONEq(`{"message":"contract publish successful"}`, body)
 
 	this.Equal(1, this.countRows("resources"))
+	this.Equal([]string{"create.yaml InvoiceCreate", "import.yaml InvoiceImport"}, this.mergedModuleBodies())
 	this.Equal([]string{
-		"$ object required",
-		"$.email string optional",
-		"$.id string required",
-		"$.name string optional",
-	}, this.mergedProperties())
+		"InvoiceCreate. object required",
+		"InvoiceCreate.id string required",
+		"InvoiceCreate.name string required",
+		"InvoiceImport. object required",
+		"InvoiceImport.email string required",
+		"InvoiceImport.id string required",
+	}, this.mergedModuleFields())
 }
 
 func (this *IntegrationSuite) TestPublishContract_BothConsumedSpellingsInOneFile_MergesIntoOneResource() {
@@ -209,11 +236,13 @@ func (this *IntegrationSuite) TestPublishContract_BothConsumedSpellingsInOneFile
 	this.JSONEq(`{"message":"contract publish successful"}`, body)
 
 	this.Equal(1, this.countRows("resources"))
+	this.Equal([]string{"invoices.yaml InvoiceDetail", "invoices.yaml InvoiceList"}, this.mergedModuleBodies())
 	this.Equal([]string{
-		"$ object required",
-		"$.created_at string required",
-		"$.id string required",
-	}, this.mergedProperties())
+		"InvoiceDetail. object required",
+		"InvoiceDetail.created_at string required",
+		"InvoiceList. object required",
+		"InvoiceList.id string required",
+	}, this.mergedModuleFields())
 
 	var endpoint string
 	err := this.Pool.QueryRow(context.Background(), "SELECT endpoint FROM resources").Scan(&endpoint)

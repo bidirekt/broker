@@ -7,4 +7,5 @@ type PersistedContract struct {
 	Version         string
 	ContractContent string
 	Resources       map[string]PersistedResource
+	Schemas         Schemas
 }

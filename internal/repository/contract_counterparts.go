@@ -18,6 +18,7 @@ func (this *ContractRepository) LoadCounterparts(
 	}
 
 	providersQueried := make(map[string]bool)
+	catalogs := schemaCatalogs{}
 
 	for _, resource := range contract.Resources {
 		switch resource.Direction {
@@ -28,7 +29,7 @@ func (this *ContractRepository) LoadCounterparts(
 
 			providersQueried[resource.ProviderHash] = true
 
-			provider, err := this.GetProviderResourceByConsumerResource(ctx, resource.ProviderHash, environmentID)
+			provider, err := this.loadProviderResource(ctx, catalogs, resource.ProviderHash, environmentID)
 			if err == nil {
 				counterparts.Providers[resource.ProviderHash] = provider
 			}
@@ -37,11 +38,7 @@ func (this *ContractRepository) LoadCounterparts(
 				continue
 			}
 
-			counterparts.Consumers[resource.ProviderHash] = this.GetConsumersResourcesByProviderHashAndEnvironmentID(
-				ctx,
-				resource.ProviderHash,
-				environmentID,
-			)
+			counterparts.Consumers[resource.ProviderHash] = this.loadConsumerResources(ctx, catalogs, resource.ProviderHash, environmentID)
 		}
 	}
 

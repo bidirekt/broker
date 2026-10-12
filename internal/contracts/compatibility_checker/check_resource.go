@@ -16,17 +16,6 @@ func checkResources(checked *model.PersistedResource, counterpart *model.Persist
 	}
 }
 
-func parentPresentIn(resource *model.PersistedResource, path string) bool {
-	parent, hasParent := model.ParentPath(path)
-	if !hasParent {
-		return true
-	}
-
-	_, present := resource.Properties[parent]
-
-	return present
-}
-
 func acceptsType(reader, producer string) bool {
 	if reader == producer {
 		return true

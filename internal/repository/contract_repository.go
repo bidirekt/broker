@@ -74,23 +74,11 @@ const (
 		SELECT id FROM resources WHERE direction = 'consumes' AND consumer_hash = $1
 	`
 
-	insertPropertyQuery = `
-		INSERT INTO properties
-			(resource_id, path)
+	insertResourceBodyQuery = `
+		INSERT INTO resource_bodies
+			(resource_id, contract_id, source, schema_id)
 		VALUES
-			($1, $2)
-		RETURNING id
-	`
-
-	findPropertyIDByResourceAndPathQuery = `
-		SELECT id FROM properties WHERE resource_id = $1 AND path = $2
-	`
-
-	insertPropertyVersionQuery = `
-		INSERT INTO property_versions
-			(property_id, contract_id, type, optional, nullable, change_type)
-		VALUES
-			($1, $2, $3, $4, $5, $6)
+			($1, $2, $3, $4)
 	`
 
 	insertResourceVersionQuery = `
@@ -119,11 +107,8 @@ const (
 			r.consumer_hash,
 			r.created_at,
 			rv.change_type,
-			live.id,
-			live.path,
-			live.type,
-			live.optional,
-			live.nullable
+			bodies.sources,
+			bodies.schema_names
 		FROM contracts c
 		JOIN participants pa ON pa.id = c.participant_id
 		JOIN resources r ON r.participant_id = c.participant_id
@@ -134,19 +119,14 @@ const (
 			ORDER BY contract_id DESC
 			LIMIT 1
 		) rv ON true
-		LEFT JOIN LATERAL (
-			SELECT p.id, p.path, pv.type, pv.optional, pv.nullable
-			FROM properties p
-			JOIN LATERAL (
-				SELECT type, optional, nullable, change_type
-				FROM property_versions
-				WHERE property_id = p.id AND contract_id <= c.id
-				ORDER BY contract_id DESC
-				LIMIT 1
-			) pv ON true
-			WHERE p.resource_id = r.id
-			  AND pv.change_type <> 'removed'
-		) live ON true
+		JOIN LATERAL (
+			SELECT
+				array_agg(rb.source ORDER BY rb.source COLLATE "C", rb.id) AS sources,
+				array_agg(s.name ORDER BY rb.source COLLATE "C", rb.id) AS schema_names
+			FROM resource_bodies rb
+			LEFT JOIN schemas s ON s.id = rb.schema_id
+			WHERE rb.resource_id = r.id AND rb.contract_id = c.id
+		) bodies ON true
 		WHERE pa.name = $1
 		  AND c.id = (SELECT MAX(id) FROM contracts WHERE participant_id = pa.id)
 		  AND rv.change_type = 'added'
@@ -172,11 +152,8 @@ const (
 			r.consumer_hash,
 			r.created_at,
 			rv.change_type,
-			live.id,
-			live.path,
-			live.type,
-			live.optional,
-			live.nullable
+			bodies.sources,
+			bodies.schema_names
 		FROM contract_versions cv
 		JOIN contracts c ON c.id = cv.contract_id
 		JOIN participants pa ON pa.id = cv.participant_id
@@ -188,19 +165,14 @@ const (
 			ORDER BY contract_id DESC
 			LIMIT 1
 		) rv ON true
-		LEFT JOIN LATERAL (
-			SELECT p.id, p.path, pv.type, pv.optional, pv.nullable
-			FROM properties p
-			JOIN LATERAL (
-				SELECT type, optional, nullable, change_type
-				FROM property_versions
-				WHERE property_id = p.id AND contract_id <= c.id
-				ORDER BY contract_id DESC
-				LIMIT 1
-			) pv ON true
-			WHERE p.resource_id = r.id
-			  AND pv.change_type <> 'removed'
-		) live ON true
+		JOIN LATERAL (
+			SELECT
+				array_agg(rb.source ORDER BY rb.source COLLATE "C", rb.id) AS sources,
+				array_agg(s.name ORDER BY rb.source COLLATE "C", rb.id) AS schema_names
+			FROM resource_bodies rb
+			LEFT JOIN schemas s ON s.id = rb.schema_id
+			WHERE rb.resource_id = r.id AND rb.contract_id = c.id
+		) bodies ON true
 		WHERE pa.name = $1
 		  AND cv.version = $2
 		ORDER BY r.id
@@ -220,10 +192,8 @@ const (
 			r.provider_hash,
 			r.consumer_hash,
 			r.created_at,
-			live.path,
-			live.type,
-			live.optional,
-			live.nullable,
+			bodies.sources,
+			bodies.schema_names,
 			dep.version,
 			anchor.contract_id
 		FROM
@@ -254,19 +224,14 @@ const (
 			ORDER BY contract_id DESC
 			LIMIT 1
 		) rv ON true
-		LEFT JOIN LATERAL (
-			SELECT p.path, pv.type, pv.optional, pv.nullable
-			FROM properties p
-			JOIN LATERAL (
-				SELECT type, optional, nullable, change_type
-				FROM property_versions
-				WHERE property_id = p.id AND contract_id <= anchor.contract_id
-				ORDER BY contract_id DESC
-				LIMIT 1
-			) pv ON true
-			WHERE p.resource_id = r.id
-			  AND pv.change_type <> 'removed'
-		) live ON true
+		JOIN LATERAL (
+			SELECT
+				array_agg(rb.source ORDER BY rb.source COLLATE "C", rb.id) AS sources,
+				array_agg(s.name ORDER BY rb.source COLLATE "C", rb.id) AS schema_names
+			FROM resource_bodies rb
+			LEFT JOIN schemas s ON s.id = rb.schema_id
+			WHERE rb.resource_id = r.id AND rb.contract_id = anchor.contract_id
+		) bodies ON true
 		WHERE
 			r.direction = $1
 		AND
@@ -289,10 +254,8 @@ const (
 			r.provider_hash,
 			r.consumer_hash,
 			r.created_at,
-			live.path,
-			live.type,
-			live.optional,
-			live.nullable,
+			bodies.sources,
+			bodies.schema_names,
 			e.name,
 			dep.version,
 			anchor.contract_id
@@ -323,19 +286,14 @@ const (
 			ORDER BY contract_id DESC
 			LIMIT 1
 		) rv ON true
-		LEFT JOIN LATERAL (
-			SELECT p.path, pv.type, pv.optional, pv.nullable
-			FROM properties p
-			JOIN LATERAL (
-				SELECT type, optional, nullable, change_type
-				FROM property_versions
-				WHERE property_id = p.id AND contract_id <= anchor.contract_id
-				ORDER BY contract_id DESC
-				LIMIT 1
-			) pv ON true
-			WHERE p.resource_id = r.id
-			  AND pv.change_type <> 'removed'
-		) live ON true
+		JOIN LATERAL (
+			SELECT
+				array_agg(rb.source ORDER BY rb.source COLLATE "C", rb.id) AS sources,
+				array_agg(s.name ORDER BY rb.source COLLATE "C", rb.id) AS schema_names
+			FROM resource_bodies rb
+			LEFT JOIN schemas s ON s.id = rb.schema_id
+			WHERE rb.resource_id = r.id AND rb.contract_id = anchor.contract_id
+		) bodies ON true
 		LEFT JOIN LATERAL (
 			SELECT DISTINCT ON (environment_id) environment_id, version
 			FROM deployments
@@ -398,15 +356,16 @@ func (this *ContractRepository) Create(
 	this.insertContract(ctx, tx, contract)
 	this.insertContractVersion(ctx, tx, contract)
 
+	for name, schema := range contract.Schemas {
+		this.insertAddedSchema(ctx, tx, contract, name, schema)
+	}
+
 	for _, resource := range contract.Resources {
 		resourceID := this.insertResource(ctx, tx, contract.ParticipantID, &resource)
-		this.insertResourceVersion(ctx, tx, newInsertResourceVersionRowAdded(contract.ID, resourceID))
-
-		for _, property := range resource.Properties {
-			propertyID := this.insertNewProperty(ctx, tx, resourceID, &property)
-			this.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowAdded(contract.ID, propertyID, property))
-		}
+		this.insertResourceVersion(ctx, tx, resourceID, contract.ID, model.ChangeAdded)
 	}
+
+	this.insertResourceBodies(ctx, tx, contract)
 
 	if err := tx.Commit(ctx); err != nil {
 		panic(fmt.Errorf("error committing transaction: %w", err))
@@ -429,53 +388,30 @@ func (this *ContractRepository) Update(
 	this.insertContract(ctx, tx, next)
 	this.insertContractVersion(ctx, tx, next)
 
-	for key, resourceChange := range diff.Resources {
-		switch resourceChange.Kind {
+	for name, schemaChange := range diff.Schemas {
+		switch schemaChange.Kind {
 		case model.ChangeAdded:
-			resource := next.Resources[key]
-			resourceID := this.insertResource(ctx, tx, next.ParticipantID, &resource)
-			this.insertResourceVersion(ctx, tx, newInsertResourceVersionRowAdded(next.ID, resourceID))
-
-			for _, property := range resource.Properties {
-				propertyID := this.insertNewProperty(ctx, tx, resourceID, &property)
-				this.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowAdded(next.ID, propertyID, property))
-			}
-
+			this.insertAddedSchema(ctx, tx, next, name, next.Schemas[name])
 		case model.ChangeModified:
-			resource := next.Resources[key]
-			resourceID, _ := this.findResourceIDByHash(ctx, tx, key, resource.Direction)
-
-			for _, propertyChange := range resourceChange.Properties {
-				switch propertyChange.Kind {
-				case model.ChangeAdded:
-					property := propertyChange.After
-					propertyID := this.insertNewProperty(ctx, tx, resourceID, &property)
-					this.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowAdded(next.ID, propertyID, property))
-
-				case model.ChangeModified:
-					property := propertyChange.After
-					propertyID, _ := this.getPropertyIDByResourceIDAndPropertyPath(ctx, tx, resourceID, property.Path)
-					this.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowModified(next.ID, propertyID, property))
-
-				case model.ChangeRemoved:
-					property := propertyChange.Before
-					propertyID, _ := this.getPropertyIDByResourceIDAndPropertyPath(ctx, tx, resourceID, property.Path)
-					this.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowRemoved(next.ID, propertyID, property))
-				}
-			}
-
+			this.insertFieldChanges(ctx, tx, next, name, schemaChange.Fields)
 		case model.ChangeRemoved:
-			resource := current.Resources[key]
-			resourceID, _ := this.findResourceIDByHash(ctx, tx, key, resource.Direction)
-			this.insertResourceVersion(ctx, tx, newInsertResourceVersionRowRemoved(next.ID, resourceID))
-
-			for _, propertyChange := range resourceChange.Properties {
-				property := propertyChange.Before
-				propertyID, _ := this.getPropertyIDByResourceIDAndPropertyPath(ctx, tx, resourceID, property.Path)
-				this.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowRemoved(next.ID, propertyID, property))
-			}
+			this.insertRemovedSchema(ctx, tx, next, name, schemaChange.Fields)
 		}
 	}
+
+	for hash, kind := range diff.Resources {
+		switch kind {
+		case model.ChangeAdded:
+			resource := next.Resources[hash]
+			resourceID := this.insertResource(ctx, tx, next.ParticipantID, &resource)
+			this.insertResourceVersion(ctx, tx, resourceID, next.ID, model.ChangeAdded)
+		case model.ChangeRemoved:
+			resourceID, _ := this.findResourceIDByHash(ctx, tx, hash, current.Resources[hash].Direction)
+			this.insertResourceVersion(ctx, tx, resourceID, next.ID, model.ChangeRemoved)
+		}
+	}
+
+	this.insertResourceBodies(ctx, tx, next)
 
 	if err := tx.Commit(ctx); err != nil {
 		panic(fmt.Errorf("error committing transaction: %w", err))
@@ -592,96 +528,43 @@ func (this *ContractRepository) findResourceIDByHash(
 	hash string,
 	direction model.Direction,
 ) (int64, bool) {
-	query := findResourceIDByConsumerHashQuery
 	if direction == model.Provides {
-		query = findResourceIDByProviderHashQuery
+		return findID(ctx, tx, findResourceIDByProviderHashQuery, hash)
 	}
 
-	var id int64
-	err := tx.QueryRow(ctx, query, hash).Scan(&id)
-	if err == nil {
-		return id, true
-	}
-	if errors.Is(err, pgx.ErrNoRows) {
-		return 0, false
-	}
-	panic(fmt.Errorf("error looking up existing resource: %w", err))
-}
-
-func (this *ContractRepository) insertNewProperty(
-	ctx context.Context,
-	tx pgx.Tx,
-	resourceID int64,
-	property *model.Property,
-) int64 {
-	if id, ok := this.getPropertyIDByResourceIDAndPropertyPath(ctx, tx, resourceID, property.Path); ok {
-		return id
-	}
-
-	var id int64
-	if err := tx.QueryRow(
-		ctx,
-		insertPropertyQuery,
-		resourceID,
-		property.Path,
-	).Scan(&id); err != nil {
-		panic(fmt.Errorf("error inserting property: %w", err))
-	}
-
-	return id
-}
-
-func (this *ContractRepository) getPropertyIDByResourceIDAndPropertyPath(
-	ctx context.Context,
-	tx pgx.Tx,
-	resourceID int64,
-	path string,
-) (int64, bool) {
-	var id int64
-	err := tx.QueryRow(ctx, findPropertyIDByResourceAndPathQuery, resourceID, path).Scan(&id)
-	if err == nil {
-		return id, true
-	}
-
-	if errors.Is(err, pgx.ErrNoRows) {
-		return 0, false
-	}
-
-	panic(fmt.Errorf("error looking up existing property: %w", err))
-}
-
-func (this *ContractRepository) insertPropertyVersion(
-	ctx context.Context,
-	tx pgx.Tx,
-	row *insertPropertyVersionRow,
-) {
-	if _, err := tx.Exec(
-		ctx,
-		insertPropertyVersionQuery,
-		row.PropertyID,
-		row.ContractID,
-		row.Type,
-		row.Optional,
-		row.Nullable,
-		row.ChangeType,
-	); err != nil {
-		panic(fmt.Errorf("error inserting property version: %w", err))
-	}
+	return findID(ctx, tx, findResourceIDByConsumerHashQuery, hash)
 }
 
 func (this *ContractRepository) insertResourceVersion(
 	ctx context.Context,
 	tx pgx.Tx,
-	row *insertResourceVersionRow,
+	resourceID int64,
+	contractID int64,
+	kind model.ChangeKind,
 ) {
-	if _, err := tx.Exec(
-		ctx,
-		insertResourceVersionQuery,
-		row.ResourceID,
-		row.ContractID,
-		row.ChangeType,
-	); err != nil {
+	if _, err := tx.Exec(ctx, insertResourceVersionQuery, resourceID, contractID, string(kind)); err != nil {
 		panic(fmt.Errorf("error inserting resource version: %w", err))
+	}
+}
+
+// insertResourceBodies writes the bodies of every live resource of the snapshot, after its schemas.
+func (this *ContractRepository) insertResourceBodies(
+	ctx context.Context,
+	tx pgx.Tx,
+	contract *model.UploadedContract,
+) {
+	schemaIDs := this.findSchemaIDsByName(ctx, tx, contract.ParticipantID)
+
+	for hash, resource := range contract.Resources {
+		resourceID, _ := this.findResourceIDByHash(ctx, tx, hash, resource.Direction)
+
+		for _, body := range resource.Bodies {
+			schemaID := sql.NullInt64{Int64: schemaIDs[body.SchemaName.String], Valid: body.SchemaName.Valid}
+
+			if _, err := tx.Exec(ctx, insertResourceBodyQuery, resourceID, contract.ID, body.Source, schemaID); err != nil {
+				panic(fmt.Errorf("error inserting resource body: %w", err))
+			}
+		}
 	}
 }
 
@@ -690,14 +573,11 @@ func (this *ContractRepository) GetLatestContractByName(
 	participantName string,
 ) (*model.PersistedContract, bool) {
 	rows, err := this.pool.Query(ctx, getLatestContractByName, participantName)
-
 	if err != nil {
 		panic(fmt.Errorf("error loading contract tree: %w", err))
 	}
 
-	defer rows.Close()
-
-	return scanPersistedContractTree(rows)
+	return this.withSchemas(ctx, scanPersistedContractTree(rows))
 }
 
 func (this *ContractRepository) GetContractByNameAndVersion(
@@ -710,13 +590,30 @@ func (this *ContractRepository) GetContractByNameAndVersion(
 		panic(fmt.Errorf("error loading contract tree by name and version: %w", err))
 	}
 
-	defer rows.Close()
-
-	return scanPersistedContractTree(rows)
+	return this.withSchemas(ctx, scanPersistedContractTree(rows))
 }
 
-func scanPersistedContractTree(rows pgx.Rows) (*model.PersistedContract, bool) {
-	var found bool
+func (this *ContractRepository) withSchemas(
+	ctx context.Context,
+	contract *model.PersistedContract,
+) (*model.PersistedContract, bool) {
+	if contract == nil {
+		return nil, false
+	}
+
+	contract.Schemas = this.loadSchemasAt(ctx, schemaCatalogs{}, contract.ID)
+
+	for hash, resource := range contract.Resources {
+		resource.Schemas = contract.Schemas
+		contract.Resources[hash] = resource
+	}
+
+	return contract, true
+}
+
+func scanPersistedContractTree(rows pgx.Rows) *model.PersistedContract {
+	defer rows.Close()
+
 	var contract *model.PersistedContract
 
 	for rows.Next() {
@@ -740,38 +637,25 @@ func scanPersistedContractTree(rows pgx.Rows) (*model.PersistedContract, bool) {
 			&row.ResourceConsumerHash,
 			&row.ResourceCreatedAt,
 			&row.ResourceVersionChangeType,
-			&row.PropertyID,
-			&row.PropertyPath,
-			&row.PropertyVersionType,
-			&row.PropertyVersionOptional,
-			&row.PropertyVersionNullable,
+			&row.BodySources,
+			&row.BodySchemaNames,
 		); err != nil {
 			panic(fmt.Errorf("error scanning contract tree row: %w", err))
 		}
 
-		if !found {
+		if contract == nil {
 			contract = row.toPersistedContractModel()
-			found = true
 		}
 
 		resource := row.toResourceModel()
-		primaryHash := resource.PrimaryHash()
-
-		if _, seen := contract.Resources[primaryHash]; !seen {
-			contract.Resources[primaryHash] = resource
-		}
-
-		if !row.PropertyPath.Valid {
-			continue
-		}
-
-		property := row.toPropertyModel()
-		if _, seen := contract.Resources[primaryHash].Properties[property.Path]; !seen {
-			contract.Resources[primaryHash].Properties[property.Path] = property
-		}
+		contract.Resources[resource.PrimaryHash()] = resource
 	}
 
-	return contract, found
+	if err := rows.Err(); err != nil {
+		panic(fmt.Errorf("error reading contract tree: %w", err))
+	}
+
+	return contract
 }
 
 type CurrentConsumerInEnv struct {
@@ -785,6 +669,23 @@ func (this *ContractRepository) GetProviderResourceByConsumerResource(
 	providerHash string,
 	environmentID int64,
 ) (model.PersistedResource, error) {
+	return this.loadProviderResource(ctx, schemaCatalogs{}, providerHash, environmentID)
+}
+
+func (this *ContractRepository) GetConsumersResourcesByProviderHashAndEnvironmentID(
+	ctx context.Context,
+	providerHash string,
+	environmentID int64,
+) []model.PersistedResource {
+	return this.loadConsumerResources(ctx, schemaCatalogs{}, providerHash, environmentID)
+}
+
+func (this *ContractRepository) loadProviderResource(
+	ctx context.Context,
+	catalogs schemaCatalogs,
+	providerHash string,
+	environmentID int64,
+) (model.PersistedResource, error) {
 	rows, err := this.pool.Query(
 		ctx,
 		loadProviderResourceWithDeploymentsQuery,
@@ -792,7 +693,6 @@ func (this *ContractRepository) GetProviderResourceByConsumerResource(
 		providerHash,
 		environmentID,
 	)
-
 	if err != nil {
 		panic(fmt.Errorf("error loading provider resource of consumer: %w", err))
 	}
@@ -818,10 +718,8 @@ func (this *ContractRepository) GetProviderResourceByConsumerResource(
 			&row.ResourceProviderHash,
 			&row.ResourceConsumerHash,
 			&row.ResourceCreatedAt,
-			&row.PropertyPath,
-			&row.PropertyVersionType,
-			&row.PropertyVersionOptional,
-			&row.PropertyVersionNullable,
+			&row.BodySources,
+			&row.BodySchemaNames,
 			&row.DeploymentEnvironment,
 			&row.DeploymentVersion,
 			&row.ContractID,
@@ -834,24 +732,29 @@ func (this *ContractRepository) GetProviderResourceByConsumerResource(
 			found = true
 		}
 
-		if row.PropertyPath.Valid {
-			provider.Properties[row.PropertyPath.String] = row.toPropertyModel()
-		}
-
 		if row.DeploymentEnvironment.Valid {
 			provider.DeployedVersions[row.DeploymentEnvironment.String] = row.DeploymentVersion.String
 		}
 	}
 
+	if err := rows.Err(); err != nil {
+		panic(fmt.Errorf("error reading provider resource of consumer: %w", err))
+	}
+
+	rows.Close()
+
 	if !found {
 		return model.PersistedResource{}, ErrProviderResourceNotFound
 	}
 
+	provider.Schemas = this.loadSchemasAt(ctx, catalogs, provider.ContractID)
+
 	return provider, nil
 }
 
-func (this *ContractRepository) GetConsumersResourcesByProviderHashAndEnvironmentID(
+func (this *ContractRepository) loadConsumerResources(
 	ctx context.Context,
+	catalogs schemaCatalogs,
 	providerHash string,
 	environmentID int64,
 ) []model.PersistedResource {
@@ -862,14 +765,13 @@ func (this *ContractRepository) GetConsumersResourcesByProviderHashAndEnvironmen
 		providerHash,
 		environmentID,
 	)
-
 	if err != nil {
 		panic(fmt.Errorf("error finding consumers of provider: %w", err))
 	}
 
 	defer rows.Close()
 
-	consumersMap := make(map[int64]model.PersistedResource)
+	consumers := make([]model.PersistedResource, 0)
 
 	for rows.Next() {
 		var row tableRow
@@ -887,29 +789,25 @@ func (this *ContractRepository) GetConsumersResourcesByProviderHashAndEnvironmen
 			&row.ResourceProviderHash,
 			&row.ResourceConsumerHash,
 			&row.ResourceCreatedAt,
-			&row.PropertyPath,
-			&row.PropertyVersionType,
-			&row.PropertyVersionOptional,
-			&row.PropertyVersionNullable,
+			&row.BodySources,
+			&row.BodySchemaNames,
 			&row.ResourceVersion,
 			&row.ContractID,
 		); err != nil {
 			panic(fmt.Errorf("error scanning consumer: %w", err))
 		}
 
-		if _, seen := consumersMap[row.ResourceID]; !seen {
-			consumersMap[row.ResourceID] = row.toResourceModel()
-		}
-
-		if row.PropertyPath.Valid {
-			consumersMap[row.ResourceID].Properties[row.PropertyPath.String] = row.toPropertyModel()
-		}
+		consumers = append(consumers, row.toResourceModel())
 	}
 
-	consumers := make([]model.PersistedResource, 0, len(consumersMap))
+	if err := rows.Err(); err != nil {
+		panic(fmt.Errorf("error reading consumers of provider: %w", err))
+	}
 
-	for _, consumer := range consumersMap {
-		consumers = append(consumers, consumer)
+	rows.Close()
+
+	for index := range consumers {
+		consumers[index].Schemas = this.loadSchemasAt(ctx, catalogs, consumers[index].ContractID)
 	}
 
 	return consumers

@@ -1,70 +1,91 @@
 package validator
 
 import (
-	"maps"
-	"slices"
-
+	"github.com/bidirekt/broker/internal/contracts/contract"
 	"github.com/bidirekt/broker/internal/contracts/mapper/fragmentmapper"
+	"github.com/bidirekt/broker/internal/contracts/schemagraph"
 	"github.com/bidirekt/broker/internal/contracts/violation"
+	"github.com/bidirekt/broker/internal/model"
 )
-
-type typedProperty struct {
-	propertyType string
-	source       string
-}
 
 // Only consumed resources merge, so only they can disagree with themselves.
 func conflictingPropertyTypes(declarations fragmentmapper.Declarations) []violation.Violation {
+	graph := schemagraph.New(fragmentmapper.ToSchemaModels(declarations))
+
 	var violations []violation.Violation
 
-	seen := map[string]map[string]typedProperty{}
-
-	for _, declaration := range declarations.Resources {
+	for _, declaration := range fragmentmapper.ToMergedResourceDeclarations(declarations) {
 		if !declaration.Resource.IsConsumer() {
 			continue
 		}
 
-		if _, declared := declarations.Catalog[declaration.SchemaName]; !declared {
+		bodies := describedBodies(declaration.Resource.Bodies, declarations.Catalog)
+		if len(bodies) == 0 {
 			continue
 		}
 
-		path := declaration.Path.String()
-
-		declaredTypes, tracked := seen[path]
-		if !tracked {
-			declaredTypes = map[string]typedProperty{}
-			seen[path] = declaredTypes
+		conflicts := &typeConflicts{
+			path:     declaration.Path.String(),
+			resource: declaration.Resource.Describe(),
+			compared: map[string]bool{},
 		}
+		conflicts.compare(graph.Root(bodies, schemagraph.Readers), "$")
 
-		properties := declaration.Resource.Properties
-		for _, propertyPath := range slices.Sorted(maps.Keys(properties)) {
-			current := typedProperty{propertyType: properties[propertyPath].Type, source: declaration.Source}
-
-			previous, taken := declaredTypes[propertyPath]
-			if !taken {
-				declaredTypes[propertyPath] = current
-
-				continue
-			}
-
-			if previous.propertyType == current.propertyType {
-				continue
-			}
-
-			violations = append(violations, violation.Violation{
-				ErrorCode: "resource.type_conflict",
-				Path:      path,
-				Source:    declaration.Source,
-				Details: map[string]string{
-					"resource":     declaration.Resource.Describe(),
-					"property":     propertyPath,
-					"type":         current.propertyType,
-					"declaredIn":   previous.source,
-					"declaredType": previous.propertyType,
-				},
-			})
-		}
+		violations = append(violations, conflicts.violations...)
 	}
 
 	return violations
+}
+
+func describedBodies(bodies []model.ResourceBody, catalog contract.SchemasMap) []model.ResourceBody {
+	var described []model.ResourceBody
+
+	for _, body := range bodies {
+		if _, declared := catalog[body.SchemaName.String]; body.SchemaName.Valid && declared {
+			described = append(described, body)
+		}
+	}
+
+	return described
+}
+
+// typeConflicts compares each joined shape once, so a conflict inside a schema used in many places is reported once.
+type typeConflicts struct {
+	path       string
+	resource   string
+	compared   map[string]bool
+	violations []violation.Violation
+}
+
+func (this *typeConflicts) compare(node schemagraph.Node, property string) {
+	shapes := node.ShapeKey()
+	if this.compared[shapes] {
+		return
+	}
+
+	this.compared[shapes] = true
+
+	members := node.Members()
+	for _, member := range members[1:] {
+		if member.Type == members[0].Type {
+			continue
+		}
+
+		this.violations = append(this.violations, violation.Violation{
+			ErrorCode: "resource.type_conflict",
+			Path:      this.path,
+			Source:    member.Source,
+			Details: map[string]string{
+				"resource":     this.resource,
+				"property":     property,
+				"type":         member.Type,
+				"declaredIn":   members[0].Source,
+				"declaredType": members[0].Type,
+			},
+		})
+	}
+
+	for _, segment := range node.Segments() {
+		this.compare(node.Child(segment), model.ChildPath(property, segment))
+	}
 }

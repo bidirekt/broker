@@ -61,6 +61,8 @@ func ToUploadedContract(
 	resources := fragmentmapper.ToResourceModels(declarations)
 
 	uploadedContract := model.NewUploadedContract(participant.ID, participant.Name, version, contractContent)
+	uploadedContract.Schemas = fragmentmapper.ToSchemaModels(declarations)
+
 	for _, resource := range resources {
 		if err := uploadedContract.AddResource(&resource); err != nil {
 			return nil, nil, err

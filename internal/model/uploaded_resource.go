@@ -14,7 +14,7 @@ type UploadedResource struct {
 	Endpoint           string
 	Method             string
 	ResponseStatusCode null.String
-	Properties         map[string]Property
+	Bodies             []ResourceBody
 }
 
 func (this *UploadedResource) IsConsumer() bool {
@@ -82,14 +82,14 @@ func (this *UploadedResource) PrimaryHash() string {
 
 func NewRestRequestConsumer(
 	provider, endpoint, method string,
-	properties map[string]Property,
+	bodies []ResourceBody,
 ) *UploadedResource {
 	resource := &UploadedResource{
 		Direction:   Consumes,
 		Interaction: RestRequest,
 		Endpoint:    endpoint,
 		Method:      method,
-		Properties:  properties,
+		Bodies:      bodies,
 	}
 
 	if provider != "" {
@@ -101,27 +101,27 @@ func NewRestRequestConsumer(
 
 func NewRestRequestProvider(
 	endpoint, method string,
-	properties map[string]Property,
+	bodies []ResourceBody,
 ) *UploadedResource {
 	return &UploadedResource{
 		Direction:   Provides,
 		Interaction: RestRequest,
 		Endpoint:    endpoint,
 		Method:      method,
-		Properties:  properties,
+		Bodies:      bodies,
 	}
 }
 
 func NewRestResponseConsumer(
 	provider, endpoint, method, statusCode string,
-	properties map[string]Property,
+	bodies []ResourceBody,
 ) *UploadedResource {
 	resource := &UploadedResource{
 		Direction:   Consumes,
 		Interaction: RestResponse,
 		Endpoint:    endpoint,
 		Method:      method,
-		Properties:  properties,
+		Bodies:      bodies,
 	}
 
 	if provider != "" {
@@ -137,14 +137,14 @@ func NewRestResponseConsumer(
 
 func NewRestResponseProvider(
 	endpoint, method, statusCode string,
-	properties map[string]Property,
+	bodies []ResourceBody,
 ) *UploadedResource {
 	resource := &UploadedResource{
 		Direction:   Provides,
 		Interaction: RestResponse,
 		Endpoint:    endpoint,
 		Method:      method,
-		Properties:  properties,
+		Bodies:      bodies,
 	}
 
 	if statusCode != "" {

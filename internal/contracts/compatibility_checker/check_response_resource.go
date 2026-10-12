@@ -1,6 +1,16 @@
 package compatibility_checker
 
-import "github.com/bidirekt/broker/internal/model"
+import (
+	"github.com/bidirekt/broker/internal/contracts/schemagraph"
+	"github.com/bidirekt/broker/internal/model"
+)
+
+var responseRules = readingRules{
+	readerIsConsumer: true,
+	missing:          ReasonPropertyMissingInProvider,
+	optional:         ReasonPropertyOptionalInProviderRequiredInConsumer,
+	nullable:         ReasonPropertyNullableInProviderNotNullableInConsumer,
+}
 
 func checkResponseResource(
 	checked *model.PersistedResource,
@@ -8,56 +18,8 @@ func checkResponseResource(
 	consumer *model.PersistedResource,
 	provider *model.PersistedResource,
 ) []ContractBreakingChange {
-	var breaks []ContractBreakingChange
+	read := schemagraph.New(consumer.Schemas).Root(consumer.Bodies, schemagraph.Readers)
+	provided := schemagraph.New(provider.Schemas).Root(provider.Bodies, schemagraph.Readers)
 
-	for consumerPropertyPath, consumerProperty := range consumer.Properties {
-		providerProperty, propertyExists := provider.Properties[consumerPropertyPath]
-
-		// If the property is not present in the provider, is required in the consumer and its parent is present in the provider, it is a breaking change.
-		if !propertyExists {
-			if !consumerProperty.Optional && parentPresentIn(provider, consumerPropertyPath) {
-				breaks = append(breaks, NewPropertyBreakChange(
-					checked,
-					counterpart,
-					ReasonPropertyMissingInProvider,
-					consumerPropertyPath,
-				))
-			}
-
-			continue
-		}
-
-		// If the property is present in the provider with a type the consumer does not accept, it is a breaking change.
-		if !acceptsType(consumerProperty.Type, providerProperty.Type) {
-			breaks = append(breaks, NewPropertyBreakChange(
-				checked,
-				counterpart,
-				ReasonPropertyTypeMismatch,
-				consumerPropertyPath,
-			))
-
-			continue
-		}
-
-		// If the property is required in the consumer and is optional in the provider, it is a breaking change.
-		if !consumerProperty.Optional && providerProperty.Optional {
-			breaks = append(breaks, NewPropertyBreakChange(
-				checked,
-				counterpart,
-				ReasonPropertyOptionalInProviderRequiredInConsumer,
-				consumerPropertyPath,
-			))
-		}
-
-		if providerProperty.Nullable && !consumerProperty.Nullable {
-			breaks = append(breaks, NewPropertyBreakChange(
-				checked,
-				counterpart,
-				ReasonPropertyNullableInProviderNotNullableInConsumer,
-				consumerPropertyPath,
-			))
-		}
-	}
-
-	return breaks
+	return compareBodies(checked, counterpart, responseRules, read, provided)
 }

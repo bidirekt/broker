@@ -7,6 +7,7 @@ import (
 	"github.com/bidirekt/broker/internal/contracts/mapper/fragmentmapper"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/goccy/go-yaml"
+	"github.com/guregu/null"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -245,7 +246,7 @@ func resourcePaths(declarations fragmentmapper.Declarations) []string {
 	return paths
 }
 
-func TestToDeclarations_OrdenaRecursosPorServicoEndpointMetodoEStatus(t *testing.T) {
+func TestToDeclarations_SortsResourcesByServiceEndpointMethodAndStatus(t *testing.T) {
 	declarations := declarationsOf(t, declaredFile{"api.yaml", orderedContractYAML})
 
 	assert.Equal(t, []string{
@@ -262,7 +263,7 @@ func TestToDeclarations_OrdenaRecursosPorServicoEndpointMetodoEStatus(t *testing
 	}, resourcePaths(declarations))
 }
 
-func TestToDeclarations_OrdenaFragmentosPorOrigemNaoPelaOrdemDeEntrada(t *testing.T) {
+func TestToDeclarations_SortsFragmentsBySourceNotByInputOrder(t *testing.T) {
 	declarations := declarationsOf(t,
 		declaredFile{"b.yaml", petByNameYAML},
 		declaredFile{"a.yaml", petByIdYAML},
@@ -275,7 +276,7 @@ func TestToDeclarations_OrdenaFragmentosPorOrigemNaoPelaOrdemDeEntrada(t *testin
 	assert.Equal(t, "consumes;pets_api;rest;/pets;get;responses;200", declarations.Resources[1].Path.String())
 }
 
-func TestToDeclarations_OrdenaSchemasPorOrigemENome(t *testing.T) {
+func TestToDeclarations_SortsSchemasBySourceAndName(t *testing.T) {
 	declarations := declarationsOf(t,
 		declaredFile{"b.yaml", petByNameYAML},
 		declaredFile{"a.yaml", petByIdYAML},
@@ -288,7 +289,7 @@ func TestToDeclarations_OrdenaSchemasPorOrigemENome(t *testing.T) {
 	}, declarations.Schemas)
 }
 
-func TestToDeclarations_CatalogoFicaComAPrimeiraDeclaracaoDeCadaNome(t *testing.T) {
+func TestToDeclarations_CatalogKeepsTheFirstDeclarationOfEachName(t *testing.T) {
 	declarations := declarationsOf(t,
 		declaredFile{"b.yaml", petByNameYAML},
 		declaredFile{"a.yaml", petByIdYAML},
@@ -302,11 +303,11 @@ func TestToDeclarations_CatalogoFicaComAPrimeiraDeclaracaoDeCadaNome(t *testing.
 	require.Len(t, declarations.Resources, 2)
 	consumer := declarations.Resources[1]
 	assert.Equal(t, "b.yaml", consumer.Source)
-	assert.Contains(t, consumer.Resource.Properties, "$.id")
-	assert.NotContains(t, consumer.Resource.Properties, "$.name")
+	assert.Equal(t, []model.ResourceBody{{Source: "b.yaml", SchemaName: null.StringFrom("Pet")}}, consumer.Resource.Bodies)
+	assert.Equal(t, model.Schema{"": {Type: "object"}, "id": {Type: "string"}}, fragmentmapper.ToSchemaModels(declarations)["Pet"])
 }
 
-func TestToDeclarations_CapturaSchemaNameDoRequestEDasResponses(t *testing.T) {
+func TestToDeclarations_CapturesTheSchemaNameOfTheRequestAndOfEachResponse(t *testing.T) {
 	declarations := declarationsOf(t, declaredFile{"pets.yaml", createPetYAML})
 
 	require.Len(t, declarations.Resources, 3)
@@ -314,20 +315,20 @@ func TestToDeclarations_CapturaSchemaNameDoRequestEDasResponses(t *testing.T) {
 	request := declarations.Resources[0]
 	assert.Equal(t, "PetCreate", request.SchemaName)
 	assert.Equal(t, model.RestRequest, request.Resource.Interaction)
-	assert.Contains(t, request.Resource.Properties, "$.name")
+	assert.Equal(t, []model.ResourceBody{{Source: "pets.yaml", SchemaName: null.StringFrom("PetCreate")}}, request.Resource.Bodies)
 
 	created := declarations.Resources[1]
 	assert.Equal(t, "Pet", created.SchemaName)
 	assert.Equal(t, "201", created.Resource.ResponseStatusCode.String)
-	assert.Contains(t, created.Resource.Properties, "$.id")
+	assert.Equal(t, []model.ResourceBody{{Source: "pets.yaml", SchemaName: null.StringFrom("Pet")}}, created.Resource.Bodies)
 
 	rejected := declarations.Resources[2]
 	assert.Equal(t, "Problem", rejected.SchemaName)
 	assert.Equal(t, "422", rejected.Resource.ResponseStatusCode.String)
-	assert.Contains(t, rejected.Resource.Properties, "$.title")
+	assert.Equal(t, []model.ResourceBody{{Source: "pets.yaml", SchemaName: null.StringFrom("Problem")}}, rejected.Resource.Bodies)
 }
 
-func TestToDeclarations_NormalizaEndpointNoPath(t *testing.T) {
+func TestToDeclarations_NormalizesTheEndpointInThePath(t *testing.T) {
 	declarations := declarationsOf(t, declaredFile{"users.yaml", slashedEndpointsYAML})
 
 	assert.Equal(t, []string{
@@ -340,16 +341,16 @@ func TestToDeclarations_NormalizaEndpointNoPath(t *testing.T) {
 	assert.Equal(t, "/users", declarations.Resources[1].Resource.Endpoint)
 }
 
-func TestToDeclarations_NomeNaoResolvidoGeraPropriedadeDoSchemaZero(t *testing.T) {
+func TestToDeclarations_UnresolvedSchemaName_StaysInTheBody(t *testing.T) {
 	declarations := declarationsOf(t, declaredFile{"ghosts.yaml", unresolvedSchemaYAML})
 
 	require.Len(t, declarations.Resources, 1)
 	assert.Equal(t, "Ghost", declarations.Resources[0].SchemaName)
 	assert.NotContains(t, declarations.Catalog, "Ghost")
-	assert.Equal(t, map[string]model.Property{"$": {Path: "$"}}, declarations.Resources[0].Resource.Properties)
+	assert.Equal(t, []model.ResourceBody{{Source: "ghosts.yaml", SchemaName: null.StringFrom("Ghost")}}, declarations.Resources[0].Resource.Bodies)
 }
 
-func TestToDeclarations_NullBodyDeclaresResourceWithoutSchemaOrProperties(t *testing.T) {
+func TestToDeclarations_NullBody_DeclaresTheResourceWithABodyWithoutSchema(t *testing.T) {
 	declarations := declarationsOf(t, declaredFile{"files.yaml", undescribedBodiesYAML})
 
 	assert.Equal(t, []string{
@@ -373,10 +374,12 @@ func TestToDeclarations_NullBodyDeclaresResourceWithoutSchemaOrProperties(t *tes
 		"provides;rest;/files/*;delete;responses;204": true,
 	}, withoutSchema)
 
-	assert.Equal(t, *model.NewRestRequestProvider("/files", "post", map[string]model.Property{}), declarations.Resources[0].Resource)
+	undescribed := []model.ResourceBody{{Source: "files.yaml"}}
+
+	assert.Equal(t, *model.NewRestRequestProvider("/files", "post", undescribed), declarations.Resources[0].Resource)
 	assert.Empty(t, declarations.Resources[0].SchemaName)
-	assert.Equal(t, *model.NewRestResponseProvider("/files/*", "get", "200", map[string]model.Property{}), declarations.Resources[3].Resource)
-	assert.Equal(t, *model.NewRestResponseProvider("/files/*", "delete", "204", map[string]model.Property{}), declarations.Resources[4].Resource)
+	assert.Equal(t, *model.NewRestResponseProvider("/files/*", "get", "200", undescribed), declarations.Resources[3].Resource)
+	assert.Equal(t, *model.NewRestResponseProvider("/files/*", "delete", "204", undescribed), declarations.Resources[4].Resource)
 }
 
 func TestToDeclarations_EmptyStringBodyIsAnUnresolvedSchemaName(t *testing.T) {
@@ -387,7 +390,7 @@ func TestToDeclarations_EmptyStringBodyIsAnUnresolvedSchemaName(t *testing.T) {
 	for _, declaration := range declarations.Resources {
 		assert.False(t, declaration.WithoutSchema, declaration.Path.String())
 		assert.Empty(t, declaration.SchemaName, declaration.Path.String())
-		assert.Equal(t, map[string]model.Property{"$": {Path: "$"}}, declaration.Resource.Properties, declaration.Path.String())
+		assert.Equal(t, []model.ResourceBody{{Source: "files.yaml", SchemaName: null.StringFrom("")}}, declaration.Resource.Bodies, declaration.Path.String())
 	}
 
 	assert.Equal(t, []string{
@@ -406,14 +409,8 @@ func TestToDeclarations_PatchRoute_DeclaresRequestAndResponseInProvidesAndConsum
 		"provides;rest;/pets/*;patch;responses;200",
 	}, resourcePaths(declarations))
 
-	requestProperties := map[string]model.Property{
-		"$":      {Path: "$", Type: "object"},
-		"$.name": {Path: "$.name", Type: "string"},
-	}
-	responseProperties := map[string]model.Property{
-		"$":    {Path: "$", Type: "object"},
-		"$.id": {Path: "$.id", Type: "string"},
-	}
+	requestBodies := []model.ResourceBody{{Source: "pets.yaml", SchemaName: null.StringFrom("PetPatch")}}
+	responseBodies := []model.ResourceBody{{Source: "pets.yaml", SchemaName: null.StringFrom("Pet")}}
 
 	resources := make([]model.UploadedResource, 0, len(declarations.Resources))
 	for _, declaration := range declarations.Resources {
@@ -421,10 +418,10 @@ func TestToDeclarations_PatchRoute_DeclaresRequestAndResponseInProvidesAndConsum
 	}
 
 	assert.Equal(t, []model.UploadedResource{
-		*model.NewRestRequestConsumer("pets_api", "/pets/*", "patch", requestProperties),
-		*model.NewRestResponseConsumer("pets_api", "/pets/*", "patch", "200", responseProperties),
-		*model.NewRestRequestProvider("/pets/*", "patch", requestProperties),
-		*model.NewRestResponseProvider("/pets/*", "patch", "200", responseProperties),
+		*model.NewRestRequestConsumer("pets_api", "/pets/*", "patch", requestBodies),
+		*model.NewRestResponseConsumer("pets_api", "/pets/*", "patch", "200", responseBodies),
+		*model.NewRestRequestProvider("/pets/*", "patch", requestBodies),
+		*model.NewRestResponseProvider("/pets/*", "patch", "200", responseBodies),
 	}, resources)
 }
 
@@ -440,7 +437,7 @@ func TestToDeclarations_PatchSortsBetweenPutAndDelete(t *testing.T) {
 	}, resourcePaths(declarations))
 }
 
-func TestToDeclarations_FragmentoSemDocumentoNaoDeclaraNada(t *testing.T) {
+func TestToDeclarations_FragmentWithoutDocument_DeclaresNothing(t *testing.T) {
 	declarations := fragmentmapper.ToDeclarations([]contract.Fragment{{Source: "empty.yaml"}})
 
 	assert.Empty(t, declarations.Resources)
@@ -448,4 +445,5 @@ func TestToDeclarations_FragmentoSemDocumentoNaoDeclaraNada(t *testing.T) {
 	assert.NotNil(t, declarations.Catalog)
 	assert.Empty(t, declarations.Catalog)
 	assert.Empty(t, fragmentmapper.ToResourceModels(declarations))
+	assert.Empty(t, fragmentmapper.ToSchemaModels(declarations))
 }

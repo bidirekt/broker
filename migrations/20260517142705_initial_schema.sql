@@ -63,30 +63,58 @@ CREATE TABLE resource_versions (
 CREATE INDEX ON resource_versions (resource_id, contract_id);
 CREATE INDEX ON resource_versions (contract_id);
 
-CREATE TABLE properties (
-  id           BIGSERIAL PRIMARY KEY,
-  resource_id  BIGINT NOT NULL REFERENCES resources(id),
-  path         text NOT NULL,
-  created_at   timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (resource_id, path)
+CREATE TABLE schemas (
+  id              BIGSERIAL PRIMARY KEY,
+  participant_id  BIGINT NOT NULL REFERENCES participants(id),
+  name            text NOT NULL,
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (participant_id, name)
 );
 
-CREATE INDEX ON properties (resource_id);
-
-CREATE TABLE property_versions (
+CREATE TABLE schema_versions (
   id           BIGSERIAL PRIMARY KEY,
-  property_id  BIGINT NOT NULL REFERENCES properties(id),
+  schema_id    BIGINT NOT NULL REFERENCES schemas(id),
+  contract_id  BIGINT NOT NULL REFERENCES contracts(id),
+  change_type  text NOT NULL CHECK (change_type IN ('added', 'removed')),
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (schema_id, contract_id)
+);
+
+CREATE INDEX ON schema_versions (contract_id);
+
+CREATE TABLE fields (
+  id          BIGSERIAL PRIMARY KEY,
+  schema_id   BIGINT NOT NULL REFERENCES schemas(id),
+  path        text NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (schema_id, path)
+);
+
+CREATE TABLE field_versions (
+  id           BIGSERIAL PRIMARY KEY,
+  field_id     BIGINT NOT NULL REFERENCES fields(id),
   contract_id  BIGINT NOT NULL REFERENCES contracts(id),
   type         text,
-  optional     boolean,
-  nullable     boolean NOT NULL DEFAULT false,
+  optional     boolean NOT NULL,
+  nullable     boolean NOT NULL,
+  ref          text,
   change_type  text NOT NULL CHECK (change_type IN ('added', 'modified', 'removed')),
   created_at   timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (property_id, contract_id)
+  UNIQUE (field_id, contract_id)
 );
 
-CREATE INDEX ON property_versions (property_id, contract_id);
-CREATE INDEX ON property_versions (contract_id);
+CREATE INDEX ON field_versions (contract_id);
+
+CREATE TABLE resource_bodies (
+  id           BIGSERIAL PRIMARY KEY,
+  resource_id  BIGINT NOT NULL REFERENCES resources(id),
+  contract_id  BIGINT NOT NULL REFERENCES contracts(id),
+  source       text NOT NULL,
+  schema_id    BIGINT REFERENCES schemas(id),
+  created_at   timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX ON resource_bodies (contract_id, resource_id);
 
 CREATE TABLE deployments (
   id              BIGSERIAL PRIMARY KEY,

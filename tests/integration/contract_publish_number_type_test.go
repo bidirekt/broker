@@ -33,10 +33,10 @@ func (this *IntegrationSuite) TestPublishContract_NumberProperty_StoredWithTheNu
 
 	var storedType string
 	this.Require().NoError(this.Pool.QueryRow(context.Background(),
-		`SELECT property_versions.type
-		   FROM properties
-		   JOIN property_versions ON property_versions.property_id = properties.id
-		  WHERE properties.path = '$.price'`,
+		`SELECT field_versions.type
+		   FROM fields
+		   JOIN field_versions ON field_versions.field_id = fields.id
+		  WHERE fields.path = 'price'`,
 	).Scan(&storedType))
 	this.Equal("number", storedType)
 }

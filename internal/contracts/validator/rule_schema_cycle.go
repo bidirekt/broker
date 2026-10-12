@@ -14,7 +14,7 @@ func schemasInCycle(declarations fragmentmapper.Declarations) []violation.Violat
 	var violations []violation.Violation
 
 	for _, declaration := range declarations.Schemas {
-		cycle, found := cycleBackTo(declaration.Name, declaration.Schema, declarations.Catalog, contract.RefTrail{}.Enter(declaration.Name))
+		cycle, found := cycleBackTo(declaration.Name, declaration.Schema, declarations.Catalog, contract.RefTrail{}.Enter(declaration.Name), map[string]bool{})
 		if !found {
 			continue
 		}
@@ -33,7 +33,15 @@ func schemasInCycle(declarations fragmentmapper.Declarations) []violation.Violat
 	return violations
 }
 
-func cycleBackTo(start string, schema contract.Schema, catalog contract.SchemasMap, trail contract.RefTrail) (contract.RefTrail, bool) {
+// cycleBackTo never explores a name twice: a name whose search did not lead back to start cannot lead there later,
+// which keeps the search linear when schemas point at the next one in several fields.
+func cycleBackTo(
+	start string,
+	schema contract.Schema,
+	catalog contract.SchemasMap,
+	trail contract.RefTrail,
+	exploredWithoutCycle map[string]bool,
+) (contract.RefTrail, bool) {
 	switch {
 	case schema.IsRef():
 		if trail.Contains(schema.Ref) {
@@ -41,28 +49,33 @@ func cycleBackTo(start string, schema contract.Schema, catalog contract.SchemasM
 		}
 
 		target, declared := catalog[schema.Ref]
-		if !declared {
+		if !declared || exploredWithoutCycle[schema.Ref] {
 			return contract.RefTrail{}, false
 		}
 
-		return cycleBackTo(start, target, catalog, trail.Enter(schema.Ref))
+		cycle, found := cycleBackTo(start, target, catalog, trail.Enter(schema.Ref), exploredWithoutCycle)
+		if !found {
+			exploredWithoutCycle[schema.Ref] = true
+		}
+
+		return cycle, found
 
 	case schema.IsArray():
 		if schema.Items == nil {
 			return contract.RefTrail{}, false
 		}
 
-		return cycleBackTo(start, *schema.Items, catalog, trail)
+		return cycleBackTo(start, *schema.Items, catalog, trail, exploredWithoutCycle)
 
 	case schema.IsObject():
 		for _, name := range slices.Sorted(maps.Keys(schema.Properties)) {
-			if cycle, found := cycleBackTo(start, schema.Properties[name], catalog, trail); found {
+			if cycle, found := cycleBackTo(start, schema.Properties[name], catalog, trail, exploredWithoutCycle); found {
 				return cycle, true
 			}
 		}
 
 		if schema.Values != nil {
-			return cycleBackTo(start, *schema.Values, catalog, trail)
+			return cycleBackTo(start, *schema.Values, catalog, trail, exploredWithoutCycle)
 		}
 	}
 

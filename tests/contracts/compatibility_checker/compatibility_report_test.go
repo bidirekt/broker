@@ -28,7 +28,7 @@ func (this noStoredVerdicts) GetVerdict(context.Context, int64, int64) (*model.C
 
 func postPetsResources(
 	interaction string,
-	consumerProperties, providerProperties map[string]model.Property,
+	consumerSchema, providerSchema model.Schema,
 ) (consumer, provider model.PersistedResource) {
 	kind, status := model.RestResponse, null.StringFrom(interaction)
 	if interaction == "request" {
@@ -45,7 +45,8 @@ func postPetsResources(
 		Endpoint:           "/pets",
 		Method:             "post",
 		ResponseStatusCode: status,
-		Properties:         consumerProperties,
+		Bodies:             []model.ResourceBody{{Source: "web.yaml", SchemaName: null.StringFrom("Pet")}},
+		Schemas:            model.Schemas{"Pet": consumerSchema},
 	}
 
 	provider = model.PersistedResource{
@@ -56,7 +57,8 @@ func postPetsResources(
 		Endpoint:           "/pets",
 		Method:             "post",
 		ResponseStatusCode: status,
-		Properties:         providerProperties,
+		Bodies:             []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Pet")}},
+		Schemas:            model.Schemas{"Pet": providerSchema},
 		DeployedVersions:   map[string]string{production: "1.0.0"},
 	}
 
@@ -82,16 +84,16 @@ func checkFrom(
 }
 
 func TestFreshPropertyBreaksCarryTheRoleOfTheCheckedSide(t *testing.T) {
-	required := map[string]model.Property{"$.name": model.NewProperty("$.name", "string", false, false)}
-	optional := map[string]model.Property{"$.name": model.NewProperty("$.name", "string", true, false)}
-	integer := map[string]model.Property{"$.name": model.NewProperty("$.name", "integer", false, false)}
-	absent := map[string]model.Property{"$": {Path: "$", Type: "object"}}
+	required := model.Schema{"": {Type: "object"}, "name": {Type: "string"}}
+	optional := model.Schema{"": {Type: "object"}, "name": {Type: "string", Optional: true}}
+	integer := model.Schema{"": {Type: "object"}, "name": {Type: "integer"}}
+	absent := model.Schema{"": {Type: "object"}}
 
 	cases := []struct {
 		reason      compatibility_checker.BreakingReason
 		interaction string
-		consumer    map[string]model.Property
-		provider    map[string]model.Property
+		consumer    model.Schema
+		provider    model.Schema
 	}{
 		{compatibility_checker.ReasonPropertyMissingInProvider, "201", required, absent},
 		{compatibility_checker.ReasonPropertyOptionalInProviderRequiredInConsumer, "201", required, optional},
@@ -129,8 +131,8 @@ func TestFreshPropertyBreaksCarryTheRoleOfTheCheckedSide(t *testing.T) {
 }
 
 func TestFreshResourceBreaksCarryTheirFixedRole(t *testing.T) {
-	properties := map[string]model.Property{"$.name": model.NewProperty("$.name", "string", false, false)}
-	consumer, provider := postPetsResources("201", properties, properties)
+	pet := model.Schema{"": {Type: "object"}, "name": {Type: "string"}}
+	consumer, provider := postPetsResources("201", pet, pet)
 
 	undeployed := provider
 	undeployed.DeployedVersions = map[string]string{"staging": "1.0.0"}
@@ -241,12 +243,12 @@ func TestCachedPropertyBreaksCarryTheRoleOfTheCurrentCheck(t *testing.T) {
 }
 
 func TestFreshBreaksOfAnInteractionAreSortedByProperty(t *testing.T) {
-	consumerProperties := map[string]model.Property{}
-	for _, property := range []string{"$.weight", "$.photoUrl", "$.ownerId", "$.name", "$.age", "$.color"} {
-		consumerProperties[property] = model.Property{Type: "string"}
+	readByTheConsumer := model.Schema{"": {Type: "object"}}
+	for _, property := range []string{"weight", "photoUrl", "ownerId", "name", "age", "color"} {
+		readByTheConsumer[property] = model.Field{Type: "string"}
 	}
 
-	consumer, provider := postPetsResources("201", consumerProperties, map[string]model.Property{"$": {Type: "object"}})
+	consumer, provider := postPetsResources("201", readByTheConsumer, model.Schema{"": {Type: "object"}})
 
 	report := checkFrom(consumer, model.ResourceCounterparts{
 		Providers: map[string]model.PersistedResource{postPetsHash: provider},

@@ -7,6 +7,7 @@ import (
 	"github.com/bidirekt/broker/internal/contracts/mapper/fragmentmapper"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/goccy/go-yaml"
+	"github.com/guregu/null"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -63,11 +64,7 @@ func TestToResourceModels_Happy_MaterializesResources(t *testing.T) {
 	assert.Equal(t, "/pets", resource.Endpoint)
 	assert.Equal(t, "get", resource.Method)
 	assert.Equal(t, "200", resource.ResponseStatusCode.String)
-
-	assert.Contains(t, resource.Properties, "$")
-	assert.Contains(t, resource.Properties, "$.id")
-	assert.Contains(t, resource.Properties, "$.name")
-	assert.Equal(t, "string", resource.Properties["$.id"].Type)
+	assert.Equal(t, []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Pet")}}, resource.Bodies)
 }
 
 const postWithRequestBodyJSON = `{
@@ -76,7 +73,7 @@ const postWithRequestBodyJSON = `{
       "rest": {
         "/pets": {
           "post": {
-            "request": "Pet",
+            "request": "NewPet",
             "responses": { "201": "Pet" }
           }
         }
@@ -84,6 +81,12 @@ const postWithRequestBodyJSON = `{
     }
   },
   "schemas": {
+    "NewPet": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" }
+      }
+    },
     "Pet": {
       "type": "object",
       "properties": {
@@ -112,63 +115,6 @@ const provideRestResponseJSON = `{
   }
 }`
 
-const primitiveTopLevelJSON = `{
-  "consumes": {
-    "ping-service": {
-      "rest": {
-        "/ping": {
-          "get": { "responses": { "200": "Pong" } }
-        }
-      }
-    }
-  },
-  "schemas": {
-    "Pong": { "type": "string" }
-  }
-}`
-
-const arrayOfObjectsJSON = `{
-  "consumes": {
-    "pets_service": {
-      "rest": {
-        "/pets": {
-          "get": { "responses": { "200": "PetList" } }
-        }
-      }
-    }
-  },
-  "schemas": {
-    "PetList": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string" }
-        }
-      }
-    }
-  }
-}`
-
-const refResolvesJSON = `{
-  "consumes": {
-    "pets_service": {
-      "rest": {
-        "/pets": {
-          "get": { "responses": { "200": "PetRef" } }
-        }
-      }
-    }
-  },
-  "schemas": {
-    "PetRef": { "ref": "Pet" },
-    "Pet": {
-      "type": "object",
-      "properties": { "id": { "type": "string" } }
-    }
-  }
-}`
-
 func TestToResourceModels_PostWithRequestBody_EmitsRequestAndResponses(t *testing.T) {
 	resources := toResourceModels(t, postWithRequestBodyJSON)
 
@@ -189,12 +135,12 @@ func TestToResourceModels_PostWithRequestBody_EmitsRequestAndResponses(t *testin
 	assert.Equal(t, "/pets", request.Endpoint)
 	assert.Equal(t, "post", request.Method)
 	assert.Empty(t, request.ResponseStatusCode)
-	assert.Contains(t, request.Properties, "$.id")
+	assert.Equal(t, []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("NewPet")}}, request.Bodies)
 
 	assert.Equal(t, model.Consumes, response.Direction)
 	assert.Equal(t, model.RestResponse, response.Interaction)
 	assert.Equal(t, "201", response.ResponseStatusCode.String)
-	assert.Contains(t, response.Properties, "$.name")
+	assert.Equal(t, []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Pet")}}, response.Bodies)
 }
 
 func TestToResourceModels_ProvidesSide_EmitsProvidedResource(t *testing.T) {
@@ -209,99 +155,5 @@ func TestToResourceModels_ProvidesSide_EmitsProvidedResource(t *testing.T) {
 	assert.Equal(t, "/pets", resource.Endpoint)
 	assert.Equal(t, "get", resource.Method)
 	assert.Equal(t, "200", resource.ResponseStatusCode.String)
-	assert.Contains(t, resource.Properties, "$.id")
-}
-
-func TestToResourceModels_PrimitiveTopLevel_EmitsRootPrimitive(t *testing.T) {
-	resources := toResourceModels(t, primitiveTopLevelJSON)
-
-	require.Len(t, resources, 1)
-	resource := resources[0]
-
-	require.Contains(t, resource.Properties, "$")
-	assert.Equal(t, "string", resource.Properties["$"].Type)
-	assert.Len(t, resource.Properties, 1)
-}
-
-func TestToResourceModels_ArrayOfObjects_WalksItemsViaSchemaPointer(t *testing.T) {
-	resources := toResourceModels(t, arrayOfObjectsJSON)
-
-	require.Len(t, resources, 1)
-	resource := resources[0]
-
-	require.Contains(t, resource.Properties, "$")
-	require.Contains(t, resource.Properties, "$[]")
-	require.Contains(t, resource.Properties, "$[].id")
-	assert.Equal(t, "array", resource.Properties["$"].Type)
-	assert.Equal(t, "object", resource.Properties["$[]"].Type)
-	assert.Equal(t, "string", resource.Properties["$[].id"].Type)
-}
-
-func TestToResourceModels_RefResolves_SubstitutesReferencedSchema(t *testing.T) {
-	resources := toResourceModels(t, refResolvesJSON)
-
-	require.Len(t, resources, 1)
-	resource := resources[0]
-
-	require.Contains(t, resource.Properties, "$")
-	require.Contains(t, resource.Properties, "$.id")
-	assert.Equal(t, "object", resource.Properties["$"].Type)
-	assert.Equal(t, "string", resource.Properties["$.id"].Type)
-}
-
-const wideShallowContractJSON = `{
-  "provides": {
-    "rest": {
-      "/users": {
-        "get": {
-          "responses": { "200": "UsersList" }
-        }
-      }
-    }
-  },
-  "schemas": {
-    "UsersList": {
-      "type": "object",
-      "properties": {
-        "users": {
-          "type": "array",
-          "items": { "ref": "User" }
-        }
-      }
-    },
-    "User": {
-      "type": "object",
-      "properties": {
-        "userId":        { "type": "string" },
-        "another":       { "type": "object" },
-        "somethingElse": { "type": "string" },
-        "list": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "userId":        { "type": "string" },
-              "another":       { "type": "object" },
-              "somethingElse": { "type": "string" },
-              "list": {
-                "type": "array",
-                "items": { "type": "object" }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-}`
-
-func TestToResourceModels_WideShallowSchema_MaterializesEveryBranch(t *testing.T) {
-	resources := toResourceModels(t, wideShallowContractJSON)
-
-	require.Len(t, resources, 1)
-	resource := resources[0]
-
-	require.Contains(t, resource.Properties, "$.users[].list[].list[]")
-	assert.Equal(t, "array", resource.Properties["$.users[].list[].list"].Type)
-	assert.Equal(t, "string", resource.Properties["$.users[].list[].userId"].Type)
+	assert.Equal(t, []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Pet")}}, resource.Bodies)
 }

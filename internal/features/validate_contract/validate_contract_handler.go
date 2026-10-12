@@ -130,7 +130,8 @@ func toPersistedContract(
 			Endpoint:           resource.Endpoint,
 			Method:             resource.Method,
 			ResponseStatusCode: resource.ResponseStatusCode,
-			Properties:         resource.Properties,
+			Bodies:             resource.Bodies,
+			Schemas:            uploadedContract.Schemas,
 			ProviderHash:       resource.ProviderHash(),
 		}
 	}
@@ -142,6 +143,7 @@ func toPersistedContract(
 	return &model.PersistedContract{
 		ParticipantName: uploadedContract.ParticipantName,
 		Resources:       resources,
+		Schemas:         uploadedContract.Schemas,
 	}
 }
 
