@@ -269,3 +269,42 @@ properties:
 		},
 	}, schema)
 }
+
+func TestSchemaFromDocument_ObjectWithValues(t *testing.T) {
+	schema := contract.SchemaFromDocument(schemaDocument(t, `type: object
+values:
+  ref: Pet
+  nullable: true
+`))
+
+	assert.Equal(t, contract.Schema{Type: "object", Values: &contract.Schema{Ref: "Pet", Nullable: true}}, schema)
+	assert.True(t, schema.IsObject())
+	assert.False(t, schema.IsArray())
+	assert.False(t, schema.IsPrimitive())
+	assert.False(t, schema.IsRef())
+}
+
+func TestSchemaFromDocument_ValuesWithoutTypeIsObject(t *testing.T) {
+	schema := contract.SchemaFromDocument(schemaDocument(t, `values:
+  type: string
+`))
+
+	assert.Equal(t, contract.Schema{Values: &contract.Schema{Type: "string"}}, schema)
+	assert.True(t, schema.IsObject())
+	assert.False(t, schema.IsArray())
+}
+
+func TestSchemaFromDocument_RefWithValuesIsNotRef(t *testing.T) {
+	schema := contract.SchemaFromDocument(schemaDocument(t, "ref: Pet\nvalues: {}\n"))
+
+	assert.Equal(t, "Pet", schema.Ref)
+	assert.False(t, schema.IsRef())
+}
+
+func TestSchemaFromDocument_ValuesThatIsNotAMappingIsIgnored(t *testing.T) {
+	schema := contract.SchemaFromDocument(schemaDocument(t, `type: object
+values: string
+`))
+
+	assert.Equal(t, contract.Schema{Type: "object"}, schema)
+}

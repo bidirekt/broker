@@ -45,3 +45,18 @@ func TestToPropertyModels_ArrayItem_SuffixesBrackets(t *testing.T) {
 		"$.x[]": {Path: "$.x[]", Type: "string", Optional: false},
 	}, properties)
 }
+
+func TestToPropertyModels_MapValues_SuffixesBraces(t *testing.T) {
+	properties := schemamapper.ToPropertyModels(nil, contract.Schema{
+		Type: "object",
+		Properties: map[string]contract.Schema{
+			"x": {Type: "object", Values: &contract.Schema{Type: "string"}},
+		},
+	})
+
+	assert.Equal(t, map[string]model.Property{
+		"$":     {Path: "$", Type: "object", Optional: false},
+		"$.x":   {Path: "$.x", Type: "object", Optional: false},
+		"$.x{}": {Path: "$.x{}", Type: "string", Optional: false},
+	}, properties)
+}

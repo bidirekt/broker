@@ -118,11 +118,16 @@ func NewPropertyBreakChange(
 	}
 }
 
-// typeToken renders a property's type, resolving array item types from the
-// flat property map: $.list (array) + $.list[] (string) → "array<string>".
+// typeToken renders a property's type, resolving array item and map value types
+// from the flat property map: $.list (array) + $.list[] (string) → "array<string>",
+// $.pets (object) + $.pets{} (object) → "map<object>".
 func typeToken(resource *model.PersistedResource, propertyPath string) string {
 	if resource.Properties[propertyPath].Type == "array" {
 		return "array<" + typeToken(resource, propertyPath+"[]") + ">"
+	}
+
+	if _, isMap := resource.Properties[propertyPath+"{}"]; isMap && resource.Properties[propertyPath].Type == "object" {
+		return "map<" + typeToken(resource, propertyPath+"{}") + ">"
 	}
 
 	return resource.Properties[propertyPath].Type

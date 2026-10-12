@@ -13,3 +13,7 @@ func (this propertyPath) Append(chunk string) propertyPath {
 func (this propertyPath) AppendArray() propertyPath {
 	return propertyPath(string(this) + "[]")
 }
+
+func (this propertyPath) AppendMap() propertyPath {
+	return propertyPath(string(this) + "{}")
+}

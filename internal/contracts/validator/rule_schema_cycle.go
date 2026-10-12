@@ -60,6 +60,10 @@ func cycleBackTo(start string, schema contract.Schema, catalog contract.SchemasM
 				return cycle, true
 			}
 		}
+
+		if schema.Values != nil {
+			return cycleBackTo(start, *schema.Values, catalog, trail)
+		}
 	}
 
 	return contract.RefTrail{}, false

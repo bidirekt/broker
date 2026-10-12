@@ -119,3 +119,88 @@ func TestSchema_NullableIsAcceptedOnEveryNode(t *testing.T) {
 
 	assert.Empty(t, violations)
 }
+
+func TestSchema_ValuesWithObjectTypeIsValid(t *testing.T) {
+	source := "type: object\n" +
+		"values:\n" +
+		"  ref: Pet\n"
+
+	violations := descriptor.Validate(descriptor.Schema(), schemaDocument(t, source), "api.yaml")
+
+	assert.Empty(t, violations)
+}
+
+func TestSchema_ValuesWithoutTypeIsValid(t *testing.T) {
+	source := "values:\n" +
+		"  type: object\n" +
+		"  properties:\n" +
+		"    name:\n" +
+		"      type: string\n"
+
+	violations := descriptor.Validate(descriptor.Schema(), schemaDocument(t, source), "api.yaml")
+
+	assert.Empty(t, violations)
+}
+
+func TestSchema_ValuesWithPropertiesIsRejectedAtTheNode(t *testing.T) {
+	source := "type: object\n" +
+		"properties:\n" +
+		"  pets:\n" +
+		"    type: object\n" +
+		"    properties:\n" +
+		"      bob:\n" +
+		"        type: string\n" +
+		"    values:\n" +
+		"      type: string\n"
+
+	violations := descriptor.Validate(descriptor.Schema(), schemaDocument(t, source), "api.yaml")
+
+	require.Len(t, violations, 1)
+	assert.Equal(t, "schema.values_with_properties", violations[0].ErrorCode)
+	assert.Equal(t, "properties;pets", violations[0].Path)
+	assert.Nil(t, violations[0].Details)
+}
+
+func TestSchema_ValuesOnNonObjectTypeIsRejectedAtTheNode(t *testing.T) {
+	source := "type: object\n" +
+		"properties:\n" +
+		"  pets:\n" +
+		"    type: string\n" +
+		"    values:\n" +
+		"      type: string\n"
+
+	violations := descriptor.Validate(descriptor.Schema(), schemaDocument(t, source), "api.yaml")
+
+	require.Len(t, violations, 1)
+	assert.Equal(t, "schema.values_without_object", violations[0].ErrorCode)
+	assert.Equal(t, "properties;pets", violations[0].Path)
+	assert.Nil(t, violations[0].Details)
+}
+
+func TestSchema_ObjectWithoutPropertiesOrValuesIsValid(t *testing.T) {
+	violations := descriptor.Validate(descriptor.Schema(), map[string]any{"type": "object"}, "api.yaml")
+
+	assert.Empty(t, violations)
+}
+
+func TestSchema_PropertyNamedStarIsAnOrdinaryName(t *testing.T) {
+	source := "type: object\n" +
+		"properties:\n" +
+		"  \"*\":\n" +
+		"    type: string\n"
+
+	violations := descriptor.Validate(descriptor.Schema(), schemaDocument(t, source), "api.yaml")
+
+	assert.Empty(t, violations)
+}
+
+func TestSchema_NullableIsAcceptedOnTheValuesNode(t *testing.T) {
+	source := "type: object\n" +
+		"values:\n" +
+		"  type: string\n" +
+		"  nullable: true\n"
+
+	violations := descriptor.Validate(descriptor.Schema(), schemaDocument(t, source), "api.yaml")
+
+	assert.Empty(t, violations)
+}
