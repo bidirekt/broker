@@ -188,7 +188,7 @@ func (this *IntegrationSuite) TestPublishContract_UnresolvedRefInUnreachedSchema
 	this.Equal(0, this.countRows("contracts"))
 }
 
-func (this *IntegrationSuite) TestPublishContract_CyclicSchema_RejectedBrokerStaysUp() {
+func (this *IntegrationSuite) TestPublishContract_CyclicSchema_Accepted() {
 	status, _ := this.post("/api/participants", namesParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
@@ -196,14 +196,9 @@ func (this *IntegrationSuite) TestPublishContract_CyclicSchema_RejectedBrokerSta
 		contractFragment{"pets.yaml", namesCyclicEndpointsYAML},
 		contractFragment{"schemas.yaml", namesCyclicSchemasYAML},
 	))
-	this.Equal(http.StatusBadRequest, status)
-	this.JSONEq(`{"message":"contract validation failed","violations":[`+
-		`{"code":"schema.cycle","path":"schemas;Owner","source":"schemas.yaml","details":{"schema":"Owner","cycle":"Owner → Pet → Owner"}},`+
-		`{"code":"schema.cycle","path":"schemas;Pet","source":"schemas.yaml","details":{"schema":"Pet","cycle":"Pet → Owner → Pet"}}`+
-		`]}`, body)
-
-	this.Equal(0, this.countRows("contracts"))
-
-	status, _ = this.post("/api/participants", `{"participant":"still_alive"}`)
 	this.Equal(http.StatusOK, status)
+	this.JSONEq(`{"message":"contract publish successful"}`, body)
+
+	this.Equal(1, this.countRows("contracts"))
+	this.Equal(2, this.countRows("schemas"))
 }
