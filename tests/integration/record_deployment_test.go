@@ -9,7 +9,9 @@ const (
 	apiParticipantBody         = `{"participant":"api"}`
 	apiV1DeploymentBody        = `{"participant":"api","version":"v1","environment":"production"}`
 	apiV2DeploymentBody        = `{"participant":"api","version":"v2","environment":"production"}`
+	apiV1StagingDeploymentBody = `{"participant":"api","version":"v1","environment":"staging"}`
 	productionEnvBodyForDeploy = `{"environment":"production"}`
+	stagingEnvBodyForDeploy    = `{"environment":"staging"}`
 )
 
 const apiV1ContractBody = `
@@ -139,11 +141,13 @@ func (this *IntegrationSuite) TestRecordDeployment_RollbackWritesNewRow() {
 	status, _ = this.post("/api/deployments", apiV1DeploymentBody)
 	this.Require().Equal(http.StatusOK, status)
 
-	status, _ = this.post("/api/deployments", apiV2DeploymentBody)
+	status, body := this.post("/api/deployments", apiV2DeploymentBody)
 	this.Require().Equal(http.StatusOK, status)
+	this.JSONEq(`{"message":"deployment recorded"}`, body)
 
-	status, _ = this.post("/api/deployments", apiV1DeploymentBody)
+	status, body = this.post("/api/deployments", apiV1DeploymentBody)
 	this.Require().Equal(http.StatusOK, status)
+	this.JSONEq(`{"message":"deployment rolled back"}`, body)
 
 	this.Equal(3, this.countRows("deployments"))
 
@@ -167,6 +171,26 @@ func (this *IntegrationSuite) TestRecordDeployment_RollbackWritesNewRow() {
 	this.Equal(row{version: "v1", rollback: false}, got[0])
 	this.Equal(row{version: "v2", rollback: false}, got[1])
 	this.Equal(row{version: "v1", rollback: true}, got[2])
+}
+
+func (this *IntegrationSuite) TestRecordDeployment_RollbackScopedPerEnvironment() {
+	this.seedApiParticipantContractAndProductionEnv()
+
+	status, _ := this.post("/api/contracts", this.publishBody("api", "v2", contractFragment{"api.yaml", apiV2ContractBody}))
+	this.Require().Equal(http.StatusOK, status)
+
+	status, _ = this.post("/api/environments", stagingEnvBodyForDeploy)
+	this.Require().Equal(http.StatusOK, status)
+
+	status, _ = this.post("/api/deployments", apiV1DeploymentBody)
+	this.Require().Equal(http.StatusOK, status)
+
+	status, _ = this.post("/api/deployments", apiV2DeploymentBody)
+	this.Require().Equal(http.StatusOK, status)
+
+	status, body := this.post("/api/deployments", apiV1StagingDeploymentBody)
+	this.Equal(http.StatusOK, status)
+	this.JSONEq(`{"message":"deployment recorded"}`, body)
 }
 
 func (this *IntegrationSuite) TestRecordDeployment_MalformedJSONReturns400() {
