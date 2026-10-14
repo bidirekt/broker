@@ -51,7 +51,12 @@ func (this *RecordDeploymentHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondEnvironmentNotFound(ctx)
 	}
 
-	this.deploymentRepository.Insert(ctx.Context(), model.NewDeployment(participant, requestBody.Version, environment))
+	deployment := model.NewDeployment(participant, requestBody.Version, environment)
+	this.deploymentRepository.Insert(ctx.Context(), deployment)
+
+	if deployment.Rollback {
+		return this.respondRolledBack(ctx)
+	}
 
 	return ctx.Status(fiber.StatusOK).JSON(RecordDeploymentResponseBody{
 		Message: DeploymentRecorded,
@@ -79,5 +84,11 @@ func (this *RecordDeploymentHandler) respondParticipantNotFound(ctx fiber.Ctx) e
 func (this *RecordDeploymentHandler) respondVersionNotFound(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusNotFound).JSON(RecordDeploymentResponseBody{
 		Message: VersionNotFound,
+	})
+}
+
+func (this *RecordDeploymentHandler) respondRolledBack(ctx fiber.Ctx) error {
+	return ctx.Status(fiber.StatusOK).JSON(RecordDeploymentResponseBody{
+		Message: DeploymentRolledBack,
 	})
 }

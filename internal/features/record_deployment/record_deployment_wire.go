@@ -1,6 +1,7 @@
 package record_deployment
 
 const DeploymentRecorded string = "deployment recorded"
+const DeploymentRolledBack string = "deployment rolled back"
 const DeploymentInvalidInput string = "deployment invalid input"
 const ParticipantNotFound string = "participant not found"
 const VersionNotFound string = "version not found"
