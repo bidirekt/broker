@@ -89,6 +89,35 @@ const refBehindRefYAML = `schemas:
         ref: Ghost
 `
 
+const unresolvedMapValuesRefYAML = `schemas:
+  Prices:
+    type: object
+    values:
+      ref: Price
+`
+
+const unresolvedNestedMapValuesRefsYAML = `schemas:
+  Catalog:
+    type: object
+    properties:
+      prices:
+        type: object
+        values:
+          ref: Price
+  PriceHistory:
+    type: object
+    values:
+      type: array
+      items:
+        ref: Price
+  PriceTables:
+    type: array
+    items:
+      type: object
+      values:
+        ref: Price
+`
+
 const cyclicSchemasYAML = `schemas:
   Pet:
     type: object
@@ -369,6 +398,44 @@ func TestValidate_UnresolvedRefBehindAResolvedRef_ReportedOnceWhereWritten(t *te
 			Path:      "schemas;Pet;properties;owner",
 			Source:    "schemas.yaml",
 			Details:   map[string]string{"schema": "Ghost", "property": "Pet.owner"},
+		},
+	}, violations)
+}
+
+func TestValidate_UnresolvedRefUnderMapValues_ReportedAtTheValues(t *testing.T) {
+	violations := validateFiles(t, validatedFile{"prices.yaml", unresolvedMapValuesRefYAML})
+
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "schema.unresolved_ref",
+			Path:      "schemas;Prices;values",
+			Source:    "prices.yaml",
+			Details:   map[string]string{"schema": "Price", "property": "Prices{}"},
+		},
+	}, violations)
+}
+
+func TestValidate_UnresolvedRefsUnderNestedMapValues_ReportEachRefSite(t *testing.T) {
+	violations := validateFiles(t, validatedFile{"prices.yaml", unresolvedNestedMapValuesRefsYAML})
+
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "schema.unresolved_ref",
+			Path:      "schemas;Catalog;properties;prices;values",
+			Source:    "prices.yaml",
+			Details:   map[string]string{"schema": "Price", "property": "Catalog.prices{}"},
+		},
+		{
+			ErrorCode: "schema.unresolved_ref",
+			Path:      "schemas;PriceHistory;values;items",
+			Source:    "prices.yaml",
+			Details:   map[string]string{"schema": "Price", "property": "PriceHistory{}[]"},
+		},
+		{
+			ErrorCode: "schema.unresolved_ref",
+			Path:      "schemas;PriceTables;items;values",
+			Source:    "prices.yaml",
+			Details:   map[string]string{"schema": "Price", "property": "PriceTables[]{}"},
 		},
 	}, violations)
 }
