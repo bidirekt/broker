@@ -338,10 +338,26 @@ func TestMapReader_ConsumerModulesSendingTheMapAndAFixedKey_CompareTheSentKeyAga
 			"consumerField": "SessionChurch.onboarding.church", "providerField": "CoreSession.onboarding{}",
 			"consumerPropertyType": "string", "providerPropertyType": "boolean",
 		})},
-		{compatibility_checker.ReasonPropertyOptionalInConsumerRequiredInProvider, onboardingDetails("$.onboarding{}", map[string]string{
-			"consumerField": "SessionMap.onboarding{}", "providerField": "CoreSession.onboarding{}", "propertyType": "boolean",
-		})},
 	}, onboardingBreaks(t, "request", twoModules, coreSession(onboardingValues(model.Field{Type: "boolean"}))))
+}
+
+func TestMapReader_ConsumerModulesSendingTheMapAndAFixedKeyOfTheValueType_HaveNoBreak(t *testing.T) {
+	twoModules := onboardingSide{
+		bodies: []model.ResourceBody{
+			{Source: "map.yaml", SchemaName: null.StringFrom("SessionMap")},
+			{Source: "church.yaml", SchemaName: null.StringFrom("SessionChurch")},
+		},
+		schemas: model.Schemas{
+			"SessionMap": onboardingValues(model.Field{Type: "boolean"}),
+			"SessionChurch": {
+				"":                  {Type: "object"},
+				"onboarding":        {Type: "object"},
+				"onboarding.church": {Type: "boolean"},
+			},
+		},
+	}
+
+	assert.Empty(t, onboardingBreaks(t, "request", twoModules, coreSession(onboardingValues(model.Field{Type: "boolean"}))))
 }
 
 func TestMapReader_ObjectWithoutProperties_IsStillMissingTheValues(t *testing.T) {
