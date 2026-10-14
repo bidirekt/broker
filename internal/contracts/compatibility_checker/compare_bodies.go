@@ -94,11 +94,9 @@ func (this *bodyComparison) compareReadRequiring(reader, producer schemagraph.No
 
 	this.comparedShapes[shapes] = true
 
-	readSegments := reader.Segments()
-
-	for _, segment := range readSegments {
+	for _, segment := range reader.Segments() {
 		if segment == model.ValuesSegment {
-			this.compareValuesRead(reader.Child(segment), producer, path, readSegments)
+			this.compareValuesRead(reader, producer, path)
 
 			continue
 		}
@@ -107,20 +105,27 @@ func (this *bodyComparison) compareReadRequiring(reader, producer schemagraph.No
 	}
 }
 
-// A map requires none of its keys, so each fixed key the reader does not read on its own is compared against the
-// values without the optional rule.
-func (this *bodyComparison) compareValuesRead(values, producer schemagraph.Node, path string, readSegments []string) {
+// A map requires none of its keys, so each fixed key is compared without the optional rule against the values of
+// the reader modules that do not read it on their own; a producer module sending neither the values nor a fixed key
+// is missing the values.
+func (this *bodyComparison) compareValuesRead(reader, producer schemagraph.Node, path string) {
+	values := reader.Child(model.ValuesSegment)
+	valuesPath := model.ChildPath(path, model.ValuesSegment)
 	producedValues := producer.Child(model.ValuesSegment)
 	producedKeys := fixedKeysOf(producer)
 
 	if producedValues.Exists() || len(producedKeys) == 0 {
-		this.compareReadRequiring(values, producedValues, model.ChildPath(path, model.ValuesSegment), len(producedKeys) == 0 && !values.Optional())
+		this.compareReadRequiring(values, producedValues, valuesPath, len(producedKeys) == 0 && !values.Optional())
 	}
 
+	sendingNothing := producer.WithoutChild(model.ValuesSegment)
 	for _, key := range producedKeys {
-		if !slices.Contains(readSegments, key) {
-			this.compareReadRequiring(values, producer.Child(key), model.ChildPath(path, key), false)
-		}
+		sendingNothing = sendingNothing.WithoutChild(key)
+		this.compareReadRequiring(reader.WithoutChild(key).Child(model.ValuesSegment), producer.Child(key), model.ChildPath(path, key), false)
+	}
+
+	if len(producedKeys) > 0 && sendingNothing.Exists() && !values.Optional() {
+		this.breakAt(this.rules.missing, valuesPath, values, sendingNothing.Child(model.ValuesSegment))
 	}
 }
 
