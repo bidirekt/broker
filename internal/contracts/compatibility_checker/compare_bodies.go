@@ -1,6 +1,8 @@
 package compatibility_checker
 
 import (
+	"slices"
+
 	"github.com/bidirekt/broker/internal/contracts/schemagraph"
 	"github.com/bidirekt/broker/internal/model"
 )
@@ -44,12 +46,16 @@ func compareBodies(
 }
 
 func (this *bodyComparison) compareRead(reader, producer schemagraph.Node, path string) {
+	this.compareReadRequiring(reader, producer, path, !reader.Optional())
+}
+
+func (this *bodyComparison) compareReadRequiring(reader, producer schemagraph.Node, path string, required bool) {
 	if !reader.Exists() {
 		return
 	}
 
 	if !producer.Exists() {
-		if !reader.Optional() {
+		if required {
 			this.breakAt(this.rules.missing, path, reader, producer)
 		}
 
@@ -74,7 +80,7 @@ func (this *bodyComparison) compareRead(reader, producer schemagraph.Node, path 
 		return
 	}
 
-	if !reader.Optional() && producer.Optional() {
+	if required && producer.Optional() {
 		this.breakAt(this.rules.optional, path, reader, producer)
 	}
 
@@ -88,9 +94,40 @@ func (this *bodyComparison) compareRead(reader, producer schemagraph.Node, path 
 
 	this.comparedShapes[shapes] = true
 
-	for _, segment := range reader.Segments() {
+	readSegments := reader.Segments()
+
+	for _, segment := range readSegments {
+		if segment == model.ValuesSegment {
+			this.compareValuesRead(reader.Child(segment), producer, path, readSegments)
+
+			continue
+		}
+
 		this.compareRead(reader.Child(segment), producer.Child(segment), model.ChildPath(path, segment))
 	}
+}
+
+// A map requires none of its keys, so each fixed key the reader does not read on its own is compared against the
+// values without the optional rule.
+func (this *bodyComparison) compareValuesRead(values, producer schemagraph.Node, path string, readSegments []string) {
+	producedValues := producer.Child(model.ValuesSegment)
+	producedKeys := fixedKeysOf(producer)
+
+	if producedValues.Exists() || len(producedKeys) == 0 {
+		this.compareRead(values, producedValues, model.ChildPath(path, model.ValuesSegment))
+	}
+
+	for _, key := range producedKeys {
+		if !slices.Contains(readSegments, key) {
+			this.compareReadRequiring(values, producer.Child(key), model.ChildPath(path, key), false)
+		}
+	}
+}
+
+func fixedKeysOf(node schemagraph.Node) []string {
+	return slices.DeleteFunc(node.Segments(), func(segment string) bool {
+		return segment == model.ItemsSegment || segment == model.ValuesSegment
+	})
 }
 
 func (this *bodyComparison) breakAt(reason BreakingReason, path string, reader, producer schemagraph.Node) {
