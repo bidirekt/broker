@@ -114,7 +114,7 @@ func (this *bodyComparison) compareValuesRead(values, producer schemagraph.Node,
 	producedKeys := fixedKeysOf(producer)
 
 	if producedValues.Exists() || len(producedKeys) == 0 {
-		this.compareRead(values, producedValues, model.ChildPath(path, model.ValuesSegment))
+		this.compareReadRequiring(values, producedValues, model.ChildPath(path, model.ValuesSegment), len(producedKeys) == 0 && !values.Optional())
 	}
 
 	for _, key := range producedKeys {
