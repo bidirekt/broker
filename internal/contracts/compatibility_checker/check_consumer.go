@@ -20,9 +20,12 @@ func (this *CompatibilityChecker) checkConsumer(
 	incompatibleItem := NewIncompatibleItem()
 
 	if !found {
-		incompatibleItem.AppendContractBreakChange(
-			NewProviderResourceNotFound(&consumerResource),
-		)
+		notFound := NewProviderResourceNotFound(&consumerResource)
+		if providerStatuses, declaresMethod := counterparts.ProviderStatuses[consumerResource.ProviderHash]; declaresMethod {
+			notFound = NewProviderResourceInteractionNotFound(&consumerResource, providerStatuses)
+		}
+
+		incompatibleItem.AppendContractBreakChange(notFound)
 
 		report.AppendResult(consumerResource.ConsumedProvider.String, incompatibleItem)
 

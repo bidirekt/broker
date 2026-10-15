@@ -115,3 +115,22 @@ func TestEndpoint_BarraDuplaNoFimContinuaMalformada(t *testing.T) {
 	assert.Equal(t, "/users//", violations[0].Path)
 	assert.Equal(t, map[string]string{"key": "/users//", "error": "malformed path"}, violations[0].Details)
 }
+
+func TestEndpoint_RejectsDoubleSlashAsAnEmptySegment(t *testing.T) {
+	subject := descriptor.Map(descriptor.Endpoint, descriptor.Object(descriptor.Fields{}))
+
+	violations := descriptor.Validate(subject, map[string]any{"//": nil}, "api.yaml")
+
+	require.Len(t, violations, 1)
+	assert.Equal(t, "endpoint.syntax", violations[0].ErrorCode)
+	assert.Equal(t, "//", violations[0].Path)
+	assert.Equal(t, map[string]string{"key": "//", "error": "malformed path"}, violations[0].Details)
+}
+
+func TestEndpoint_AcceptsTheRoot(t *testing.T) {
+	subject := descriptor.Map(descriptor.Endpoint, descriptor.Object(descriptor.Fields{}))
+
+	violations := descriptor.Validate(subject, map[string]any{"/": nil}, "api.yaml")
+
+	assert.Empty(t, violations)
+}

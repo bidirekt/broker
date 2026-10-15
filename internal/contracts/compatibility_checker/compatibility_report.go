@@ -33,6 +33,7 @@ func (this *ContractBreakingChange) InteractionKey() string {
 // environment checks that depend on deployments and never become a stored verdict.
 func (this *ContractBreakingChange) IsPropertyBreak() bool {
 	return this.Reason != ReasonProviderResourceNotFound &&
+		this.Reason != ReasonProviderResourceInteractionNotFound &&
 		this.Reason != ReasonProviderResourceNotDeployedInEnvironment &&
 		this.Reason != ReasonProviderResourceRemovedButStillConsumed
 }

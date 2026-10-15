@@ -208,14 +208,18 @@ func (this *IntegrationSuite) TestCanIDeploy_UndescribedResponseReadAsDescribed_
 	}
 }
 
-func (this *IntegrationSuite) TestCanIDeploy_RequestOmittedByTheProvider_IsProviderResourceNotFound() {
+func (this *IntegrationSuite) TestCanIDeploy_RequestOmittedByTheProvider_IsProviderResourceInteractionNotFound() {
 	this.publishAndDeployProviderForUndescribedBody(uploadWithoutRequestProviderYAML, describedUploadConsumerYAML)
 
 	fromConsumer, validatedConsumer := this.canIDeployAndValidateForUndescribedBody("files_web", describedUploadConsumerYAML)
 	for name, response := range map[string]undescribedBodyResponse{"can-i-deploy": fromConsumer, "validate": validatedConsumer} {
 		this.False(response.Deployable, "consumer %s", name)
 		this.Equal(map[string]map[string]map[string][]undescribedBodyLeaf{
-			"/files": {"post": {"request": {{Reason: "provider_resource_not_found", Role: "consumer"}}}},
+			"/files": {"post": {"request": {{
+				Reason:  "provider_resource_interaction_not_found",
+				Role:    "consumer",
+				Details: map[string]string{"providerStatuses": "201"},
+			}}}},
 		}, response.Results["files_api"].Endpoints, "consumer %s", name)
 	}
 }

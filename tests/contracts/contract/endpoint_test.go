@@ -18,3 +18,11 @@ func TestNormalizeEndpoint_KeepsRoot(t *testing.T) {
 func TestNormalizeEndpoint_LeavesPlainEndpointAlone(t *testing.T) {
 	assert.Equal(t, "/users", contract.NormalizeEndpoint("/users"))
 }
+
+func TestNormalizeEndpoint_KeepsTheSlashThatClosesAnEmptySegment(t *testing.T) {
+	for _, endpoint := range []string{"//", "/users//"} {
+		t.Run(endpoint, func(t *testing.T) {
+			assert.Equal(t, endpoint, contract.NormalizeEndpoint(endpoint))
+		})
+	}
+}
