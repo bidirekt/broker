@@ -11,6 +11,7 @@ type BreakingReason string
 
 const (
 	ReasonProviderResourceNotFound                        BreakingReason = "provider_resource_not_found"
+	ReasonProviderResourceInteractionNotFound             BreakingReason = "provider_resource_interaction_not_found"
 	ReasonPropertyMissingInProvider                       BreakingReason = "property_missing_in_provider"
 	ReasonPropertyMissingInConsumer                       BreakingReason = "property_missing_in_consumer"
 	ReasonPropertyTypeMismatch                            BreakingReason = "property_type_mismatch"
@@ -69,6 +70,25 @@ func NewProviderResourceNotFound(checkedResource *model.PersistedResource) Contr
 	return ContractBreakingChange{
 		CheckedResource: checkedResource,
 		Reason:          ReasonProviderResourceNotFound,
+	}
+}
+
+func NewProviderResourceInteractionNotFound(
+	consumerResource *model.PersistedResource,
+	providerStatuses []string,
+) ContractBreakingChange {
+	var details map[string]string
+
+	if len(providerStatuses) > 0 {
+		details = map[string]string{
+			"providerStatuses": strings.Join(providerStatuses, ", "),
+		}
+	}
+
+	return ContractBreakingChange{
+		CheckedResource: consumerResource,
+		Reason:          ReasonProviderResourceInteractionNotFound,
+		Details:         details,
 	}
 }
 

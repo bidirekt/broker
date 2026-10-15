@@ -1,7 +1,10 @@
 # Local use only: fixed credentials, broker exposed on localhost:8080.
+name: bidirekt
+
 services:
   postgres:
     image: postgres:17-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: bidirekt
       POSTGRES_PASSWORD: bidirekt
@@ -16,10 +19,11 @@ services:
 
   broker:
     image: ghcr.io/bidirekt/broker:0.1.0-rc.1
+    restart: unless-stopped
     environment:
       BIDIREKT_DATABASE_URL: postgres://bidirekt:bidirekt@postgres:5432/bidirekt?sslmode=disable
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     depends_on:
       postgres:
         condition: service_healthy

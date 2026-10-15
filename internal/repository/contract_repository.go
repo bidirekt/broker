@@ -309,6 +309,45 @@ const (
 		AND
 			rv.change_type = 'added'
 	`
+
+	deployedProviderStatusesQuery = `
+		SELECT
+			COUNT(*) > 0,
+			array_agg(r.response_status_code ORDER BY r.response_status_code COLLATE "C")
+				FILTER (WHERE r.response_status_code IS NOT NULL)
+		FROM
+			participants pa
+		JOIN LATERAL (
+			SELECT version
+			FROM deployments
+			WHERE participant_id = pa.id
+			  AND environment_id = $5
+			ORDER BY deployed_at DESC
+			LIMIT 1
+		) dep ON true
+		JOIN
+			contract_versions cv ON cv.participant_id = pa.id AND cv.version = dep.version
+		JOIN
+			resources r ON r.participant_id = pa.id
+		JOIN LATERAL (
+			SELECT change_type
+			FROM resource_versions
+			WHERE resource_id = r.id
+			  AND contract_id <= cv.contract_id
+			ORDER BY contract_id DESC
+			LIMIT 1
+		) rv ON true
+		WHERE
+			r.direction = $1
+		AND
+			pa.name = $2
+		AND
+			r.endpoint = $3
+		AND
+			r.method = $4
+		AND
+			rv.change_type = 'added'
+	`
 )
 
 type ContractRepository struct {
@@ -750,6 +789,29 @@ func (this *ContractRepository) loadProviderResource(
 	provider.Schemas = this.loadSchemasAt(ctx, catalogs, provider.ContractID)
 
 	return provider, nil
+}
+
+func (this *ContractRepository) loadDeployedProviderStatuses(
+	ctx context.Context,
+	consumerResource model.PersistedResource,
+	environmentID int64,
+) ([]string, bool) {
+	var declaresMethod bool
+	var statuses []string
+
+	if err := this.pool.QueryRow(
+		ctx,
+		deployedProviderStatusesQuery,
+		string(model.Provides),
+		consumerResource.ConsumedProvider.String,
+		consumerResource.Endpoint,
+		consumerResource.Method,
+		environmentID,
+	).Scan(&declaresMethod, &statuses); err != nil {
+		panic(fmt.Errorf("error loading statuses of deployed provider: %w", err))
+	}
+
+	return statuses, declaresMethod
 }
 
 func (this *ContractRepository) loadConsumerResources(

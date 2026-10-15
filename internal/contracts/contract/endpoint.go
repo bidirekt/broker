@@ -5,8 +5,11 @@ import (
 )
 
 func NormalizeEndpoint(endpoint string) string {
-	if len(endpoint) > 1 && strings.HasSuffix(endpoint, "/") {
-		return strings.TrimSuffix(endpoint, "/")
+	path, hasTrailingSlash := strings.CutSuffix(endpoint, "/")
+	closesSegment := path != "" && !strings.HasSuffix(path, "/")
+
+	if hasTrailingSlash && closesSegment {
+		return path
 	}
 
 	return endpoint
