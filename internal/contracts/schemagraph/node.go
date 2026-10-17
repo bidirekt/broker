@@ -120,18 +120,6 @@ func (this Node) Child(segment string) Node {
 	return child
 }
 
-func (this Node) WithoutChild(segment string) Node {
-	without := Node{graph: this.graph, join: this.join, lacking: this.lacking}
-
-	for _, member := range this.members {
-		if !this.graph.declares(Site{Schema: member.shape.Schema, Path: model.ChildPath(member.shape.Path, segment)}) {
-			without.members = append(without.members, member)
-		}
-	}
-
-	return without
-}
-
 // SiteKey identifies the node by the fields it was reached through, which carry its optional and nullable.
 func (this Node) SiteKey() string {
 	var key strings.Builder

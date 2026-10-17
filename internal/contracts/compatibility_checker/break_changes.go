@@ -166,8 +166,8 @@ func typeTokenOf(node schemagraph.Node, rendering map[string]bool) string {
 		return "array<" + typeTokenOf(node.Child(model.ItemsSegment), rendering) + ">"
 	}
 
-	if values := node.Child(model.ValuesSegment); values.Exists() && node.Type() == "object" {
-		return "map<" + typeTokenOf(values, rendering) + ">"
+	if node.Type() == "map" {
+		return "map<" + typeTokenOf(node.Child(model.ValuesSegment), rendering) + ">"
 	}
 
 	return node.Type()

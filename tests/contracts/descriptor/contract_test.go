@@ -173,14 +173,14 @@ func TestContract_MessageViraChaveDesconhecida(t *testing.T) {
 	assert.Equal(t, "provides;message", violations[0].Path)
 }
 
-func TestContract_SchemaVazioEhTipoInvalido(t *testing.T) {
+func TestContract_EmptySchemaIsAnInvalidType(t *testing.T) {
 	violations := descriptor.Validate(descriptor.Contract, contractDocument(t, "schemas:\n  Pet: {}\n"), "api.yaml")
 
 	require.Len(t, violations, 1)
 	assert.Equal(t, "schema.invalid_type", violations[0].ErrorCode)
 	assert.Equal(t, "schemas;Pet", violations[0].Path)
 	assert.Equal(t, "", violations[0].Details["value"])
-	assert.Equal(t, "object, array, string, integer, float, number, boolean", violations[0].Details["allowed"])
+	assert.Equal(t, "object, array, map, string, integer, float, number, boolean", violations[0].Details["allowed"])
 }
 
 func TestContract_SchemaNuloEhTipoInvalido(t *testing.T) {

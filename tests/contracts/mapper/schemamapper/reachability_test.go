@@ -179,7 +179,7 @@ func TestToSchemaModels_SchemaReferencingItselfThroughMapValues_IsConvertedOnce(
 		"Node": {
 			Type: "object",
 			Properties: map[string]contract.Schema{
-				"children": {Type: "object", Values: &contract.Schema{Ref: "Node"}},
+				"children": {Type: "map", Values: &contract.Schema{Ref: "Node"}},
 			},
 		},
 	}
@@ -189,7 +189,7 @@ func TestToSchemaModels_SchemaReferencingItselfThroughMapValues_IsConvertedOnce(
 	assert.Equal(t, model.Schemas{
 		"Node": {
 			"":           {Type: "object"},
-			"children":   {Type: "object"},
+			"children":   {Type: "map"},
 			"children{}": {Ref: "Node"},
 		},
 	}, schemas)

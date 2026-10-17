@@ -63,11 +63,14 @@ func unresolvedRefsIn(schema contract.Schema, catalog contract.SchemasMap, sourc
 			)...)
 		}
 
-		if schema.Values != nil {
-			violations = append(violations, unresolvedRefsIn(*schema.Values, catalog, source, path+";values", property+"{}")...)
+		return violations
+
+	case schema.IsMap():
+		if schema.Values == nil {
+			return nil
 		}
 
-		return violations
+		return unresolvedRefsIn(*schema.Values, catalog, source, path+";values", property+"{}")
 	}
 
 	return nil

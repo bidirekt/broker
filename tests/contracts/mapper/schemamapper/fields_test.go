@@ -21,49 +21,34 @@ func TestToSchemaModels_DeclaredType_IsTheFieldType(t *testing.T) {
 	}
 }
 
-func TestToSchemaModels_PropertiesWithoutType_IsAnObject(t *testing.T) {
+func TestToSchemaModels_PropertiesWithoutType_IsNotAnObject(t *testing.T) {
 	catalog := contract.SchemasMap{
 		"Address": {Properties: map[string]contract.Schema{"city": {Type: "string"}}},
 	}
 
 	schemas := schemamapper.ToSchemaModels(catalog, []string{"Address"})
 
-	assert.Equal(t, model.Schemas{
-		"Address": {
-			"":     {Type: "object"},
-			"city": {Type: "string"},
-		},
-	}, schemas)
+	assert.Equal(t, model.Schemas{"Address": {"": {}}}, schemas)
 }
 
-func TestToSchemaModels_ValuesWithoutType_IsAnObject(t *testing.T) {
+func TestToSchemaModels_ValuesWithoutType_IsNotAMap(t *testing.T) {
 	catalog := contract.SchemasMap{
 		"Scores": {Values: &contract.Schema{Type: "integer"}},
 	}
 
 	schemas := schemamapper.ToSchemaModels(catalog, []string{"Scores"})
 
-	assert.Equal(t, model.Schemas{
-		"Scores": {
-			"":   {Type: "object"},
-			"{}": {Type: "integer"},
-		},
-	}, schemas)
+	assert.Equal(t, model.Schemas{"Scores": {"": {}}}, schemas)
 }
 
-func TestToSchemaModels_ItemsWithoutType_IsAnArray(t *testing.T) {
+func TestToSchemaModels_ItemsWithoutType_IsNotAnArray(t *testing.T) {
 	catalog := contract.SchemasMap{
 		"Tags": {Items: &contract.Schema{Type: "string"}},
 	}
 
 	schemas := schemamapper.ToSchemaModels(catalog, []string{"Tags"})
 
-	assert.Equal(t, model.Schemas{
-		"Tags": {
-			"":   {Type: "array"},
-			"[]": {Type: "string"},
-		},
-	}, schemas)
+	assert.Equal(t, model.Schemas{"Tags": {"": {}}}, schemas)
 }
 
 func TestToSchemaModels_RefField_KeepsTheTargetNameAndNothingBelowIt(t *testing.T) {
@@ -118,7 +103,7 @@ func TestToSchemaModels_RefAsArrayItemsAndAsMapValues_IsARefField(t *testing.T) 
 			Type: "object",
 			Properties: map[string]contract.Schema{
 				"queue":  {Type: "array", Items: &contract.Schema{Ref: "Pet"}},
-				"byName": {Type: "object", Values: &contract.Schema{Ref: "Pet"}},
+				"byName": {Type: "map", Values: &contract.Schema{Ref: "Pet"}},
 			},
 		},
 		"Pet": {
@@ -134,7 +119,7 @@ func TestToSchemaModels_RefAsArrayItemsAndAsMapValues_IsARefField(t *testing.T) 
 			"":         {Type: "object"},
 			"queue":    {Type: "array"},
 			"queue[]":  {Ref: "Pet"},
-			"byName":   {Type: "object"},
+			"byName":   {Type: "map"},
 			"byName{}": {Ref: "Pet"},
 		},
 		"Pet": {
@@ -214,7 +199,7 @@ func TestToSchemaModels_OptionalAndNullable_StayOnTheNodeThatDeclaresThem(t *tes
 				"nickname": {Type: "string", Optional: true},
 				"bio":      {Type: "string", Optional: true, Nullable: true},
 				"tags":     {Type: "array", Items: &contract.Schema{Type: "string", Nullable: true}},
-				"scores":   {Type: "object", Values: &contract.Schema{Type: "integer", Optional: true, Nullable: true}},
+				"scores":   {Type: "map", Values: &contract.Schema{Type: "integer", Optional: true, Nullable: true}},
 			},
 		},
 	}
@@ -229,7 +214,7 @@ func TestToSchemaModels_OptionalAndNullable_StayOnTheNodeThatDeclaresThem(t *tes
 			"bio":      {Type: "string", Optional: true, Nullable: true},
 			"tags":     {Type: "array"},
 			"tags[]":   {Type: "string", Nullable: true},
-			"scores":   {Type: "object"},
+			"scores":   {Type: "map"},
 			"scores{}": {Type: "integer", Optional: true, Nullable: true},
 		},
 	}, schemas)

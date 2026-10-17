@@ -469,7 +469,7 @@ schemas:
             sku:
               type: string
       tags:
-        type: object
+        type: map
         values:
           type: string
   Address:
@@ -625,7 +625,7 @@ func (this *IntegrationSuite) TestContractRepository_ReadsByVersion_ReturnEachVe
 			"items":       {Type: "array"},
 			"items[]":     {Type: "object"},
 			"items[].sku": {Type: "string"},
-			"tags":        {Type: "object"},
+			"tags":        {Type: "map"},
 			"tags{}":      {Type: "string"},
 		},
 		"Address": {"": {Type: "object"}, "city": {Type: "string"}},
