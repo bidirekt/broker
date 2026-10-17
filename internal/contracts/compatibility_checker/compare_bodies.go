@@ -1,8 +1,6 @@
 package compatibility_checker
 
 import (
-	"slices"
-
 	"github.com/bidirekt/broker/internal/contracts/schemagraph"
 	"github.com/bidirekt/broker/internal/model"
 )
@@ -46,16 +44,12 @@ func compareBodies(
 }
 
 func (this *bodyComparison) compareRead(reader, producer schemagraph.Node, path string) {
-	this.compareReadRequiring(reader, producer, path, !reader.Optional())
-}
-
-func (this *bodyComparison) compareReadRequiring(reader, producer schemagraph.Node, path string, required bool) {
 	if !reader.Exists() {
 		return
 	}
 
 	if !producer.Exists() {
-		if required {
+		if !reader.Optional() {
 			this.breakAt(this.rules.missing, path, reader, producer)
 		}
 
@@ -80,7 +74,7 @@ func (this *bodyComparison) compareReadRequiring(reader, producer schemagraph.No
 		return
 	}
 
-	if required && producer.Optional() {
+	if !reader.Optional() && producer.Optional() {
 		this.breakAt(this.rules.optional, path, reader, producer)
 	}
 
@@ -95,44 +89,8 @@ func (this *bodyComparison) compareReadRequiring(reader, producer schemagraph.No
 	this.comparedShapes[shapes] = true
 
 	for _, segment := range reader.Segments() {
-		if segment == model.ValuesSegment {
-			this.compareValuesRead(reader, producer, path)
-
-			continue
-		}
-
 		this.compareRead(reader.Child(segment), producer.Child(segment), model.ChildPath(path, segment))
 	}
-}
-
-// A map requires none of its keys, so each fixed key is compared without the optional rule against the values of
-// the reader modules that do not read it on their own; a producer module sending neither the values nor a fixed key
-// is missing the values.
-func (this *bodyComparison) compareValuesRead(reader, producer schemagraph.Node, path string) {
-	values := reader.Child(model.ValuesSegment)
-	valuesPath := model.ChildPath(path, model.ValuesSegment)
-	producedValues := producer.Child(model.ValuesSegment)
-	producedKeys := fixedKeysOf(producer)
-
-	if producedValues.Exists() || len(producedKeys) == 0 {
-		this.compareReadRequiring(values, producedValues, valuesPath, len(producedKeys) == 0 && !values.Optional())
-	}
-
-	sendingNothing := producer.WithoutChild(model.ValuesSegment)
-	for _, key := range producedKeys {
-		sendingNothing = sendingNothing.WithoutChild(key)
-		this.compareReadRequiring(reader.WithoutChild(key).Child(model.ValuesSegment), producer.Child(key), model.ChildPath(path, key), false)
-	}
-
-	if len(producedKeys) > 0 && sendingNothing.Exists() && !values.Optional() {
-		this.breakAt(this.rules.missing, valuesPath, values, sendingNothing.Child(model.ValuesSegment))
-	}
-}
-
-func fixedKeysOf(node schemagraph.Node) []string {
-	return slices.DeleteFunc(node.Segments(), func(segment string) bool {
-		return segment == model.ItemsSegment || segment == model.ValuesSegment
-	})
 }
 
 func (this *bodyComparison) breakAt(reason BreakingReason, path string, reader, producer schemagraph.Node) {

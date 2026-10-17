@@ -469,7 +469,7 @@ schemas:
             sku:
               type: string
       tags:
-        type: object
+        type: map
         values:
           type: string
   Address:
@@ -560,13 +560,14 @@ func (this *IntegrationSuite) TestContractRepository_SecondPublish_WritesOnlyThe
 	changed := strings.Replace(schemaRowsOrdersContract,
 		"      city:\n        type: string\n",
 		"      city:\n        type: string\n        nullable: true\n      zip:\n        type: string\n", 1)
-	changed = strings.Replace(changed, "            sku:\n              type: string\n", "", 1)
+	changed = strings.Replace(changed, "            sku:\n", "            quantity:\n", 1)
 	this.publishSchemaRowsOrders("2", changed)
 
 	this.Empty(this.schemaRowsSchemaEvents(2))
 	this.Equal([]string{
 		"Address.city:modified",
 		"Address.zip:added",
+		"Order.items[].quantity:added",
 		"Order.items[].sku:removed",
 	}, this.schemaRowsFieldEvents(2))
 	this.Equal(0, len(this.schemaRowsStrings(`SELECT change_type FROM resource_versions WHERE contract_id = 2`)))
@@ -625,7 +626,7 @@ func (this *IntegrationSuite) TestContractRepository_ReadsByVersion_ReturnEachVe
 			"items":       {Type: "array"},
 			"items[]":     {Type: "object"},
 			"items[].sku": {Type: "string"},
-			"tags":        {Type: "object"},
+			"tags":        {Type: "map"},
 			"tags{}":      {Type: "string"},
 		},
 		"Address": {"": {Type: "object"}, "city": {Type: "string"}},
@@ -703,6 +704,9 @@ const schemaRowsAccountsWidgetContract = `consumes:
 schemas:
   Profile:
     type: object
+    properties:
+      avatar:
+        type: string
 `
 
 func (this *IntegrationSuite) TestContractRepository_CounterpartReads_CarryTheCatalogAtTheDeployedVersion() {
@@ -746,7 +750,7 @@ func (this *IntegrationSuite) TestContractRepository_CounterpartReads_CarryTheCa
 	this.Require().Len(consumers, 1)
 	this.Equal(model.Schemas{
 		"Account": {"": {Type: "object"}, "avatar": {Type: "string"}},
-		"Profile": {"": {Type: "object"}},
+		"Profile": {"": {Type: "object"}, "avatar": {Type: "string"}},
 	}, consumers[0].Schemas)
 	this.Equal(null.StringFrom("1"), consumers[0].ParticipantVersion)
 

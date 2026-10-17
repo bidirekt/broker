@@ -94,7 +94,7 @@ func TestSchemaType_RejeitaTipoForaDoConjunto(t *testing.T) {
 	assert.Equal(t, "schema.invalid_type", violations[0].ErrorCode)
 	assert.Equal(t, map[string]string{
 		"value":   "decimal",
-		"allowed": "object, array, string, integer, float, number, boolean",
+		"allowed": "object, array, map, string, integer, float, number, boolean",
 	}, violations[0].Details)
 }
 

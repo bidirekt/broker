@@ -194,15 +194,15 @@ func TestPropertyTypeRendersMapValueType(t *testing.T) {
 	consumer := consumerResource()
 	consumer.Schemas = model.Schemas{"FrontThing": {
 		"":            {Type: "object"},
-		"pets":        {Type: "object"},
+		"pets":        {Type: "map"},
 		"pets{}":      {Type: "object"},
 		"pets{}.name": {Type: "string"},
-		"tags":        {Type: "object"},
+		"tags":        {Type: "map"},
 		"tags{}":      {Type: "array"},
 		"tags{}[]":    {Type: "string"},
 		"owner":       {Type: "object"},
 		"owner.name":  {Type: "string"},
-		"scores":      {Type: "object"},
+		"scores":      {Type: "map"},
 		"scores{}":    {Type: "integer"},
 	}}
 	provider := providerResource()
