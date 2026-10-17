@@ -264,34 +264,36 @@ properties:
 	}, schema)
 }
 
-func TestSchemaFromDocument_ObjectWithValues(t *testing.T) {
-	schema := contract.SchemaFromDocument(schemaDocument(t, `type: object
+func TestSchemaFromDocument_MapWithValues(t *testing.T) {
+	schema := contract.SchemaFromDocument(schemaDocument(t, `type: map
 values:
   ref: Pet
   nullable: true
 `))
 
-	assert.Equal(t, contract.Schema{Type: "object", Values: &contract.Schema{Ref: "Pet", Nullable: true}}, schema)
-	assert.True(t, schema.IsObject())
+	assert.Equal(t, contract.Schema{Type: "map", Values: &contract.Schema{Ref: "Pet", Nullable: true}}, schema)
+	assert.True(t, schema.IsMap())
+	assert.False(t, schema.IsObject())
 	assert.False(t, schema.IsArray())
 	assert.False(t, schema.IsPrimitive())
 	assert.False(t, schema.IsRef())
 }
 
-func TestSchemaFromDocument_ValuesWithoutTypeIsNotAnObject(t *testing.T) {
+func TestSchemaFromDocument_ValuesWithoutTypeIsNotAMap(t *testing.T) {
 	schema := contract.SchemaFromDocument(schemaDocument(t, `values:
   type: string
 `))
 
 	assert.Equal(t, contract.Schema{Values: &contract.Schema{Type: "string"}}, schema)
+	assert.False(t, schema.IsMap())
 	assert.False(t, schema.IsObject())
 	assert.False(t, schema.IsArray())
 }
 
 func TestSchemaFromDocument_ValuesThatIsNotAMappingIsIgnored(t *testing.T) {
-	schema := contract.SchemaFromDocument(schemaDocument(t, `type: object
+	schema := contract.SchemaFromDocument(schemaDocument(t, `type: map
 values: string
 `))
 
-	assert.Equal(t, contract.Schema{Type: "object"}, schema)
+	assert.Equal(t, contract.Schema{Type: "map"}, schema)
 }

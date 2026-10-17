@@ -285,7 +285,7 @@ func TestArrayItemsAndMapValuesAreChildrenOfTheirCollection(t *testing.T) {
 		path       string
 	}{
 		{"[]", model.Schema{"": {Type: "object"}, "categories": {Type: "array"}, "categories[]": {Type: "string"}}, "$.categories"},
-		{"{}", model.Schema{"": {Type: "object"}, "pets": {Type: "object"}, "pets{}": {Type: "object"}}, "$.pets"},
+		{"{}", model.Schema{"": {Type: "object"}, "pets": {Type: "map"}, "pets{}": {Type: "object"}}, "$.pets"},
 	}
 
 	root := model.Schema{"": {Type: "object"}}

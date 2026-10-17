@@ -362,9 +362,9 @@ func (this *IntegrationSuite) TestValidateContract_SchemaWithoutType_Rejected() 
 
 	this.Equal(http.StatusBadRequest, status)
 	this.JSONEq(`{"message":"contract validation failed","violations":[`+
-		`{"code":"schema.invalid_type","path":"schemas;Item;properties;dimensions","source":"api.yaml","details":{"value":"","allowed":"object, array, string, integer, float, number, boolean"}},`+
-		`{"code":"schema.invalid_type","path":"schemas;Item;properties;prices","source":"api.yaml","details":{"value":"","allowed":"object, array, string, integer, float, number, boolean"}},`+
-		`{"code":"schema.invalid_type","path":"schemas;Item;properties;tags","source":"api.yaml","details":{"value":"","allowed":"object, array, string, integer, float, number, boolean"}}`+
+		`{"code":"schema.invalid_type","path":"schemas;Item;properties;dimensions","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean"}},`+
+		`{"code":"schema.invalid_type","path":"schemas;Item;properties;prices","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean"}},`+
+		`{"code":"schema.invalid_type","path":"schemas;Item;properties;tags","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean"}}`+
 		`]}`, body)
 }
 

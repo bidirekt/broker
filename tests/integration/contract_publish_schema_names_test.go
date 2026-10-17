@@ -48,7 +48,7 @@ const namesDanglingSchemaYAML = `schemas:
 
 const namesDanglingMapValuesYAML = `schemas:
   Pets:
-    type: object
+    type: map
     values:
       ref: Pet
 `

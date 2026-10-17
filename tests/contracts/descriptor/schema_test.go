@@ -64,7 +64,21 @@ func TestSchema_ArraySemItemsNoNivelFundo(t *testing.T) {
 	assert.Nil(t, violations[0].Details)
 }
 
-func TestSchema_VazioEhTipoInvalido(t *testing.T) {
+func TestSchema_MapWithoutValuesAtTheDeepestLevel(t *testing.T) {
+	source := "type: object\n" +
+		"properties:\n" +
+		"  pets:\n" +
+		"    type: map\n"
+
+	violations := descriptor.Validate(descriptor.Schema(), schemaDocument(t, source), "api.yaml")
+
+	require.Len(t, violations, 1)
+	assert.Equal(t, "schema.map_without_values", violations[0].ErrorCode)
+	assert.Equal(t, "properties;pets", violations[0].Path)
+	assert.Nil(t, violations[0].Details)
+}
+
+func TestSchema_EmptyIsAnInvalidType(t *testing.T) {
 	violations := descriptor.Validate(descriptor.Schema(), map[string]any{}, "api.yaml")
 
 	require.Len(t, violations, 1)
@@ -72,7 +86,7 @@ func TestSchema_VazioEhTipoInvalido(t *testing.T) {
 	assert.Equal(t, "", violations[0].Path)
 	assert.Equal(t, map[string]string{
 		"value":   "",
-		"allowed": "object, array, string, integer, float, number, boolean",
+		"allowed": "object, array, map, string, integer, float, number, boolean",
 	}, violations[0].Details)
 }
 
@@ -170,8 +184,8 @@ func TestSchema_NullableIsAcceptedOnEveryNode(t *testing.T) {
 	assert.Empty(t, violations)
 }
 
-func TestSchema_ValuesWithObjectTypeIsValid(t *testing.T) {
-	source := "type: object\n" +
+func TestSchema_MapWithValuesIsValid(t *testing.T) {
+	source := "type: map\n" +
 		"values:\n" +
 		"  ref: Pet\n"
 
@@ -198,45 +212,83 @@ func TestSchema_PropertiesItemsOrValuesWithoutTypeIsAnInvalidType(t *testing.T) 
 			assert.Equal(t, "properties;attributes", violations[0].Path)
 			assert.Equal(t, map[string]string{
 				"value":   "",
-				"allowed": "object, array, string, integer, float, number, boolean",
+				"allowed": "object, array, map, string, integer, float, number, boolean",
 			}, violations[0].Details)
 		})
 	}
 }
 
-func TestSchema_ValuesWithPropertiesIsRejectedAtTheNode(t *testing.T) {
-	source := "type: object\n" +
-		"properties:\n" +
-		"  pets:\n" +
-		"    type: object\n" +
-		"    properties:\n" +
-		"      bob:\n" +
-		"        type: string\n" +
-		"    values:\n" +
-		"      type: string\n"
+func TestSchema_KeyOfAnotherTypeIsNotAllowed(t *testing.T) {
+	for name, testCase := range map[string]struct {
+		node         string
+		key          string
+		declaredType string
+	}{
+		"items on a string": {
+			node:         "    type: string\n    items:\n      type: string\n",
+			key:          "items",
+			declaredType: "string",
+		},
+		"values on an object": {
+			node:         "    type: object\n    properties:\n      bob:\n        type: string\n    values:\n      type: string\n",
+			key:          "values",
+			declaredType: "object",
+		},
+		"properties on a map": {
+			node:         "    type: map\n    values:\n      type: string\n    properties:\n      bob:\n        type: string\n",
+			key:          "properties",
+			declaredType: "map",
+		},
+		"properties on an array": {
+			node:         "    type: array\n    items:\n      type: string\n    properties:\n      bob:\n        type: string\n",
+			key:          "properties",
+			declaredType: "array",
+		},
+		"items on a map": {
+			node:         "    type: map\n    values:\n      type: string\n    items:\n      type: string\n",
+			key:          "items",
+			declaredType: "map",
+		},
+		"values on an array": {
+			node:         "    type: array\n    items:\n      type: string\n    values:\n      type: string\n",
+			key:          "values",
+			declaredType: "array",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			source := "type: object\n" +
+				"properties:\n" +
+				"  pets:\n" +
+				testCase.node
 
-	violations := descriptor.Validate(descriptor.Schema(), schemaDocument(t, source), "api.yaml")
+			violations := descriptor.Validate(descriptor.Schema(), schemaDocument(t, source), "api.yaml")
 
-	require.Len(t, violations, 1)
-	assert.Equal(t, "schema.values_with_properties", violations[0].ErrorCode)
-	assert.Equal(t, "properties;pets", violations[0].Path)
-	assert.Nil(t, violations[0].Details)
+			require.Len(t, violations, 1)
+			assert.Equal(t, "schema.key_not_allowed", violations[0].ErrorCode)
+			assert.Equal(t, "properties;pets", violations[0].Path)
+			assert.Equal(t, map[string]string{"key": testCase.key, "type": testCase.declaredType}, violations[0].Details)
+		})
+	}
 }
 
-func TestSchema_ValuesOnNonObjectTypeIsRejectedAtTheNode(t *testing.T) {
-	source := "type: object\n" +
+func TestSchema_EachKeyOfAnotherTypeIsReportedOnItsOwn(t *testing.T) {
+	source := "type: integer\n" +
 		"properties:\n" +
-		"  pets:\n" +
+		"  bob:\n" +
 		"    type: string\n" +
-		"    values:\n" +
-		"      type: string\n"
+		"items:\n" +
+		"  type: string\n" +
+		"values:\n" +
+		"  type: string\n"
 
 	violations := descriptor.Validate(descriptor.Schema(), schemaDocument(t, source), "api.yaml")
 
-	require.Len(t, violations, 1)
-	assert.Equal(t, "schema.values_without_object", violations[0].ErrorCode)
-	assert.Equal(t, "properties;pets", violations[0].Path)
-	assert.Nil(t, violations[0].Details)
+	require.Len(t, violations, 3)
+	for index, key := range []string{"properties", "items", "values"} {
+		assert.Equal(t, "schema.key_not_allowed", violations[index].ErrorCode)
+		assert.Equal(t, "", violations[index].Path)
+		assert.Equal(t, map[string]string{"key": key, "type": "integer"}, violations[index].Details)
+	}
 }
 
 func TestSchema_ObjectWithoutPropertiesOrValuesIsValid(t *testing.T) {
@@ -257,7 +309,7 @@ func TestSchema_PropertyNamedStarIsAnOrdinaryName(t *testing.T) {
 }
 
 func TestSchema_NullableIsAcceptedOnTheValuesNode(t *testing.T) {
-	source := "type: object\n" +
+	source := "type: map\n" +
 		"values:\n" +
 		"  type: string\n" +
 		"  nullable: true\n"

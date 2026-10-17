@@ -31,7 +31,7 @@ func TestToSchemaModels_PropertiesWithoutType_IsNotAnObject(t *testing.T) {
 	assert.Equal(t, model.Schemas{"Address": {"": {}}}, schemas)
 }
 
-func TestToSchemaModels_ValuesWithoutType_IsNotAnObject(t *testing.T) {
+func TestToSchemaModels_ValuesWithoutType_IsNotAMap(t *testing.T) {
 	catalog := contract.SchemasMap{
 		"Scores": {Values: &contract.Schema{Type: "integer"}},
 	}
@@ -103,7 +103,7 @@ func TestToSchemaModels_RefAsArrayItemsAndAsMapValues_IsARefField(t *testing.T) 
 			Type: "object",
 			Properties: map[string]contract.Schema{
 				"queue":  {Type: "array", Items: &contract.Schema{Ref: "Pet"}},
-				"byName": {Type: "object", Values: &contract.Schema{Ref: "Pet"}},
+				"byName": {Type: "map", Values: &contract.Schema{Ref: "Pet"}},
 			},
 		},
 		"Pet": {
@@ -119,7 +119,7 @@ func TestToSchemaModels_RefAsArrayItemsAndAsMapValues_IsARefField(t *testing.T) 
 			"":         {Type: "object"},
 			"queue":    {Type: "array"},
 			"queue[]":  {Ref: "Pet"},
-			"byName":   {Type: "object"},
+			"byName":   {Type: "map"},
 			"byName{}": {Ref: "Pet"},
 		},
 		"Pet": {
@@ -199,7 +199,7 @@ func TestToSchemaModels_OptionalAndNullable_StayOnTheNodeThatDeclaresThem(t *tes
 				"nickname": {Type: "string", Optional: true},
 				"bio":      {Type: "string", Optional: true, Nullable: true},
 				"tags":     {Type: "array", Items: &contract.Schema{Type: "string", Nullable: true}},
-				"scores":   {Type: "object", Values: &contract.Schema{Type: "integer", Optional: true, Nullable: true}},
+				"scores":   {Type: "map", Values: &contract.Schema{Type: "integer", Optional: true, Nullable: true}},
 			},
 		},
 	}
@@ -214,7 +214,7 @@ func TestToSchemaModels_OptionalAndNullable_StayOnTheNodeThatDeclaresThem(t *tes
 			"bio":      {Type: "string", Optional: true, Nullable: true},
 			"tags":     {Type: "array"},
 			"tags[]":   {Type: "string", Nullable: true},
-			"scores":   {Type: "object"},
+			"scores":   {Type: "map"},
 			"scores{}": {Type: "integer", Optional: true, Nullable: true},
 		},
 	}, schemas)

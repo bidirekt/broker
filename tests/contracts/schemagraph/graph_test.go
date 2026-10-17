@@ -116,20 +116,19 @@ func TestChild_NotDeclared_DoesNotExist(t *testing.T) {
 func TestSegments_ListPropertiesItemsAndValuesInByteOrder(t *testing.T) {
 	catalog := model.Schemas{
 		"Order": {
-			"":             {Type: "object"},
-			"total":        {Type: "float"},
-			"Currency":     {Type: "string"},
-			"_links":       {Type: "object"},
-			"_links.self":  {Type: "string"},
-			"items":        {Type: "array"},
-			"items[]":      {Type: "object"},
-			"items[].sku":  {Type: "string"},
-			"meta":         {Type: "object"},
-			"meta{}":       {Type: "string"},
-			"rows":         {Type: "array"},
-			"rows[]":       {Type: "array"},
-			"rows[][]":     {Type: "integer"},
-			"meta.version": {Type: "integer"},
+			"":            {Type: "object"},
+			"total":       {Type: "float"},
+			"Currency":    {Type: "string"},
+			"_links":      {Type: "object"},
+			"_links.self": {Type: "string"},
+			"items":       {Type: "array"},
+			"items[]":     {Type: "object"},
+			"items[].sku": {Type: "string"},
+			"meta":        {Type: "map"},
+			"meta{}":      {Type: "string"},
+			"rows":        {Type: "array"},
+			"rows[]":      {Type: "array"},
+			"rows[][]":    {Type: "integer"},
 		},
 	}
 
@@ -139,14 +138,14 @@ func TestSegments_ListPropertiesItemsAndValuesInByteOrder(t *testing.T) {
 	assert.Equal(t, []string{"self"}, root.Child("_links").Segments())
 	assert.Equal(t, []string{"[]"}, root.Child("items").Segments())
 	assert.Equal(t, []string{"sku"}, root.Child("items").Child("[]").Segments())
-	assert.Equal(t, []string{"version", "{}"}, root.Child("meta").Segments())
+	assert.Equal(t, []string{"{}"}, root.Child("meta").Segments())
 	assert.Equal(t, "integer", root.Child("rows").Child("[]").Child("[]").Type())
 }
 
 func TestSegments_OfARootArrayAndARootMap(t *testing.T) {
 	catalog := model.Schemas{
 		"Tags": {"": {Type: "array"}, "[]": {Type: "string"}},
-		"Pets": {"": {Type: "object"}, "{}": {Type: "object"}, "{}.name": {Type: "string"}},
+		"Pets": {"": {Type: "map"}, "{}": {Type: "object"}, "{}.name": {Type: "string"}},
 	}
 
 	assert.Equal(t, []string{"[]"}, graphRoot(catalog, "Tags").Segments())
@@ -183,7 +182,7 @@ func TestField_NamesTheSchemaAndThePathTheNodeWasReachedAt(t *testing.T) {
 			"items[].sku": {Type: "string"},
 		},
 		"Address": {"": {Type: "object"}, "city": {Type: "string"}},
-		"Pets":    {"": {Type: "object"}, "{}": {Type: "object"}, "{}.name": {Type: "string"}},
+		"Pets":    {"": {Type: "map"}, "{}": {Type: "object"}, "{}.name": {Type: "string"}},
 		"Tags":    {"": {Type: "array"}, "[]": {Type: "string"}},
 	}
 

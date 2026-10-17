@@ -165,12 +165,12 @@ func TestFieldNames_ArrayItemsAndMapValues_KeepTheirSegments(t *testing.T) {
 	}, billingFields(t, "200", billingBody("Invoice", readByTheConsumer), billingBody("Invoice", providedByTheProvider)))
 
 	sentByTheConsumer := model.Schemas{"Pets": {
-		"":        {Type: "object"},
+		"":        {Type: "map"},
 		"{}":      {Type: "object"},
 		"{}.name": {Type: "string", Nullable: true},
 	}}
 	readByTheProvider := model.Schemas{"Pets": {
-		"":        {Type: "object"},
+		"":        {Type: "map"},
 		"{}":      {Type: "object"},
 		"{}.name": {Type: "string"},
 		"{}.age":  {Type: "integer"},

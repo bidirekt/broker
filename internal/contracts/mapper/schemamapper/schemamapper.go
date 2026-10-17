@@ -42,9 +42,14 @@ func fieldModelsFromSchema(fields model.Schema, path string, schema contract.Sch
 			fieldModelsFromSchema(fields, model.ChildPath(path, name), property)
 		}
 
-		if schema.Values != nil {
-			fieldModelsFromSchema(fields, model.ChildPath(path, model.ValuesSegment), *schema.Values)
+	case schema.IsMap():
+		fields[path] = model.Field{Type: "map", Optional: schema.Optional, Nullable: schema.Nullable}
+
+		if schema.Values == nil {
+			return
 		}
+
+		fieldModelsFromSchema(fields, model.ChildPath(path, model.ValuesSegment), *schema.Values)
 
 	case schema.IsArray():
 		fields[path] = model.Field{Type: "array", Optional: schema.Optional, Nullable: schema.Nullable}

@@ -31,7 +31,7 @@ type petsBreak struct {
 func petsMapProvidedByTheProvider() model.Schema {
 	return model.Schema{
 		"":            {Type: "object"},
-		"pets":        {Type: "object"},
+		"pets":        {Type: "map"},
 		"pets{}":      {Type: "object"},
 		"pets{}.name": {Type: "string"},
 	}
@@ -112,7 +112,7 @@ func TestMapValuesReadAsProvidedHaveNoBreak(t *testing.T) {
 func TestMapValuesWithAnotherTypeBreakOnTheValues(t *testing.T) {
 	readByTheConsumer := model.Schema{
 		"":       {Type: "object"},
-		"pets":   {Type: "object"},
+		"pets":   {Type: "map"},
 		"pets{}": {Type: "string"},
 	}
 
@@ -148,19 +148,36 @@ func TestMapValueChildMissingInTheProviderBreaksOnTheChild(t *testing.T) {
 	})
 }
 
-func TestFixedKeyReadAgainstAMapIsMissingInTheProvider(t *testing.T) {
+func TestMapValueMemberWithAnotherTypeBreaksOnTheMember(t *testing.T) {
+	readByTheConsumer := petsMapProvidedByTheProvider()
+	readByTheConsumer["pets{}.name"] = model.Field{Type: "integer"}
+
+	assertPetsBreaks(t, readByTheConsumer, petsMapProvidedByTheProvider(), []petsBreak{
+		{compatibility_checker.ReasonPropertyTypeMismatch, "$.pets{}.name"},
+	})
+}
+
+func TestObjectReadAgainstAMapBreaksOnTheParent(t *testing.T) {
 	readByTheConsumer := model.Schema{
 		"":         {Type: "object"},
 		"pets":     {Type: "object"},
 		"pets.bob": {Type: "object"},
 	}
+
+	assertPetsBreaks(t, readByTheConsumer, petsMapProvidedByTheProvider(), []petsBreak{
+		{compatibility_checker.ReasonPropertyTypeMismatch, "$.pets"},
+	})
+}
+
+func TestMapReadAgainstAnObjectBreaksOnTheParent(t *testing.T) {
 	providedByTheProvider := model.Schema{
-		"":       {Type: "object"},
-		"pets":   {Type: "object"},
-		"pets{}": {Type: "object"},
+		"":              {Type: "object"},
+		"pets":          {Type: "object"},
+		"pets.bob":      {Type: "object"},
+		"pets.bob.name": {Type: "string"},
 	}
 
-	assertPetsBreaks(t, readByTheConsumer, providedByTheProvider, []petsBreak{
-		{compatibility_checker.ReasonPropertyMissingInProvider, "$.pets.bob"},
+	assertPetsBreaks(t, petsMapProvidedByTheProvider(), providedByTheProvider, []petsBreak{
+		{compatibility_checker.ReasonPropertyTypeMismatch, "$.pets"},
 	})
 }

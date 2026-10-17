@@ -91,7 +91,7 @@ const refBehindRefYAML = `schemas:
 
 const unresolvedMapValuesRefYAML = `schemas:
   Prices:
-    type: object
+    type: map
     values:
       ref: Price
 `
@@ -101,11 +101,11 @@ const unresolvedNestedMapValuesRefsYAML = `schemas:
     type: object
     properties:
       prices:
-        type: object
+        type: map
         values:
           ref: Price
   PriceHistory:
-    type: object
+    type: map
     values:
       type: array
       items:
@@ -113,7 +113,7 @@ const unresolvedNestedMapValuesRefsYAML = `schemas:
   PriceTables:
     type: array
     items:
-      type: object
+      type: map
       values:
         ref: Price
 `
@@ -146,7 +146,7 @@ const nodeChildrenMapCycleYAML = `schemas:
     type: object
     properties:
       children:
-        type: object
+        type: map
         values:
           ref: Node
 `
@@ -611,6 +611,62 @@ func TestValidate_ConsumedResourceWithConflictingTypes_NamesBothDeclarations(t *
 				"type":         "integer",
 				"declaredIn":   "a.yaml",
 				"declaredType": "string",
+			},
+		},
+	}, violations)
+}
+
+func TestValidate_ConsumedPropertyAsAMapAndAsAnObject_IsATypeConflict(t *testing.T) {
+	const asAMap = `consumes:
+  payments:
+    rest:
+      /invoices:
+        get:
+          responses:
+            200: InvoiceWithMapLines
+schemas:
+  InvoiceWithMapLines:
+    type: object
+    properties:
+      lines:
+        type: map
+        values:
+          type: integer
+`
+	const asAnObject = `consumes:
+  payments:
+    rest:
+      /invoices:
+        get:
+          responses:
+            200: InvoiceWithObjectLines
+schemas:
+  InvoiceWithObjectLines:
+    type: object
+    properties:
+      lines:
+        type: object
+        properties:
+          first:
+            type: integer
+`
+
+	violations := validateFiles(t,
+		validatedFile{"b.yaml", asAMap},
+		validatedFile{"a.yaml", asAnObject},
+	)
+
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "resource.type_conflict",
+			Path:      "consumes;payments;rest;/invoices;get;responses;200",
+			Source:    "b.yaml",
+			Details: map[string]string{
+				"resource":     "consumes payments GET /invoices 200",
+				"property":     "$.lines",
+				"type":         "map",
+				"declaredIn":   "a.yaml",
+				"declaredType": "object",
 			},
 		},
 	}, violations)

@@ -51,6 +51,10 @@ func (this *Schema) IsArray() bool {
 	return this.Type == "array"
 }
 
+func (this *Schema) IsMap() bool {
+	return this.Type == "map"
+}
+
 func (this *Schema) IsPrimitive() bool {
 	return isPrimitiveType(this.Type)
 }
