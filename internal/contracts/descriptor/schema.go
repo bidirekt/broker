@@ -23,6 +23,7 @@ func Schema() Node {
 		keyBelongsTo("properties", "object"),
 		keyBelongsTo("items", "array"),
 		keyBelongsTo("values", "map"),
+		objectRequiresProperties,
 		arrayRequiresItems,
 		mapRequiresValues,
 	)
@@ -76,6 +77,15 @@ func keyNotAllowed(key string, schemaType string) *violation.Violation {
 		ErrorCode: "schema.key_not_allowed",
 		Details:   map[string]string{"key": key, "type": schemaType},
 	}
+}
+
+func objectRequiresProperties(present PresentFields) *violation.Violation {
+	properties, _ := present["properties"].(map[string]any)
+	if present["type"] != "object" || len(properties) > 0 {
+		return nil
+	}
+
+	return &violation.Violation{ErrorCode: "schema.object_without_properties"}
 }
 
 func arrayRequiresItems(present PresentFields) *violation.Violation {

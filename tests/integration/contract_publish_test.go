@@ -732,6 +732,27 @@ schemas:
         type: map
 `
 
+const objectWithoutPropertiesYAML = `provides:
+  rest:
+    /pets:
+      get:
+        responses:
+          200: Pet
+schemas:
+  Pet:
+    type: object
+    properties:
+      owner:
+        type: object
+      tags:
+        type: object
+        properties: {}
+      vaccinations:
+        type: object
+        values:
+          type: boolean
+`
+
 const keyOfAnotherTypeYAML = `provides:
   rest:
     /pets:
@@ -765,6 +786,24 @@ func (this *IntegrationSuite) TestPublishContract_MapWithoutValues_Rejected() {
 	this.Equal(http.StatusBadRequest, status)
 	this.JSONEq(`{"message":"contract validation failed","violations":[`+
 		`{"code":"schema.map_without_values","path":"schemas;Pet;properties;vaccinations","source":"api.yaml","details":null}`+
+		`]}`, body)
+
+	this.Equal(0, this.countRows("contracts"))
+}
+
+func (this *IntegrationSuite) TestPublishContract_ObjectWithoutProperties_Rejected() {
+	status, _ := this.post("/api/participants", `{"participant":"pets_service"}`)
+	this.Require().Equal(http.StatusOK, status)
+
+	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1",
+		contractFragment{"api.yaml", objectWithoutPropertiesYAML},
+	))
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"schema.object_without_properties","path":"schemas;Pet;properties;owner","source":"api.yaml","details":null},`+
+		`{"code":"schema.object_without_properties","path":"schemas;Pet;properties;tags","source":"api.yaml","details":null},`+
+		`{"code":"schema.key_not_allowed","path":"schemas;Pet;properties;vaccinations","source":"api.yaml","details":{"key":"values","type":"object"}},`+
+		`{"code":"schema.object_without_properties","path":"schemas;Pet;properties;vaccinations","source":"api.yaml","details":null}`+
 		`]}`, body)
 
 	this.Equal(0, this.countRows("contracts"))

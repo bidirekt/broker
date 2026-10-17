@@ -78,6 +78,48 @@ func TestSchema_MapWithoutValuesAtTheDeepestLevel(t *testing.T) {
 	assert.Nil(t, violations[0].Details)
 }
 
+func TestSchema_ObjectWithoutPropertiesAtTheDeepestLevel(t *testing.T) {
+	source := "type: object\n" +
+		"properties:\n" +
+		"  owner:\n" +
+		"    type: object\n"
+
+	violations := descriptor.Validate(descriptor.Schema(), schemaDocument(t, source), "api.yaml")
+
+	require.Len(t, violations, 1)
+	assert.Equal(t, "schema.object_without_properties", violations[0].ErrorCode)
+	assert.Equal(t, "properties;owner", violations[0].Path)
+	assert.Nil(t, violations[0].Details)
+}
+
+func TestSchema_ObjectWithEmptyPropertiesIsRejected(t *testing.T) {
+	source := "type: object\n" +
+		"properties: {}\n"
+
+	violations := descriptor.Validate(descriptor.Schema(), schemaDocument(t, source), "api.yaml")
+
+	require.Len(t, violations, 1)
+	assert.Equal(t, "schema.object_without_properties", violations[0].ErrorCode)
+	assert.Equal(t, "", violations[0].Path)
+	assert.Nil(t, violations[0].Details)
+}
+
+func TestSchema_ObjectWithValuesHasNoPropertiesAndAKeyNotAllowed(t *testing.T) {
+	source := "type: object\n" +
+		"values:\n" +
+		"  type: string\n"
+
+	violations := descriptor.Validate(descriptor.Schema(), schemaDocument(t, source), "api.yaml")
+
+	require.Len(t, violations, 2)
+	assert.Equal(t, "schema.key_not_allowed", violations[0].ErrorCode)
+	assert.Equal(t, "", violations[0].Path)
+	assert.Equal(t, map[string]string{"key": "values", "type": "object"}, violations[0].Details)
+	assert.Equal(t, "schema.object_without_properties", violations[1].ErrorCode)
+	assert.Equal(t, "", violations[1].Path)
+	assert.Nil(t, violations[1].Details)
+}
+
 func TestSchema_EmptyIsAnInvalidType(t *testing.T) {
 	violations := descriptor.Validate(descriptor.Schema(), map[string]any{}, "api.yaml")
 
@@ -291,10 +333,13 @@ func TestSchema_EachKeyOfAnotherTypeIsReportedOnItsOwn(t *testing.T) {
 	}
 }
 
-func TestSchema_ObjectWithoutPropertiesOrValuesIsValid(t *testing.T) {
+func TestSchema_ObjectWithoutPropertiesIsRejected(t *testing.T) {
 	violations := descriptor.Validate(descriptor.Schema(), map[string]any{"type": "object"}, "api.yaml")
 
-	assert.Empty(t, violations)
+	require.Len(t, violations, 1)
+	assert.Equal(t, "schema.object_without_properties", violations[0].ErrorCode)
+	assert.Equal(t, "", violations[0].Path)
+	assert.Nil(t, violations[0].Details)
 }
 
 func TestSchema_PropertyNamedStarIsAnOrdinaryName(t *testing.T) {

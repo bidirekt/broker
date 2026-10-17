@@ -92,7 +92,7 @@ const wideShallowContractJSON = `{
       "type": "object",
       "properties": {
         "userId":        { "type": "string" },
-        "another":       { "type": "object" },
+        "another":       { "type": "object", "properties": { "id": { "type": "string" } } },
         "somethingElse": { "type": "string" },
         "list": {
           "type": "array",
@@ -100,11 +100,11 @@ const wideShallowContractJSON = `{
             "type": "object",
             "properties": {
               "userId":        { "type": "string" },
-              "another":       { "type": "object" },
+              "another":       { "type": "object", "properties": { "id": { "type": "string" } } },
               "somethingElse": { "type": "string" },
               "list": {
                 "type": "array",
-                "items": { "type": "object" }
+                "items": { "type": "object", "properties": { "id": { "type": "string" } } }
               }
             }
           }
@@ -239,14 +239,17 @@ func TestToSchemaModels_WideSchema_KeepsEveryDeclaredFieldOnce(t *testing.T) {
 			"":                     {Type: "object"},
 			"userId":               {Type: "string"},
 			"another":              {Type: "object"},
+			"another.id":           {Type: "string"},
 			"somethingElse":        {Type: "string"},
 			"list":                 {Type: "array"},
 			"list[]":               {Type: "object"},
 			"list[].userId":        {Type: "string"},
 			"list[].another":       {Type: "object"},
+			"list[].another.id":    {Type: "string"},
 			"list[].somethingElse": {Type: "string"},
 			"list[].list":          {Type: "array"},
 			"list[].list[]":        {Type: "object"},
+			"list[].list[].id":     {Type: "string"},
 		},
 	}, schemas)
 }
