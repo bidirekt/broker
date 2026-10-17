@@ -11,16 +11,6 @@ type Fields map[string]Node
 
 type PresentFields map[string]any
 
-func (this PresentFields) HasAny(names ...string) bool {
-	for _, name := range names {
-		if this[name] != nil {
-			return true
-		}
-	}
-
-	return false
-}
-
 type Rule func(present PresentFields) *violation.Violation
 
 type ObjectNode struct {
