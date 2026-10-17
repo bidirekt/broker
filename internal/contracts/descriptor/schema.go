@@ -16,11 +16,20 @@ func Schema() Node {
 		"ref":         SchemaRef,
 		"optional":    Flag,
 		"nullable":    Flag,
-	}).Rules(schemaHasShape, arrayRequiresItems, valuesExcludeProperties, valuesRequireObject)
+	}).Rules(
+		schemaRequiresTypeOrRef,
+		refExcludes("type"),
+		refExcludes("properties"),
+		refExcludes("items"),
+		refExcludes("values"),
+		arrayRequiresItems,
+		valuesExcludeProperties,
+		valuesRequireObject,
+	)
 }
 
-func schemaHasShape(present PresentFields) *violation.Violation {
-	if present.HasAny("type", "properties", "items", "values", "ref") {
+func schemaRequiresTypeOrRef(present PresentFields) *violation.Violation {
+	if present.HasAny("type", "ref") {
 		return nil
 	}
 
@@ -30,6 +39,19 @@ func schemaHasShape(present PresentFields) *violation.Violation {
 			"value":   "",
 			"allowed": strings.Join(SchemaType.Allowed, ", "),
 		},
+	}
+}
+
+func refExcludes(key string) Rule {
+	return func(present PresentFields) *violation.Violation {
+		if present["ref"] == nil || present[key] == nil {
+			return nil
+		}
+
+		return &violation.Violation{
+			ErrorCode: "schema.key_not_allowed",
+			Details:   map[string]string{"key": key, "type": "ref"},
+		}
 	}
 }
 

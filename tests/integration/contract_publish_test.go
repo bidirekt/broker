@@ -619,6 +619,56 @@ schemas:
         type: string
 `
 
+const schemaWithoutTypeYAML = `provides:
+  rest:
+    /pets:
+      get:
+        responses:
+          200: Pet
+schemas:
+  Pet:
+    type: object
+    properties:
+      owner:
+        properties:
+          name:
+            type: string
+      tags:
+        items:
+          type: string
+      vaccinations:
+        values:
+          type: string
+`
+
+const shapeKeyBesideRefYAML = `provides:
+  rest:
+    /pets:
+      get:
+        responses:
+          200: Pet
+schemas:
+  Pet:
+    type: object
+    properties:
+      owner:
+        ref: Person
+        type: object
+        properties:
+          name:
+            type: string
+      walker:
+        ref: Person
+        optional: true
+        nullable: true
+        description: who walks the pet
+  Person:
+    type: object
+    properties:
+      name:
+        type: string
+`
+
 func (this *IntegrationSuite) TestPublishContract_InvalidSchemaType_Rejected() {
 	status, _ := this.post("/api/participants", petsParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
@@ -630,6 +680,39 @@ func (this *IntegrationSuite) TestPublishContract_InvalidSchemaType_Rejected() {
 	this.JSONEq(`{"message":"contract validation failed","violations":[`+
 		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;id;type","source":"api.yaml","details":{"value":"strng","allowed":"object, array, string, integer, float, number, boolean"}},`+
 		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;tags;items","source":"api.yaml","details":{"value":"","allowed":"object, array, string, integer, float, number, boolean"}}`+
+		`]}`, body)
+
+	this.Equal(0, this.countRows("contracts"))
+}
+
+func (this *IntegrationSuite) TestPublishContract_SchemaWithoutType_Rejected() {
+	status, _ := this.post("/api/participants", `{"participant":"pets_service"}`)
+	this.Require().Equal(http.StatusOK, status)
+
+	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1",
+		contractFragment{"api.yaml", schemaWithoutTypeYAML},
+	))
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;owner","source":"api.yaml","details":{"value":"","allowed":"object, array, string, integer, float, number, boolean"}},`+
+		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;tags","source":"api.yaml","details":{"value":"","allowed":"object, array, string, integer, float, number, boolean"}},`+
+		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;vaccinations","source":"api.yaml","details":{"value":"","allowed":"object, array, string, integer, float, number, boolean"}}`+
+		`]}`, body)
+
+	this.Equal(0, this.countRows("contracts"))
+}
+
+func (this *IntegrationSuite) TestPublishContract_ShapeKeyBesideRef_Rejected() {
+	status, _ := this.post("/api/participants", `{"participant":"pets_service"}`)
+	this.Require().Equal(http.StatusOK, status)
+
+	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1",
+		contractFragment{"api.yaml", shapeKeyBesideRefYAML},
+	))
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"schema.key_not_allowed","path":"schemas;Pet;properties;owner","source":"api.yaml","details":{"key":"type","type":"ref"}},`+
+		`{"code":"schema.key_not_allowed","path":"schemas;Pet;properties;owner","source":"api.yaml","details":{"key":"properties","type":"ref"}}`+
 		`]}`, body)
 
 	this.Equal(0, this.countRows("contracts"))

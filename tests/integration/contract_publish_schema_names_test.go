@@ -53,6 +53,23 @@ const namesDanglingMapValuesYAML = `schemas:
       ref: Pet
 `
 
+const namesDanglingRefBesideOptionalNullableAndDescriptionYAML = `provides:
+  rest:
+    /pets:
+      get:
+        responses:
+          200: Pet
+schemas:
+  Pet:
+    type: object
+    properties:
+      walker:
+        ref: Person
+        optional: true
+        nullable: true
+        description: who walks the pet
+`
+
 const namesResolvedSchemasYAML = `schemas:
   Invoice:
     type: object
@@ -206,6 +223,21 @@ func (this *IntegrationSuite) TestPublishContract_UnresolvedRefUnderMapValues() 
 	this.Equal(http.StatusBadRequest, status)
 	this.JSONEq(`{"message":"contract validation failed","violations":[`+
 		`{"code":"schema.unresolved_ref","path":"schemas;Pets;values","source":"schemas.yaml","details":{"schema":"Pet","property":"Pets{}"}}`+
+		`]}`, body)
+
+	this.Equal(0, this.countRows("contracts"))
+}
+
+func (this *IntegrationSuite) TestPublishContract_UnresolvedRefBesideOptionalNullableAndDescription() {
+	status, _ := this.post("/api/participants", namesParticipantBody)
+	this.Require().Equal(http.StatusOK, status)
+
+	status, body := this.post("/api/contracts", this.publishBody("names_service", "1",
+		contractFragment{"pets.yaml", namesDanglingRefBesideOptionalNullableAndDescriptionYAML},
+	))
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"schema.unresolved_ref","path":"schemas;Pet;properties;walker","source":"pets.yaml","details":{"schema":"Person","property":"Pet.walker"}}`+
 		`]}`, body)
 
 	this.Equal(0, this.countRows("contracts"))

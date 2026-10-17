@@ -144,6 +144,56 @@ const validateUnresolvedSchemaYAML = `provides:
           200: Missing
 `
 
+const validateSchemaWithoutTypeYAML = `provides:
+  rest:
+    /items:
+      get:
+        responses:
+          200: Item
+schemas:
+  Item:
+    type: object
+    properties:
+      dimensions:
+        properties:
+          width:
+            type: integer
+      tags:
+        items:
+          type: string
+      prices:
+        values:
+          type: integer
+`
+
+const validateShapeKeyBesideRefYAML = `provides:
+  rest:
+    /items:
+      get:
+        responses:
+          200: Item
+schemas:
+  Item:
+    type: object
+    properties:
+      supplier:
+        ref: Supplier
+        type: object
+        properties:
+          name:
+            type: string
+      manufacturer:
+        ref: Supplier
+        optional: true
+        nullable: true
+        description: who makes the item
+  Supplier:
+    type: object
+    properties:
+      name:
+        type: string
+`
+
 func (this *IntegrationSuite) mustPostForValidate(path, body string) {
 	status, response := this.post(path, body)
 	this.Require().Equalf(http.StatusOK, status, "POST %s: %s", path, response)
@@ -302,6 +352,33 @@ func (this *IntegrationSuite) TestValidateContract_RuleViolation() {
 	this.Require().Len(response.Violations, 1)
 	this.Equal("schema.unresolved_name", response.Violations[0].Code)
 	this.Equal("api.yaml", response.Violations[0].Source)
+}
+
+func (this *IntegrationSuite) TestValidateContract_SchemaWithoutType_Rejected() {
+	this.setupForValidate("catalog")
+
+	status, body := this.post("/api/contracts/validate",
+		this.validateBody("catalog", "production", validateFile{"api.yaml", validateSchemaWithoutTypeYAML}))
+
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"schema.invalid_type","path":"schemas;Item;properties;dimensions","source":"api.yaml","details":{"value":"","allowed":"object, array, string, integer, float, number, boolean"}},`+
+		`{"code":"schema.invalid_type","path":"schemas;Item;properties;prices","source":"api.yaml","details":{"value":"","allowed":"object, array, string, integer, float, number, boolean"}},`+
+		`{"code":"schema.invalid_type","path":"schemas;Item;properties;tags","source":"api.yaml","details":{"value":"","allowed":"object, array, string, integer, float, number, boolean"}}`+
+		`]}`, body)
+}
+
+func (this *IntegrationSuite) TestValidateContract_ShapeKeyBesideRef_Rejected() {
+	this.setupForValidate("catalog")
+
+	status, body := this.post("/api/contracts/validate",
+		this.validateBody("catalog", "production", validateFile{"api.yaml", validateShapeKeyBesideRefYAML}))
+
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"schema.key_not_allowed","path":"schemas;Item;properties;supplier","source":"api.yaml","details":{"key":"type","type":"ref"}},`+
+		`{"code":"schema.key_not_allowed","path":"schemas;Item;properties;supplier","source":"api.yaml","details":{"key":"properties","type":"ref"}}`+
+		`]}`, body)
 }
 
 func (this *IntegrationSuite) TestValidateContract_Compatible() {
