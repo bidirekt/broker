@@ -21,49 +21,34 @@ func TestToSchemaModels_DeclaredType_IsTheFieldType(t *testing.T) {
 	}
 }
 
-func TestToSchemaModels_PropertiesWithoutType_IsAnObject(t *testing.T) {
+func TestToSchemaModels_PropertiesWithoutType_IsNotAnObject(t *testing.T) {
 	catalog := contract.SchemasMap{
 		"Address": {Properties: map[string]contract.Schema{"city": {Type: "string"}}},
 	}
 
 	schemas := schemamapper.ToSchemaModels(catalog, []string{"Address"})
 
-	assert.Equal(t, model.Schemas{
-		"Address": {
-			"":     {Type: "object"},
-			"city": {Type: "string"},
-		},
-	}, schemas)
+	assert.Equal(t, model.Schemas{"Address": {"": {}}}, schemas)
 }
 
-func TestToSchemaModels_ValuesWithoutType_IsAnObject(t *testing.T) {
+func TestToSchemaModels_ValuesWithoutType_IsNotAnObject(t *testing.T) {
 	catalog := contract.SchemasMap{
 		"Scores": {Values: &contract.Schema{Type: "integer"}},
 	}
 
 	schemas := schemamapper.ToSchemaModels(catalog, []string{"Scores"})
 
-	assert.Equal(t, model.Schemas{
-		"Scores": {
-			"":   {Type: "object"},
-			"{}": {Type: "integer"},
-		},
-	}, schemas)
+	assert.Equal(t, model.Schemas{"Scores": {"": {}}}, schemas)
 }
 
-func TestToSchemaModels_ItemsWithoutType_IsAnArray(t *testing.T) {
+func TestToSchemaModels_ItemsWithoutType_IsNotAnArray(t *testing.T) {
 	catalog := contract.SchemasMap{
 		"Tags": {Items: &contract.Schema{Type: "string"}},
 	}
 
 	schemas := schemamapper.ToSchemaModels(catalog, []string{"Tags"})
 
-	assert.Equal(t, model.Schemas{
-		"Tags": {
-			"":   {Type: "array"},
-			"[]": {Type: "string"},
-		},
-	}, schemas)
+	assert.Equal(t, model.Schemas{"Tags": {"": {}}}, schemas)
 }
 
 func TestToSchemaModels_RefField_KeepsTheTargetNameAndNothingBelowIt(t *testing.T) {
