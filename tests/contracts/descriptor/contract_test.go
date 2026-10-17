@@ -192,7 +192,7 @@ func TestContract_SchemaNuloEhTipoInvalido(t *testing.T) {
 }
 
 func TestContract_OptionalNaoBooleanoEhKind(t *testing.T) {
-	source := "schemas:\n  Pet:\n    type: object\n    optional: talvez\n"
+	source := "schemas:\n  Pet:\n    type: object\n    properties:\n      id:\n        type: string\n    optional: talvez\n"
 
 	violations := descriptor.Validate(descriptor.Contract, contractDocument(t, source), "api.yaml")
 
