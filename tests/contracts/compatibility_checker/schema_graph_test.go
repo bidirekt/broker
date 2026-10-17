@@ -145,8 +145,7 @@ func TestTypeMismatch_StopsTheDescentAtThatField(t *testing.T) {
 	providedByTheProvider := model.Schemas{"Order": {
 		"":            {Type: "object"},
 		"address":     {Type: "string"},
-		"items":       {Type: "object"},
-		"items.sku":   {Type: "string"},
+		"items":       {Type: "map"},
 		"items{}":     {Type: "integer"},
 		"items{}.sku": {Type: "string"},
 	}}
@@ -219,6 +218,45 @@ func TestSameSchemaReachedThroughFieldsWithOtherFlags_ChecksEachField(t *testing
 			"consumerField": "Order.shipping", "providerField": "Order.shipping", "propertyType": "object",
 		})},
 	}, ordersBreaks(t, "201", ordersBody("Order", readByTheConsumer), ordersBody("Order", providedByTheProvider)))
+}
+
+func TestMapAgainstAnObject_BreaksOnTheParentOnly(t *testing.T) {
+	aMap := model.Schemas{"Order": {
+		"":             {Type: "object"},
+		"lines":        {Type: "map"},
+		"lines{}":      {Type: "object"},
+		"lines{}.sku":  {Type: "string"},
+		"lines{}.unit": {Type: "integer"},
+	}}
+	anObject := model.Schemas{"Order": {
+		"":              {Type: "object"},
+		"lines":         {Type: "object"},
+		"lines.first":   {Type: "object"},
+		"lines.first.x": {Type: "string"},
+	}}
+
+	for name, testCase := range map[string]struct {
+		interaction                string
+		consumerSide               model.Schemas
+		providerSide               model.Schemas
+		consumerType, providerType string
+	}{
+		"a map read against an object in a response": {"201", aMap, anObject, "map<object>", "object"},
+		"an object read against a map in a response": {"201", anObject, aMap, "object", "map<object>"},
+		"a map read against an object in a request":  {"request", anObject, aMap, "object", "map<object>"},
+		"an object read against a map in a request":  {"request", aMap, anObject, "map<object>", "object"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, []ordersBreak{
+				{compatibility_checker.ReasonPropertyTypeMismatch, ordersDetails("$.lines", map[string]string{
+					"consumerField":        "Order.lines",
+					"providerField":        "Order.lines",
+					"consumerPropertyType": testCase.consumerType,
+					"providerPropertyType": testCase.providerType,
+				})},
+			}, ordersBreaks(t, testCase.interaction, ordersBody("Order", testCase.consumerSide), ordersBody("Order", testCase.providerSide)))
+		})
+	}
 }
 
 func exponentialCatalog(prefix, leafType string) model.Schemas {

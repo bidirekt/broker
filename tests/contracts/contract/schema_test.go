@@ -80,13 +80,15 @@ properties:
 	assert.False(t, schema.IsRef())
 }
 
-func TestSchemaFromDocument_ObjetoSemTypeMasComPropertiesEhObjeto(t *testing.T) {
-	schema := contract.SchemaFromDocument(schemaDocument(t, `properties: {}
+func TestSchemaFromDocument_PropertiesWithoutTypeIsNotAnObject(t *testing.T) {
+	schema := contract.SchemaFromDocument(schemaDocument(t, `properties:
+  id:
+    type: string
 `))
 
-	assert.NotNil(t, schema.Properties)
-	assert.Empty(t, schema.Properties)
-	assert.True(t, schema.IsObject())
+	assert.Equal(t, contract.Schema{Properties: map[string]contract.Schema{"id": {Type: "string"}}}, schema)
+	assert.False(t, schema.IsObject())
+	assert.False(t, schema.IsArray())
 }
 
 func TestSchemaFromDocument_PropriedadeQueNaoEhMapaViraSchemaZero(t *testing.T) {
@@ -98,12 +100,12 @@ properties:
 	assert.Equal(t, map[string]contract.Schema{"id": {}}, schema.Properties)
 }
 
-func TestSchemaFromDocument_PropertiesQueNaoEhMapaEhIgnorado(t *testing.T) {
-	schema := contract.SchemaFromDocument(schemaDocument(t, `properties: id
+func TestSchemaFromDocument_PropertiesThatIsNotAMappingIsIgnored(t *testing.T) {
+	schema := contract.SchemaFromDocument(schemaDocument(t, `type: object
+properties: id
 `))
 
-	assert.Nil(t, schema.Properties)
-	assert.False(t, schema.IsObject())
+	assert.Equal(t, contract.Schema{Type: "object"}, schema)
 }
 
 func TestSchemaFromDocument_ArrayComItems(t *testing.T) {
@@ -145,13 +147,13 @@ items: string
 	assert.Equal(t, contract.Schema{Type: "array"}, schema)
 }
 
-func TestSchemaFromDocument_ItemsSemTypeEhArray(t *testing.T) {
+func TestSchemaFromDocument_ItemsWithoutTypeIsNotAnArray(t *testing.T) {
 	schema := contract.SchemaFromDocument(schemaDocument(t, `items:
   type: string
 `))
 
 	assert.Equal(t, contract.Schema{Items: &contract.Schema{Type: "string"}}, schema)
-	assert.True(t, schema.IsArray())
+	assert.False(t, schema.IsArray())
 	assert.False(t, schema.IsObject())
 }
 
@@ -167,19 +169,11 @@ optional: true
 	assert.False(t, schema.IsPrimitive())
 }
 
-func TestSchemaFromDocument_RefComTypeOuEstruturaNaoEhRef(t *testing.T) {
-	for name, source := range map[string]string{
-		"type":       "ref: Pet\ntype: object\n",
-		"properties": "ref: Pet\nproperties: {}\n",
-		"items":      "ref: Pet\nitems: {}\n",
-	} {
-		t.Run(name, func(t *testing.T) {
-			schema := contract.SchemaFromDocument(schemaDocument(t, source))
+func TestSchemaFromDocument_RefWithTypeIsNotARef(t *testing.T) {
+	schema := contract.SchemaFromDocument(schemaDocument(t, "ref: Pet\ntype: object\n"))
 
-			assert.Equal(t, "Pet", schema.Ref)
-			assert.False(t, schema.IsRef())
-		})
-	}
+	assert.Equal(t, "Pet", schema.Ref)
+	assert.False(t, schema.IsRef())
 }
 
 func TestSchemaFromDocument_Optional(t *testing.T) {
@@ -270,41 +264,36 @@ properties:
 	}, schema)
 }
 
-func TestSchemaFromDocument_ObjectWithValues(t *testing.T) {
-	schema := contract.SchemaFromDocument(schemaDocument(t, `type: object
+func TestSchemaFromDocument_MapWithValues(t *testing.T) {
+	schema := contract.SchemaFromDocument(schemaDocument(t, `type: map
 values:
   ref: Pet
   nullable: true
 `))
 
-	assert.Equal(t, contract.Schema{Type: "object", Values: &contract.Schema{Ref: "Pet", Nullable: true}}, schema)
-	assert.True(t, schema.IsObject())
+	assert.Equal(t, contract.Schema{Type: "map", Values: &contract.Schema{Ref: "Pet", Nullable: true}}, schema)
+	assert.True(t, schema.IsMap())
+	assert.False(t, schema.IsObject())
 	assert.False(t, schema.IsArray())
 	assert.False(t, schema.IsPrimitive())
 	assert.False(t, schema.IsRef())
 }
 
-func TestSchemaFromDocument_ValuesWithoutTypeIsObject(t *testing.T) {
+func TestSchemaFromDocument_ValuesWithoutTypeIsNotAMap(t *testing.T) {
 	schema := contract.SchemaFromDocument(schemaDocument(t, `values:
   type: string
 `))
 
 	assert.Equal(t, contract.Schema{Values: &contract.Schema{Type: "string"}}, schema)
-	assert.True(t, schema.IsObject())
+	assert.False(t, schema.IsMap())
+	assert.False(t, schema.IsObject())
 	assert.False(t, schema.IsArray())
 }
 
-func TestSchemaFromDocument_RefWithValuesIsNotRef(t *testing.T) {
-	schema := contract.SchemaFromDocument(schemaDocument(t, "ref: Pet\nvalues: {}\n"))
-
-	assert.Equal(t, "Pet", schema.Ref)
-	assert.False(t, schema.IsRef())
-}
-
 func TestSchemaFromDocument_ValuesThatIsNotAMappingIsIgnored(t *testing.T) {
-	schema := contract.SchemaFromDocument(schemaDocument(t, `type: object
+	schema := contract.SchemaFromDocument(schemaDocument(t, `type: map
 values: string
 `))
 
-	assert.Equal(t, contract.Schema{Type: "object"}, schema)
+	assert.Equal(t, contract.Schema{Type: "map"}, schema)
 }

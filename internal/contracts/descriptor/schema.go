@@ -1,6 +1,7 @@
 package descriptor
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/bidirekt/broker/internal/contracts/violation"
@@ -16,11 +17,19 @@ func Schema() Node {
 		"ref":         SchemaRef,
 		"optional":    Flag,
 		"nullable":    Flag,
-	}).Rules(schemaHasShape, arrayRequiresItems, valuesExcludeProperties, valuesRequireObject)
+	}).Rules(
+		schemaRequiresTypeOrRef,
+		refExcludes("type"),
+		keyBelongsTo("properties", "object"),
+		keyBelongsTo("items", "array"),
+		keyBelongsTo("values", "map"),
+		arrayRequiresItems,
+		mapRequiresValues,
+	)
 }
 
-func schemaHasShape(present PresentFields) *violation.Violation {
-	if present.HasAny("type", "properties", "items", "values", "ref") {
+func schemaRequiresTypeOrRef(present PresentFields) *violation.Violation {
+	if present.HasAny("type", "ref") {
 		return nil
 	}
 
@@ -33,6 +42,42 @@ func schemaHasShape(present PresentFields) *violation.Violation {
 	}
 }
 
+func refExcludes(key string) Rule {
+	return func(present PresentFields) *violation.Violation {
+		if present["ref"] == nil || present[key] == nil {
+			return nil
+		}
+
+		return keyNotAllowed(key, "ref")
+	}
+}
+
+func keyBelongsTo(key string, schemaType string) Rule {
+	return func(present PresentFields) *violation.Violation {
+		if present[key] == nil {
+			return nil
+		}
+
+		if present["ref"] != nil {
+			return keyNotAllowed(key, "ref")
+		}
+
+		declaredType, valid := present["type"].(string)
+		if !valid || declaredType == schemaType || !slices.Contains(SchemaType.Allowed, declaredType) {
+			return nil
+		}
+
+		return keyNotAllowed(key, declaredType)
+	}
+}
+
+func keyNotAllowed(key string, schemaType string) *violation.Violation {
+	return &violation.Violation{
+		ErrorCode: "schema.key_not_allowed",
+		Details:   map[string]string{"key": key, "type": schemaType},
+	}
+}
+
 func arrayRequiresItems(present PresentFields) *violation.Violation {
 	if present["type"] != "array" || present["items"] != nil {
 		return nil
@@ -41,18 +86,10 @@ func arrayRequiresItems(present PresentFields) *violation.Violation {
 	return &violation.Violation{ErrorCode: "schema.array_without_items"}
 }
 
-func valuesExcludeProperties(present PresentFields) *violation.Violation {
-	if present["values"] == nil || present["properties"] == nil {
+func mapRequiresValues(present PresentFields) *violation.Violation {
+	if present["type"] != "map" || present["values"] != nil {
 		return nil
 	}
 
-	return &violation.Violation{ErrorCode: "schema.values_with_properties"}
-}
-
-func valuesRequireObject(present PresentFields) *violation.Violation {
-	if present["values"] == nil || present["type"] == nil || present["type"] == "object" {
-		return nil
-	}
-
-	return &violation.Violation{ErrorCode: "schema.values_without_object"}
+	return &violation.Violation{ErrorCode: "schema.map_without_values"}
 }
