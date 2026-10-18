@@ -230,6 +230,20 @@ schemas:
         type: string
 `
 
+const validateSchemaNameWithADotYAML = `provides:
+  rest:
+    /pets:
+      get:
+        responses:
+          200: Pet.v2
+schemas:
+  Pet.v2:
+    type: object
+    properties:
+      name:
+        type: string
+`
+
 func (this *IntegrationSuite) mustPostForValidate(path, body string) {
 	status, response := this.post(path, body)
 	this.Require().Equalf(http.StatusOK, status, "POST %s: %s", path, response)
@@ -441,6 +455,18 @@ func (this *IntegrationSuite) TestValidateContract_OptionalOnANamedSchema_Reject
 	this.Equal(http.StatusBadRequest, status)
 	this.JSONEq(`{"message":"contract validation failed","violations":[`+
 		`{"code":"schema.optional_not_allowed","path":"schemas;Pet","source":"api.yaml","details":{"position":"schema"}}`+
+		`]}`, body)
+}
+
+func (this *IntegrationSuite) TestValidateContract_SchemaNameWithADot_Rejected() {
+	this.setupForValidate("pets_service")
+
+	status, body := this.post("/api/contracts/validate",
+		this.validateBody("pets_service", "production", validateFile{"api.yaml", validateSchemaNameWithADotYAML}))
+
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"schema.name_syntax","path":"schemas;Pet.v2","source":"api.yaml","details":{"key":"Pet.v2","error":"must not contain \".\", \"[\", \"]\", \"{\", \"}\" or \";\""}}`+
 		`]}`, body)
 }
 

@@ -1,8 +1,11 @@
 package descriptor
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
+	"strings"
+	"unicode"
 
 	"github.com/bidirekt/broker/internal/contracts/contract"
 	"github.com/bidirekt/broker/internal/validations"
@@ -21,8 +24,8 @@ var (
 	Endpoint     = Key{ErrorCode: "endpoint.syntax", Check: endpointSyntax}
 	ServiceName  = Key{ErrorCode: "service.name_syntax", Check: validations.ParticipantName}
 	StatusCode   = Key{ErrorCode: "status.out_of_range", Check: statusCodeInRange}
-	SchemaName   = Key{}
-	PropertyName = Key{}
+	SchemaName   = Key{ErrorCode: "schema.name_syntax", Check: pathSafeName}
+	PropertyName = Key{ErrorCode: "property.name_syntax", Check: pathSafeName}
 )
 
 func endpointSyntax(key string) error {
@@ -41,4 +44,17 @@ func statusCodeInRange(key string) error {
 	}
 
 	return nil
+}
+
+func pathSafeName(key string) error {
+	switch {
+	case key == "":
+		return errors.New("must not be empty")
+	case strings.ContainsAny(key, ".[]{};"):
+		return errors.New(`must not contain ".", "[", "]", "{", "}" or ";"`)
+	case strings.ContainsFunc(key, unicode.IsControl):
+		return errors.New("must not contain control characters")
+	default:
+		return nil
+	}
 }
