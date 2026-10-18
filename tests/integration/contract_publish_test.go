@@ -363,6 +363,35 @@ func (this *IntegrationSuite) TestPublishContract_BadServiceName_RejectedNothing
 	this.Equal(0, this.countRows("contracts"))
 }
 
+const propertyNameWithADotYAML = `provides:
+  rest:
+    /pets:
+      get:
+        responses:
+          200: Pet
+schemas:
+  Pet:
+    type: object
+    properties:
+      user.name:
+        type: string
+`
+
+func (this *IntegrationSuite) TestPublishContract_PropertyNameWithADot_RejectedNothingStored() {
+	status, _ := this.post("/api/participants", `{"participant":"pets_service"}`)
+	this.Require().Equal(http.StatusOK, status)
+
+	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1",
+		contractFragment{"api.yaml", propertyNameWithADotYAML},
+	))
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"property.name_syntax","path":"schemas;Pet;properties;user.name","source":"api.yaml","details":{"key":"user.name","error":"must not contain \".\", \"[\", \"]\", \"{\", \"}\" or \";\""}}`+
+		`]}`, body)
+
+	this.Equal(0, this.countRows("contracts"))
+}
+
 func (this *IntegrationSuite) TestPublishContract_UnknownParticipant() {
 	status, body := this.post("/api/contracts", this.publishBody("ghost_service", "1", contractFragment{"api.yaml", contractBody}))
 	this.Equal(http.StatusNotFound, status)
