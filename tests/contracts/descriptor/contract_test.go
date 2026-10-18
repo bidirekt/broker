@@ -192,14 +192,45 @@ func TestContract_SchemaNuloEhTipoInvalido(t *testing.T) {
 }
 
 func TestContract_NonBooleanOptionalIsAnInvalidKind(t *testing.T) {
-	source := "schemas:\n  Pet:\n    type: object\n    properties:\n      id:\n        type: string\n    optional: maybe\n"
+	source := "schemas:\n  Pet:\n    type: object\n    properties:\n      id:\n        type: string\n        optional: maybe\n"
 
 	violations := descriptor.Validate(descriptor.Contract, contractDocument(t, source), "api.yaml")
 
 	require.Len(t, violations, 1)
 	assert.Equal(t, "value.invalid_kind", violations[0].ErrorCode)
-	assert.Equal(t, "schemas;Pet;optional", violations[0].Path)
+	assert.Equal(t, "schemas;Pet;properties;id;optional", violations[0].Path)
 	assert.Equal(t, map[string]string{"expected": "boolean", "got": "string"}, violations[0].Details)
+}
+
+func TestContract_OptionalOnANamedSchemaIsNotAllowed(t *testing.T) {
+	for _, optional := range []string{"true", "false"} {
+		t.Run(optional, func(t *testing.T) {
+			source := "schemas:\n  Pet:\n    type: object\n    optional: " + optional + "\n    properties:\n      id:\n        type: string\n"
+
+			violations := descriptor.Validate(descriptor.Contract, contractDocument(t, source), "api.yaml")
+
+			require.Len(t, violations, 1)
+			assert.Equal(t, "schema.optional_not_allowed", violations[0].ErrorCode)
+			assert.Equal(t, "schemas;Pet", violations[0].Path)
+			assert.Equal(t, "api.yaml", violations[0].Source)
+			assert.Equal(t, map[string]string{"position": "schema"}, violations[0].Details)
+		})
+	}
+}
+
+func TestContract_NullOptionalOrNullableOnANamedSchemaIsValid(t *testing.T) {
+	for name, flag := range map[string]string{
+		"null optional": "optional: ~",
+		"nullable":      "nullable: true",
+	} {
+		t.Run(name, func(t *testing.T) {
+			source := "schemas:\n  Pet:\n    type: object\n    " + flag + "\n    properties:\n      id:\n        type: string\n"
+
+			violations := descriptor.Validate(descriptor.Contract, contractDocument(t, source), "api.yaml")
+
+			assert.Empty(t, violations)
+		})
+	}
 }
 
 func TestContract_DocumentoNuloNaoViola(t *testing.T) {

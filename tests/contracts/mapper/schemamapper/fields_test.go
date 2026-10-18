@@ -169,7 +169,7 @@ func TestToSchemaModels_OptionalAndNullableRefSite_StayOnTheSiteField(t *testing
 	assert.Equal(t, model.Field{Type: "object"}, schemas["Address"][""])
 }
 
-func TestToSchemaModels_OptionalAndNullableTarget_StayOnTheTargetSchema(t *testing.T) {
+func TestToSchemaModels_NullableTarget_StaysOnTheTargetSchema(t *testing.T) {
 	catalog := contract.SchemasMap{
 		"User": {
 			Type:       "object",
@@ -177,7 +177,6 @@ func TestToSchemaModels_OptionalAndNullableTarget_StayOnTheTargetSchema(t *testi
 		},
 		"Manager": {
 			Type:       "object",
-			Optional:   true,
 			Nullable:   true,
 			Properties: map[string]contract.Schema{"name": {Type: "string"}},
 		},
@@ -186,7 +185,7 @@ func TestToSchemaModels_OptionalAndNullableTarget_StayOnTheTargetSchema(t *testi
 	schemas := schemamapper.ToSchemaModels(catalog, []string{"User"})
 
 	assert.Equal(t, model.Field{Ref: "Manager"}, schemas["User"]["manager"])
-	assert.Equal(t, model.Field{Type: "object", Optional: true, Nullable: true}, schemas["Manager"][""])
+	assert.Equal(t, model.Field{Type: "object", Nullable: true}, schemas["Manager"][""])
 }
 
 func TestToSchemaModels_OptionalAndNullable_StayOnTheNodeThatDeclaresThem(t *testing.T) {
@@ -199,7 +198,7 @@ func TestToSchemaModels_OptionalAndNullable_StayOnTheNodeThatDeclaresThem(t *tes
 				"nickname": {Type: "string", Optional: true},
 				"bio":      {Type: "string", Optional: true, Nullable: true},
 				"tags":     {Type: "array", Items: &contract.Schema{Type: "string", Nullable: true}},
-				"scores":   {Type: "map", Values: &contract.Schema{Type: "integer", Optional: true, Nullable: true}},
+				"scores":   {Type: "map", Values: &contract.Schema{Type: "integer", Nullable: true}},
 			},
 		},
 	}
@@ -215,7 +214,7 @@ func TestToSchemaModels_OptionalAndNullable_StayOnTheNodeThatDeclaresThem(t *tes
 			"tags":     {Type: "array"},
 			"tags[]":   {Type: "string", Nullable: true},
 			"scores":   {Type: "map"},
-			"scores{}": {Type: "integer", Optional: true, Nullable: true},
+			"scores{}": {Type: "integer", Nullable: true},
 		},
 	}, schemas)
 }

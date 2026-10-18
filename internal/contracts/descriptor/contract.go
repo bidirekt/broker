@@ -7,7 +7,7 @@ var Contract = Object(Fields{
 	"consumes": Map(ServiceName, Object(Fields{
 		"rest": Map(Endpoint, methods),
 	})),
-	"schemas": Map(SchemaName, Schema()),
+	"schemas": Map(SchemaName, SchemaAt("schema")),
 })
 
 var methods = Object(Fields{

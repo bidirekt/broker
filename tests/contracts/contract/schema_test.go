@@ -159,10 +159,9 @@ func TestSchemaFromDocument_ItemsWithoutTypeIsNotAnArray(t *testing.T) {
 
 func TestSchemaFromDocument_Ref(t *testing.T) {
 	schema := contract.SchemaFromDocument(schemaDocument(t, `ref: Pet
-optional: true
 `))
 
-	assert.Equal(t, contract.Schema{Ref: "Pet", Optional: true}, schema)
+	assert.Equal(t, contract.Schema{Ref: "Pet"}, schema)
 	assert.True(t, schema.IsRef())
 	assert.False(t, schema.IsObject())
 	assert.False(t, schema.IsArray())
@@ -183,7 +182,7 @@ func TestSchemaFromDocument_Optional(t *testing.T) {
 	assert.False(t, contract.SchemaFromDocument(contract.Document{"type": "string"}).Optional)
 }
 
-func TestSchemaFromDocument_RecursaoAninhada(t *testing.T) {
+func TestSchemaFromDocument_NestedRecursion(t *testing.T) {
 	schema := contract.SchemaFromDocument(schemaDocument(t, `type: object
 properties:
   users:
@@ -195,7 +194,6 @@ properties:
           type: array
           items:
             ref: Tag
-            optional: true
 `))
 
 	assert.Equal(t, contract.Schema{
@@ -208,7 +206,7 @@ properties:
 					Properties: map[string]contract.Schema{
 						"tags": {
 							Type:  "array",
-							Items: &contract.Schema{Ref: "Tag", Optional: true},
+							Items: &contract.Schema{Ref: "Tag"},
 						},
 					},
 				},

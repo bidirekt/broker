@@ -7,17 +7,25 @@ import (
 	"github.com/bidirekt/broker/internal/contracts/violation"
 )
 
-func Schema() Node {
+func Property() Node {
+	return schema()
+}
+
+func SchemaAt(position string) Node {
+	return schema(optionalNotAllowedAt(position))
+}
+
+func schema(positionRules ...Rule) Node {
 	return Object(Fields{
 		"type":        SchemaType,
 		"description": Text,
-		"properties":  Map(PropertyName, Lazy(Schema)),
-		"items":       Lazy(Schema),
-		"values":      Lazy(Schema),
+		"properties":  Map(PropertyName, Lazy(Property)),
+		"items":       Lazy(func() Node { return SchemaAt("items") }),
+		"values":      Lazy(func() Node { return SchemaAt("values") }),
 		"ref":         SchemaRef,
 		"optional":    Flag,
 		"nullable":    Flag,
-	}).Rules(
+	}).Rules(append([]Rule{
 		schemaRequiresTypeOrRef,
 		refExcludes("type"),
 		keyBelongsTo("properties", "object"),
@@ -26,7 +34,7 @@ func Schema() Node {
 		objectRequiresProperties,
 		arrayRequiresItems,
 		mapRequiresValues,
-	)
+	}, positionRules...)...)
 }
 
 func schemaRequiresTypeOrRef(present PresentFields) *violation.Violation {
@@ -106,4 +114,17 @@ func mapRequiresValues(present PresentFields) *violation.Violation {
 	}
 
 	return &violation.Violation{ErrorCode: "schema.map_without_values"}
+}
+
+func optionalNotAllowedAt(position string) Rule {
+	return func(present PresentFields) *violation.Violation {
+		if present["optional"] == nil {
+			return nil
+		}
+
+		return &violation.Violation{
+			ErrorCode: "schema.optional_not_allowed",
+			Details:   map[string]string{"position": position},
+		}
+	}
 }
