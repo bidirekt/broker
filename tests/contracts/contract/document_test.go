@@ -7,10 +7,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestDocument_MappingDevolveOSubmapa(t *testing.T) {
-	document := contract.Document{"schemas": map[string]any{"Pet": map[string]any{"type": "object"}}}
+func TestDocument_MappingReturnsTheNestedMapping(t *testing.T) {
+	pet := map[string]any{"type": "object", "properties": map[string]any{"name": map[string]any{"type": "string"}}}
+	document := contract.Document{"schemas": map[string]any{"Pet": pet}}
 
-	assert.Equal(t, contract.Document{"Pet": map[string]any{"type": "object"}}, document.Mapping("schemas"))
+	assert.Equal(t, contract.Document{"Pet": pet}, document.Mapping("schemas"))
 	assert.Equal(t, "object", document.Mapping("schemas").Mapping("Pet").Text("type"))
 }
 

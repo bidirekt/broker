@@ -107,12 +107,12 @@ func TestObject_CampoComValorNuloNaoContaComoEscrito(t *testing.T) {
 	assert.Empty(t, seen)
 }
 
-func TestObject_RegrasRodamDepoisDosCamposERecebemOsEscritos(t *testing.T) {
+func TestObject_RulesRunAfterTheFieldsAndReceiveTheWrittenOnes(t *testing.T) {
 	subject := descriptor.Object(descriptor.Fields{
 		"type":  descriptor.String(),
 		"items": descriptor.String(),
 	}).Rules(func(present descriptor.PresentFields) *violation.Violation {
-		if present["type"] != "array" || present.HasAny("items") {
+		if present["type"] != "array" || present["items"] != nil {
 			return nil
 		}
 
@@ -128,11 +128,11 @@ func TestObject_RegrasRodamDepoisDosCamposERecebemOsEscritos(t *testing.T) {
 	assert.Equal(t, "api.yaml", violations[1].Source)
 }
 
-func TestObject_RegraEmObjetoNuloRodaComEscritosVazios(t *testing.T) {
+func TestObject_RuleOnANullObjectRunsWithNoWrittenFields(t *testing.T) {
 	subject := descriptor.Object(descriptor.Fields{
 		"Pet": descriptor.Object(descriptor.Fields{"type": descriptor.String()}).
 			Rules(func(present descriptor.PresentFields) *violation.Violation {
-				if present.HasAny("type") {
+				if present["type"] != nil {
 					return nil
 				}
 

@@ -30,7 +30,7 @@ func Schema() Node {
 }
 
 func schemaRequiresTypeOrRef(present PresentFields) *violation.Violation {
-	if present.HasAny("type", "ref") {
+	if present["type"] != nil || (present["ref"] != nil && present["ref"] != "") {
 		return nil
 	}
 
@@ -80,8 +80,12 @@ func keyNotAllowed(key string, schemaType string) *violation.Violation {
 }
 
 func objectRequiresProperties(present PresentFields) *violation.Violation {
-	properties, _ := present["properties"].(map[string]any)
-	if present["type"] != "object" || len(properties) > 0 {
+	if present["ref"] != nil || present["type"] != "object" {
+		return nil
+	}
+
+	properties, isMapping := present["properties"].(map[string]any)
+	if len(properties) > 0 || (present["properties"] != nil && !isMapping) {
 		return nil
 	}
 
@@ -89,7 +93,7 @@ func objectRequiresProperties(present PresentFields) *violation.Violation {
 }
 
 func arrayRequiresItems(present PresentFields) *violation.Violation {
-	if present["type"] != "array" || present["items"] != nil {
+	if present["ref"] != nil || present["type"] != "array" || present["items"] != nil {
 		return nil
 	}
 
@@ -97,7 +101,7 @@ func arrayRequiresItems(present PresentFields) *violation.Violation {
 }
 
 func mapRequiresValues(present PresentFields) *violation.Violation {
-	if present["type"] != "map" || present["values"] != nil {
+	if present["ref"] != nil || present["type"] != "map" || present["values"] != nil {
 		return nil
 	}
 

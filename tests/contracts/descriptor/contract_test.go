@@ -191,8 +191,8 @@ func TestContract_SchemaNuloEhTipoInvalido(t *testing.T) {
 	assert.Equal(t, "schemas;Pet", violations[0].Path)
 }
 
-func TestContract_OptionalNaoBooleanoEhKind(t *testing.T) {
-	source := "schemas:\n  Pet:\n    type: object\n    properties:\n      id:\n        type: string\n    optional: talvez\n"
+func TestContract_NonBooleanOptionalIsAnInvalidKind(t *testing.T) {
+	source := "schemas:\n  Pet:\n    type: object\n    properties:\n      id:\n        type: string\n    optional: maybe\n"
 
 	violations := descriptor.Validate(descriptor.Contract, contractDocument(t, source), "api.yaml")
 

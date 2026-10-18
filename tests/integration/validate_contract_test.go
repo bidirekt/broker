@@ -194,6 +194,27 @@ schemas:
         type: string
 `
 
+const validateObjectWithoutPropertiesYAML = `provides:
+  rest:
+    /pets:
+      get:
+        responses:
+          200: Pet
+schemas:
+  Pet:
+    type: object
+    properties:
+      owner:
+        type: object
+      tags:
+        type: object
+        properties: {}
+      vaccinations:
+        type: object
+        values:
+          type: boolean
+`
+
 func (this *IntegrationSuite) mustPostForValidate(path, body string) {
 	status, response := this.post(path, body)
 	this.Require().Equalf(http.StatusOK, status, "POST %s: %s", path, response)
@@ -378,6 +399,21 @@ func (this *IntegrationSuite) TestValidateContract_ShapeKeyBesideRef_Rejected() 
 	this.JSONEq(`{"message":"contract validation failed","violations":[`+
 		`{"code":"schema.key_not_allowed","path":"schemas;Item;properties;supplier","source":"api.yaml","details":{"key":"type","type":"ref"}},`+
 		`{"code":"schema.key_not_allowed","path":"schemas;Item;properties;supplier","source":"api.yaml","details":{"key":"properties","type":"ref"}}`+
+		`]}`, body)
+}
+
+func (this *IntegrationSuite) TestValidateContract_ObjectWithoutProperties_Rejected() {
+	this.setupForValidate("pets_service")
+
+	status, body := this.post("/api/contracts/validate",
+		this.validateBody("pets_service", "production", validateFile{"api.yaml", validateObjectWithoutPropertiesYAML}))
+
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"schema.object_without_properties","path":"schemas;Pet;properties;owner","source":"api.yaml","details":null},`+
+		`{"code":"schema.object_without_properties","path":"schemas;Pet;properties;tags","source":"api.yaml","details":null},`+
+		`{"code":"schema.key_not_allowed","path":"schemas;Pet;properties;vaccinations","source":"api.yaml","details":{"key":"values","type":"object"}},`+
+		`{"code":"schema.object_without_properties","path":"schemas;Pet;properties;vaccinations","source":"api.yaml","details":null}`+
 		`]}`, body)
 }
 
