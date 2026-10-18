@@ -118,6 +118,18 @@ const unresolvedNestedMapValuesRefsYAML = `schemas:
         ref: Price
 `
 
+const unresolvedWholeSchemaRefYAML = `schemas:
+  Order:
+    ref: Missing
+`
+
+const unresolvedArrayItemsRefYAML = `schemas:
+  Tags:
+    type: array
+    items:
+      ref: Missing
+`
+
 const cyclicSchemasYAML = `schemas:
   Pet:
     type: object
@@ -436,6 +448,32 @@ func TestValidate_UnresolvedRefsUnderNestedMapValues_ReportEachRefSite(t *testin
 			Path:      "schemas;PriceTables;items;values",
 			Source:    "prices.yaml",
 			Details:   map[string]string{"schema": "Price", "property": "PriceTables[]{}"},
+		},
+	}, violations)
+}
+
+func TestValidate_UnresolvedRefAsTheWholeSchema_ReportedAtTheSchema(t *testing.T) {
+	violations := validateFiles(t, validatedFile{"orders.yaml", unresolvedWholeSchemaRefYAML})
+
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "schema.unresolved_ref",
+			Path:      "schemas;Order",
+			Source:    "orders.yaml",
+			Details:   map[string]string{"schema": "Missing", "property": "Order"},
+		},
+	}, violations)
+}
+
+func TestValidate_UnresolvedRefUnderArrayItems_ReportedAtTheItems(t *testing.T) {
+	violations := validateFiles(t, validatedFile{"tags.yaml", unresolvedArrayItemsRefYAML})
+
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "schema.unresolved_ref",
+			Path:      "schemas;Tags;items",
+			Source:    "tags.yaml",
+			Details:   map[string]string{"schema": "Missing", "property": "Tags[]"},
 		},
 	}, violations)
 }

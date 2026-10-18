@@ -82,14 +82,7 @@ func (this Node) Field() string {
 
 	site := this.members[0].site
 
-	switch {
-	case site.Path == "":
-		return site.Schema
-	case strings.HasPrefix(site.Path, model.ItemsSegment) || strings.HasPrefix(site.Path, model.ValuesSegment):
-		return site.Schema + site.Path
-	default:
-		return site.Schema + "." + site.Path
-	}
+	return model.FieldName(site.Schema, site.Path)
 }
 
 func (this Node) Segments() []string {

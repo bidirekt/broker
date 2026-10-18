@@ -45,3 +45,20 @@ func TestParentOf_TheSchemaItself_HasNoParent(t *testing.T) {
 
 	assert.False(t, nested)
 }
+
+func TestFieldName_SpellsTheSchemaFollowedByThePathInsideIt(t *testing.T) {
+	fieldNames := []struct {
+		schema, path, field string
+	}{
+		{"Order", "", "Order"},
+		{"Order", "billing", "Order.billing"},
+		{"Order", "items[].sku", "Order.items[].sku"},
+		{"Tags", "[]", "Tags[]"},
+		{"Pets", "{}.name", "Pets{}.name"},
+		{"PriceTables", "[]{}", "PriceTables[]{}"},
+	}
+
+	for _, tc := range fieldNames {
+		assert.Equal(t, tc.field, model.FieldName(tc.schema, tc.path), tc.schema+" + "+tc.path)
+	}
+}

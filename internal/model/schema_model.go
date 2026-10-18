@@ -30,6 +30,17 @@ func ChildPath(parent, segment string) string {
 	}
 }
 
+func FieldName(schema, path string) string {
+	switch {
+	case path == "":
+		return schema
+	case strings.HasPrefix(path, ItemsSegment) || strings.HasPrefix(path, ValuesSegment):
+		return schema + path
+	default:
+		return schema + "." + path
+	}
+}
+
 func ParentOf(path string) (parent string, segment string, nested bool) {
 	switch {
 	case path == "":
