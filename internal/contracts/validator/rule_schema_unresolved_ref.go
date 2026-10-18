@@ -7,6 +7,7 @@ import (
 	"github.com/bidirekt/broker/internal/contracts/contract"
 	"github.com/bidirekt/broker/internal/contracts/mapper/fragmentmapper"
 	"github.com/bidirekt/broker/internal/contracts/violation"
+	"github.com/bidirekt/broker/internal/model"
 )
 
 // Each schema is inspected in its own definition only, so a broken ref is reported once, where it is written.
@@ -17,16 +18,22 @@ func unresolvedSchemaRefs(declarations fragmentmapper.Declarations) []violation.
 		violations = append(violations, unresolvedRefsIn(
 			declaration.Schema,
 			declarations.Catalog,
-			declaration.Source,
+			declaration,
 			schemaPath(declaration.Name),
-			declaration.Name,
+			"",
 		)...)
 	}
 
 	return violations
 }
 
-func unresolvedRefsIn(schema contract.Schema, catalog contract.SchemasMap, source string, path string, property string) []violation.Violation {
+func unresolvedRefsIn(
+	schema contract.Schema,
+	catalog contract.SchemasMap,
+	declaration fragmentmapper.SchemaDeclaration,
+	documentPath string,
+	path string,
+) []violation.Violation {
 	switch {
 	case schema.IsRef():
 		if _, declared := catalog[schema.Ref]; declared {
@@ -35,11 +42,11 @@ func unresolvedRefsIn(schema contract.Schema, catalog contract.SchemasMap, sourc
 
 		return []violation.Violation{{
 			ErrorCode: "schema.unresolved_ref",
-			Path:      path,
-			Source:    source,
+			Path:      documentPath,
+			Source:    declaration.Source,
 			Details: map[string]string{
 				"schema":   schema.Ref,
-				"property": property,
+				"property": model.FieldName(declaration.Name, path),
 			},
 		}}
 
@@ -48,7 +55,7 @@ func unresolvedRefsIn(schema contract.Schema, catalog contract.SchemasMap, sourc
 			return nil
 		}
 
-		return unresolvedRefsIn(*schema.Items, catalog, source, path+";items", property+"[]")
+		return unresolvedRefsIn(*schema.Items, catalog, declaration, documentPath+";items", model.ChildPath(path, model.ItemsSegment))
 
 	case schema.IsObject():
 		var violations []violation.Violation
@@ -57,9 +64,9 @@ func unresolvedRefsIn(schema contract.Schema, catalog contract.SchemasMap, sourc
 			violations = append(violations, unresolvedRefsIn(
 				schema.Properties[name],
 				catalog,
-				source,
-				path+";properties;"+name,
-				property+"."+name,
+				declaration,
+				documentPath+";properties;"+name,
+				model.ChildPath(path, name),
 			)...)
 		}
 
@@ -70,7 +77,7 @@ func unresolvedRefsIn(schema contract.Schema, catalog contract.SchemasMap, sourc
 			return nil
 		}
 
-		return unresolvedRefsIn(*schema.Values, catalog, source, path+";values", property+"{}")
+		return unresolvedRefsIn(*schema.Values, catalog, declaration, documentPath+";values", model.ChildPath(path, model.ValuesSegment))
 	}
 
 	return nil
