@@ -215,6 +215,21 @@ schemas:
           type: boolean
 `
 
+const validateOptionalOnANamedSchemaYAML = `provides:
+  rest:
+    /pets:
+      get:
+        responses:
+          200: Pet
+schemas:
+  Pet:
+    type: object
+    optional: true
+    properties:
+      name:
+        type: string
+`
+
 func (this *IntegrationSuite) mustPostForValidate(path, body string) {
 	status, response := this.post(path, body)
 	this.Require().Equalf(http.StatusOK, status, "POST %s: %s", path, response)
@@ -414,6 +429,18 @@ func (this *IntegrationSuite) TestValidateContract_ObjectWithoutProperties_Rejec
 		`{"code":"schema.object_without_properties","path":"schemas;Pet;properties;tags","source":"api.yaml","details":null},`+
 		`{"code":"schema.key_not_allowed","path":"schemas;Pet;properties;vaccinations","source":"api.yaml","details":{"key":"values","type":"object"}},`+
 		`{"code":"schema.object_without_properties","path":"schemas;Pet;properties;vaccinations","source":"api.yaml","details":null}`+
+		`]}`, body)
+}
+
+func (this *IntegrationSuite) TestValidateContract_OptionalOnANamedSchema_Rejected() {
+	this.setupForValidate("pets_service")
+
+	status, body := this.post("/api/contracts/validate",
+		this.validateBody("pets_service", "production", validateFile{"api.yaml", validateOptionalOnANamedSchemaYAML}))
+
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"schema.optional_not_allowed","path":"schemas;Pet","source":"api.yaml","details":{"position":"schema"}}`+
 		`]}`, body)
 }
 

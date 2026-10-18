@@ -121,15 +121,6 @@ func TestMapValuesWithAnotherTypeBreakOnTheValues(t *testing.T) {
 	})
 }
 
-func TestOptionalMapValuesBreakAgainstARequiredReader(t *testing.T) {
-	providedByTheProvider := petsMapProvidedByTheProvider()
-	providedByTheProvider["pets{}"] = model.Field{Type: "object", Optional: true}
-
-	assertPetsBreaks(t, petsMapProvidedByTheProvider(), providedByTheProvider, []petsBreak{
-		{compatibility_checker.ReasonPropertyOptionalInProviderRequiredInConsumer, "$.pets{}"},
-	})
-}
-
 func TestNullableMapValuesBreakAgainstANonNullableReader(t *testing.T) {
 	providedByTheProvider := petsMapProvidedByTheProvider()
 	providedByTheProvider["pets{}"] = model.Field{Type: "object", Nullable: true}
