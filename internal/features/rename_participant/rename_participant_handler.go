@@ -30,13 +30,17 @@ func (this *RenameParticipantHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondInvalidName(ctx)
 	}
 
-	found, conflict := this.participantRepository.Rename(ctx.Context(), requestBody.OldName, requestBody.NewName)
+	found, conflict, published := this.participantRepository.Rename(ctx.Context(), requestBody.OldName, requestBody.NewName)
 	if conflict {
 		return this.respondAlreadyExists(ctx)
 	}
 
 	if !found {
 		return this.respondNotFound(ctx)
+	}
+
+	if published {
+		return this.respondHasPublishedContracts(ctx)
 	}
 
 	return ctx.Status(fiber.StatusOK).JSON(RenameParticipantResponseBody{
@@ -65,5 +69,11 @@ func (this *RenameParticipantHandler) respondAlreadyExists(ctx fiber.Ctx) error 
 func (this *RenameParticipantHandler) respondNotFound(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusNotFound).JSON(RenameParticipantResponseBody{
 		Message: ParticipantNotFound,
+	})
+}
+
+func (this *RenameParticipantHandler) respondHasPublishedContracts(ctx fiber.Ctx) error {
+	return ctx.Status(fiber.StatusConflict).JSON(RenameParticipantResponseBody{
+		Message: ParticipantHasPublishedContracts,
 	})
 }
