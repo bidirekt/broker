@@ -41,12 +41,28 @@ const (
 	`
 
 	renameParticipantQuery = `
-		UPDATE participants
-		SET
-			name = $2
-		WHERE
-			name = $1
-		RETURNING id
+		WITH participant AS (
+			SELECT
+				id,
+				EXISTS (SELECT 1 FROM contracts WHERE participant_id = participants.id) AS published
+			FROM
+				participants
+			WHERE
+				name = $1
+		),
+		renamed AS (
+			UPDATE participants
+			SET
+				name = $2
+			FROM
+				participant
+			WHERE
+				participants.id = participant.id AND NOT participant.published
+		)
+		SELECT
+			published
+		FROM
+			participant
 	`
 
 	listParticipantNamesQuery = `
@@ -93,23 +109,22 @@ func (this *ParticipantRepository) Create(ctx context.Context, p *model.Particip
 	}
 }
 
-func (this *ParticipantRepository) Rename(ctx context.Context, oldName, newName string) (found, conflict bool) {
-	var id int64
-	err := this.pool.QueryRow(ctx, renameParticipantQuery, oldName, newName).Scan(&id)
+func (this *ParticipantRepository) Rename(ctx context.Context, oldName, newName string) (found, conflict, published bool) {
+	err := this.pool.QueryRow(ctx, renameParticipantQuery, oldName, newName).Scan(&published)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return false, false
+		return false, false, false
 	}
 
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-		return false, true
+		return false, true, false
 	}
 
 	if err != nil {
 		panic(fmt.Errorf("error renaming participant: %w", err))
 	}
 
-	return true, false
+	return true, false, published
 }
 
 func (this *ParticipantRepository) ListNames(ctx context.Context) []string {
