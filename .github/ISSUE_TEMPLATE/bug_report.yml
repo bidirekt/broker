@@ -1,0 +1,51 @@
+name: Bug report
+description: Report something that does not work as expected.
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command
+      description: The command you ran.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: What the command printed.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: cli-version
+    attributes:
+      label: CLI version
+      description: The output of `bidirekt --version`.
+    validations:
+      required: true
+  - type: input
+    id: broker-version
+    attributes:
+      label: Broker version
+      description: The `brokerVersion` in the output of `curl -s <broker-url>/health`.
+    validations:
+      required: true
+  - type: textarea
+    id: contract
+    attributes:
+      label: Contract
+      description: The contract file involved, if any.
+      render: yaml
