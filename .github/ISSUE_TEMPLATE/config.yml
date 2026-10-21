@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions
+    url: https://bidirekt.com/docs
+    about: The docs explain how to use Bidirekt.
+  - name: Report a security vulnerability
+    url: https://github.com/bidirekt/broker/blob/main/SECURITY.md
+    about: Report it privately, never in a public issue.
