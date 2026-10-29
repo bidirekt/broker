@@ -23,7 +23,7 @@ reviews:
         - No row struct that only copies a model: pass the model.X fields straight into tx.QueryRow arguments and Scan destinations. Keep a row struct only when it composes data.
     - path: "internal/contracts/**/*.go"
       instructions: |
-        - Input that feeds a hash or a match key is rejected at publish with a 400 validation error, never silently normalized. Only meaning-free spelling (a trailing /) is normalized.
+        - Invalid input that feeds a hash or a match key (e.g. a {param} path segment) is rejected at publish with a 400 validation error, never silently normalized into a valid one. Only meaning-free spelling (a trailing /) is normalized.
         - Dynamic endpoint path segments are * (one segment each); {param} is rejected.
         - Reason codes go to the wire verbatim; never strip the property_ prefix, it tells property-level from resource-level.
         - The contract package (data, parse, normalize) imports neither the validator nor the mapper.
