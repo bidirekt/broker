@@ -6,3 +6,25 @@ reviews:
   auto_review:
     enabled: true
     drafts: false
+  path_instructions:
+    - path: "**/*.go"
+      instructions: |
+        - Method receivers are named this, never a single letter.
+        - A function that transforms data names its input and output (e.g. fragmentmapper.ToResourceModels); flag names like Map, Flatten, walk or builder.
+        - Comments only for what the code cannot say: a future prohibition, an arbitrary choice or a contract between files. Prefer a self-explanatory name; flag comments that restate the code, including godoc that only repeats the name.
+        - Wire JSON keys are camelCase; snake_case domain keys are converted at the mapper boundary, never in the domain.
+    - path: "**/*_test.go"
+      instructions: |
+        - tests/<pkg>/ mirrors internal/<pkg>/ (or pkg/<pkg>/) one to one, sub-packages included; flag a test directory without a matching package. tests/integration and tests/e2e are the only exceptions.
+        - Each test file is self-contained: it defines its own constants and inline setup and never reuses a fixture or helper from a sibling file. Duplication is preferred.
+        - No narrative comment blocks in tests.
+    - path: "internal/repository/**/*.go"
+      instructions: |
+        - No row struct that only copies a model: pass the model.X fields straight into tx.QueryRow arguments and Scan destinations. Keep a row struct only when it composes data.
+    - path: "internal/contracts/**/*.go"
+      instructions: |
+        - Invalid input that feeds a hash or a match key (e.g. a {param} path segment) is rejected at publish with a 400 validation error, never silently normalized into a valid one. Only meaning-free spelling (a trailing /) is normalized.
+        - Dynamic endpoint path segments are * (one segment each); {param} is rejected.
+        - Reason codes go to the wire verbatim; never strip the property_ prefix, it tells property-level from resource-level.
+        - The contract package (data, parse, normalize) imports neither the validator nor the mapper.
+        - Consumer/provider roles in a breaking change come from IsConsumer()/IsProvider(), never from argument or slice position.
