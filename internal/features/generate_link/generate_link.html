@@ -1,12 +1,14 @@
 {{define "title"}}{{with .Page.Message}}{{.}}{{else}}New {{.Page.Purpose}} link{{end}}{{end}}
 
 {{define "content"}}
+<section class="narrow">
 {{with .Page.Message}}
 <h1>{{.}}</h1>
 {{else}}
 <h1>New {{.Page.Purpose}} link</h1>
 <p>Send this {{.Page.Purpose}} link to {{.Page.Email}}. It works once, for 24 hours, and is not shown again. The previous link no longer works.</p>
-<p><code>{{.Page.Link}}</code></p>
+<p class="link"><code>{{.Page.Link}}</code></p>
 {{end}}
-<p><a href="/users">Back to users</a></p>
+<p class="back"><a href="/users">Back to users</a></p>
+</section>
 {{end}}

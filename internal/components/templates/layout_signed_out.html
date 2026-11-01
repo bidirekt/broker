@@ -9,11 +9,15 @@
   <script src="/assets/app.js"></script>
 </head>
 <body hx-boost="true">
-  <header>
-    <span class="brand">Bidirekt</span>
+  <header class="topbar">
+    <div class="frame topbar-inner">
+      <span class="brand">{{template "mark"}}Bidirekt</span>
+    </div>
   </header>
-  <main>
-    {{template "content" .}}
+  <main class="sheet">
+    <div class="frame">
+      {{template "content" .}}
+    </div>
   </main>
 </body>
 </html>

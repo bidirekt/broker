@@ -9,14 +9,25 @@
   <script src="/assets/app.js"></script>
 </head>
 <body hx-boost="true" hx-headers='{"X-CSRF-Token": "{{.CSRFToken}}"}'>
-  <header>
-    <span class="brand">Bidirekt</span>
-    <form method="post" action="/sign-out">
-      <button type="submit">Sign out</button>
-    </form>
+  <header class="topbar">
+    <div class="frame topbar-inner">
+      <span class="brand">{{template "mark"}}Bidirekt</span>
+      <nav class="nav" aria-label="Main">
+        {{if .IsAdmin}}
+        <a href="/users"{{if eq .Section "users"}} aria-current="page"{{end}}>Users</a>
+        {{else}}
+        <a href="/profile"{{if eq .Section "profile"}} aria-current="page"{{end}}>Profile</a>
+        {{end}}
+      </nav>
+      <form class="sign-out" method="post" action="/sign-out">
+        <button type="submit">Sign out</button>
+      </form>
+    </div>
   </header>
-  <main>
-    {{template "content" .}}
+  <main class="sheet">
+    <div class="frame">
+      {{template "content" .}}
+    </div>
   </main>
 </body>
 </html>

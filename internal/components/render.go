@@ -5,6 +5,7 @@ import (
 	"embed"
 	"html/template"
 	"io/fs"
+	"strings"
 
 	"github.com/gofiber/fiber/v3"
 )
@@ -21,6 +22,8 @@ var layouts = template.Must(template.ParseFS(templateFiles, "templates/layout*.h
 
 type layoutData struct {
 	CSRFToken string
+	IsAdmin   bool
+	Section   string
 	Page      any
 }
 
@@ -33,10 +36,10 @@ func Render(ctx fiber.Ctx, status int, files fs.FS, page string, data any) error
 		return err
 	}
 
-	layout, csrfToken := layoutFor(ctx)
+	layout, values := layoutFor(ctx, data)
 
 	var html bytes.Buffer
-	if err := set.ExecuteTemplate(&html, layout, layoutData{CSRFToken: csrfToken, Page: data}); err != nil {
+	if err := set.ExecuteTemplate(&html, layout, values); err != nil {
 		return err
 	}
 
@@ -54,10 +57,23 @@ func isHtmxRequest(ctx fiber.Ctx) bool {
 	return ctx.Get("HX-Request") == "true"
 }
 
-func layoutFor(ctx fiber.Ctx) (layout string, csrfToken string) {
-	if session, ok := SessionFrom(ctx); ok {
-		return signedInLayout, session.CSRFToken
+func layoutFor(ctx fiber.Ctx, page any) (layout string, data layoutData) {
+	session, ok := SessionFrom(ctx)
+	if !ok {
+		return signedOutLayout, layoutData{Page: page}
 	}
 
-	return signedOutLayout, ""
+	principal, _ := PrincipalFrom(ctx)
+
+	return signedInLayout, layoutData{
+		CSRFToken: session.CSRFToken,
+		IsAdmin:   principal.IsAdmin,
+		Section:   sectionOf(ctx.Path()),
+		Page:      page,
+	}
+}
+
+func sectionOf(path string) string {
+	section, _, _ := strings.Cut(strings.TrimPrefix(path, "/"), "/")
+	return section
 }

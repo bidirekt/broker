@@ -97,6 +97,25 @@ func (this *IntegrationSuite) TestSignIn_UserLandsOnProfile() {
 	this.Equal("/profile", header.Get("Location"))
 }
 
+func (this *IntegrationSuite) TestSignIn_AdminNavigationLinksOnlyToUsers() {
+	cookie := this.signInAsAdmin()
+
+	_, _, body := this.getPage("/users", cookie)
+
+	this.Contains(body, `<a href="/users" aria-current="page">Users</a>`)
+	this.NotContains(body, `href="/profile"`)
+}
+
+func (this *IntegrationSuite) TestSignIn_UserNavigationLinksOnlyToProfile() {
+	this.createActiveUser(signInUserEmail, model.PermissionWrite, signInUserPassword)
+	cookie := this.signInAsUser(signInUserEmail, signInUserPassword)
+
+	_, _, body := this.getPage("/profile", cookie)
+
+	this.Contains(body, `<a href="/profile" aria-current="page">Profile</a>`)
+	this.NotContains(body, `href="/users"`)
+}
+
 func (this *IntegrationSuite) TestSignIn_EmailMatchesIgnoringCase() {
 	this.createActiveUser(signInUserEmail, model.PermissionRead, signInUserPassword)
 

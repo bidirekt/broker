@@ -1,8 +1,10 @@
 {{define "title"}}Users{{end}}
 
 {{define "content"}}
-<h1>Users</h1>
-<p><a href="/users/invite">Invite a user</a></p>
+<div class="title-row">
+  <h1>Users</h1>
+  <a class="button" href="/users/invite">Invite a user</a>
+</div>
 {{if .Page.Users}}
 <table>
   <thead>
@@ -10,33 +12,35 @@
       <th>Email</th>
       <th>Permission</th>
       <th>State</th>
-      <th></th>
+      <th><span class="visually-hidden">Actions</span></th>
     </tr>
   </thead>
   <tbody>
     {{range .Page.Users}}
-    <tr>
+    <tr data-state="{{.State}}">
       <td>{{.Email}}</td>
       <td>{{.Permission}}</td>
       <td>{{.State}}</td>
       <td class="actions">
-        <a href="/users/{{.ID}}/edit">Edit</a>
-        {{if eq .State "invited"}}
-        <form method="post" action="/users/{{.ID}}/link"><button type="submit">New invite link</button></form>
-        {{else if eq .State "active"}}
-        <form method="post" action="/users/{{.ID}}/link"><button type="submit">New reset link</button></form>
-        {{end}}
-        {{if eq .State "deactivated"}}
-        <form method="post" action="/users/{{.ID}}/reactivate"><button type="submit">Reactivate</button></form>
-        {{else}}
-        <form method="post" action="/users/{{.ID}}/deactivate"><button type="submit">Deactivate</button></form>
-        {{end}}
+        <div class="row-actions">
+          <a href="/users/{{.ID}}/edit">Edit</a>
+          {{if eq .State "invited"}}
+          <form method="post" action="/users/{{.ID}}/link"><button type="submit">New invite link</button></form>
+          {{else if eq .State "active"}}
+          <form method="post" action="/users/{{.ID}}/link"><button type="submit">New reset link</button></form>
+          {{end}}
+          {{if eq .State "deactivated"}}
+          <form method="post" action="/users/{{.ID}}/reactivate"><button type="submit">Reactivate</button></form>
+          {{else}}
+          <form method="post" action="/users/{{.ID}}/deactivate"><button type="submit">Deactivate</button></form>
+          {{end}}
+        </div>
       </td>
     </tr>
     {{end}}
   </tbody>
 </table>
 {{else}}
-<p class="muted">No users yet — invite the first one</p>
+<p class="empty">No users yet — invite the first one</p>
 {{end}}
 {{end}}
