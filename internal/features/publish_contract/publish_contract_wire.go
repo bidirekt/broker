@@ -6,11 +6,11 @@ import (
 )
 
 const (
-	ContractPublishSuccessful   string = "contract publish successful"
-	ContractInvalidInput        string = "contract invalid input"
-	ContractValidationFailed    string = "contract validation failed"
-	ContractVersionConflict     string = "contract version already exists with different content"
-	ContractParticipantNotFound string = "contract participant not found"
+	ContractPublishSuccessfulMessage   string = "contract publish successful"
+	ContractInvalidInputMessage        string = "contract invalid input"
+	ContractValidationFailedMessage    string = "contract validation failed"
+	ContractVersionConflictMessage     string = "contract version already exists with different content"
+	ContractParticipantNotFoundMessage string = "contract participant not found"
 )
 
 type PublishContractRequestBody struct {

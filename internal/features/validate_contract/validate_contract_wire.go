@@ -7,11 +7,11 @@ import (
 )
 
 const (
-	ContractValidated        string = "contract validated successfully"
-	ContractInvalidInput     string = "contract invalid input"
-	ContractValidationFailed string = "contract validation failed"
-	ParticipantNotFound      string = "participant not found"
-	EnvironmentNotFound      string = "environment not found"
+	ContractValidatedMessage        string = "contract validated successfully"
+	ContractInvalidInputMessage     string = "contract invalid input"
+	ContractValidationFailedMessage string = "contract validation failed"
+	ParticipantNotFoundMessage      string = "participant not found"
+	EnvironmentNotFoundMessage      string = "environment not found"
 )
 
 type ValidateContractRequestBody struct {

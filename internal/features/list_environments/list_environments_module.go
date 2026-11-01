@@ -5,8 +5,9 @@ import (
 	"github.com/bidirekt/broker/internal/repository"
 )
 
-func Register(components *components.Components) {
-	environmentRepository := repository.NewEnvironmentRepository(components.Pool)
-	handler := NewListEnvironmentsHandler(environmentRepository)
-	components.Server.Get("/api/environments", handler.Handle)
+func Register(kernel *components.Components) {
+	environmentRepository := repository.NewEnvironmentRepository(kernel.Pool)
+	useCase := NewListEnvironmentsUseCase(environmentRepository)
+	apiHandler := NewListEnvironmentsApiHandler(useCase)
+	kernel.Server.Get("/api/environments", apiHandler.Handle)
 }

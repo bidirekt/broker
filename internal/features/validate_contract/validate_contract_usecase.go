@@ -2,9 +2,7 @@ package validate_contract
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/bidirekt/broker/internal/contracts/compatibility_checker"
 	"github.com/bidirekt/broker/internal/contracts/contract_differ"
@@ -12,10 +10,35 @@ import (
 	"github.com/bidirekt/broker/internal/contracts/violation"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/bidirekt/broker/internal/repository"
-	"github.com/gofiber/fiber/v3"
 )
 
-type ValidateContractHandler struct {
+type ValidateContractStatus int
+
+const (
+	ContractValidated ValidateContractStatus = iota
+	ParticipantNotFound
+	EnvironmentNotFound
+	ContractFilesUnreadable
+	ContractValidationFailed
+)
+
+type ValidateContractInput struct {
+	ParticipantName string
+	EnvironmentName string
+	Contracts       []contractfiles.File
+}
+
+type ValidateContractOutput struct {
+	Status      ValidateContractStatus
+	ReadError   string
+	Violations  []violation.Violation
+	Participant string
+	Environment string
+	Deployable  bool
+	Results     map[string]compatibility_checker.Hierarchical
+}
+
+type ValidateContractUseCase struct {
 	contractRepository    *repository.ContractRepository
 	deploymentRepository  *repository.DeploymentRepository
 	environmentRepository *repository.EnvironmentRepository
@@ -23,81 +46,71 @@ type ValidateContractHandler struct {
 	compatibilityChecker  *compatibility_checker.CompatibilityChecker
 }
 
-func NewValidateContractHandler(
+func NewValidateContractUseCase(
 	contractRepository *repository.ContractRepository,
 	deploymentRepository *repository.DeploymentRepository,
 	environmentRepository *repository.EnvironmentRepository,
 	participantRepository *repository.ParticipantRepository,
-) *ValidateContractHandler {
-	return &ValidateContractHandler{
+	compatibilityChecker *compatibility_checker.CompatibilityChecker,
+) *ValidateContractUseCase {
+	return &ValidateContractUseCase{
 		contractRepository:    contractRepository,
 		deploymentRepository:  deploymentRepository,
 		environmentRepository: environmentRepository,
 		participantRepository: participantRepository,
-		compatibilityChecker:  compatibility_checker.NewCompatibilityChecker(localFilesHaveNoVerdict{}),
+		compatibilityChecker:  compatibilityChecker,
 	}
 }
 
-func (this *ValidateContractHandler) Handle(ctx fiber.Ctx) error {
-	requestBody := &ValidateContractRequestBody{}
-	if err := json.Unmarshal(ctx.Body(), requestBody); err != nil {
-		return this.respondInvalidInput(ctx)
-	}
-
-	participantName := strings.TrimSpace(requestBody.Participant)
-	environmentName := strings.TrimSpace(requestBody.Environment)
-	if participantName == "" || environmentName == "" || len(requestBody.Contracts) == 0 || contractfiles.HasBlankSource(requestBody.Contracts) {
-		return this.respondInvalidInput(ctx)
-	}
-
-	participant, exists := this.participantRepository.FindByName(ctx.Context(), participantName)
+func (this *ValidateContractUseCase) Execute(ctx context.Context, input ValidateContractInput) (ValidateContractOutput, error) {
+	participant, exists := this.participantRepository.FindByName(ctx, input.ParticipantName)
 	if !exists {
-		return this.respondNotFound(ctx, ParticipantNotFound)
+		return ValidateContractOutput{Status: ParticipantNotFound}, nil
 	}
 
-	environment, exists := this.environmentRepository.FindByName(ctx.Context(), environmentName)
+	environment, exists := this.environmentRepository.FindByName(ctx, input.EnvironmentName)
 	if !exists {
-		return this.respondNotFound(ctx, EnvironmentNotFound)
+		return ValidateContractOutput{Status: EnvironmentNotFound}, nil
 	}
 
-	fragments, shapeViolations, err := contractfiles.ToFragments(requestBody.Contracts)
+	fragments, shapeViolations, err := contractfiles.ToFragments(input.Contracts)
 	if err != nil {
-		return this.respondBadRequest(ctx, err)
+		return ValidateContractOutput{Status: ContractFilesUnreadable, ReadError: err.Error()}, nil
 	}
 
 	if len(shapeViolations) > 0 {
-		return this.respondValidationFailed(ctx, shapeViolations)
+		return ValidateContractOutput{Status: ContractValidationFailed, Violations: shapeViolations}, nil
 	}
 
 	uploadedContract, violations, err := contractfiles.ToUploadedContract(fragments, participant, "", "")
 	if len(violations) > 0 {
-		return this.respondValidationFailed(ctx, violations)
+		return ValidateContractOutput{Status: ContractValidationFailed, Violations: violations}, nil
 	}
 
 	if err != nil {
-		return err
+		return ValidateContractOutput{}, err
 	}
 
-	removedResources, err := this.toRemovedSinceDeployed(ctx.Context(), participant, environment, uploadedContract)
+	removedResources, err := this.toRemovedSinceDeployed(ctx, participant, environment, uploadedContract)
 	if err != nil {
-		return err
+		return ValidateContractOutput{}, err
 	}
 
 	localContract := toPersistedContract(uploadedContract, removedResources)
 
-	counterparts := this.contractRepository.LoadCounterparts(ctx.Context(), localContract, environment.ID)
-	compatibilityReport := this.compatibilityChecker.Check(ctx.Context(), localContract, environment, counterparts)
+	counterparts := this.contractRepository.LoadCounterparts(ctx, localContract, environment.ID)
+	compatibilityReport := this.compatibilityChecker.Check(ctx, localContract, environment, counterparts)
 
-	return ctx.Status(fiber.StatusOK).JSON(ValidateContractResponseBody{
-		Message:     ContractValidated,
+	return ValidateContractOutput{
+		Status:      ContractValidated,
 		Participant: participant.Name,
 		Environment: environment.Name,
 		Deployable:  compatibilityReport.Deployable(),
 		Results:     compatibilityReport.Hierarchical,
-	})
+	}, nil
 }
 
-func (this *ValidateContractHandler) toRemovedSinceDeployed(
+func (this *ValidateContractUseCase) toRemovedSinceDeployed(
 	ctx context.Context,
 	participant *model.Participant,
 	environment *model.Environment,
@@ -145,35 +158,4 @@ func toPersistedContract(
 		Resources:       resources,
 		Schemas:         uploadedContract.Schemas,
 	}
-}
-
-type localFilesHaveNoVerdict struct{}
-
-func (this localFilesHaveNoVerdict) GetVerdict(context.Context, int64, int64) (*model.CompatibilityVerdict, bool) {
-	return nil, false
-}
-
-func (this *ValidateContractHandler) respondInvalidInput(ctx fiber.Ctx) error {
-	return ctx.Status(fiber.StatusBadRequest).JSON(ValidateContractErrorResponseBody{
-		Message: ContractInvalidInput,
-	})
-}
-
-func (this *ValidateContractHandler) respondBadRequest(ctx fiber.Ctx, err error) error {
-	return ctx.Status(fiber.StatusBadRequest).JSON(ValidateContractErrorResponseBody{
-		Message: err.Error(),
-	})
-}
-
-func (this *ValidateContractHandler) respondValidationFailed(ctx fiber.Ctx, violations []violation.Violation) error {
-	return ctx.Status(fiber.StatusBadRequest).JSON(ValidateContractValidationResponseBody{
-		Message:    ContractValidationFailed,
-		Violations: violations,
-	})
-}
-
-func (this *ValidateContractHandler) respondNotFound(ctx fiber.Ctx, message string) error {
-	return ctx.Status(fiber.StatusNotFound).JSON(ValidateContractErrorResponseBody{
-		Message: message,
-	})
 }

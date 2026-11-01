@@ -5,9 +5,10 @@ import (
 	"github.com/bidirekt/broker/internal/repository"
 )
 
-func Register(components *components.Components) {
-	contractRepository := repository.NewContractRepository(components.Pool)
-	participantRepository := repository.NewParticipantRepository(components.Pool)
-	handler := NewPublishContractHandler(contractRepository, participantRepository)
-	components.Server.Post("/api/contracts", handler.Handle)
+func Register(kernel *components.Components) {
+	contractRepository := repository.NewContractRepository(kernel.Pool)
+	participantRepository := repository.NewParticipantRepository(kernel.Pool)
+	useCase := NewPublishContractUseCase(contractRepository, participantRepository)
+	apiHandler := NewPublishContractApiHandler(useCase)
+	kernel.Server.Post("/api/contracts", apiHandler.Handle)
 }

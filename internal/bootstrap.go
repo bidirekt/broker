@@ -15,23 +15,23 @@ import (
 )
 
 func Run() (*components.Components, error) {
-	components, err := components.New()
+	kernel, err := components.New()
 	if err != nil {
 		return nil, err
 	}
 
-	create_participant.Register(components)
-	create_environment.Register(components)
-	publish_contract.Register(components)
-	validate_contract.Register(components)
-	can_i_deploy.Register(components)
-	record_deployment.Register(components)
-	rename_participant.Register(components)
-	health.Register(components)
-	list_participants.Register(components)
-	list_environments.Register(components)
+	create_participant.Register(kernel)
+	create_environment.Register(kernel)
+	publish_contract.Register(kernel)
+	validate_contract.Register(kernel)
+	can_i_deploy.Register(kernel)
+	record_deployment.Register(kernel)
+	rename_participant.Register(kernel)
+	health.Register(kernel)
+	list_participants.Register(kernel)
+	list_environments.Register(kernel)
 
-	return components, nil
+	return kernel, nil
 }
 
 func Healthcheck() error {

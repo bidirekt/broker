@@ -4,11 +4,11 @@ import (
 	"github.com/bidirekt/broker/internal/contracts/compatibility_checker"
 )
 
-const ContractChecked = "contract checked successfully"
-const CanIDeployInvalidInput = "can-i-deploy invalid input"
-const ContractNotFound = "contract not found"
-const ParticipantNotFound = "participant not found"
-const EnvironmentNotFound = "environment not found"
+const ContractCheckedMessage = "contract checked successfully"
+const CanIDeployInvalidInputMessage = "can-i-deploy invalid input"
+const ContractNotFoundMessage = "contract not found"
+const ParticipantNotFoundMessage = "participant not found"
+const EnvironmentNotFoundMessage = "environment not found"
 
 type CanIDeployRequestBody struct {
 	Participant string `json:"participant"`

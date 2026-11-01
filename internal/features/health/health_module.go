@@ -4,7 +4,7 @@ import (
 	"github.com/bidirekt/broker/internal/components"
 )
 
-func Register(components *components.Components) {
+func Register(kernel *components.Components) {
 	handler := NewHealthHandler()
-	components.Server.Get("/health", handler.Handle)
+	kernel.Server.Get("/health", handler.Handle)
 }

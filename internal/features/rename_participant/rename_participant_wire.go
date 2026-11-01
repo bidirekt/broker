@@ -1,12 +1,12 @@
 package rename_participant
 
 const (
-	ParticipantRenamed               string = "participant renamed"
-	ParticipantInvalidInput          string = "participant invalid input"
-	ParticipantNameNotSnakeCase      string = "participant name must be snake_case"
-	ParticipantAlreadyExists         string = "participant already exists"
-	ParticipantNotFound              string = "participant not found"
-	ParticipantHasPublishedContracts string = "participant has published contracts, create a new participant and switch every consumer's consumes to it"
+	ParticipantRenamedMessage               string = "participant renamed"
+	ParticipantInvalidInputMessage          string = "participant invalid input"
+	ParticipantNameNotSnakeCaseMessage      string = "participant name must be snake_case"
+	ParticipantAlreadyExistsMessage         string = "participant already exists"
+	ParticipantNotFoundMessage              string = "participant not found"
+	ParticipantHasPublishedContractsMessage string = "participant has published contracts, create a new participant and switch every consumer's consumes to it"
 )
 
 type RenameParticipantRequestBody struct {
