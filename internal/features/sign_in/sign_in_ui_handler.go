@@ -22,11 +22,15 @@ func (this *SignInUiHandler) ShowForm(ctx fiber.Ctx) error {
 	return components.Render(ctx, fiber.StatusOK, pageFiles, signInTemplate, SignInPage{})
 }
 
-func (this *SignInUiHandler) SignIn(ctx fiber.Ctx) error {
+func (this *SignInUiHandler) RequireSameOrigin(ctx fiber.Ctx) error {
 	if err := components.RequireSameOrigin(ctx); err != nil {
 		return err
 	}
 
+	return ctx.Next()
+}
+
+func (this *SignInUiHandler) SignIn(ctx fiber.Ctx) error {
 	identifier := this.Identifier(ctx)
 	output := this.useCase.Execute(ctx.Context(), SignInInput{
 		Identifier: identifier,

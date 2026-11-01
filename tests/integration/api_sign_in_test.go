@@ -3,7 +3,9 @@ package integration_test
 import (
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/bidirekt/broker/internal/components"
@@ -18,6 +20,8 @@ const (
 	apiSignInAdminPassword      = "integration-admin-password"
 	apiSignInInvalidCredentials = `{"message":"invalid credentials"}`
 	apiSignInInvalidInput       = `{"message":"sign in invalid input"}`
+	apiSignInForbidden          = `{"message":"forbidden"}`
+	apiSignInForeignOrigin      = "https://evil.example"
 )
 
 func (this *IntegrationSuite) apiSignInBody(email, password string) string {
@@ -95,4 +99,38 @@ func (this *IntegrationSuite) TestApiSignIn_RejectsInvalidInput() {
 			this.JSONEq(apiSignInInvalidInput, body)
 		})
 	}
+}
+
+func (this *IntegrationSuite) apiSignInSend(contentType, origin, requestBody string) (status int, body string) {
+	req := httptest.NewRequest("POST", "/api/sign-in", strings.NewReader(requestBody))
+	req.Header.Set("Content-Type", contentType)
+	if origin != "" {
+		req.Header.Set("Origin", origin)
+	}
+
+	status, _, body = this.sendApiRequest(req, "")
+	return status, body
+}
+
+func (this *IntegrationSuite) TestApiSignIn_ForeignOriginIsForbidden() {
+	this.createActiveUser(apiSignInEmail, model.PermissionWrite, apiSignInPassword)
+
+	status, body := this.apiSignInSend("application/json", apiSignInForeignOrigin, this.apiSignInBody(apiSignInEmail, apiSignInPassword))
+	this.Equal(http.StatusForbidden, status)
+	this.JSONEq(apiSignInForbidden, body)
+}
+
+func (this *IntegrationSuite) TestApiSignIn_PlainTextBodyIsInvalidInput() {
+	this.createActiveUser(apiSignInEmail, model.PermissionWrite, apiSignInPassword)
+
+	status, body := this.apiSignInSend("text/plain", "", this.apiSignInBody(apiSignInEmail, apiSignInPassword))
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(apiSignInInvalidInput, body)
+}
+
+func (this *IntegrationSuite) TestApiSignIn_JsonMediaTypeMatchesCaseInsensitively() {
+	this.createActiveUser(apiSignInEmail, model.PermissionWrite, apiSignInPassword)
+
+	status, body := this.apiSignInSend("Application/JSON; charset=utf-8", suitePublicURL, this.apiSignInBody(apiSignInEmail, apiSignInPassword))
+	this.Equal(http.StatusOK, status, body)
 }

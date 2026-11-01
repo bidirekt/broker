@@ -5,6 +5,8 @@ const (
 	ApiInvalidCredentialsMessage  string = "invalid credentials"
 	SignInInvalidInputMessage     string = "sign in invalid input"
 	SignedInMessage               string = "signed in"
+	TooManySignInAttemptsMessage  string = "too many attempts, try again later"
+	ForbiddenMessage              string = "forbidden"
 
 	identifierFormField = "identifier"
 	passwordFormField   = "password"

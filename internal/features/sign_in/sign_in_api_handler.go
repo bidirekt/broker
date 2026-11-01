@@ -2,6 +2,7 @@ package sign_in
 
 import (
 	"encoding/json"
+	"mime"
 	"strings"
 	"time"
 
@@ -16,6 +17,20 @@ type SignInApiHandler struct {
 
 func NewSignInApiHandler(useCase *SignInUseCase, settings components.Settings) *SignInApiHandler {
 	return &SignInApiHandler{useCase: useCase, settings: settings}
+}
+
+func (this *SignInApiHandler) RequireJsonFromPublicOrigin(ctx fiber.Ctx) error {
+	if origin := ctx.Get(fiber.HeaderOrigin); origin != "" && origin != this.settings.PublicURL {
+		return ctx.Status(fiber.StatusForbidden).JSON(SignInResponseBody{
+			Message: ForbiddenMessage,
+		})
+	}
+
+	if mediaType, _, err := mime.ParseMediaType(ctx.Get(fiber.HeaderContentType)); err != nil || mediaType != fiber.MIMEApplicationJSON {
+		return this.respondInvalidInput(ctx)
+	}
+
+	return ctx.Next()
 }
 
 func (this *SignInApiHandler) Handle(ctx fiber.Ctx) error {

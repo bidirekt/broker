@@ -26,6 +26,7 @@ const (
 	rateLimitWrongPassword  = "rate-limit-wrong-horse"
 	rateLimitTooManyMessage = "too many attempts, try again later"
 	rateLimitTooManyBody    = `{"message":"too many attempts, try again later"}`
+	rateLimitForeignOrigin  = "https://evil.example"
 )
 
 func (this *IntegrationSuite) startRateLimitedApp() *components.Components {
@@ -55,6 +56,35 @@ func (this *IntegrationSuite) rateLimitPageSignIn(app *components.Components, fo
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Origin", rateLimitPublicURL)
 	req.Header.Set("Accept", "text/html")
+
+	return this.rateLimitSend(app, req, forwardedFor)
+}
+
+func (this *IntegrationSuite) rateLimitCrossSitePageSignIn(app *components.Components, forwardedFor, identifier, password string) (status int, body string) {
+	form := url.Values{"identifier": {identifier}, "password": {password}}
+	req := httptest.NewRequest("POST", "/sign-in", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Origin", rateLimitForeignOrigin)
+	req.Header.Set("Accept", "text/html")
+
+	return this.rateLimitSend(app, req, forwardedFor)
+}
+
+func (this *IntegrationSuite) rateLimitCrossSiteApiSignIn(app *components.Components, forwardedFor, email, password string) (status int, body string) {
+	requestBody, err := json.Marshal(map[string]string{"email": email, "password": password})
+	this.Require().NoError(err)
+	req := httptest.NewRequest("POST", "/api/sign-in", strings.NewReader(string(requestBody)))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", rateLimitForeignOrigin)
+
+	return this.rateLimitSend(app, req, forwardedFor)
+}
+
+func (this *IntegrationSuite) rateLimitPlainTextApiSignIn(app *components.Components, forwardedFor, email, password string) (status int, body string) {
+	requestBody, err := json.Marshal(map[string]string{"email": email, "password": password})
+	this.Require().NoError(err)
+	req := httptest.NewRequest("POST", "/api/sign-in", strings.NewReader(string(requestBody)))
+	req.Header.Set("Content-Type", "text/plain")
 
 	return this.rateLimitSend(app, req, forwardedFor)
 }
@@ -167,4 +197,55 @@ func (this *IntegrationSuite) TestSignInRateLimit_ForwardedForFromAnUntrustedSou
 
 	status, _ := this.rateLimitPageSignIn(app, "203.0.113.99", rateLimitAdminUsername, rateLimitWrongPassword)
 	this.Equal(http.StatusTooManyRequests, status)
+}
+
+func (this *IntegrationSuite) TestSignInRateLimit_CrossSitePagePostsDoNotCountForTheAccount() {
+	app := this.startRateLimitedApp()
+	this.createActiveUser(rateLimitAnaEmail, model.PermissionWrite, rateLimitPassword)
+	const clientIP = "203.0.113.60"
+
+	for range 10 {
+		status, _ := this.rateLimitCrossSitePageSignIn(app, clientIP, rateLimitAnaEmail, rateLimitWrongPassword)
+		this.Require().Equal(http.StatusForbidden, status)
+	}
+
+	status, _ := this.rateLimitPageSignIn(app, clientIP, rateLimitAnaEmail, rateLimitPassword)
+	this.Equal(http.StatusSeeOther, status)
+}
+
+func (this *IntegrationSuite) TestSignInRateLimit_PlainTextApiPostsDoNotCountForTheAccount() {
+	app := this.startRateLimitedApp()
+	this.createActiveUser(rateLimitAnaEmail, model.PermissionWrite, rateLimitPassword)
+	const clientIP = "203.0.113.70"
+
+	for range 10 {
+		status, _ := this.rateLimitPlainTextApiSignIn(app, clientIP, rateLimitAnaEmail, rateLimitWrongPassword)
+		this.Require().Equal(http.StatusBadRequest, status)
+	}
+
+	status, body := this.rateLimitApiSignIn(app, clientIP, rateLimitAnaEmail, rateLimitPassword)
+	this.Require().Equal(http.StatusOK, status, body)
+	var response struct {
+		Token string `json:"token"`
+	}
+	this.Require().NoError(json.Unmarshal([]byte(body), &response))
+	this.NotEmpty(response.Token)
+}
+
+func (this *IntegrationSuite) TestSignInRateLimit_CrossSitePostsDoNotBlockTheIP() {
+	app := this.startRateLimitedApp()
+	const clientIP = "203.0.113.80"
+
+	for attempt := range 51 {
+		identifier := fmt.Sprintf("intruder-%d", attempt)
+		signIn := this.rateLimitCrossSitePageSignIn
+		if attempt%2 == 1 {
+			signIn = this.rateLimitCrossSiteApiSignIn
+		}
+		status, _ := signIn(app, clientIP, identifier, rateLimitWrongPassword)
+		this.Require().Equal(http.StatusForbidden, status)
+	}
+
+	status, _ := this.rateLimitPageSignIn(app, clientIP, rateLimitAdminUsername, rateLimitAdminPassword)
+	this.Equal(http.StatusSeeOther, status)
 }

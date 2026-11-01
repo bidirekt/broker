@@ -1,4 +1,4 @@
-package components
+package sign_in
 
 import (
 	"strings"
@@ -9,20 +9,19 @@ import (
 )
 
 const (
-	signInFailureWindow          = 15 * time.Minute
-	signInFailuresPerIP          = 50
-	signInFailuresPerAccount     = 10
-	tooManySignInAttemptsMessage = "too many attempts, try again later"
-	signInIdentifierLocalsName   = "signInIdentifier"
+	signInFailureWindow        = 15 * time.Minute
+	signInFailuresPerIP        = 50
+	signInFailuresPerAccount   = 10
+	signInIdentifierLocalsName = "signInIdentifier"
 )
 
-type SignInLimiter struct {
+type signInLimiter struct {
 	perIP      fiber.Handler
 	perAccount fiber.Handler
 }
 
-func NewSignInLimiter() *SignInLimiter {
-	return &SignInLimiter{
+func newSignInLimiter() *signInLimiter {
+	return &signInLimiter{
 		perIP: newSignInFailureLimiter(signInFailuresPerIP, func(ctx fiber.Ctx) string {
 			return ctx.IP()
 		}),
@@ -41,16 +40,16 @@ func newSignInFailureLimiter(maxFailures int, key func(fiber.Ctx) string) fiber.
 		SkipSuccessfulRequests: true,
 		KeyGenerator:           key,
 		LimitReached: func(fiber.Ctx) error {
-			return fiber.NewError(fiber.StatusTooManyRequests, tooManySignInAttemptsMessage)
+			return fiber.NewError(fiber.StatusTooManyRequests, TooManySignInAttemptsMessage)
 		},
 	})
 }
 
-func (this *SignInLimiter) PerIP(ctx fiber.Ctx) error {
+func (this *signInLimiter) PerIP(ctx fiber.Ctx) error {
 	return this.perIP(ctx)
 }
 
-func (this *SignInLimiter) PerAccount(identifierFrom func(fiber.Ctx) string) fiber.Handler {
+func (this *signInLimiter) PerAccount(identifierFrom func(fiber.Ctx) string) fiber.Handler {
 	return func(ctx fiber.Ctx) error {
 		ctx.Locals(signInIdentifierLocalsName, strings.ToLower(identifierFrom(ctx)))
 		return this.perAccount(ctx)
