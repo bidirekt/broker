@@ -111,7 +111,6 @@ func (this *IntegrationSuite) reactivateUserDeactivateRacing(userID int64, race 
 	linkOnHold, err := this.Pool.Begin(ctx)
 	this.Require().NoError(err)
 	defer func() { _ = linkOnHold.Rollback(ctx) }()
-	// the deactivation locks the user, then waits here before it ends the link and commits
 	_, err = linkOnHold.Exec(ctx, `SELECT 1 FROM one_time_links WHERE user_id = $1 FOR UPDATE`, userID)
 	this.Require().NoError(err)
 

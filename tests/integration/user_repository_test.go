@@ -278,8 +278,6 @@ func (this *IntegrationSuite) TestUserRepository_SetPasswordWithLinkWhileDeactiv
 	linkOnHold, err := this.Pool.Begin(ctx)
 	this.Require().NoError(err)
 	defer func() { _ = linkOnHold.Rollback(ctx) }()
-	// Deactivate updates the user before it ends the link, so it must reach the user while
-	// SetPasswordWithLink waits here to use the link, with whatever locks it took until then
 	_, err = linkOnHold.Exec(ctx, `SELECT 1 FROM one_time_links WHERE token_hash = $1 FOR UPDATE`, []byte("ana-invite"))
 	this.Require().NoError(err)
 
