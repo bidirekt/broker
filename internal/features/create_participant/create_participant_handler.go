@@ -33,11 +33,10 @@ func (this *CreateParticipantHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondInvalidName(ctx)
 	}
 
-	if this.participantRepository.ExistsByName(ctx.Context(), requestBody.Participant) {
+	created := this.participantRepository.Create(ctx.Context(), model.NewParticipant(requestBody.Participant))
+	if !created {
 		return this.respondAlreadyExists(ctx)
 	}
-
-	this.participantRepository.Create(ctx.Context(), model.NewParticipant(requestBody.Participant))
 
 	return ctx.Status(fiber.StatusOK).JSON(CreateParticipantResponseBody{
 		Message: ParticipantCreated,

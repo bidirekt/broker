@@ -61,7 +61,7 @@ func (this *PublishContractHandler) Handle(ctx fiber.Ctx) error {
 	}
 
 	if err != nil {
-		return this.respondPublishFailed(ctx)
+		return err
 	}
 
 	if existing, found := this.contractRepository.LoadChecksumForVersion(ctx.Context(), uploadedContract.ParticipantID, version); found {
@@ -107,12 +107,6 @@ func (this *PublishContractHandler) respondValidationFailed(ctx fiber.Ctx, viola
 	return ctx.Status(fiber.StatusBadRequest).JSON(PublishContractValidationResponseBody{
 		Message:    ContractValidationFailed,
 		Violations: violations,
-	})
-}
-
-func (this *PublishContractHandler) respondPublishFailed(ctx fiber.Ctx) error {
-	return ctx.Status(fiber.StatusInternalServerError).JSON(PublishContractResponseBody{
-		Message: ContractPublishFailed,
 	})
 }
 
