@@ -145,7 +145,6 @@ deps:
       - feature_can_i_deploy
       - feature_create_environment
       - feature_create_participant
-      - feature_generate_link
       - feature_health
       - feature_list_environments
       - feature_list_participants

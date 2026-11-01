@@ -240,6 +240,12 @@ func (this *IntegrationSuite) TestSetPassword_PasswordRuleIsCheckedBeforeTheLink
 	this.Contains(body, setPasswordPasswordInvalid)
 }
 
+func (this *IntegrationSuite) TestSetPassword_UnknownTokenWithAValidPasswordAnswers410() {
+	status, _, body := this.submitSetPassword("unknown", setPasswordNewPassword)
+	this.Equal(http.StatusGone, status)
+	this.Contains(body, setPasswordLinkInvalid)
+}
+
 func (this *IntegrationSuite) TestSetPassword_ForeignOrMissingOriginIsRefused() {
 	token := this.createInvitedUserWithLink(setPasswordUserEmail)
 

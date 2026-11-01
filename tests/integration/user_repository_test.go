@@ -10,8 +10,9 @@ import (
 )
 
 const (
-	userRepositoryPasswordHash    = "$argon2id$v=19$m=19456,t=2,p=1$c2FsdA$a2V5"
-	userRepositoryNewPasswordHash = "$argon2id$v=19$m=19456,t=2,p=1$c2FsdDI$a2V5Mg"
+	userRepositoryPasswordHash      = "$argon2id$v=19$m=19456,t=2,p=1$c2FsdA$a2V5"
+	userRepositoryNewPasswordHash   = "$argon2id$v=19$m=19456,t=2,p=1$c2FsdDI$a2V5Mg"
+	userRepositoryResetPasswordHash = "$argon2id$v=19$m=19456,t=2,p=1$c2FsdDM$a2V5Mw"
 )
 
 func userRepositoryInBackground(write func()) (finished <-chan any) {
@@ -233,8 +234,6 @@ func (this *IntegrationSuite) TestUserRepository_SetPasswordWithLinkWhileReplace
 	userUpdatesOnHold, err := this.Pool.Begin(ctx)
 	this.Require().NoError(err)
 	defer func() { _ = userUpdatesOnHold.Rollback(ctx) }()
-	// SHARE holds back UPDATE users but not SELECT ... FOR UPDATE, so SetPasswordWithLink stops right
-	// before it updates the user, keeping the locks it took until then
 	_, err = userUpdatesOnHold.Exec(ctx, `LOCK TABLE users IN SHARE MODE`)
 	this.Require().NoError(err)
 
@@ -280,7 +279,7 @@ func (this *IntegrationSuite) TestUserRepository_ChangePasswordKeepingSession_Ke
 	this.Require().True(sessions.Create(ctx, &model.Session{IDHash: []byte("ana-phone"), UserID: null.IntFrom(user.ID), CSRFToken: "phone-csrf"}, userRepositoryPasswordHash))
 	this.Require().True(sessions.Create(ctx, &model.Session{IDHash: []byte("admin-session"), CSRFToken: "admin-csrf"}, ""))
 
-	repo.ChangePasswordKeepingSession(ctx, user.ID, userRepositoryNewPasswordHash, []byte("ana-laptop"))
+	this.Require().True(repo.ChangePasswordKeepingSession(ctx, user.ID, userRepositoryPasswordHash, userRepositoryNewPasswordHash, []byte("ana-laptop")))
 
 	found, ok := repo.FindByID(ctx, user.ID)
 	this.Require().True(ok)
@@ -309,9 +308,56 @@ func (this *IntegrationSuite) TestUserRepository_ChangePasswordKeepingSession_En
 	_, _, usable := links.FindUsable(ctx, []byte("ana-reset"))
 	this.Require().True(usable)
 
-	repo.ChangePasswordKeepingSession(ctx, user.ID, userRepositoryNewPasswordHash, []byte("ana-laptop"))
+	this.Require().True(repo.ChangePasswordKeepingSession(ctx, user.ID, userRepositoryPasswordHash, userRepositoryNewPasswordHash, []byte("ana-laptop")))
 
 	_, _, usable = links.FindUsable(ctx, []byte("ana-reset"))
 	this.False(usable)
 	this.Equal(1, this.countRows("one_time_links"))
+}
+
+func (this *IntegrationSuite) TestUserRepository_ChangePasswordKeepingSessionAfterAResetSetAnotherPassword_ChangesNothing() {
+	ctx := context.Background()
+	repo := repository.NewUserRepository(this.Pool)
+	links := repository.NewOneTimeLinkRepository(this.Pool)
+	sessions := repository.NewSessionRepository(this.Pool)
+
+	user := &model.User{Email: "ana@x.com", Permission: model.PermissionWrite}
+	this.Require().True(repo.CreateInvited(ctx, user,
+		&model.OneTimeLink{TokenHash: []byte("ana-invite"), Purpose: model.LinkPurposeInvite, ExpiresAt: time.Now().Add(24 * time.Hour)},
+	))
+	this.Require().True(repo.SetPasswordWithLink(ctx, []byte("ana-invite"), userRepositoryPasswordHash))
+	_, found, deactivated := links.ReplaceOpen(ctx, &model.OneTimeLink{TokenHash: []byte("ana-reset"), UserID: user.ID, ExpiresAt: time.Now().Add(24 * time.Hour)})
+	this.Require().True(found)
+	this.Require().False(deactivated)
+	this.Require().True(repo.SetPasswordWithLink(ctx, []byte("ana-reset"), userRepositoryResetPasswordHash))
+	this.Require().True(sessions.Create(ctx, &model.Session{IDHash: []byte("ana-laptop"), UserID: null.IntFrom(user.ID), CSRFToken: "laptop-csrf"}, userRepositoryResetPasswordHash))
+	this.Require().True(sessions.Create(ctx, &model.Session{IDHash: []byte("ana-phone"), UserID: null.IntFrom(user.ID), CSRFToken: "phone-csrf"}, userRepositoryResetPasswordHash))
+
+	this.False(repo.ChangePasswordKeepingSession(ctx, user.ID, userRepositoryPasswordHash, userRepositoryNewPasswordHash, []byte("ana-laptop")))
+
+	storedUser, ok := repo.FindByID(ctx, user.ID)
+	this.Require().True(ok)
+	this.Equal(userRepositoryResetPasswordHash, storedUser.PasswordHash.String)
+	_, ok = sessions.FindByIDHash(ctx, []byte("ana-laptop"))
+	this.True(ok)
+	_, ok = sessions.FindByIDHash(ctx, []byte("ana-phone"))
+	this.True(ok)
+}
+
+func (this *IntegrationSuite) TestUserRepository_ChangePasswordKeepingSessionOfADeactivatedUser_ChangesNothing() {
+	ctx := context.Background()
+	repo := repository.NewUserRepository(this.Pool)
+
+	user := &model.User{Email: "ana@x.com", Permission: model.PermissionWrite}
+	this.Require().True(repo.CreateInvited(ctx, user,
+		&model.OneTimeLink{TokenHash: []byte("ana-invite"), Purpose: model.LinkPurposeInvite, ExpiresAt: time.Now().Add(24 * time.Hour)},
+	))
+	this.Require().True(repo.SetPasswordWithLink(ctx, []byte("ana-invite"), userRepositoryPasswordHash))
+	this.Require().True(repo.Deactivate(ctx, user.ID))
+
+	this.False(repo.ChangePasswordKeepingSession(ctx, user.ID, userRepositoryPasswordHash, userRepositoryNewPasswordHash, []byte("ana-laptop")))
+
+	found, ok := repo.FindByID(ctx, user.ID)
+	this.Require().True(ok)
+	this.Equal(userRepositoryPasswordHash, found.PasswordHash.String)
 }

@@ -50,7 +50,9 @@ func (this *UpdateProfileUseCase) Execute(ctx context.Context, input UpdateProfi
 		return UpdateProfileOutput{}, err
 	}
 
-	this.userRepository.ChangePasswordKeepingSession(ctx, user.ID, passwordHash, input.SessionIDHash)
+	if !this.userRepository.ChangePasswordKeepingSession(ctx, user.ID, user.PasswordHash.String, passwordHash, input.SessionIDHash) {
+		return UpdateProfileOutput{Status: CurrentPasswordWrong}, nil
+	}
 
 	return UpdateProfileOutput{Status: PasswordChanged}, nil
 }

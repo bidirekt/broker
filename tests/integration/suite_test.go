@@ -191,6 +191,7 @@ func (this *IntegrationSuite) postForm(path, sessionCookie, csrfToken string, fo
 }
 
 func (this *IntegrationSuite) sendPageRequest(req *http.Request, sessionCookie string) (status int, header http.Header, body string) {
+	req.Header.Set("Accept", "text/html")
 	if sessionCookie != "" {
 		req.AddCookie(&http.Cookie{Name: suiteSessionCookieName, Value: sessionCookie})
 	}

@@ -110,6 +110,15 @@ const (
 			id = $1
 	`
 
+	changeVerifiedPasswordHashQuery = `
+		UPDATE users
+		SET
+			password_hash = $3,
+			updated_at = now()
+		WHERE
+			id = $1 AND active AND password_hash = $2
+	`
+
 	deleteUserSessionsQuery = `
 		DELETE FROM sessions
 		WHERE
@@ -306,9 +315,10 @@ func (this *UserRepository) SetPasswordWithLink(ctx context.Context, tokenHash [
 func (this *UserRepository) ChangePasswordKeepingSession(
 	ctx context.Context,
 	userID int64,
-	passwordHash string,
+	verifiedPasswordHash string,
+	newPasswordHash string,
 	keptSessionIDHash []byte,
-) {
+) (changed bool) {
 	tx, err := this.pool.Begin(ctx)
 	if err != nil {
 		panic(fmt.Errorf("error starting transaction: %w", err))
@@ -316,8 +326,13 @@ func (this *UserRepository) ChangePasswordKeepingSession(
 
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	if _, err := tx.Exec(ctx, setUserPasswordHashQuery, userID, passwordHash); err != nil {
-		panic(fmt.Errorf("error setting user password: %w", err))
+	tag, err := tx.Exec(ctx, changeVerifiedPasswordHashQuery, userID, verifiedPasswordHash, newPasswordHash)
+	if err != nil {
+		panic(fmt.Errorf("error changing user password: %w", err))
+	}
+
+	if tag.RowsAffected() == 0 {
+		return false
 	}
 
 	if _, err := tx.Exec(ctx, deleteUserOtherSessionsQuery, userID, keptSessionIDHash); err != nil {
@@ -331,6 +346,8 @@ func (this *UserRepository) ChangePasswordKeepingSession(
 	if err := tx.Commit(ctx); err != nil {
 		panic(fmt.Errorf("error committing transaction: %w", err))
 	}
+
+	return true
 }
 
 func scanUser(row pgx.CollectableRow) (*model.User, error) {

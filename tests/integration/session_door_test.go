@@ -28,14 +28,11 @@ type doorRequest struct {
 	path    string
 	cookie  string
 	headers map[string]string
-	form    string
 }
 
 func (this *IntegrationSuite) sendThroughDoor(request doorRequest) (status int, header http.Header, body string) {
-	req := httptest.NewRequest(request.method, request.path, strings.NewReader(request.form))
-	if request.form != "" {
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	}
+	req := httptest.NewRequest(request.method, request.path, nil)
+	req.Header.Set("Accept", "text/html")
 	if request.cookie != "" {
 		req.AddCookie(&http.Cookie{Name: doorSessionCookieName, Value: request.cookie})
 	}
@@ -193,17 +190,6 @@ func (this *IntegrationSuite) TestSessionDoor_PostWithCSRFHeaderAndOrigin_Passes
 	status, _, _ := this.sendThroughDoor(doorRequest{
 		method: "POST", path: doorUnknownPage, cookie: doorSessionCookie,
 		headers: map[string]string{"Origin": doorPublicURL, "X-CSRF-Token": doorCSRFToken},
-	})
-	this.Equal(http.StatusNotFound, status)
-}
-
-func (this *IntegrationSuite) TestSessionDoor_PostWithCSRFFormFieldAndOrigin_PassesTheDoor() {
-	this.createDoorSession(null.Int{})
-
-	status, _, _ := this.sendThroughDoor(doorRequest{
-		method: "POST", path: doorUnknownPage, cookie: doorSessionCookie,
-		headers: map[string]string{"Origin": doorPublicURL},
-		form:    "csrf_token=" + doorCSRFToken,
 	})
 	this.Equal(http.StatusNotFound, status)
 }

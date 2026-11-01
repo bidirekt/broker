@@ -105,7 +105,7 @@ func (this *IntegrationSuite) TestSessionRepository_CreateAfterTheProfilePasswor
 
 	signInRead, found := users.FindByID(ctx, userID)
 	this.Require().True(found)
-	users.ChangePasswordKeepingSession(ctx, userID, sessionRepositoryNewPasswordHash, []byte("ana-laptop"))
+	this.Require().True(users.ChangePasswordKeepingSession(ctx, userID, signInRead.PasswordHash.String, sessionRepositoryNewPasswordHash, []byte("ana-laptop")))
 
 	this.False(repo.Create(ctx, sessionRepositoryUserSession("ana-phone", userID), signInRead.PasswordHash.String))
 	_, ok := repo.FindByIDHash(ctx, []byte("ana-phone"))
@@ -164,7 +164,6 @@ func (this *IntegrationSuite) TestSessionRepository_CreateCommittedFirst_IsDelet
 	sameIDHash, err := this.Pool.Begin(ctx)
 	this.Require().NoError(err)
 	defer func() { _ = sameIDHash.Rollback(ctx) }()
-	// an uncommitted session with the same id_hash holds Create back after it has locked the user
 	_, err = sameIDHash.Exec(ctx, `INSERT INTO sessions (id_hash, csrf_token) VALUES ($1, 'held-csrf')`, []byte("ana-session"))
 	this.Require().NoError(err)
 

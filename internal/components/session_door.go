@@ -20,7 +20,6 @@ const (
 
 	signInPath           = "/sign-in"
 	csrfTokenHeader      = "X-CSRF-Token"
-	csrfTokenFormField   = "csrf_token"
 	forbiddenPageMessage = "forbidden"
 )
 
@@ -110,9 +109,6 @@ func (this *sessionKeeper) carriesCSRFProof(ctx fiber.Ctx, session CurrentSessio
 	}
 
 	token := ctx.Get(csrfTokenHeader)
-	if token == "" {
-		token = ctx.FormValue(csrfTokenFormField)
-	}
 
 	return token != "" && subtle.ConstantTimeCompare([]byte(token), []byte(session.CSRFToken)) == 1
 }

@@ -39,7 +39,10 @@ func respondError(ctx fiber.Ctx, err error) error {
 		status, message = fiberErr.Code, fiberErr.Message
 	}
 
-	if isUnderPath(ctx.Path(), "/api") || isUnderPath(ctx.Path(), "/health") {
+	ctx.Response().Header.Del(fiber.HeaderLocation)
+	ctx.Response().Header.Del("HX-Redirect")
+
+	if !isPagePath(ctx) || !asksForPage(ctx) {
 		return ctx.Status(status).JSON(errorResponseBody{Message: message})
 	}
 
@@ -57,11 +60,16 @@ func isPagePath(ctx fiber.Ctx) bool {
 	return !isUnderPath(ctx.Path(), "/api") && !isUnderPath(ctx.Path(), "/health") && !isUnderPath(ctx.Path(), "/assets")
 }
 
+func asksForPage(ctx fiber.Ctx) bool {
+	return isHtmxRequest(ctx) || strings.Contains(ctx.Get(fiber.HeaderAccept), "text/html")
+}
+
 func createHttpServer(settings Settings, pool *pgxpool.Pool) *fiber.App {
 	server := fiber.New(fiber.Config{
 		BodyLimit:    publishBodyLimit,
 		ErrorHandler: respondError,
 	})
+	server.Server().SecureErrorLogMessage = true
 
 	server.Use(recover.New(recover.Config{EnableStackTrace: true}))
 	server.Use(helmet.New(helmet.Config{

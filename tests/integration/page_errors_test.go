@@ -1,12 +1,17 @@
 package integration_test
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"errors"
 	"io"
+	"log"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"time"
 
 	"github.com/bidirekt/broker/internal/model"
@@ -32,6 +37,7 @@ func (this *IntegrationSuite) sendPageErrorsRequest(req *http.Request) (status i
 	}
 
 	req.AddCookie(&http.Cookie{Name: "bidirekt_session", Value: pageErrorsSessionCookie})
+	req.Header.Set("Accept", "text/html")
 
 	resp, err := this.Components.Server.Test(req, fiber.TestConfig{Timeout: 10 * time.Second})
 	this.Require().NoError(err)
@@ -39,6 +45,22 @@ func (this *IntegrationSuite) sendPageErrorsRequest(req *http.Request) (status i
 
 	bytes, err := io.ReadAll(resp.Body)
 	this.Require().NoError(err)
+
+	return resp.StatusCode, resp.Header, string(bytes)
+}
+
+func (this *IntegrationSuite) sendRawPageErrorsRequest(raw string) (status int, header http.Header, body string) {
+	client, server := net.Pipe()
+	served := make(chan error, 1)
+	go func() { served <- this.Components.Server.Server().ServeConn(server) }()
+	go func() { _, _ = client.Write([]byte(raw)) }()
+
+	resp, err := http.ReadResponse(bufio.NewReader(client), nil)
+	this.Require().NoError(err)
+	bytes, err := io.ReadAll(resp.Body)
+	this.Require().NoError(err)
+	_ = client.Close()
+	<-served
 
 	return resp.StatusCode, resp.Header, string(bytes)
 }
@@ -114,4 +136,45 @@ func (this *IntegrationSuite) TestUnhappyPath_HtmxPagePostFailureAnswers500Witho
 	this.Equal(http.StatusInternalServerError, status)
 	this.Contains(body, "something went wrong")
 	this.Equal("false", header.Get("HX-Push-Url"))
+}
+
+func (this *IntegrationSuite) TestUnhappyPath_OversizedApiRequestHeadAnswers431AsJSONWithoutARedirect() {
+	status, header, body := this.sendRawPageErrorsRequest(
+		"GET /api/participants HTTP/1.1\r\nHost: localhost:8080\r\nX-Oversized: " + strings.Repeat("a", 9*1024) + "\r\n\r\n",
+	)
+	this.Equal(http.StatusRequestHeaderFieldsTooLarge, status)
+	this.Contains(header.Get("Content-Type"), "application/json")
+	this.Empty(header.Get("Location"))
+	this.JSONEq(`{"message":"Request Header Fields Too Large"}`, body)
+}
+
+func (this *IntegrationSuite) TestUnhappyPath_ApiRequestWithABadContentLengthAnswers400AsJSONWithoutARedirect() {
+	status, header, body := this.sendRawPageErrorsRequest(
+		"POST /api/participants HTTP/1.1\r\nHost: localhost:8080\r\nContent-Length: abc\r\n\r\n",
+	)
+	this.Equal(http.StatusBadRequest, status)
+	this.Contains(header.Get("Content-Type"), "application/json")
+	this.Empty(header.Get("Location"))
+	this.Contains(body, `"message"`)
+}
+
+func (this *IntegrationSuite) TestUnhappyPath_UnparsableRequestHeadIsLoggedWithoutItsSecrets() {
+	var logged bytes.Buffer
+	previous := log.Writer()
+	log.SetOutput(&logged)
+
+	status, _, body := this.sendRawPageErrorsRequest("POST /set-password?token=secret-link-token HTTP/1.1\r\n" +
+		"Host: localhost:8080\r\n" +
+		"Cookie: bidirekt_session=secret-session-cookie\r\n" +
+		"Authorization: Bearer secret-jwt\r\n" +
+		"Content-Length: abc\r\n\r\n",
+	)
+
+	log.SetOutput(previous)
+	this.Equal(http.StatusBadRequest, status)
+	this.Contains(logged.String(), "failed")
+	for _, secret := range []string{"secret-link-token", "secret-session-cookie", "secret-jwt"} {
+		this.NotContains(logged.String(), secret)
+		this.NotContains(body, secret)
+	}
 }

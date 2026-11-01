@@ -47,6 +47,10 @@ func (this *SetPasswordUseCase) Execute(ctx context.Context, input SetPasswordIn
 		return SetPasswordOutput{Status: PasswordInvalid}, nil
 	}
 
+	if !this.IsLinkUsable(ctx, input.Token) {
+		return SetPasswordOutput{Status: LinkInvalid}, nil
+	}
+
 	passwordHash, err := components.HashPassword(input.Password)
 	if err != nil {
 		return SetPasswordOutput{}, err
