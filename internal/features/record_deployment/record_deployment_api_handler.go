@@ -1,6 +1,10 @@
 package record_deployment
 
-import "github.com/gofiber/fiber/v3"
+import (
+	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/model"
+	"github.com/gofiber/fiber/v3"
+)
 
 type RecordDeploymentApiHandler struct {
 	useCase *RecordDeploymentUseCase
@@ -11,6 +15,10 @@ func NewRecordDeploymentApiHandler(useCase *RecordDeploymentUseCase) *RecordDepl
 }
 
 func (this *RecordDeploymentApiHandler) Handle(ctx fiber.Ctx) error {
+	if err := components.RequirePermission(ctx, model.PermissionWrite); err != nil {
+		return err
+	}
+
 	requestBody := &RecordDeploymentRequestBody{}
 	if err := ctx.Bind().JSON(requestBody); err != nil {
 		return this.respondInvalidInput(ctx)

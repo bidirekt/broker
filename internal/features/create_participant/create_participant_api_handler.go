@@ -1,6 +1,10 @@
 package create_participant
 
-import "github.com/gofiber/fiber/v3"
+import (
+	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/model"
+	"github.com/gofiber/fiber/v3"
+)
 
 type CreateParticipantApiHandler struct {
 	useCase *CreateParticipantUseCase
@@ -11,6 +15,10 @@ func NewCreateParticipantApiHandler(useCase *CreateParticipantUseCase) *CreatePa
 }
 
 func (this *CreateParticipantApiHandler) Handle(ctx fiber.Ctx) error {
+	if err := components.RequirePermission(ctx, model.PermissionWrite); err != nil {
+		return err
+	}
+
 	requestBody := &CreateParticipantRequestBody{}
 	if err := ctx.Bind().JSON(requestBody); err != nil {
 		return this.respondInvalidInput(ctx)

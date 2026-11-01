@@ -52,7 +52,7 @@ func (this *SignInUiHandler) SignIn(ctx fiber.Ctx) error {
 func (this *SignInUiHandler) respondInvalidCredentials(ctx fiber.Ctx, identifier string) error {
 	return components.Render(ctx, fiber.StatusUnauthorized, pageFiles, signInTemplate, SignInPage{
 		Identifier: identifier,
-		Message:    InvalidCredentialsMessage,
+		Message:    PageInvalidCredentialsMessage,
 	})
 }
 

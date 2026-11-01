@@ -17,6 +17,8 @@ const (
 )
 
 func (this *IntegrationSuite) TestAdminRoutes_RefuseAUserSession() {
+	this.deleteSuiteWriter()
+
 	userID := this.createActiveUser(adminRoutesUserEmail, model.PermissionWrite, adminRoutesUserPassword)
 	cookie := this.signInAsUser(adminRoutesUserEmail, adminRoutesUserPassword)
 	_, _, profile := this.getPage("/profile", cookie)

@@ -196,7 +196,11 @@ func (this *IntegrationSuite) TestSessionDoor_PostWithCSRFHeaderAndOrigin_Passes
 
 func (this *IntegrationSuite) TestSessionDoor_LeavesApiHealthAndAssetsOpen() {
 	for _, path := range []string{"/api/participants", "/health", "/assets/app.css"} {
-		status, header, _ := this.sendThroughDoor(doorRequest{method: "GET", path: path})
+		status, header, _ := this.sendThroughDoor(doorRequest{
+			method:  "GET",
+			path:    path,
+			headers: map[string]string{"Authorization": "Bearer " + this.writerToken},
+		})
 		this.Equal(http.StatusOK, status, path)
 		this.Empty(header.Get("Location"), path)
 	}

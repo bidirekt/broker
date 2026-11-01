@@ -1,7 +1,10 @@
 package sign_in
 
 const (
-	InvalidCredentialsMessage string = "invalid email, username or password"
+	PageInvalidCredentialsMessage string = "invalid email, username or password"
+	ApiInvalidCredentialsMessage  string = "invalid credentials"
+	SignInInvalidInputMessage     string = "sign in invalid input"
+	SignedInMessage               string = "signed in"
 
 	identifierFormField = "identifier"
 	passwordFormField   = "password"
@@ -16,4 +19,19 @@ const (
 type SignInPage struct {
 	Identifier string
 	Message    string
+}
+
+type SignInRequestBody struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type SignInResponseBody struct {
+	Message string `json:"message"`
+}
+
+type SignedInResponseBody struct {
+	Message   string `json:"message"`
+	Token     string `json:"token"`
+	ExpiresAt string `json:"expiresAt"`
 }

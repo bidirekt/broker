@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/bidirekt/broker/internal/components"
 	"github.com/bidirekt/broker/internal/contracts/contractfiles"
 	"github.com/bidirekt/broker/internal/contracts/violation"
+	"github.com/bidirekt/broker/internal/model"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -18,6 +20,10 @@ func NewPublishContractApiHandler(useCase *PublishContractUseCase) *PublishContr
 }
 
 func (this *PublishContractApiHandler) Handle(ctx fiber.Ctx) error {
+	if err := components.RequirePermission(ctx, model.PermissionWrite); err != nil {
+		return err
+	}
+
 	requestBody := &PublishContractRequestBody{}
 	if err := json.Unmarshal(ctx.Body(), requestBody); err != nil {
 		return this.respondInvalidInput(ctx)

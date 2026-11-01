@@ -38,6 +38,7 @@ func (this *IntegrationSuite) sendPageErrorsRequest(req *http.Request) (status i
 
 	req.AddCookie(&http.Cookie{Name: "bidirekt_session", Value: pageErrorsSessionCookie})
 	req.Header.Set("Accept", "text/html")
+	req.Header.Set("Authorization", "Bearer "+this.writerToken)
 
 	resp, err := this.Components.Server.Test(req, fiber.TestConfig{Timeout: 10 * time.Second})
 	this.Require().NoError(err)

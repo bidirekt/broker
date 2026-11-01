@@ -1,6 +1,10 @@
 package create_environment
 
-import "github.com/gofiber/fiber/v3"
+import (
+	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/model"
+	"github.com/gofiber/fiber/v3"
+)
 
 type CreateEnvironmentApiHandler struct {
 	useCase *CreateEnvironmentUseCase
@@ -11,6 +15,10 @@ func NewCreateEnvironmentApiHandler(useCase *CreateEnvironmentUseCase) *CreateEn
 }
 
 func (this *CreateEnvironmentApiHandler) Handle(ctx fiber.Ctx) error {
+	if err := components.RequirePermission(ctx, model.PermissionWrite); err != nil {
+		return err
+	}
+
 	requestBody := &CreateEnvironmentRequestBody{}
 	if err := ctx.Bind().JSON(requestBody); err != nil {
 		return this.respondInvalidInput(ctx)

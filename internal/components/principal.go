@@ -5,7 +5,10 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
-const noAccessMessage = "you don't have access"
+const (
+	noAccessMessage     = "you don't have access"
+	forbiddenApiMessage = "forbidden"
+)
 
 type Principal struct {
 	UserID     int64
@@ -46,4 +49,13 @@ func RequireUser(ctx fiber.Ctx) error {
 	}
 
 	return fiber.NewError(fiber.StatusForbidden, noAccessMessage)
+}
+
+func RequirePermission(ctx fiber.Ctx, permission model.Permission) error {
+	principal, ok := PrincipalFrom(ctx)
+	if ok && (principal.Permission == permission || principal.Permission == model.PermissionWrite) {
+		return nil
+	}
+
+	return fiber.NewError(fiber.StatusForbidden, forbiddenApiMessage)
 }

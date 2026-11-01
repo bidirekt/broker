@@ -5,6 +5,7 @@ go 1.26.10
 require (
 	github.com/goccy/go-yaml v1.19.2
 	github.com/gofiber/fiber/v3 v3.6.1
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/guregu/null v4.0.0+incompatible
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/stretchr/testify v1.12.1

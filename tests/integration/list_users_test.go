@@ -42,6 +42,8 @@ func (this *IntegrationSuite) TestListUsers_AdminSeesEveryUserByteWiseWithPermis
 }
 
 func (this *IntegrationSuite) TestListUsers_HtmxPageAnswersWithoutHXPushUrlAndIsNotStored() {
+	this.deleteSuiteWriter()
+
 	req := httptest.NewRequest("GET", "/users", nil)
 	req.Header.Set("HX-Request", "true")
 
@@ -54,6 +56,8 @@ func (this *IntegrationSuite) TestListUsers_HtmxPageAnswersWithoutHXPushUrlAndIs
 }
 
 func (this *IntegrationSuite) TestListUsers_ShowsTheEmptyStateWithoutUsers() {
+	this.deleteSuiteWriter()
+
 	status, _, body := this.getPage("/users", this.signInAsAdmin())
 
 	this.Require().Equal(http.StatusOK, status)

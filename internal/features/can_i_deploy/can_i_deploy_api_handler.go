@@ -1,6 +1,10 @@
 package can_i_deploy
 
-import "github.com/gofiber/fiber/v3"
+import (
+	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/model"
+	"github.com/gofiber/fiber/v3"
+)
 
 type CanIDeployApiHandler struct {
 	useCase *CanIDeployUseCase
@@ -11,6 +15,10 @@ func NewCanIDeployApiHandler(useCase *CanIDeployUseCase) *CanIDeployApiHandler {
 }
 
 func (this *CanIDeployApiHandler) Handle(ctx fiber.Ctx) error {
+	if err := components.RequirePermission(ctx, model.PermissionRead); err != nil {
+		return err
+	}
+
 	requestBody := &CanIDeployRequestBody{}
 	if err := ctx.Bind().JSON(requestBody); err != nil {
 		return this.respondInvalidInput(ctx)

@@ -43,6 +43,8 @@ func (this *IntegrationSuite) userRepositoryAwaitLockWaiters(count int) {
 }
 
 func (this *IntegrationSuite) TestUserRepository_CreateInvitedWithTheSameEmailInAnotherCase_ReturnsNotCreatedAndLeavesOneUser() {
+	this.deleteSuiteWriter()
+
 	ctx := context.Background()
 	repo := repository.NewUserRepository(this.Pool)
 
@@ -86,6 +88,8 @@ func (this *IntegrationSuite) TestUserRepository_CreateInvited_StoresAnInvitedUs
 }
 
 func (this *IntegrationSuite) TestUserRepository_List_OrdersByEmailByteWise() {
+	this.deleteSuiteWriter()
+
 	ctx := context.Background()
 	repo := repository.NewUserRepository(this.Pool)
 

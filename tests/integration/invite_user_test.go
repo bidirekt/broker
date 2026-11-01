@@ -102,6 +102,8 @@ func (this *IntegrationSuite) TestInviteUser_HtmxInviteShowsTheLinkWithoutPushin
 }
 
 func (this *IntegrationSuite) TestInviteUser_RejectsAnEmailInUseInAnotherCase() {
+	this.deleteSuiteWriter()
+
 	status, _ := this.inviteUser(inviteUserEmail, "write")
 	this.Require().Equal(http.StatusOK, status)
 
@@ -114,6 +116,8 @@ func (this *IntegrationSuite) TestInviteUser_RejectsAnEmailInUseInAnotherCase() 
 }
 
 func (this *IntegrationSuite) TestInviteUser_RejectsAMalformedEmail() {
+	this.deleteSuiteWriter()
+
 	for _, email := range []string{"ana.x.com", "ana @x.com"} {
 		status, body := this.inviteUser(email, "read")
 
@@ -125,6 +129,8 @@ func (this *IntegrationSuite) TestInviteUser_RejectsAMalformedEmail() {
 }
 
 func (this *IntegrationSuite) TestInviteUser_RejectsATamperedPermission() {
+	this.deleteSuiteWriter()
+
 	for _, permission := range []string{"admin", "Write", ""} {
 		status, body := this.inviteUser(inviteUserEmail, permission)
 

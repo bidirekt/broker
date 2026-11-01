@@ -25,7 +25,7 @@ func (this *IntegrationSuite) health(method string) (status int, response string
 func (this *IntegrationSuite) TestHappyPath_HealthReportsStatusAndVersions() {
 	status, body := this.health("GET")
 	this.Equal(http.StatusOK, status)
-	this.JSONEq(`{"status":"ok","brokerVersion":"dev","apiVersion":1}`, body)
+	this.JSONEq(`{"status":"ok","brokerVersion":"dev","apiVersion":2}`, body)
 }
 
 func (this *IntegrationSuite) TestUnhappyPath_PostHealthIsNotRouted() {

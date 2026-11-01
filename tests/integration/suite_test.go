@@ -30,6 +30,8 @@ const (
 	suiteAdminUsername     = "admin"
 	suiteAdminPassword     = "integration-admin-password"
 	suiteSessionCookieName = "bidirekt_session"
+	suiteWriterEmail       = "suite-writer@x.com"
+	suiteWriterPassword    = "suite-writer-correct-horse"
 )
 
 var csrfTokenInPage = regexp.MustCompile(`"X-CSRF-Token": "([^"]+)"`)
@@ -41,9 +43,10 @@ func TestIntegrationSuite(t *testing.T) {
 type IntegrationSuite struct {
 	suite.Suite
 
-	container  *postgres.PostgresContainer
-	Components *components.Components
-	Pool       *pgxpool.Pool
+	container   *postgres.PostgresContainer
+	Components  *components.Components
+	Pool        *pgxpool.Pool
+	writerToken string
 }
 
 func (this *IntegrationSuite) SetupSuite() {
@@ -115,24 +118,58 @@ func (this *IntegrationSuite) SetupTest() {
 	)
 
 	this.Require().NoError(err)
+
+	this.createActiveUser(suiteWriterEmail, model.PermissionWrite, suiteWriterPassword)
+	this.writerToken = this.signInToApi(suiteWriterEmail, suiteWriterPassword)
+}
+
+func (this *IntegrationSuite) deleteSuiteWriter() {
+	_, err := this.Pool.Exec(context.Background(), `DELETE FROM users WHERE email = $1`, suiteWriterEmail)
+	this.Require().NoError(err)
+}
+
+func (this *IntegrationSuite) signInToApi(email, password string) (token string) {
+	requestBody, err := json.Marshal(map[string]string{"email": email, "password": password})
+	this.Require().NoError(err)
+
+	status, _, body := this.postWithToken("/api/sign-in", "", string(requestBody))
+	this.Require().Equal(http.StatusOK, status, body)
+
+	var response struct {
+		Token string `json:"token"`
+	}
+	this.Require().NoError(json.Unmarshal([]byte(body), &response))
+
+	return response.Token
 }
 
 func (this *IntegrationSuite) post(path, body string) (status int, response string) {
-	req := httptest.NewRequest("POST", path, strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := this.Components.Server.Test(req, fiber.TestConfig{Timeout: 10 * time.Second})
-	this.Require().NoError(err)
-	defer func() { _ = resp.Body.Close() }()
-
-	bytes, err := io.ReadAll(resp.Body)
-	this.Require().NoError(err)
-
-	return resp.StatusCode, string(bytes)
+	status, _, response = this.postWithToken(path, this.writerToken, body)
+	return status, response
 }
 
 func (this *IntegrationSuite) get(path string) (status int, response string) {
+	status, _, response = this.getWithToken(path, this.writerToken)
+	return status, response
+}
+
+func (this *IntegrationSuite) postWithToken(path, token, body string) (status int, header http.Header, response string) {
+	req := httptest.NewRequest("POST", path, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	return this.sendApiRequest(req, token)
+}
+
+func (this *IntegrationSuite) getWithToken(path, token string) (status int, header http.Header, response string) {
 	req := httptest.NewRequest("GET", path, nil)
+
+	return this.sendApiRequest(req, token)
+}
+
+func (this *IntegrationSuite) sendApiRequest(req *http.Request, token string) (status int, header http.Header, response string) {
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 
 	resp, err := this.Components.Server.Test(req, fiber.TestConfig{Timeout: 10 * time.Second})
 	this.Require().NoError(err)
@@ -141,7 +178,7 @@ func (this *IntegrationSuite) get(path string) (status int, response string) {
 	bytes, err := io.ReadAll(resp.Body)
 	this.Require().NoError(err)
 
-	return resp.StatusCode, string(bytes)
+	return resp.StatusCode, resp.Header, string(bytes)
 }
 
 type contractFragment struct {

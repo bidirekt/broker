@@ -1,6 +1,10 @@
 package rename_participant
 
-import "github.com/gofiber/fiber/v3"
+import (
+	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/model"
+	"github.com/gofiber/fiber/v3"
+)
 
 type RenameParticipantApiHandler struct {
 	useCase *RenameParticipantUseCase
@@ -11,6 +15,10 @@ func NewRenameParticipantApiHandler(useCase *RenameParticipantUseCase) *RenamePa
 }
 
 func (this *RenameParticipantApiHandler) Handle(ctx fiber.Ctx) error {
+	if err := components.RequirePermission(ctx, model.PermissionWrite); err != nil {
+		return err
+	}
+
 	requestBody := &RenameParticipantRequestBody{}
 	if err := ctx.Bind().JSON(requestBody); err != nil {
 		return this.respondInvalidInput(ctx)

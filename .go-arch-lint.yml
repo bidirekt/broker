@@ -45,6 +45,7 @@ vendors:
   testify:        { in: [github.com/stretchr/testify, github.com/stretchr/testify/**] }
   testcontainers: { in: [github.com/testcontainers/testcontainers-go, github.com/testcontainers/testcontainers-go/**] }
   x_crypto:       { in: [golang.org/x/crypto/**] }
+  golang_jwt:     { in: [github.com/golang-jwt/jwt/v5, github.com/golang-jwt/jwt/v5/**] }
 
 deps:
   cmd:
@@ -100,10 +101,10 @@ deps:
     mayDependOn: [components, repository, model, validations]
     canUse: [fiber]
   feature_list_environments:
-    mayDependOn: [components, repository]
+    mayDependOn: [components, repository, model]
     canUse: [fiber]
   feature_list_participants:
-    mayDependOn: [components, repository]
+    mayDependOn: [components, repository, model]
     canUse: [fiber]
   feature_list_users:
     mayDependOn: [components, repository, model]
@@ -118,7 +119,7 @@ deps:
     mayDependOn: [components, repository, model]
     canUse: [fiber]
   feature_rename_participant:
-    mayDependOn: [components, repository, validations]
+    mayDependOn: [components, repository, model, validations]
     canUse: [fiber]
   feature_set_password:
     mayDependOn: [components, repository, validations]
@@ -138,7 +139,7 @@ deps:
 
   components:
     mayDependOn: [model, validations, repository, pkg, migrations]
-    canUse: [fiber, pgx, guregu_null, x_crypto]
+    canUse: [fiber, pgx, guregu_null, x_crypto, golang_jwt]
   contracts:
     mayDependOn: [contracts, model, validations]
     canUse: [yaml, guregu_null]
@@ -171,4 +172,4 @@ deps:
       - model
       - validations
       - pkg
-    canUse: [fiber, pgx, guregu_null, yaml, testify, testcontainers]
+    canUse: [fiber, pgx, guregu_null, yaml, testify, testcontainers, golang_jwt]

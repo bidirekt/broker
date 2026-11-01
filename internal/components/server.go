@@ -77,11 +77,13 @@ func createHttpServer(settings Settings, pool *pgxpool.Pool) *fiber.App {
 		ContentSecurityPolicy: pageContentSecurityPolicy,
 	}))
 	serveAssets(server)
+	users := repository.NewUserRepository(pool)
 	server.Use(sessionDoor(&sessionKeeper{
 		settings: settings,
 		sessions: repository.NewSessionRepository(pool),
-		users:    repository.NewUserRepository(pool),
+		users:    users,
 	}))
+	server.Use(bearerDoor(&bearerKeeper{settings: settings, users: users}))
 
 	return server
 }

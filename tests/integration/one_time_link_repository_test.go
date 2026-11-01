@@ -106,6 +106,8 @@ func (this *IntegrationSuite) TestOneTimeLinkRepository_ReplaceOpen_RefusesAUser
 }
 
 func (this *IntegrationSuite) TestOneTimeLinkRepository_ReplaceOpen_ReportsAnUnknownUserAndStoresNothing() {
+	this.deleteSuiteWriter()
+
 	repo := repository.NewOneTimeLinkRepository(this.Pool)
 
 	email, found, deactivated := repo.ReplaceOpen(context.Background(),
