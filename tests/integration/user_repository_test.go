@@ -265,6 +265,50 @@ func (this *IntegrationSuite) TestUserRepository_SetPasswordWithLinkWhileReplace
 	this.True(usable)
 }
 
+func (this *IntegrationSuite) TestUserRepository_SetPasswordWithLinkWhileDeactivateRuns_BothFinishWithoutADeadlock() {
+	ctx := context.Background()
+	repo := repository.NewUserRepository(this.Pool)
+	links := repository.NewOneTimeLinkRepository(this.Pool)
+
+	user := &model.User{Email: "ana@x.com", Permission: model.PermissionWrite}
+	this.Require().True(repo.CreateInvited(ctx, user,
+		&model.OneTimeLink{TokenHash: []byte("ana-invite"), Purpose: model.LinkPurposeInvite, ExpiresAt: time.Now().Add(24 * time.Hour)},
+	))
+
+	linkOnHold, err := this.Pool.Begin(ctx)
+	this.Require().NoError(err)
+	defer func() { _ = linkOnHold.Rollback(ctx) }()
+	// Deactivate updates the user before it ends the link, so it must reach the user while
+	// SetPasswordWithLink waits here to use the link, with whatever locks it took until then
+	_, err = linkOnHold.Exec(ctx, `SELECT 1 FROM one_time_links WHERE token_hash = $1 FOR UPDATE`, []byte("ana-invite"))
+	this.Require().NoError(err)
+
+	var set bool
+	setFinished := userRepositoryInBackground(func() {
+		set = repo.SetPasswordWithLink(ctx, []byte("ana-invite"), userRepositoryPasswordHash)
+	})
+	this.userRepositoryAwaitLockWaiters(1)
+
+	var deactivated bool
+	deactivateFinished := userRepositoryInBackground(func() {
+		deactivated = repo.Deactivate(ctx, user.ID)
+	})
+	this.userRepositoryAwaitLockWaiters(2)
+
+	this.Require().NoError(linkOnHold.Rollback(ctx))
+	this.Nil(<-setFinished)
+	this.Nil(<-deactivateFinished)
+
+	this.True(set)
+	this.True(deactivated)
+	found, ok := repo.FindByID(ctx, user.ID)
+	this.Require().True(ok)
+	this.Equal(userRepositoryPasswordHash, found.PasswordHash.String)
+	this.Equal(model.UserDeactivated, found.State())
+	_, _, usable := links.FindUsable(ctx, []byte("ana-invite"))
+	this.False(usable)
+}
+
 func (this *IntegrationSuite) TestUserRepository_ChangePasswordKeepingSession_KeepsOnlyTheGivenSession() {
 	ctx := context.Background()
 	repo := repository.NewUserRepository(this.Pool)

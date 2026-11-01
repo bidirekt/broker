@@ -5,11 +5,14 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/bidirekt/broker/internal/repository"
+	"github.com/gofiber/fiber/v3"
 )
 
 const (
@@ -41,6 +44,93 @@ func (this *IntegrationSuite) reactivateUserUpdatedAt(userID int64) time.Time {
 	this.Require().NoError(err)
 
 	return updatedAt
+}
+
+func reactivateUserInBackground(send func()) (finished <-chan any) {
+	panicked := make(chan any, 1)
+	go func() {
+		defer func() { panicked <- recover() }()
+		send()
+	}()
+
+	return panicked
+}
+
+func (this *IntegrationSuite) reactivateUserAwaitLockWaiters(count int) {
+	this.Require().Eventually(func() bool {
+		var waiting int
+		err := this.Pool.QueryRow(context.Background(),
+			`SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'`,
+		).Scan(&waiting)
+		return err == nil && waiting == count
+	}, 10*time.Second, 10*time.Millisecond)
+}
+
+func (this *IntegrationSuite) reactivateUserSendForm(path, sessionCookie, csrfToken string, form url.Values) (status int) {
+	req := httptest.NewRequest("POST", path, strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Origin", suitePublicURL)
+	if csrfToken != "" {
+		req.Header.Set("X-CSRF-Token", csrfToken)
+	}
+	if sessionCookie != "" {
+		req.AddCookie(&http.Cookie{Name: suiteSessionCookieName, Value: sessionCookie})
+	}
+
+	resp, err := this.Components.Server.Test(req, fiber.TestConfig{Timeout: 10 * time.Second})
+	if err != nil {
+		panic(err)
+	}
+	_ = resp.Body.Close()
+
+	return resp.StatusCode
+}
+
+func (this *IntegrationSuite) reactivateUserCountRows(table string, userID int64) int {
+	var count int
+	err := this.Pool.QueryRow(context.Background(), `SELECT count(*) FROM `+table+` WHERE user_id = $1`, userID).Scan(&count)
+	this.Require().NoError(err)
+
+	return count
+}
+
+func (this *IntegrationSuite) reactivateUserDeactivateRacing(userID int64, race func(adminCookie, csrfToken string) (status int)) (raceStatus int) {
+	ctx := context.Background()
+	tokenHash := sha256.Sum256([]byte(reactivateUserLinkToken))
+	_, found, deactivated := repository.NewOneTimeLinkRepository(this.Pool).ReplaceOpen(ctx, &model.OneTimeLink{
+		TokenHash: tokenHash[:],
+		UserID:    userID,
+		ExpiresAt: time.Now().Add(time.Hour),
+	})
+	this.Require().True(found)
+	this.Require().False(deactivated)
+	adminCookie := this.signInAsAdmin()
+	_, _, users := this.getPage("/users", adminCookie)
+	csrfToken := this.csrfTokenFrom(users)
+
+	linkOnHold, err := this.Pool.Begin(ctx)
+	this.Require().NoError(err)
+	defer func() { _ = linkOnHold.Rollback(ctx) }()
+	// the deactivation locks the user, then waits here before it ends the link and commits
+	_, err = linkOnHold.Exec(ctx, `SELECT 1 FROM one_time_links WHERE user_id = $1 FOR UPDATE`, userID)
+	this.Require().NoError(err)
+
+	var deactivateStatus int
+	deactivateFinished := reactivateUserInBackground(func() {
+		deactivateStatus = this.reactivateUserSendForm(fmt.Sprintf("/users/%d/deactivate", userID), adminCookie, csrfToken, url.Values{})
+	})
+	this.reactivateUserAwaitLockWaiters(1)
+	raceFinished := reactivateUserInBackground(func() {
+		raceStatus = race(adminCookie, csrfToken)
+	})
+	this.reactivateUserAwaitLockWaiters(2)
+
+	this.Require().NoError(linkOnHold.Rollback(ctx))
+	this.Require().Nil(<-deactivateFinished)
+	this.Require().Nil(<-raceFinished)
+	this.Require().Equal(http.StatusSeeOther, deactivateStatus)
+
+	return raceStatus
 }
 
 func (this *IntegrationSuite) TestReactivateUser_TheUserSignsInAgain() {
@@ -77,6 +167,36 @@ func (this *IntegrationSuite) TestReactivateUser_AnInvitedUserComesBackInvitedWi
 	this.Equal(0, this.countRows("one_time_links"))
 	_, _, usable := repository.NewOneTimeLinkRepository(this.Pool).FindUsable(context.Background(), tokenHash[:])
 	this.False(usable, "the link from before the deactivation works again")
+}
+
+func (this *IntegrationSuite) TestReactivateUser_ASignInThatReadTheUserBeforeTheDeactivationHasNoSessionAfterReactivation() {
+	userID := this.createActiveUser(reactivateUserEmail, model.PermissionWrite, reactivateUserPassword)
+
+	signInStatus := this.reactivateUserDeactivateRacing(userID, func(string, string) int {
+		return this.reactivateUserSendForm("/sign-in", "", "", url.Values{"identifier": {reactivateUserEmail}, "password": {reactivateUserPassword}})
+	})
+	this.Require().Equal(http.StatusUnauthorized, signInStatus)
+
+	status, _ := this.reactivateUserPost(userID, "reactivate")
+
+	this.Require().Equal(http.StatusSeeOther, status)
+	this.Equal(model.UserActive, this.reactivateUserState(userID))
+	this.Equal(0, this.reactivateUserCountRows("sessions", userID))
+}
+
+func (this *IntegrationSuite) TestReactivateUser_ALinkRequestedWhileTheUserWasBeingDeactivatedIsNotThereAfterReactivation() {
+	userID := this.createActiveUser(reactivateUserEmail, model.PermissionWrite, reactivateUserPassword)
+
+	linkStatus := this.reactivateUserDeactivateRacing(userID, func(adminCookie, csrfToken string) int {
+		return this.reactivateUserSendForm(fmt.Sprintf("/users/%d/link", userID), adminCookie, csrfToken, url.Values{})
+	})
+	this.Require().Equal(http.StatusConflict, linkStatus)
+
+	status, _ := this.reactivateUserPost(userID, "reactivate")
+
+	this.Require().Equal(http.StatusSeeOther, status)
+	this.Equal(model.UserActive, this.reactivateUserState(userID))
+	this.Equal(0, this.reactivateUserCountRows("one_time_links", userID))
 }
 
 func (this *IntegrationSuite) TestReactivateUser_AnActiveOrInvitedUserGoesBackToUsersUnchanged() {

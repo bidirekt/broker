@@ -5,11 +5,14 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/bidirekt/broker/internal/repository"
+	"github.com/gofiber/fiber/v3"
 )
 
 const (
@@ -35,9 +38,55 @@ func (this *IntegrationSuite) deactivateUserUpdatedAt(userID int64) time.Time {
 	return updatedAt
 }
 
-func (this *IntegrationSuite) TestDeactivateUser_EndsTheSessionsTheSignInAndThePendingLink() {
-	userID := this.createActiveUser(deactivateUserEmail, model.PermissionWrite, deactivateUserPassword)
-	userCookie := this.signInAsUser(deactivateUserEmail, deactivateUserPassword)
+func deactivateUserInBackground(send func()) (finished <-chan any) {
+	panicked := make(chan any, 1)
+	go func() {
+		defer func() { panicked <- recover() }()
+		send()
+	}()
+
+	return panicked
+}
+
+func (this *IntegrationSuite) deactivateUserAwaitLockWaiters(count int) {
+	this.Require().Eventually(func() bool {
+		var waiting int
+		err := this.Pool.QueryRow(context.Background(),
+			`SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'`,
+		).Scan(&waiting)
+		return err == nil && waiting == count
+	}, 10*time.Second, 10*time.Millisecond)
+}
+
+func (this *IntegrationSuite) deactivateUserSendForm(path, sessionCookie, csrfToken string, form url.Values) (status int) {
+	req := httptest.NewRequest("POST", path, strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Origin", suitePublicURL)
+	if csrfToken != "" {
+		req.Header.Set("X-CSRF-Token", csrfToken)
+	}
+	if sessionCookie != "" {
+		req.AddCookie(&http.Cookie{Name: suiteSessionCookieName, Value: sessionCookie})
+	}
+
+	resp, err := this.Components.Server.Test(req, fiber.TestConfig{Timeout: 10 * time.Second})
+	if err != nil {
+		panic(err)
+	}
+	_ = resp.Body.Close()
+
+	return resp.StatusCode
+}
+
+func (this *IntegrationSuite) deactivateUserCountRows(table string, userID int64) int {
+	var count int
+	err := this.Pool.QueryRow(context.Background(), `SELECT count(*) FROM `+table+` WHERE user_id = $1`, userID).Scan(&count)
+	this.Require().NoError(err)
+
+	return count
+}
+
+func (this *IntegrationSuite) deactivateUserSeedLink(userID int64) {
 	tokenHash := sha256.Sum256([]byte(deactivateUserLinkToken))
 	_, found, deactivated := repository.NewOneTimeLinkRepository(this.Pool).ReplaceOpen(context.Background(), &model.OneTimeLink{
 		TokenHash: tokenHash[:],
@@ -46,6 +95,44 @@ func (this *IntegrationSuite) TestDeactivateUser_EndsTheSessionsTheSignInAndTheP
 	})
 	this.Require().True(found)
 	this.Require().False(deactivated)
+}
+
+func (this *IntegrationSuite) deactivateUserRacing(userID int64, race func(adminCookie, csrfToken string) (status int)) (raceStatus int) {
+	ctx := context.Background()
+	this.deactivateUserSeedLink(userID)
+	adminCookie := this.signInAsAdmin()
+	_, _, users := this.getPage("/users", adminCookie)
+	csrfToken := this.csrfTokenFrom(users)
+
+	linkOnHold, err := this.Pool.Begin(ctx)
+	this.Require().NoError(err)
+	defer func() { _ = linkOnHold.Rollback(ctx) }()
+	// the deactivation locks the user, then waits here before it ends the link and commits
+	_, err = linkOnHold.Exec(ctx, `SELECT 1 FROM one_time_links WHERE user_id = $1 FOR UPDATE`, userID)
+	this.Require().NoError(err)
+
+	var deactivateStatus int
+	deactivateFinished := deactivateUserInBackground(func() {
+		deactivateStatus = this.deactivateUserSendForm(fmt.Sprintf("/users/%d/deactivate", userID), adminCookie, csrfToken, url.Values{})
+	})
+	this.deactivateUserAwaitLockWaiters(1)
+	raceFinished := deactivateUserInBackground(func() {
+		raceStatus = race(adminCookie, csrfToken)
+	})
+	this.deactivateUserAwaitLockWaiters(2)
+
+	this.Require().NoError(linkOnHold.Rollback(ctx))
+	this.Require().Nil(<-deactivateFinished)
+	this.Require().Nil(<-raceFinished)
+	this.Require().Equal(http.StatusSeeOther, deactivateStatus)
+
+	return raceStatus
+}
+
+func (this *IntegrationSuite) TestDeactivateUser_EndsTheSessionsTheSignInAndThePendingLink() {
+	userID := this.createActiveUser(deactivateUserEmail, model.PermissionWrite, deactivateUserPassword)
+	userCookie := this.signInAsUser(deactivateUserEmail, deactivateUserPassword)
+	this.deactivateUserSeedLink(userID)
 
 	status, header, _ := this.deactivateUser(fmt.Sprint(userID))
 
@@ -66,6 +153,28 @@ func (this *IntegrationSuite) TestDeactivateUser_EndsTheSessionsTheSignInAndTheP
 	status, _, body := this.getPage("/set-password?token="+deactivateUserLinkToken, "")
 	this.Equal(http.StatusGone, status)
 	this.Contains(body, deactivateUserLinkNotValid)
+}
+
+func (this *IntegrationSuite) TestDeactivateUser_ASignInThatReadTheUserBeforeTheDeactivationLeavesNoSession() {
+	userID := this.createActiveUser(deactivateUserEmail, model.PermissionWrite, deactivateUserPassword)
+
+	signInStatus := this.deactivateUserRacing(userID, func(string, string) int {
+		return this.deactivateUserSendForm("/sign-in", "", "", url.Values{"identifier": {deactivateUserEmail}, "password": {deactivateUserPassword}})
+	})
+
+	this.Equal(http.StatusUnauthorized, signInStatus)
+	this.Equal(0, this.deactivateUserCountRows("sessions", userID))
+}
+
+func (this *IntegrationSuite) TestDeactivateUser_AUserDeactivatedWhileALinkWaitsForTheUserGetsNoLink() {
+	userID := this.createActiveUser(deactivateUserEmail, model.PermissionWrite, deactivateUserPassword)
+
+	linkStatus := this.deactivateUserRacing(userID, func(adminCookie, csrfToken string) int {
+		return this.deactivateUserSendForm(fmt.Sprintf("/users/%d/link", userID), adminCookie, csrfToken, url.Values{})
+	})
+
+	this.Equal(http.StatusConflict, linkStatus)
+	this.Equal(0, this.deactivateUserCountRows("one_time_links", userID))
 }
 
 func (this *IntegrationSuite) TestDeactivateUser_AnAlreadyDeactivatedUserGoesBackToUsersUnchanged() {
