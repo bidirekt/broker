@@ -1,6 +1,9 @@
 package rename_participant
 
-import "github.com/gofiber/fiber/v3"
+import (
+	"github.com/bidirekt/broker/internal/validations"
+	"github.com/gofiber/fiber/v3"
+)
 
 type RenameParticipantApiHandler struct {
 	useCase *RenameParticipantUseCase
@@ -16,7 +19,7 @@ func (this *RenameParticipantApiHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondInvalidInput(ctx)
 	}
 
-	if requestBody.OldName == "" || requestBody.NewName == "" {
+	if validations.UnpaddedValue(requestBody.OldName) != nil || requestBody.NewName == "" {
 		return this.respondInvalidInput(ctx)
 	}
 

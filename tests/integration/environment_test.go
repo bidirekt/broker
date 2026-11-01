@@ -40,3 +40,20 @@ func (this *IntegrationSuite) TestUnhappyPath_EnvironmentNameUnderParticipantKey
 
 	this.Equal(0, this.countRows("environments"))
 }
+
+func (this *IntegrationSuite) TestUnhappyPath_PaddedEnvironmentName() {
+	cases := map[string]string{
+		"leading space":    `{"environment":" production"}`,
+		"trailing space":   `{"environment":"production "}`,
+		"trailing newline": `{"environment":"production\n"}`,
+		"only spaces":      `{"environment":"   "}`,
+	}
+
+	for name, body := range cases {
+		status, response := this.post("/api/environments", body)
+		this.Equal(http.StatusBadRequest, status, name)
+		this.JSONEq(`{"message":"environment invalid input"}`, response, name)
+	}
+
+	this.Equal(0, this.countRows("environments"))
+}

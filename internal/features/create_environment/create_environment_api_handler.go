@@ -1,6 +1,9 @@
 package create_environment
 
-import "github.com/gofiber/fiber/v3"
+import (
+	"github.com/bidirekt/broker/internal/validations"
+	"github.com/gofiber/fiber/v3"
+)
 
 type CreateEnvironmentApiHandler struct {
 	useCase *CreateEnvironmentUseCase
@@ -16,7 +19,7 @@ func (this *CreateEnvironmentApiHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondInvalidInput(ctx)
 	}
 
-	if requestBody.Environment == "" {
+	if validations.UnpaddedValue(requestBody.Environment) != nil {
 		return this.respondInvalidInput(ctx)
 	}
 

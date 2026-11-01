@@ -2,10 +2,10 @@ package publish_contract
 
 import (
 	"encoding/json"
-	"strings"
 
 	"github.com/bidirekt/broker/internal/contracts/contractfiles"
 	"github.com/bidirekt/broker/internal/contracts/violation"
+	"github.com/bidirekt/broker/internal/validations"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -23,7 +23,7 @@ func (this *PublishContractApiHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondInvalidInput(ctx)
 	}
 
-	if !isUnpaddedValue(requestBody.ServiceName) || !isUnpaddedValue(requestBody.Version) || len(requestBody.Contracts) == 0 || contractfiles.HasBlankSource(requestBody.Contracts) {
+	if validations.UnpaddedValue(requestBody.ServiceName) != nil || validations.UnpaddedValue(requestBody.Version) != nil || len(requestBody.Contracts) == 0 || contractfiles.HasBlankSource(requestBody.Contracts) {
 		return this.respondInvalidInput(ctx)
 	}
 
@@ -85,8 +85,4 @@ func (this *PublishContractApiHandler) respondSuccess(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusOK).JSON(PublishContractResponseBody{
 		Message: ContractPublishSuccessfulMessage,
 	})
-}
-
-func isUnpaddedValue(value string) bool {
-	return value != "" && strings.TrimSpace(value) == value
 }
