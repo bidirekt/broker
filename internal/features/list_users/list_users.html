@@ -20,10 +20,16 @@
       <td>{{.Permission}}</td>
       <td>{{.State}}</td>
       <td class="actions">
+        <a href="/users/{{.ID}}/edit">Edit</a>
         {{if eq .State "invited"}}
         <form method="post" action="/users/{{.ID}}/link"><button type="submit">New invite link</button></form>
         {{else if eq .State "active"}}
         <form method="post" action="/users/{{.ID}}/link"><button type="submit">New reset link</button></form>
+        {{end}}
+        {{if eq .State "deactivated"}}
+        <form method="post" action="/users/{{.ID}}/reactivate"><button type="submit">Reactivate</button></form>
+        {{else}}
+        <form method="post" action="/users/{{.ID}}/deactivate"><button type="submit">Deactivate</button></form>
         {{end}}
       </td>
     </tr>

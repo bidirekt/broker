@@ -30,7 +30,11 @@ func (this *IntegrationSuite) TestAdminRoutes_RefuseAUserSession() {
 		{http.MethodGet, "/users", nil},
 		{http.MethodGet, "/users/invite", nil},
 		{http.MethodPost, "/users/invite", url.Values{"email": {"bob@x.com"}, "permission": {"read"}}},
+		{http.MethodGet, fmt.Sprintf("/users/%d/edit", userID), nil},
+		{http.MethodPost, fmt.Sprintf("/users/%d/edit", userID), url.Values{"email": {"bob@x.com"}, "permission": {"read"}}},
 		{http.MethodPost, fmt.Sprintf("/users/%d/link", userID), url.Values{}},
+		{http.MethodPost, fmt.Sprintf("/users/%d/deactivate", userID), url.Values{}},
+		{http.MethodPost, fmt.Sprintf("/users/%d/reactivate", userID), url.Values{}},
 	}
 
 	for _, route := range routes {

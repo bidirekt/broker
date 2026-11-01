@@ -1,0 +1,19 @@
+{{define "title"}}Edit a user{{end}}
+
+{{define "content"}}
+<h1>Edit a user</h1>
+{{with .Page.Message}}<p role="alert">{{.}}</p>{{end}}
+{{if .Page.UserID}}
+<form method="post" action="/users/{{.Page.UserID}}/edit">
+  <label for="email">Email</label>
+  <input id="email" name="email" type="text" inputmode="email" autocomplete="off" value="{{.Page.Email}}" required autofocus>
+  <label for="permission">Permission</label>
+  <select id="permission" name="permission" required>
+    <option value="read"{{if eq .Page.Permission "read"}} selected{{end}}>read</option>
+    <option value="write"{{if eq .Page.Permission "write"}} selected{{end}}>write</option>
+  </select>
+  <button type="submit">Save</button>
+</form>
+{{end}}
+<p><a href="/users">Back to users</a></p>
+{{end}}
