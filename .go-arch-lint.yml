@@ -55,35 +55,35 @@ deps:
     canUse: [fiber]
 
   feature_can_i_deploy:
-    mayDependOn: [contracts, components, repository, model, validations]
+    mayDependOn: [contracts, components, repository, model]
     canUse: [fiber, guregu_null]
   feature_create_environment:
-    mayDependOn: [components, repository, model, validations]
-    canUse: [fiber, guregu_null]
+    mayDependOn: [components, repository, model]
+    canUse: [fiber]
   feature_create_participant:
     mayDependOn: [components, repository, model, validations]
-    canUse: [fiber, guregu_null]
+    canUse: [fiber]
   feature_health:
     mayDependOn: [components]
     canUse: [fiber]
   feature_list_environments:
-    mayDependOn: [components, repository, model]
+    mayDependOn: [components, repository]
     canUse: [fiber]
   feature_list_participants:
-    mayDependOn: [components, repository, model]
+    mayDependOn: [components, repository]
     canUse: [fiber]
   feature_publish_contract:
-    mayDependOn: [contracts, components, repository, model, validations]
-    canUse: [fiber, guregu_null]
+    mayDependOn: [contracts, components, repository, model]
+    canUse: [fiber]
   feature_record_deployment:
-    mayDependOn: [components, repository, model, validations]
-    canUse: [fiber, guregu_null]
+    mayDependOn: [components, repository, model]
+    canUse: [fiber]
   feature_rename_participant:
-    mayDependOn: [components, repository, model, validations]
-    canUse: [fiber, guregu_null]
+    mayDependOn: [components, repository, validations]
+    canUse: [fiber]
   feature_validate_contract:
-    mayDependOn: [contracts, components, repository, model, validations]
-    canUse: [fiber, guregu_null]
+    mayDependOn: [contracts, components, repository, model]
+    canUse: [fiber]
 
   components:
     mayDependOn: [model, pkg, migrations]
