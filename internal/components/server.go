@@ -66,8 +66,10 @@ func asksForPage(ctx fiber.Ctx) bool {
 
 func createHttpServer(settings Settings, pool *pgxpool.Pool) *fiber.App {
 	server := fiber.New(fiber.Config{
-		BodyLimit:    publishBodyLimit,
-		ErrorHandler: respondError,
+		BodyLimit:     publishBodyLimit,
+		ErrorHandler:  respondError,
+		CaseSensitive: true,
+		StrictRouting: true,
 	})
 	server.Server().SecureErrorLogMessage = true
 

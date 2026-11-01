@@ -33,3 +33,18 @@ func (this *IntegrationSuite) TestUnhappyPath_PostHealthIsNotRouted() {
 	this.Equal(http.StatusMethodNotAllowed, status)
 	this.JSONEq(`{"message":"Method Not Allowed"}`, body)
 }
+
+func (this *IntegrationSuite) TestUnhappyPath_HealthIsRoutedOnlyAtItsExactPath() {
+	cookie := this.signInAsAdmin()
+
+	for _, path := range []string{"/HEALTH", "/health/"} {
+		req := httptest.NewRequest("GET", path, nil)
+		req.AddCookie(&http.Cookie{Name: "bidirekt_session", Value: cookie})
+
+		resp, err := this.Components.Server.Test(req, fiber.TestConfig{Timeout: 10 * time.Second})
+		this.Require().NoError(err)
+		_ = resp.Body.Close()
+
+		this.Equal(http.StatusNotFound, resp.StatusCode, path)
+	}
+}

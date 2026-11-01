@@ -213,6 +213,22 @@ func (this *IntegrationSuite) TestSessionDoor_LeavesSignInAndSetPasswordSubPaths
 	}
 }
 
+func (this *IntegrationSuite) TestSessionDoor_AnotherCaseOfAPagePathIsNotRouted() {
+	this.createDoorSession(null.Int{})
+
+	for _, path := range []string{"/USERS", "/SIGN-IN"} {
+		status, _, _ := this.sendThroughDoor(doorRequest{method: "GET", path: path, cookie: doorSessionCookie})
+		this.Equal(http.StatusNotFound, status, path)
+	}
+}
+
+func (this *IntegrationSuite) TestSessionDoor_SignInAndSetPasswordWithATrailingSlashAreNotRouted() {
+	for _, path := range []string{"/sign-in/", "/set-password/"} {
+		status, _, _ := this.sendThroughDoor(doorRequest{method: "GET", path: path})
+		this.Equal(http.StatusNotFound, status, path)
+	}
+}
+
 func (this *IntegrationSuite) TestSessionDoor_LookalikePrefixStaysBehindTheDoor() {
 	status, header, _ := this.sendThroughDoor(doorRequest{method: "GET", path: "/sign-inside"})
 	this.Equal(http.StatusSeeOther, status)

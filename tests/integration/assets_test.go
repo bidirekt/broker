@@ -49,3 +49,14 @@ func (this *IntegrationSuite) TestHappyPath_StylesheetIsServedAsCSS() {
 	this.Equal(http.StatusOK, status)
 	this.Contains(contentType, "text/css")
 }
+
+func (this *IntegrationSuite) TestUnhappyPath_AssetsAreServedOnlyAtTheirExactPath() {
+	req := httptest.NewRequest("GET", "/ASSETS/app.css", nil)
+	req.AddCookie(&http.Cookie{Name: "bidirekt_session", Value: this.signInAsAdmin()})
+
+	resp, err := this.Components.Server.Test(req, fiber.TestConfig{Timeout: 10 * time.Second})
+	this.Require().NoError(err)
+	_ = resp.Body.Close()
+
+	this.Equal(http.StatusNotFound, resp.StatusCode)
+}

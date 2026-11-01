@@ -132,3 +132,56 @@ func (this *IntegrationSuite) TestApiAuthentication_LeavesHealthOpenOnApiVersion
 	this.Equal(http.StatusOK, status)
 	this.JSONEq(`{"status":"ok","brokerVersion":"dev","apiVersion":2}`, body)
 }
+
+func (this *IntegrationSuite) TestApiAuthentication_RefusesASessionCookieOnAnotherCaseOfTheApiPath() {
+	this.createActiveUser(apiAuthenticationEmail, model.PermissionWrite, apiAuthenticationPassword)
+	cookie := this.signInAsUser(apiAuthenticationEmail, apiAuthenticationPassword)
+	_, _, profile := this.getPage("/profile", cookie)
+	csrfToken := this.csrfTokenFrom(profile)
+
+	for _, path := range []string{"/API/participants", "/Api/Participants"} {
+		this.Run("GET "+path, func() {
+			status, _, _ := this.getPage(path, cookie)
+			this.Equal(http.StatusNotFound, status)
+		})
+
+		this.Run("POST "+path, func() {
+			req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{"participant":"pets"}`))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Origin", suitePublicURL)
+			req.Header.Set("X-CSRF-Token", csrfToken)
+
+			status, _, _ := this.sendPageRequest(req, cookie)
+			this.Equal(http.StatusNotFound, status)
+			this.Equal(0, this.countRows("participants"))
+		})
+	}
+}
+
+func (this *IntegrationSuite) TestApiAuthentication_SendsATokenOnAnotherCaseOfTheApiPathToSignIn() {
+	for _, path := range []string{"/API/participants", "/Api/Participants"} {
+		this.Run("GET "+path, func() {
+			status, header, _ := this.getWithToken(path, this.writerToken)
+			this.Equal(http.StatusSeeOther, status)
+			this.Equal("/sign-in", header.Get("Location"))
+		})
+
+		this.Run("POST "+path, func() {
+			status, header, _ := this.postWithToken(path, this.writerToken, `{"participant":"pets"}`)
+			this.Equal(http.StatusSeeOther, status)
+			this.Equal("/sign-in", header.Get("Location"))
+			this.Equal(0, this.countRows("participants"))
+		})
+	}
+}
+
+func (this *IntegrationSuite) TestApiAuthentication_SignInWithATrailingSlashIssuesNoToken() {
+	this.createActiveUser(apiAuthenticationEmail, model.PermissionWrite, apiAuthenticationPassword)
+	requestBody, err := json.Marshal(map[string]string{"email": apiAuthenticationEmail, "password": apiAuthenticationPassword})
+	this.Require().NoError(err)
+
+	status, header, body := this.postWithToken("/api/sign-in/", "", string(requestBody))
+	this.Equal(http.StatusUnauthorized, status)
+	this.Equal("Bearer", header.Get("WWW-Authenticate"))
+	this.JSONEq(apiAuthenticationUnauthenticated, body)
+}
