@@ -59,36 +59,36 @@ func (this *RecordDeploymentHandler) Handle(ctx fiber.Ctx) error {
 	}
 
 	return ctx.Status(fiber.StatusOK).JSON(RecordDeploymentResponseBody{
-		Message: DeploymentRecorded,
+		Message: DeploymentRecordedMessage,
 	})
 }
 
 func (this *RecordDeploymentHandler) respondInvalidInput(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(RecordDeploymentResponseBody{
-		Message: DeploymentInvalidInput,
+		Message: DeploymentInvalidInputMessage,
 	})
 }
 
 func (this *RecordDeploymentHandler) respondEnvironmentNotFound(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusNotFound).JSON(RecordDeploymentResponseBody{
-		Message: EnvironmentNotFound,
+		Message: EnvironmentNotFoundMessage,
 	})
 }
 
 func (this *RecordDeploymentHandler) respondParticipantNotFound(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusNotFound).JSON(RecordDeploymentResponseBody{
-		Message: ParticipantNotFound,
+		Message: ParticipantNotFoundMessage,
 	})
 }
 
 func (this *RecordDeploymentHandler) respondVersionNotFound(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusNotFound).JSON(RecordDeploymentResponseBody{
-		Message: VersionNotFound,
+		Message: VersionNotFoundMessage,
 	})
 }
 
 func (this *RecordDeploymentHandler) respondRolledBack(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusOK).JSON(RecordDeploymentResponseBody{
-		Message: DeploymentRolledBack,
+		Message: DeploymentRolledBackMessage,
 	})
 }

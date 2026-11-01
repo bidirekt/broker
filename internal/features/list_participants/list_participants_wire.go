@@ -1,6 +1,6 @@
 package list_participants
 
-const ParticipantsListed string = "participants listed successfully"
+const ParticipantsListedMessage string = "participants listed successfully"
 
 type ListParticipantsResponseBody struct {
 	Message      string   `json:"message"`

@@ -31,18 +31,18 @@ func (this *CreateEnvironmentHandler) Handle(ctx fiber.Ctx) error {
 	}
 
 	return ctx.Status(fiber.StatusOK).JSON(CreateEnvironmentResponseBody{
-		Message: EnvironmentCreated,
+		Message: EnvironmentCreatedMessage,
 	})
 }
 
 func (this *CreateEnvironmentHandler) respondInvalidInput(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(CreateEnvironmentResponseBody{
-		Message: EnvironmentInvalidInput,
+		Message: EnvironmentInvalidInputMessage,
 	})
 }
 
 func (this *CreateEnvironmentHandler) respondAlreadyExists(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusOK).JSON(CreateEnvironmentResponseBody{
-		Message: EnvironmentAlreadyExists,
+		Message: EnvironmentAlreadyExistsMessage,
 	})
 }

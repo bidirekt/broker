@@ -15,7 +15,7 @@ func NewListEnvironmentsHandler(repo *repository.EnvironmentRepository) *ListEnv
 
 func (this *ListEnvironmentsHandler) Handle(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusOK).JSON(ListEnvironmentsResponseBody{
-		Message:      EnvironmentsListed,
+		Message:      EnvironmentsListedMessage,
 		Environments: this.environmentRepository.ListNames(ctx.Context()),
 	})
 }

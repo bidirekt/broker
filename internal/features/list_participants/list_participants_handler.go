@@ -15,7 +15,7 @@ func NewListParticipantsHandler(repo *repository.ParticipantRepository) *ListPar
 
 func (this *ListParticipantsHandler) Handle(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusOK).JSON(ListParticipantsResponseBody{
-		Message:      ParticipantsListed,
+		Message:      ParticipantsListedMessage,
 		Participants: this.participantRepository.ListNames(ctx.Context()),
 	})
 }

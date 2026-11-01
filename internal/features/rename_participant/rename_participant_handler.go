@@ -44,36 +44,36 @@ func (this *RenameParticipantHandler) Handle(ctx fiber.Ctx) error {
 	}
 
 	return ctx.Status(fiber.StatusOK).JSON(RenameParticipantResponseBody{
-		Message: ParticipantRenamed,
+		Message: ParticipantRenamedMessage,
 	})
 }
 
 func (this *RenameParticipantHandler) respondInvalidInput(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(RenameParticipantResponseBody{
-		Message: ParticipantInvalidInput,
+		Message: ParticipantInvalidInputMessage,
 	})
 }
 
 func (this *RenameParticipantHandler) respondInvalidName(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(RenameParticipantResponseBody{
-		Message: ParticipantNameNotSnakeCase,
+		Message: ParticipantNameNotSnakeCaseMessage,
 	})
 }
 
 func (this *RenameParticipantHandler) respondAlreadyExists(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusConflict).JSON(RenameParticipantResponseBody{
-		Message: ParticipantAlreadyExists,
+		Message: ParticipantAlreadyExistsMessage,
 	})
 }
 
 func (this *RenameParticipantHandler) respondNotFound(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusNotFound).JSON(RenameParticipantResponseBody{
-		Message: ParticipantNotFound,
+		Message: ParticipantNotFoundMessage,
 	})
 }
 
 func (this *RenameParticipantHandler) respondHasPublishedContracts(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusConflict).JSON(RenameParticipantResponseBody{
-		Message: ParticipantHasPublishedContracts,
+		Message: ParticipantHasPublishedContractsMessage,
 	})
 }

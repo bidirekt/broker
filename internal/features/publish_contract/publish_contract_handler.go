@@ -82,7 +82,7 @@ func (this *PublishContractHandler) Handle(ctx fiber.Ctx) error {
 
 func (this *PublishContractHandler) respondParticipantNotFound(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusNotFound).JSON(PublishContractResponseBody{
-		Message: ContractParticipantNotFound,
+		Message: ContractParticipantNotFoundMessage,
 	})
 }
 
@@ -105,25 +105,25 @@ func (this *PublishContractHandler) respondBadRequest(ctx fiber.Ctx, err error) 
 
 func (this *PublishContractHandler) respondValidationFailed(ctx fiber.Ctx, violations []violation.Violation) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(PublishContractValidationResponseBody{
-		Message:    ContractValidationFailed,
+		Message:    ContractValidationFailedMessage,
 		Violations: violations,
 	})
 }
 
 func (this *PublishContractHandler) respondInvalidInput(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(PublishContractResponseBody{
-		Message: ContractInvalidInput,
+		Message: ContractInvalidInputMessage,
 	})
 }
 
 func (this *PublishContractHandler) respondVersionConflict(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusConflict).JSON(PublishContractResponseBody{
-		Message: ContractVersionConflict,
+		Message: ContractVersionConflictMessage,
 	})
 }
 
 func (this *PublishContractHandler) respondSuccess(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusOK).JSON(PublishContractResponseBody{
-		Message: ContractPublishSuccessful,
+		Message: ContractPublishSuccessfulMessage,
 	})
 }

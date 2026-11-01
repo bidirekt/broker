@@ -1,6 +1,6 @@
 package list_environments
 
-const EnvironmentsListed string = "environments listed successfully"
+const EnvironmentsListedMessage string = "environments listed successfully"
 
 type ListEnvironmentsResponseBody struct {
 	Message      string   `json:"message"`

@@ -1,10 +1,10 @@
 package create_participant
 
 const (
-	ParticipantCreated          string = "participant created"
-	ParticipantInvalidInput     string = "participant invalid input"
-	ParticipantNameNotSnakeCase string = "participant name must be snake_case"
-	ParticipantAlreadyExists    string = "participant already exists"
+	ParticipantCreatedMessage          string = "participant created"
+	ParticipantInvalidInputMessage     string = "participant invalid input"
+	ParticipantNameNotSnakeCaseMessage string = "participant name must be snake_case"
+	ParticipantAlreadyExistsMessage    string = "participant already exists"
 )
 
 type CreateParticipantRequestBody struct {

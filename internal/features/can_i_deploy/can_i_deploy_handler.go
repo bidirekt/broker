@@ -78,7 +78,7 @@ func (this *CanIDeployHandler) Handle(ctx fiber.Ctx) error {
 	this.recordCheck(ctx.Context(), contract, environment, deployable, compatibilityReport)
 
 	return ctx.Status(fiber.StatusOK).JSON(CanIDeployResponseBody{
-		Message:     ContractChecked,
+		Message:     ContractCheckedMessage,
 		Participant: requestBody.Participant,
 		Version:     requestBody.Version,
 		Environment: requestBody.Environment,
@@ -167,24 +167,24 @@ func (this *CanIDeployHandler) recordCheck(
 
 func (this *CanIDeployHandler) respondParticipantNotFound(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusNotFound).JSON(CanIDeployErrorResponseBody{
-		Message: ParticipantNotFound,
+		Message: ParticipantNotFoundMessage,
 	})
 }
 
 func (this *CanIDeployHandler) respondInvalidInput(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(CanIDeployErrorResponseBody{
-		Message: CanIDeployInvalidInput,
+		Message: CanIDeployInvalidInputMessage,
 	})
 }
 
 func (this *CanIDeployHandler) respondContractNotFound(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusNotFound).JSON(CanIDeployErrorResponseBody{
-		Message: ContractNotFound,
+		Message: ContractNotFoundMessage,
 	})
 }
 
 func (this *CanIDeployHandler) respondEnvironmentNotFound(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusNotFound).JSON(CanIDeployErrorResponseBody{
-		Message: EnvironmentNotFound,
+		Message: EnvironmentNotFoundMessage,
 	})
 }

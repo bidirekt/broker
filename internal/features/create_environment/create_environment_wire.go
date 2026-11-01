@@ -1,9 +1,9 @@
 package create_environment
 
 const (
-	EnvironmentCreated       string = "environment created"
-	EnvironmentInvalidInput  string = "environment invalid input"
-	EnvironmentAlreadyExists string = "environment already exists"
+	EnvironmentCreatedMessage       string = "environment created"
+	EnvironmentInvalidInputMessage  string = "environment invalid input"
+	EnvironmentAlreadyExistsMessage string = "environment already exists"
 )
 
 type CreateEnvironmentRequestBody struct {

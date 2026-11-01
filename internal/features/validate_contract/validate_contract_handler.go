@@ -52,12 +52,12 @@ func (this *ValidateContractHandler) Handle(ctx fiber.Ctx) error {
 
 	participant, exists := this.participantRepository.FindByName(ctx.Context(), participantName)
 	if !exists {
-		return this.respondNotFound(ctx, ParticipantNotFound)
+		return this.respondNotFound(ctx, ParticipantNotFoundMessage)
 	}
 
 	environment, exists := this.environmentRepository.FindByName(ctx.Context(), environmentName)
 	if !exists {
-		return this.respondNotFound(ctx, EnvironmentNotFound)
+		return this.respondNotFound(ctx, EnvironmentNotFoundMessage)
 	}
 
 	fragments, shapeViolations, err := contractfiles.ToFragments(requestBody.Contracts)
@@ -89,7 +89,7 @@ func (this *ValidateContractHandler) Handle(ctx fiber.Ctx) error {
 	compatibilityReport := this.compatibilityChecker.Check(ctx.Context(), localContract, environment, counterparts)
 
 	return ctx.Status(fiber.StatusOK).JSON(ValidateContractResponseBody{
-		Message:     ContractValidated,
+		Message:     ContractValidatedMessage,
 		Participant: participant.Name,
 		Environment: environment.Name,
 		Deployable:  compatibilityReport.Deployable(),
@@ -155,7 +155,7 @@ func (this localFilesHaveNoVerdict) GetVerdict(context.Context, int64, int64) (*
 
 func (this *ValidateContractHandler) respondInvalidInput(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(ValidateContractErrorResponseBody{
-		Message: ContractInvalidInput,
+		Message: ContractInvalidInputMessage,
 	})
 }
 
@@ -167,7 +167,7 @@ func (this *ValidateContractHandler) respondBadRequest(ctx fiber.Ctx, err error)
 
 func (this *ValidateContractHandler) respondValidationFailed(ctx fiber.Ctx, violations []violation.Violation) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(ValidateContractValidationResponseBody{
-		Message:    ContractValidationFailed,
+		Message:    ContractValidationFailedMessage,
 		Violations: violations,
 	})
 }

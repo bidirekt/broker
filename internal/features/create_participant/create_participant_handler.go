@@ -39,24 +39,24 @@ func (this *CreateParticipantHandler) Handle(ctx fiber.Ctx) error {
 	}
 
 	return ctx.Status(fiber.StatusOK).JSON(CreateParticipantResponseBody{
-		Message: ParticipantCreated,
+		Message: ParticipantCreatedMessage,
 	})
 }
 
 func (this *CreateParticipantHandler) respondInvalidInput(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(CreateParticipantResponseBody{
-		Message: ParticipantInvalidInput,
+		Message: ParticipantInvalidInputMessage,
 	})
 }
 
 func (this *CreateParticipantHandler) respondInvalidName(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(CreateParticipantResponseBody{
-		Message: ParticipantNameNotSnakeCase,
+		Message: ParticipantNameNotSnakeCaseMessage,
 	})
 }
 
 func (this *CreateParticipantHandler) respondAlreadyExists(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusOK).JSON(CreateParticipantResponseBody{
-		Message: ParticipantAlreadyExists,
+		Message: ParticipantAlreadyExistsMessage,
 	})
 }
