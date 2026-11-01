@@ -23,15 +23,13 @@ func (this *PublishContractApiHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondInvalidInput(ctx)
 	}
 
-	serviceName := strings.TrimSpace(requestBody.ServiceName)
-	version := strings.TrimSpace(requestBody.Version)
-	if serviceName == "" || version == "" || len(requestBody.Contracts) == 0 || contractfiles.HasBlankSource(requestBody.Contracts) {
+	if !isUnpaddedValue(requestBody.ServiceName) || !isUnpaddedValue(requestBody.Version) || len(requestBody.Contracts) == 0 || contractfiles.HasBlankSource(requestBody.Contracts) {
 		return this.respondInvalidInput(ctx)
 	}
 
 	output, err := this.useCase.Execute(ctx.Context(), PublishContractInput{
-		ServiceName: serviceName,
-		Version:     version,
+		ServiceName: requestBody.ServiceName,
+		Version:     requestBody.Version,
 		Contracts:   requestBody.Contracts,
 	})
 	if err != nil {
@@ -87,4 +85,8 @@ func (this *PublishContractApiHandler) respondSuccess(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusOK).JSON(PublishContractResponseBody{
 		Message: ContractPublishSuccessfulMessage,
 	})
+}
+
+func isUnpaddedValue(value string) bool {
+	return value != "" && strings.TrimSpace(value) == value
 }

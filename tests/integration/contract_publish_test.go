@@ -279,6 +279,26 @@ func (this *IntegrationSuite) TestPublishContract_BlankParticipant() {
 	}
 }
 
+func (this *IntegrationSuite) TestPublishContract_PaddedParticipantOrVersion() {
+	status, _ := this.post("/api/participants", petsParticipantBody)
+	this.Require().Equal(http.StatusOK, status)
+
+	cases := map[string]string{
+		"trailing space in participant": this.publishBody("pets_service ", "1", contractFragment{"api.yaml", contractBody}),
+		"leading space in participant":  this.publishBody(" pets_service", "1", contractFragment{"api.yaml", contractBody}),
+		"leading space in version":      this.publishBody("pets_service", " 1.0.0", contractFragment{"api.yaml", contractBody}),
+		"trailing tab in version":       this.publishBody("pets_service", "1.0.0\t", contractFragment{"api.yaml", contractBody}),
+	}
+
+	for name, body := range cases {
+		status, response := this.post("/api/contracts", body)
+		this.Equal(http.StatusBadRequest, status, name)
+		this.JSONEq(`{"message":"contract invalid input"}`, response, name)
+	}
+
+	this.Equal(0, this.countRows("contracts"))
+}
+
 func (this *IntegrationSuite) TestPublishContract_BlankSource() {
 	status, _ := this.post("/api/participants", petsParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
