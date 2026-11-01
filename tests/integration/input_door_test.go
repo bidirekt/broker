@@ -1,10 +1,14 @@
 package integration_test
 
 import (
+	"bytes"
 	"context"
+	"mime/multipart"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -52,6 +56,29 @@ func (this *IntegrationSuite) TestInputDoor_RefusesTextThatIsNotUTF8OrCarriesNUL
 		{"set-password token with an invalid UTF-8 byte and NUL", func() (int, http.Header, string) {
 			return this.getPage("/set-password?token=%FF%00", "")
 		}, "one_time_links"},
+		{"sign-in as a multipart form", func() (int, http.Header, string) {
+			var body bytes.Buffer
+			form := multipart.NewWriter(&body)
+			this.Require().NoError(form.WriteField("identifier", suiteWriterEmail))
+			this.Require().NoError(form.WriteField("password", inputDoorPassword))
+			this.Require().NoError(form.Close())
+			req := httptest.NewRequest("POST", "/sign-in", &body)
+			req.Header.Set("Content-Type", form.FormDataContentType())
+			req.Header.Set("Origin", suitePublicURL)
+			return this.sendPageRequest(req, "")
+		}, "sessions"},
+		{"sign-in identifier with NUL in a form content type of mixed case", func() (int, http.Header, string) {
+			req := httptest.NewRequest("POST", "/sign-in", strings.NewReader("identifier=a%00b&password="+inputDoorPassword))
+			req.Header.Set("Content-Type", "Application/X-WWW-Form-Urlencoded")
+			req.Header.Set("Origin", suitePublicURL)
+			return this.sendPageRequest(req, "")
+		}, "sessions"},
+		{"sign-in identifier with NUL in a form content type with a suffix", func() (int, http.Header, string) {
+			req := httptest.NewRequest("POST", "/sign-in", strings.NewReader("identifier=a%00b&password="+inputDoorPassword))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencodedx")
+			req.Header.Set("Origin", suitePublicURL)
+			return this.sendPageRequest(req, "")
+		}, "sessions"},
 	}
 
 	for _, page := range pages {
@@ -82,6 +109,8 @@ func (this *IntegrationSuite) TestInputDoor_RefusesTextThatIsNotUTF8OrCarriesNUL
 	}{
 		{"sign-in email with NUL", "/api/sign-in", "",
 			`{"email":"a\u0000@x.io","password":"` + inputDoorPassword + `"}`, "sessions"},
+		{"sign-in email with a raw NUL byte", "/api/sign-in", "",
+			"{\"email\":\"a\x00@x.io\",\"password\":\"" + inputDoorPassword + "\"}", "sessions"},
 		{"environment with an invalid UTF-8 byte", "/api/environments", this.writerToken,
 			"{\"environment\":\"a\xff\"}", "environments"},
 		{"environment with NUL", "/api/environments", this.writerToken,
@@ -113,6 +142,17 @@ func (this *IntegrationSuite) TestInputDoor_RefusesTextThatIsNotUTF8OrCarriesNUL
 			this.Equal(rowsBefore, this.countRows(api.table))
 		})
 	}
+}
+
+func (this *IntegrationSuite) TestInputDoor_RefusesAJSONNULEscapeSentAsAForm() {
+	req := httptest.NewRequest("POST", "/api/environments", strings.NewReader(`{"environment":"a\u0000"}`))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	status, _, body := this.sendApiRequest(req, this.writerToken)
+
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(`{"message":"`+inputDoorInvalidInput+`"}`, body)
+	this.Equal(0, this.countRows("environments"))
 }
 
 func (this *IntegrationSuite) TestInputDoor_AcceptsAnEscapedBackslashBeforeU0000() {

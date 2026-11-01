@@ -6,6 +6,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/valyala/fasthttp"
 )
 
 const invalidInputMessage = "invalid input"
@@ -14,23 +15,33 @@ var jsonNULEscape = []byte(`u0000`)
 
 func inputDoor() fiber.Handler {
 	return func(ctx fiber.Ctx) error {
-		if !argsAreText(ctx.Request().URI().QueryArgs().All()) {
-			return fiber.NewError(fiber.StatusBadRequest, invalidInputMessage)
-		}
-
-		if bytes.HasPrefix(ctx.Request().Header.ContentType(), []byte(fiber.MIMEApplicationForm)) {
-			if !argsAreText(ctx.Request().PostArgs().All()) {
-				return fiber.NewError(fiber.StatusBadRequest, invalidInputMessage)
-			}
-			return ctx.Next()
-		}
-
-		if body := ctx.Body(); !utf8.Valid(body) || holdsJSONNULEscape(body) {
+		if !argsAreText(ctx.Request().URI().QueryArgs().All()) || !bodyIsText(ctx) {
 			return fiber.NewError(fiber.StatusBadRequest, invalidInputMessage)
 		}
 
 		return ctx.Next()
 	}
+}
+
+func bodyIsText(ctx fiber.Ctx) bool {
+	contentType := bytes.ToLower(ctx.Request().Header.ContentType())
+	if bytes.HasPrefix(contentType, []byte(fiber.MIMEMultipartForm)) {
+		return false
+	}
+
+	body := ctx.Body()
+	if !isText(body) || holdsJSONNULEscape(body) {
+		return false
+	}
+	if !bytes.HasPrefix(contentType, []byte(fiber.MIMEApplicationForm)) {
+		return true
+	}
+
+	// Parsed apart from the request, since fasthttp skips a form content type
+	// of mixed case and would cache the empty result for the handler.
+	var form fasthttp.Args
+	form.ParseBytes(body)
+	return argsAreText(form.All())
 }
 
 func argsAreText(args iter.Seq2[[]byte, []byte]) bool {

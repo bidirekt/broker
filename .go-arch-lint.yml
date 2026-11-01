@@ -46,6 +46,7 @@ vendors:
   testcontainers: { in: [github.com/testcontainers/testcontainers-go, github.com/testcontainers/testcontainers-go/**] }
   x_crypto:       { in: [golang.org/x/crypto/**] }
   golang_jwt:     { in: [github.com/golang-jwt/jwt/v5, github.com/golang-jwt/jwt/v5/**] }
+  fasthttp:       { in: [github.com/valyala/fasthttp, github.com/valyala/fasthttp/**] }
 
 deps:
   cmd:
@@ -139,7 +140,7 @@ deps:
 
   components:
     mayDependOn: [model, validations, repository, pkg, migrations]
-    canUse: [fiber, pgx, guregu_null, x_crypto, golang_jwt]
+    canUse: [fiber, fasthttp, pgx, guregu_null, x_crypto, golang_jwt]
   contracts:
     mayDependOn: [contracts, model, validations]
     canUse: [yaml, guregu_null]
