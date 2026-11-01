@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{template "title" .}} · Bidirekt</title>
+  <link rel="stylesheet" href="/assets/app.css">
+  <script src="/assets/htmx.min.js"></script>
+  <script src="/assets/app.js"></script>
+</head>
+<body hx-boost="true" hx-headers='{"X-CSRF-Token": "{{.CSRFToken}}"}'>
+  <header>
+    <span class="brand">Bidirekt</span>
+    <form method="post" action="/sign-out">
+      <button type="submit">Sign out</button>
+    </form>
+  </header>
+  <main>
+    {{template "content" .}}
+  </main>
+</body>
+</html>

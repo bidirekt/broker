@@ -1,0 +1,36 @@
+{{define "title"}}Users{{end}}
+
+{{define "content"}}
+<h1>Users</h1>
+<p><a href="/users/invite">Invite a user</a></p>
+{{if .Page.Users}}
+<table>
+  <thead>
+    <tr>
+      <th>Email</th>
+      <th>Permission</th>
+      <th>State</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .Page.Users}}
+    <tr>
+      <td>{{.Email}}</td>
+      <td>{{.Permission}}</td>
+      <td>{{.State}}</td>
+      <td class="actions">
+        {{if eq .State "invited"}}
+        <form method="post" action="/users/{{.ID}}/link"><button type="submit">New invite link</button></form>
+        {{else if eq .State "active"}}
+        <form method="post" action="/users/{{.ID}}/link"><button type="submit">New reset link</button></form>
+        {{end}}
+      </td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{else}}
+<p class="muted">No users yet — invite the first one</p>
+{{end}}
+{{end}}

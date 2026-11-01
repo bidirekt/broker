@@ -5,14 +5,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/bidirekt/broker/internal"
 	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/model"
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/suite"
@@ -20,6 +24,15 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
+
+const (
+	suitePublicURL         = "http://localhost:8080"
+	suiteAdminUsername     = "admin"
+	suiteAdminPassword     = "integration-admin-password"
+	suiteSessionCookieName = "bidirekt_session"
+)
+
+var csrfTokenInPage = regexp.MustCompile(`"X-CSRF-Token": "([^"]+)"`)
 
 func TestIntegrationSuite(t *testing.T) {
 	suite.Run(t, new(IntegrationSuite))
@@ -59,6 +72,9 @@ func (this *IntegrationSuite) SetupSuite() {
 	this.Require().NoError(err)
 
 	this.Require().NoError(os.Setenv("BIDIREKT_DATABASE_URL", connStr))
+	this.Require().NoError(os.Setenv("BIDIREKT_PUBLIC_URL", suitePublicURL))
+	this.Require().NoError(os.Setenv("BIDIREKT_ADMIN_USERNAME", suiteAdminUsername))
+	this.Require().NoError(os.Setenv("BIDIREKT_ADMIN_PASSWORD", suiteAdminPassword))
 
 	this.Components, err = internal.Run()
 	this.Require().NoError(err)
@@ -91,7 +107,10 @@ func (this *IntegrationSuite) SetupTest() {
 			contract_versions,
 			contracts,
 			participants,
-			environments
+			environments,
+			sessions,
+			one_time_links,
+			users
 			RESTART IDENTITY CASCADE`,
 	)
 
@@ -152,4 +171,87 @@ func (this *IntegrationSuite) countRows(table string) int {
 	).Scan(&count)
 	this.Require().NoError(err)
 	return count
+}
+
+func (this *IntegrationSuite) getPage(path, sessionCookie string) (status int, header http.Header, body string) {
+	req := httptest.NewRequest("GET", path, nil)
+
+	return this.sendPageRequest(req, sessionCookie)
+}
+
+func (this *IntegrationSuite) postForm(path, sessionCookie, csrfToken string, form url.Values) (status int, header http.Header, body string) {
+	req := httptest.NewRequest("POST", path, strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Origin", suitePublicURL)
+	if csrfToken != "" {
+		req.Header.Set("X-CSRF-Token", csrfToken)
+	}
+
+	return this.sendPageRequest(req, sessionCookie)
+}
+
+func (this *IntegrationSuite) sendPageRequest(req *http.Request, sessionCookie string) (status int, header http.Header, body string) {
+	if sessionCookie != "" {
+		req.AddCookie(&http.Cookie{Name: suiteSessionCookieName, Value: sessionCookie})
+	}
+
+	resp, err := this.Components.Server.Test(req, fiber.TestConfig{Timeout: 10 * time.Second})
+	this.Require().NoError(err)
+	defer func() { _ = resp.Body.Close() }()
+
+	bytes, err := io.ReadAll(resp.Body)
+	this.Require().NoError(err)
+
+	return resp.StatusCode, resp.Header, string(bytes)
+}
+
+func (this *IntegrationSuite) signInAsAdmin() (sessionCookie string) {
+	return this.signIn(suiteAdminUsername, suiteAdminPassword)
+}
+
+func (this *IntegrationSuite) signInAsUser(email, password string) (sessionCookie string) {
+	return this.signIn(email, password)
+}
+
+func (this *IntegrationSuite) signIn(identifier, password string) (sessionCookie string) {
+	status, header, _ := this.postForm("/sign-in", "", "", url.Values{"identifier": {identifier}, "password": {password}})
+	this.Require().Equal(http.StatusSeeOther, status)
+
+	cookie, err := http.ParseSetCookie(header.Get("Set-Cookie"))
+	this.Require().NoError(err)
+	this.Require().Equal(suiteSessionCookieName, cookie.Name)
+
+	return cookie.Value
+}
+
+func (this *IntegrationSuite) csrfTokenFrom(page string) string {
+	match := csrfTokenInPage.FindStringSubmatch(page)
+	this.Require().Len(match, 2, "page carries no CSRF token")
+
+	return match[1]
+}
+
+func (this *IntegrationSuite) createActiveUser(email string, permission model.Permission, password string) (userID int64) {
+	passwordHash, err := components.HashPassword(password)
+	this.Require().NoError(err)
+
+	err = this.Pool.QueryRow(context.Background(),
+		`INSERT INTO users (email, permission, password_hash) VALUES ($1, $2, $3) RETURNING id`,
+		email, permission, passwordHash,
+	).Scan(&userID)
+	this.Require().NoError(err)
+
+	return userID
+}
+
+func (this *IntegrationSuite) setUserState(userID int64, state model.UserState) {
+	query := map[model.UserState]string{
+		model.UserInvited:     `UPDATE users SET password_hash = NULL, active = true WHERE id = $1`,
+		model.UserActive:      `UPDATE users SET active = true WHERE id = $1 AND password_hash IS NOT NULL`,
+		model.UserDeactivated: `UPDATE users SET active = false WHERE id = $1`,
+	}[state]
+
+	tag, err := this.Pool.Exec(context.Background(), query, userID)
+	this.Require().NoError(err)
+	this.Require().EqualValues(1, tag.RowsAffected(), "user %d cannot be set %s", userID, state)
 }

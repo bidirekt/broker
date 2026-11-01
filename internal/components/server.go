@@ -3,9 +3,13 @@ package components
 import (
 	"errors"
 	"log"
+	"strings"
 
+	"github.com/bidirekt/broker/internal/repository"
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/helmet"
 	"github.com/gofiber/fiber/v3/middleware/recover"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // contracts of a few thousand resources do not fit fiber's 4 MiB default
@@ -13,28 +17,63 @@ const publishBodyLimit = 8 * 1024 * 1024
 
 const internalErrorMessage = "internal error"
 
+const somethingWentWrongMessage = "something went wrong"
+
+const pageContentSecurityPolicy = "default-src 'self'; frame-ancestors 'none'"
+
 type errorResponseBody struct {
 	Message string `json:"message"`
+}
+
+type errorPage struct {
+	Status  int
+	Message string
 }
 
 func respondError(ctx fiber.Ctx, err error) error {
 	log.Printf("request %s %s failed: %v", ctx.Method(), ctx.Path(), err)
 
+	status, message := fiber.StatusInternalServerError, internalErrorMessage
 	var fiberErr *fiber.Error
 	if errors.As(err, &fiberErr) {
-		return ctx.Status(fiberErr.Code).JSON(errorResponseBody{Message: fiberErr.Message})
+		status, message = fiberErr.Code, fiberErr.Message
 	}
 
-	return ctx.Status(fiber.StatusInternalServerError).JSON(errorResponseBody{Message: internalErrorMessage})
+	if isUnderPath(ctx.Path(), "/api") || isUnderPath(ctx.Path(), "/health") {
+		return ctx.Status(status).JSON(errorResponseBody{Message: message})
+	}
+
+	if fiberErr == nil {
+		message = somethingWentWrongMessage
+	}
+	return Render(ctx, status, templateFiles, "templates/error.html", errorPage{Status: status, Message: message})
 }
 
-func createHttpServer() *fiber.App {
+func isUnderPath(path, prefix string) bool {
+	return path == prefix || strings.HasPrefix(path, prefix+"/")
+}
+
+func isPagePath(ctx fiber.Ctx) bool {
+	return !isUnderPath(ctx.Path(), "/api") && !isUnderPath(ctx.Path(), "/health") && !isUnderPath(ctx.Path(), "/assets")
+}
+
+func createHttpServer(settings Settings, pool *pgxpool.Pool) *fiber.App {
 	server := fiber.New(fiber.Config{
 		BodyLimit:    publishBodyLimit,
 		ErrorHandler: respondError,
 	})
 
 	server.Use(recover.New(recover.Config{EnableStackTrace: true}))
+	server.Use(helmet.New(helmet.Config{
+		Next:                  func(ctx fiber.Ctx) bool { return !isPagePath(ctx) },
+		ContentSecurityPolicy: pageContentSecurityPolicy,
+	}))
+	serveAssets(server)
+	server.Use(sessionDoor(&sessionKeeper{
+		settings: settings,
+		sessions: repository.NewSessionRepository(pool),
+		users:    repository.NewUserRepository(pool),
+	}))
 
 	return server
 }
