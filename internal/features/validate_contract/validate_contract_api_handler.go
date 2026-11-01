@@ -23,15 +23,13 @@ func (this *ValidateContractApiHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondInvalidInput(ctx)
 	}
 
-	participantName := strings.TrimSpace(requestBody.Participant)
-	environmentName := strings.TrimSpace(requestBody.Environment)
-	if participantName == "" || environmentName == "" || len(requestBody.Contracts) == 0 || contractfiles.HasBlankSource(requestBody.Contracts) {
+	if !isUnpaddedValue(requestBody.Participant) || !isUnpaddedValue(requestBody.Environment) || len(requestBody.Contracts) == 0 || contractfiles.HasBlankSource(requestBody.Contracts) {
 		return this.respondInvalidInput(ctx)
 	}
 
 	output, err := this.useCase.Execute(ctx.Context(), ValidateContractInput{
-		ParticipantName: participantName,
-		EnvironmentName: environmentName,
+		ParticipantName: requestBody.Participant,
+		EnvironmentName: requestBody.Environment,
 		Contracts:       requestBody.Contracts,
 	})
 	if err != nil {
@@ -81,4 +79,8 @@ func (this *ValidateContractApiHandler) respondNotFound(ctx fiber.Ctx, message s
 	return ctx.Status(fiber.StatusNotFound).JSON(ValidateContractErrorResponseBody{
 		Message: message,
 	})
+}
+
+func isUnpaddedValue(value string) bool {
+	return value != "" && strings.TrimSpace(value) == value
 }

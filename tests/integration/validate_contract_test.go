@@ -321,6 +321,24 @@ func (this *IntegrationSuite) TestValidateContract_InvalidInput() {
 	}
 }
 
+func (this *IntegrationSuite) TestValidateContract_PaddedParticipantOrEnvironment() {
+	this.setupForValidate("catalog")
+
+	file := validateFile{"api.yaml", validateCatalogStockYAML}
+	cases := map[string]string{
+		"trailing space in participant":   this.validateBody("catalog ", "production", file),
+		"leading space in participant":    this.validateBody(" catalog", "production", file),
+		"leading space in environment":    this.validateBody("catalog", " production", file),
+		"trailing newline in environment": this.validateBody("catalog", "production\n", file),
+	}
+
+	for name, body := range cases {
+		status, response := this.post("/api/contracts/validate", body)
+		this.Equal(http.StatusBadRequest, status, name)
+		this.JSONEq(`{"message":"contract invalid input"}`, response, name)
+	}
+}
+
 func (this *IntegrationSuite) TestValidateContract_ParticipantNotFoundComesBeforeDecodeError() {
 	status, body := this.post("/api/contracts/validate",
 		this.validateBody("ghost", "nowhere", validateFile{"notes.txt", validateCatalogStockYAML}))
@@ -387,7 +405,7 @@ func (this *IntegrationSuite) TestValidateContract_RuleViolation() {
 	this.setupForValidate("catalog")
 
 	status, body := this.post("/api/contracts/validate",
-		this.validateBody(" catalog ", " production ", validateFile{"api.yaml", validateUnresolvedSchemaYAML}))
+		this.validateBody("catalog", "production", validateFile{"api.yaml", validateUnresolvedSchemaYAML}))
 	this.Equal(http.StatusBadRequest, status)
 
 	var response struct {
