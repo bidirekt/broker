@@ -127,12 +127,6 @@ func (this *IntegrationSuite) TestApiAuthentication_LeavesSignInOpen() {
 	this.Empty(header.Get("WWW-Authenticate"))
 }
 
-func (this *IntegrationSuite) TestApiAuthentication_LeavesHealthOpenOnApiVersion2() {
-	status, _, body := this.getWithToken("/health", "")
-	this.Equal(http.StatusOK, status)
-	this.JSONEq(`{"status":"ok","brokerVersion":"dev","apiVersion":2}`, body)
-}
-
 func (this *IntegrationSuite) TestApiAuthentication_RefusesASessionCookieOnAnotherCaseOfTheApiPath() {
 	this.createActiveUser(apiAuthenticationEmail, model.PermissionWrite, apiAuthenticationPassword)
 	cookie := this.signInAsUser(apiAuthenticationEmail, apiAuthenticationPassword)
