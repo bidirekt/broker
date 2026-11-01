@@ -70,6 +70,7 @@ func (this *IntegrationSuite) reactivateUserSendForm(path, sessionCookie, csrfTo
 	req := httptest.NewRequest("POST", path, strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Origin", suitePublicURL)
+	req.Header.Set("X-Forwarded-For", this.clientIP)
 	if csrfToken != "" {
 		req.Header.Set("X-CSRF-Token", csrfToken)
 	}

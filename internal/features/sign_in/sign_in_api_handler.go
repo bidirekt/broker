@@ -1,6 +1,7 @@
 package sign_in
 
 import (
+	"encoding/json"
 	"strings"
 	"time"
 
@@ -50,6 +51,15 @@ func (this *SignInApiHandler) Handle(ctx fiber.Ctx) error {
 		Token:     token,
 		ExpiresAt: expiresAt.UTC().Format(time.RFC3339),
 	})
+}
+
+func (this *SignInApiHandler) Identifier(ctx fiber.Ctx) string {
+	requestBody := SignInRequestBody{}
+	if err := json.Unmarshal(ctx.Body(), &requestBody); err != nil {
+		return ""
+	}
+
+	return requestBody.Email
 }
 
 func (this *SignInApiHandler) respondInvalidInput(ctx fiber.Ctx) error {

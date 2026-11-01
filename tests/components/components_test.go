@@ -221,3 +221,45 @@ func TestNew_AcceptedSettingsReachTheDatabaseChecks(t *testing.T) {
 		})
 	}
 }
+
+func TestNew_RefusesTrustedProxiesWithAnEntryThatIsNotAnIPOrCIDR(t *testing.T) {
+	const proxiesRule = "BIDIREKT_TRUSTED_PROXIES must be a comma-separated list of IPs or CIDRs, without spaces or empty entries"
+
+	for _, trustedProxies := range []string{
+		"proxy.example.com",
+		"10.0.0.256",
+		"10.0.0.0/33",
+		"10.0.0.1/",
+		"10.0.0.1,",
+		",10.0.0.1",
+		"10.0.0.1,,10.0.0.2",
+		"10.0.0.1, 10.0.0.2",
+		" 10.0.0.1",
+		"10.0.0.1 ",
+		"fe80::1%eth0",
+	} {
+		t.Run(trustedProxies, func(t *testing.T) {
+			setValidAuthSettings(t)
+			t.Setenv("BIDIREKT_TRUSTED_PROXIES", trustedProxies)
+			t.Setenv("BIDIREKT_DATABASE_URL", "")
+
+			_, err := components.New()
+
+			assert.EqualError(t, err, proxiesRule)
+		})
+	}
+}
+
+func TestNew_AcceptedTrustedProxiesReachTheDatabaseChecks(t *testing.T) {
+	for _, trustedProxies := range []string{"", "10.0.0.1", "10.0.0.0/8,192.168.1.1", "::1", "fd00::/8,0.0.0.0"} {
+		t.Run(trustedProxies, func(t *testing.T) {
+			setValidAuthSettings(t)
+			t.Setenv("BIDIREKT_TRUSTED_PROXIES", trustedProxies)
+			t.Setenv("BIDIREKT_DATABASE_URL", "")
+
+			_, err := components.New()
+
+			assert.EqualError(t, err, "BIDIREKT_DATABASE_URL is required")
+		})
+	}
+}

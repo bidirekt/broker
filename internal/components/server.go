@@ -65,12 +65,19 @@ func asksForPage(ctx fiber.Ctx) bool {
 }
 
 func createHttpServer(settings Settings, pool *pgxpool.Pool) *fiber.App {
-	server := fiber.New(fiber.Config{
+	config := fiber.Config{
 		BodyLimit:     publishBodyLimit,
 		ErrorHandler:  respondError,
 		CaseSensitive: true,
 		StrictRouting: true,
-	})
+	}
+	if len(settings.TrustedProxies) > 0 {
+		config.TrustProxy = true
+		config.TrustProxyConfig = fiber.TrustProxyConfig{Proxies: settings.TrustedProxies}
+		config.ProxyHeader = fiber.HeaderXForwardedFor
+		config.EnableIPValidation = true
+	}
+	server := fiber.New(config)
 	server.Server().SecureErrorLogMessage = true
 
 	server.Use(recover.New(recover.Config{EnableStackTrace: true}))

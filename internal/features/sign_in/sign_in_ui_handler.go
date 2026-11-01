@@ -27,7 +27,7 @@ func (this *SignInUiHandler) SignIn(ctx fiber.Ctx) error {
 		return err
 	}
 
-	identifier := ctx.FormValue(identifierFormField)
+	identifier := this.Identifier(ctx)
 	output := this.useCase.Execute(ctx.Context(), SignInInput{
 		Identifier: identifier,
 		Password:   ctx.FormValue(passwordFormField),
@@ -47,6 +47,10 @@ func (this *SignInUiHandler) SignIn(ctx fiber.Ctx) error {
 	}
 
 	return components.Redirect(ctx, homePath)
+}
+
+func (this *SignInUiHandler) Identifier(ctx fiber.Ctx) string {
+	return ctx.FormValue(identifierFormField)
 }
 
 func (this *SignInUiHandler) respondInvalidCredentials(ctx fiber.Ctx, identifier string) error {

@@ -165,6 +165,7 @@ func (this *IntegrationSuite) TestSignIn_UserDeactivatedWhileSigningInAnswers401
 	req := httptest.NewRequest("POST", "/sign-in", strings.NewReader(this.signInForm(signInUserEmail, signInUserPassword).Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Origin", signInPublicURL)
+	req.Header.Set("X-Forwarded-For", this.clientIP)
 
 	type signInResult struct {
 		response *http.Response

@@ -2,6 +2,7 @@ package components
 
 import (
 	"errors"
+	"net"
 	"net/url"
 	"os"
 	"strconv"
@@ -46,9 +47,10 @@ func databaseConnectAttempts() (int, error) {
 }
 
 type Settings struct {
-	PublicURL     string
-	AdminUsername string
-	AdminPassword string
+	PublicURL      string
+	AdminUsername  string
+	AdminPassword  string
+	TrustedProxies []string
 }
 
 func readSettings() (Settings, error) {
@@ -67,7 +69,17 @@ func readSettings() (Settings, error) {
 		return Settings{}, err
 	}
 
-	return Settings{PublicURL: publicURL, AdminUsername: adminUsername, AdminPassword: adminPassword}, nil
+	trustedProxies, err := trustedProxies()
+	if err != nil {
+		return Settings{}, err
+	}
+
+	return Settings{
+		PublicURL:      publicURL,
+		AdminUsername:  adminUsername,
+		AdminPassword:  adminPassword,
+		TrustedProxies: trustedProxies,
+	}, nil
 }
 
 var defaultPorts = map[string]string{"https": "443", "http": "80"}
@@ -133,4 +145,30 @@ func adminPassword() (string, error) {
 	}
 
 	return value, nil
+}
+
+func trustedProxies() ([]string, error) {
+	value := os.Getenv("BIDIREKT_TRUSTED_PROXIES")
+	if value == "" {
+		return nil, nil
+	}
+
+	entries := strings.Split(value, ",")
+	for _, entry := range entries {
+		if !isIPOrCIDR(entry) {
+			return nil, errors.New("BIDIREKT_TRUSTED_PROXIES must be a comma-separated list of IPs or CIDRs, without spaces or empty entries")
+		}
+	}
+
+	return entries, nil
+}
+
+// parsed the way fiber parses TrustProxyConfig.Proxies, which only logs the entries it cannot parse
+func isIPOrCIDR(entry string) bool {
+	if strings.Contains(entry, "/") {
+		_, _, err := net.ParseCIDR(entry)
+		return err == nil
+	}
+
+	return net.ParseIP(entry) != nil
 }

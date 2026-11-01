@@ -47,6 +47,8 @@ type IntegrationSuite struct {
 	Components  *components.Components
 	Pool        *pgxpool.Pool
 	writerToken string
+	testCount   int
+	clientIP    string
 }
 
 func (this *IntegrationSuite) SetupSuite() {
@@ -78,6 +80,7 @@ func (this *IntegrationSuite) SetupSuite() {
 	this.Require().NoError(os.Setenv("BIDIREKT_PUBLIC_URL", suitePublicURL))
 	this.Require().NoError(os.Setenv("BIDIREKT_ADMIN_USERNAME", suiteAdminUsername))
 	this.Require().NoError(os.Setenv("BIDIREKT_ADMIN_PASSWORD", suiteAdminPassword))
+	this.Require().NoError(os.Setenv("BIDIREKT_TRUSTED_PROXIES", "0.0.0.0"))
 
 	this.Components, err = internal.Run()
 	this.Require().NoError(err)
@@ -118,6 +121,9 @@ func (this *IntegrationSuite) SetupTest() {
 	)
 
 	this.Require().NoError(err)
+
+	this.testCount++
+	this.clientIP = fmt.Sprintf("10.%d.%d.%d", this.testCount>>16&255, this.testCount>>8&255, this.testCount&255)
 
 	this.createActiveUser(suiteWriterEmail, model.PermissionWrite, suiteWriterPassword)
 	this.writerToken = this.signInToApi(suiteWriterEmail, suiteWriterPassword)
@@ -170,6 +176,7 @@ func (this *IntegrationSuite) sendApiRequest(req *http.Request, token string) (s
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
+	req.Header.Set("X-Forwarded-For", this.clientIP)
 
 	resp, err := this.Components.Server.Test(req, fiber.TestConfig{Timeout: 10 * time.Second})
 	this.Require().NoError(err)
@@ -232,6 +239,7 @@ func (this *IntegrationSuite) sendPageRequest(req *http.Request, sessionCookie s
 	if sessionCookie != "" {
 		req.AddCookie(&http.Cookie{Name: suiteSessionCookieName, Value: sessionCookie})
 	}
+	req.Header.Set("X-Forwarded-For", this.clientIP)
 
 	resp, err := this.Components.Server.Test(req, fiber.TestConfig{Timeout: 10 * time.Second})
 	this.Require().NoError(err)
