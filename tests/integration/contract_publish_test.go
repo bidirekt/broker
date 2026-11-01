@@ -75,6 +75,14 @@ const contractBodyBadServiceName = `{
   }
 }`
 
+const contractBodyNULEndpoint = `provides:
+  rest:
+    "/a\0b":
+      get:
+        responses:
+          200: ~
+`
+
 const contractBodyParamEndpoint = `{
   "provides": {
     "rest": {
@@ -365,6 +373,19 @@ func (this *IntegrationSuite) TestPublishContract_ParamEndpoint_RejectedNothingS
 	this.Equal(http.StatusBadRequest, status)
 	this.JSONEq(`{"message":"contract validation failed","violations":[`+
 		`{"code":"endpoint.syntax","path":"provides;rest;/users/{userId}","source":"api.yaml","details":{"key":"/users/{userId}","error":"dynamic path segments must use *"}}`+
+		`]}`, body)
+
+	this.Equal(0, this.countRows("contracts"))
+}
+
+func (this *IntegrationSuite) TestPublishContract_EndpointWithNUL_RejectedNothingStored() {
+	status, _ := this.post("/api/participants", petsParticipantBody)
+	this.Require().Equal(http.StatusOK, status)
+
+	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1", contractFragment{"api.yaml", contractBodyNULEndpoint}))
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"endpoint.syntax","path":"provides;rest;/a\u0000b","source":"api.yaml","details":{"key":"/a\u0000b","error":"malformed path"}}`+
 		`]}`, body)
 
 	this.Equal(0, this.countRows("contracts"))

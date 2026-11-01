@@ -85,6 +85,7 @@ func createHttpServer(settings Settings, pool *pgxpool.Pool) *fiber.App {
 		Next:                  func(ctx fiber.Ctx) bool { return !isPagePath(ctx) },
 		ContentSecurityPolicy: pageContentSecurityPolicy,
 	}))
+	server.Use(inputDoor())
 	serveAssets(server)
 	users := repository.NewUserRepository(pool)
 	server.Use(sessionDoor(&sessionKeeper{

@@ -16,7 +16,7 @@ func TestEndpoint_AcceptsWellFormedPaths(t *testing.T) {
 }
 
 func TestEndpoint_RejectsMalformedPaths(t *testing.T) {
-	for _, endpoint := range []string{"", "users", "/users//orders", "/users/;/orders"} {
+	for _, endpoint := range []string{"", "users", "/users//orders", "/users/;/orders", "/a\x00b", "/a\tb", "/a\x7fb"} {
 		t.Run(endpoint, func(t *testing.T) {
 			assert.EqualError(t, validations.Endpoint(endpoint), "malformed path")
 		})

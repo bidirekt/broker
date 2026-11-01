@@ -3,10 +3,11 @@ package validations
 import (
 	"errors"
 	"strings"
+	"unicode"
 )
 
 func Endpoint(value string) error {
-	if !strings.HasPrefix(value, "/") {
+	if !strings.HasPrefix(value, "/") || strings.ContainsFunc(value, unicode.IsControl) {
 		return errors.New("malformed path")
 	}
 
