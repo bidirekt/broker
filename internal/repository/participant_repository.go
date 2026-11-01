@@ -7,22 +7,10 @@ import (
 
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 const (
-	existsParticipantByNameQuery = `
-		SELECT EXISTS(
-			SELECT
-				1
-			FROM 
-				participants
-			WHERE 
-				name = $1
-		)
-	`
-
 	findParticipantByNameQuery = `
 		SELECT
 			id, name
@@ -83,14 +71,6 @@ func NewParticipantRepository(pool *pgxpool.Pool) *ParticipantRepository {
 	return &ParticipantRepository{pool: pool}
 }
 
-func (this *ParticipantRepository) ExistsByName(ctx context.Context, name string) bool {
-	var exists bool
-	if err := this.pool.QueryRow(ctx, existsParticipantByNameQuery, name).Scan(&exists); err != nil {
-		panic(fmt.Errorf("error finding participant by name: %w", err))
-	}
-	return exists
-}
-
 func (this *ParticipantRepository) FindByName(ctx context.Context, name string) (*model.Participant, bool) {
 	p := &model.Participant{}
 	err := this.pool.QueryRow(ctx, findParticipantByNameQuery, name).Scan(&p.ID, &p.Name)
@@ -103,10 +83,17 @@ func (this *ParticipantRepository) FindByName(ctx context.Context, name string) 
 	return p, true
 }
 
-func (this *ParticipantRepository) Create(ctx context.Context, p *model.Participant) {
-	if err := this.pool.QueryRow(ctx, insertParticipantQuery, p.Name).Scan(&p.ID); err != nil {
+func (this *ParticipantRepository) Create(ctx context.Context, p *model.Participant) (created bool) {
+	err := this.pool.QueryRow(ctx, insertParticipantQuery, p.Name).Scan(&p.ID)
+	if isUniqueViolation(err) {
+		return false
+	}
+
+	if err != nil {
 		panic(fmt.Errorf("error inserting participant: %w", err))
 	}
+
+	return true
 }
 
 func (this *ParticipantRepository) Rename(ctx context.Context, oldName, newName string) (found, conflict, published bool) {
@@ -115,8 +102,7 @@ func (this *ParticipantRepository) Rename(ctx context.Context, oldName, newName 
 		return false, false, false
 	}
 
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+	if isUniqueViolation(err) {
 		return false, true, false
 	}
 

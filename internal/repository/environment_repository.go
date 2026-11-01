@@ -11,17 +11,6 @@ import (
 )
 
 const (
-	existsEnvironmentByNameQuery = `
-		SELECT EXISTS(
-			SELECT
-				1
-			FROM
-				environments
-			WHERE
-				name = $1
-		)
-	`
-
 	findEnvironmentByNameQuery = `
 		SELECT
 			id, name
@@ -57,14 +46,6 @@ func NewEnvironmentRepository(pool *pgxpool.Pool) *EnvironmentRepository {
 	return &EnvironmentRepository{pool: pool}
 }
 
-func (this *EnvironmentRepository) ExistsByName(ctx context.Context, name string) bool {
-	var exists bool
-	if err := this.pool.QueryRow(ctx, existsEnvironmentByNameQuery, name).Scan(&exists); err != nil {
-		panic(fmt.Errorf("error finding environment by name: %w", err))
-	}
-	return exists
-}
-
 func (this *EnvironmentRepository) FindByName(ctx context.Context, name string) (*model.Environment, bool) {
 	e := &model.Environment{}
 	err := this.pool.QueryRow(ctx, findEnvironmentByNameQuery, name).Scan(&e.ID, &e.Name)
@@ -77,10 +58,17 @@ func (this *EnvironmentRepository) FindByName(ctx context.Context, name string) 
 	return e, true
 }
 
-func (this *EnvironmentRepository) Create(ctx context.Context, e *model.Environment) {
-	if err := this.pool.QueryRow(ctx, insertEnvironmentQuery, e.Name).Scan(&e.ID); err != nil {
+func (this *EnvironmentRepository) Create(ctx context.Context, e *model.Environment) (created bool) {
+	err := this.pool.QueryRow(ctx, insertEnvironmentQuery, e.Name).Scan(&e.ID)
+	if isUniqueViolation(err) {
+		return false
+	}
+
+	if err != nil {
 		panic(fmt.Errorf("error inserting environment: %w", err))
 	}
+
+	return true
 }
 
 func (this *EnvironmentRepository) ListNames(ctx context.Context) []string {

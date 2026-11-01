@@ -25,11 +25,10 @@ func (this *CreateEnvironmentHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondInvalidInput(ctx)
 	}
 
-	if this.environmentRepository.ExistsByName(ctx.Context(), requestBody.Environment) {
+	created := this.environmentRepository.Create(ctx.Context(), model.NewEnvironment(requestBody.Environment))
+	if !created {
 		return this.respondAlreadyExists(ctx)
 	}
-
-	this.environmentRepository.Create(ctx.Context(), model.NewEnvironment(requestBody.Environment))
 
 	return ctx.Status(fiber.StatusOK).JSON(CreateEnvironmentResponseBody{
 		Message: EnvironmentCreated,
