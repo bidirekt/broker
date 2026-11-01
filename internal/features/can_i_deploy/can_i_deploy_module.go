@@ -13,7 +13,7 @@ func Register(kernel *components.Components) {
 	compatibilityChecker := compatibility_checker.NewCompatibilityChecker(compatibilityRepository)
 	environmentRepository := repository.NewEnvironmentRepository(kernel.Pool)
 
-	handler := NewCanIDeployHandler(
+	useCase := NewCanIDeployUseCase(
 		contractRepository,
 		environmentRepository,
 		compatibilityRepository,
@@ -21,5 +21,6 @@ func Register(kernel *components.Components) {
 		participantRepository,
 	)
 
-	kernel.Server.Post("/api/can-i-deploy", handler.Handle)
+	apiHandler := NewCanIDeployApiHandler(useCase)
+	kernel.Server.Post("/api/can-i-deploy", apiHandler.Handle)
 }

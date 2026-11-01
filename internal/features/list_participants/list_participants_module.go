@@ -7,6 +7,7 @@ import (
 
 func Register(kernel *components.Components) {
 	participantRepository := repository.NewParticipantRepository(kernel.Pool)
-	handler := NewListParticipantsHandler(participantRepository)
-	kernel.Server.Get("/api/participants", handler.Handle)
+	useCase := NewListParticipantsUseCase(participantRepository)
+	apiHandler := NewListParticipantsApiHandler(useCase)
+	kernel.Server.Get("/api/participants", apiHandler.Handle)
 }

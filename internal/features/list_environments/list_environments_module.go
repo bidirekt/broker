@@ -7,6 +7,7 @@ import (
 
 func Register(kernel *components.Components) {
 	environmentRepository := repository.NewEnvironmentRepository(kernel.Pool)
-	handler := NewListEnvironmentsHandler(environmentRepository)
-	kernel.Server.Get("/api/environments", handler.Handle)
+	useCase := NewListEnvironmentsUseCase(environmentRepository)
+	apiHandler := NewListEnvironmentsApiHandler(useCase)
+	kernel.Server.Get("/api/environments", apiHandler.Handle)
 }

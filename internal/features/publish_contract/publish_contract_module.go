@@ -8,6 +8,7 @@ import (
 func Register(kernel *components.Components) {
 	contractRepository := repository.NewContractRepository(kernel.Pool)
 	participantRepository := repository.NewParticipantRepository(kernel.Pool)
-	handler := NewPublishContractHandler(contractRepository, participantRepository)
-	kernel.Server.Post("/api/contracts", handler.Handle)
+	useCase := NewPublishContractUseCase(contractRepository, participantRepository)
+	apiHandler := NewPublishContractApiHandler(useCase)
+	kernel.Server.Post("/api/contracts", apiHandler.Handle)
 }

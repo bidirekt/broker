@@ -6,7 +6,8 @@ import (
 )
 
 func Register(kernel *components.Components) {
-	repo := repository.NewEnvironmentRepository(kernel.Pool)
-	handler := NewCreateEnvironmentHandler(repo)
-	kernel.Server.Post("/api/environments", handler.Handle)
+	environmentRepository := repository.NewEnvironmentRepository(kernel.Pool)
+	useCase := NewCreateEnvironmentUseCase(environmentRepository)
+	apiHandler := NewCreateEnvironmentApiHandler(useCase)
+	kernel.Server.Post("/api/environments", apiHandler.Handle)
 }
