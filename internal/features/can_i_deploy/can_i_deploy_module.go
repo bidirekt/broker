@@ -6,12 +6,12 @@ import (
 	"github.com/bidirekt/broker/internal/repository"
 )
 
-func Register(components *components.Components) {
-	contractRepository := repository.NewContractRepository(components.Pool)
-	participantRepository := repository.NewParticipantRepository(components.Pool)
-	compatibilityRepository := repository.NewCompatibilityRepository(components.Pool)
+func Register(kernel *components.Components) {
+	contractRepository := repository.NewContractRepository(kernel.Pool)
+	participantRepository := repository.NewParticipantRepository(kernel.Pool)
+	compatibilityRepository := repository.NewCompatibilityRepository(kernel.Pool)
 	compatibilityChecker := compatibility_checker.NewCompatibilityChecker(compatibilityRepository)
-	environmentRepository := repository.NewEnvironmentRepository(components.Pool)
+	environmentRepository := repository.NewEnvironmentRepository(kernel.Pool)
 
 	handler := NewCanIDeployHandler(
 		contractRepository,
@@ -21,5 +21,5 @@ func Register(components *components.Components) {
 		participantRepository,
 	)
 
-	components.Server.Post("/api/can-i-deploy", handler.Handle)
+	kernel.Server.Post("/api/can-i-deploy", handler.Handle)
 }

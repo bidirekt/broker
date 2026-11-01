@@ -5,13 +5,13 @@ import (
 	"github.com/bidirekt/broker/internal/repository"
 )
 
-func Register(components *components.Components) {
+func Register(kernel *components.Components) {
 	handler := NewValidateContractHandler(
-		repository.NewContractRepository(components.Pool),
-		repository.NewDeploymentRepository(components.Pool),
-		repository.NewEnvironmentRepository(components.Pool),
-		repository.NewParticipantRepository(components.Pool),
+		repository.NewContractRepository(kernel.Pool),
+		repository.NewDeploymentRepository(kernel.Pool),
+		repository.NewEnvironmentRepository(kernel.Pool),
+		repository.NewParticipantRepository(kernel.Pool),
 	)
 
-	components.Server.Post("/api/contracts/validate", handler.Handle)
+	kernel.Server.Post("/api/contracts/validate", handler.Handle)
 }
