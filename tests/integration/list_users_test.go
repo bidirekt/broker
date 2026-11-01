@@ -2,6 +2,7 @@ package integration_test
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"strings"
 
 	"github.com/bidirekt/broker/internal/model"
@@ -38,6 +39,18 @@ func (this *IntegrationSuite) TestListUsers_AdminSeesEveryUserByteWiseWithPermis
 	this.Contains(body, "<td>Zoe@x.com</td>\n      <td>read</td>\n      <td>deactivated</td>")
 	this.Contains(body, "<td>ana@x.com</td>\n      <td>write</td>\n      <td>invited</td>")
 	this.Contains(body, "<td>bob@x.com</td>\n      <td>read</td>\n      <td>active</td>")
+}
+
+func (this *IntegrationSuite) TestListUsers_HtmxPageAnswersWithoutHXPushUrlAndIsNotStored() {
+	req := httptest.NewRequest("GET", "/users", nil)
+	req.Header.Set("HX-Request", "true")
+
+	status, header, body := this.sendPageRequest(req, this.signInAsAdmin())
+
+	this.Require().Equal(http.StatusOK, status)
+	this.Contains(body, listUsersEmptyState)
+	this.Empty(header.Get("HX-Push-Url"))
+	this.Equal("no-store", header.Get("Cache-Control"))
 }
 
 func (this *IntegrationSuite) TestListUsers_ShowsTheEmptyStateWithoutUsers() {

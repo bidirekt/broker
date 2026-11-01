@@ -41,15 +41,27 @@ func (this *IntegrationSuite) createResetLink(userID int64) (token string) {
 	token, err := components.RandomToken()
 	this.Require().NoError(err)
 
-	repository.NewOneTimeLinkRepository(this.Pool).ReplaceOpen(context.Background(),
-		&model.OneTimeLink{TokenHash: components.HashToken(token), UserID: userID, Purpose: model.LinkPurposeReset, ExpiresAt: time.Now().Add(24 * time.Hour)},
+	_, found, deactivated := repository.NewOneTimeLinkRepository(this.Pool).ReplaceOpen(context.Background(),
+		&model.OneTimeLink{TokenHash: components.HashToken(token), UserID: userID, ExpiresAt: time.Now().Add(24 * time.Hour)},
 	)
+	this.Require().True(found)
+	this.Require().False(deactivated)
 
 	return token
 }
 
 func (this *IntegrationSuite) submitSetPassword(token, password string) (status int, header http.Header, body string) {
 	return this.postForm("/set-password", "", "", url.Values{"token": {token}, "password": {password}})
+}
+
+func (this *IntegrationSuite) submitSetPasswordWithHtmx(token, password string) (status int, header http.Header, body string) {
+	form := url.Values{"token": {token}, "password": {password}}
+	req := httptest.NewRequest("POST", "/set-password", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Origin", "http://localhost:8080")
+	req.Header.Set("HX-Request", "true")
+
+	return this.sendPageRequest(req, "")
 }
 
 func (this *IntegrationSuite) postSetPasswordFrom(origin, token string) int {
@@ -97,15 +109,30 @@ func (this *IntegrationSuite) TestSetPassword_InvitedUserSetsAPasswordAndSignsIn
 func (this *IntegrationSuite) TestSetPassword_HtmxSubmitRedirectsWithHXRedirect() {
 	token := this.createInvitedUserWithLink(setPasswordUserEmail)
 
-	form := url.Values{"token": {token}, "password": {setPasswordNewPassword}}
-	req := httptest.NewRequest("POST", "/set-password", strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Origin", "http://localhost:8080")
-	req.Header.Set("HX-Request", "true")
-
-	status, header, _ := this.sendPageRequest(req, "")
+	status, header, _ := this.submitSetPasswordWithHtmx(token, setPasswordNewPassword)
 	this.Equal(http.StatusOK, status)
 	this.Equal("/sign-in", header.Get("HX-Redirect"))
+	this.Empty(header.Get("HX-Push-Url"))
+}
+
+func (this *IntegrationSuite) TestSetPassword_HtmxShortPasswordAnswers400WithoutPushingTheFormURL() {
+	token := this.createInvitedUserWithLink(setPasswordUserEmail)
+
+	status, header, body := this.submitSetPasswordWithHtmx(token, "fourteen-chars")
+	this.Equal(http.StatusBadRequest, status)
+	this.Contains(body, setPasswordPasswordInvalid)
+	this.Equal("false", header.Get("HX-Push-Url"))
+}
+
+func (this *IntegrationSuite) TestSetPassword_HtmxUsedLinkAnswers410WithoutPushingTheFormURL() {
+	token := this.createInvitedUserWithLink(setPasswordUserEmail)
+	status, _, _ := this.submitSetPassword(token, setPasswordNewPassword)
+	this.Require().Equal(http.StatusSeeOther, status)
+
+	status, header, body := this.submitSetPasswordWithHtmx(token, setPasswordOtherPassword)
+	this.Equal(http.StatusGone, status)
+	this.Contains(body, setPasswordLinkInvalid)
+	this.Equal("false", header.Get("HX-Push-Url"))
 }
 
 func (this *IntegrationSuite) TestSetPassword_ResetLinkEndsTheExistingSessionAndTheNewPasswordWorks() {

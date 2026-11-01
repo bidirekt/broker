@@ -14,6 +14,33 @@ const (
 	userRepositoryNewPasswordHash = "$argon2id$v=19$m=19456,t=2,p=1$c2FsdDI$a2V5Mg"
 )
 
+func userRepositoryInBackground(write func()) (finished <-chan any) {
+	panicked := make(chan any, 1)
+	go func() {
+		defer func() { panicked <- recover() }()
+		write()
+	}()
+
+	return panicked
+}
+
+func (this *IntegrationSuite) userRepositoryInsertSession(idHash string, userID int64) {
+	_, err := this.Pool.Exec(context.Background(),
+		`INSERT INTO sessions (id_hash, user_id, csrf_token) VALUES ($1, $2, $3)`, []byte(idHash), userID, idHash+"-csrf",
+	)
+	this.Require().NoError(err)
+}
+
+func (this *IntegrationSuite) userRepositoryAwaitLockWaiters(count int) {
+	this.Require().Eventually(func() bool {
+		var waiting int
+		err := this.Pool.QueryRow(context.Background(),
+			`SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'`,
+		).Scan(&waiting)
+		return err == nil && waiting == count
+	}, 10*time.Second, 10*time.Millisecond)
+}
+
 func (this *IntegrationSuite) TestUserRepository_CreateInvitedWithTheSameEmailInAnotherCase_ReturnsNotCreatedAndLeavesOneUser() {
 	ctx := context.Background()
 	repo := repository.NewUserRepository(this.Pool)
@@ -79,7 +106,6 @@ func (this *IntegrationSuite) TestUserRepository_List_OrdersByEmailByteWise() {
 func (this *IntegrationSuite) TestUserRepository_UpdateEmailAndPermission_ReportsTheClashAndKeepsSessions() {
 	ctx := context.Background()
 	repo := repository.NewUserRepository(this.Pool)
-	sessions := repository.NewSessionRepository(this.Pool)
 
 	ana := &model.User{Email: "ana@x.com", Permission: model.PermissionRead}
 	this.Require().True(repo.CreateInvited(ctx, ana,
@@ -89,7 +115,7 @@ func (this *IntegrationSuite) TestUserRepository_UpdateEmailAndPermission_Report
 	this.Require().True(repo.CreateInvited(ctx, bob,
 		&model.OneTimeLink{TokenHash: []byte("bob-invite"), Purpose: model.LinkPurposeInvite, ExpiresAt: time.Now().Add(24 * time.Hour)},
 	))
-	sessions.Create(ctx, &model.Session{IDHash: []byte("ana-session"), UserID: null.IntFrom(ana.ID), CSRFToken: "ana-csrf"})
+	this.userRepositoryInsertSession("ana-session", ana.ID)
 
 	updated, conflict := repo.UpdateEmailAndPermission(ctx, ana.ID, "BOB@x.com", model.PermissionWrite)
 	this.False(updated)
@@ -120,8 +146,8 @@ func (this *IntegrationSuite) TestUserRepository_Deactivate_WipesSessionsAndOpen
 	this.Require().True(repo.CreateInvited(ctx, user,
 		&model.OneTimeLink{TokenHash: []byte("ana-invite"), Purpose: model.LinkPurposeInvite, ExpiresAt: time.Now().Add(24 * time.Hour)},
 	))
-	sessions.Create(ctx, &model.Session{IDHash: []byte("ana-session"), UserID: null.IntFrom(user.ID), CSRFToken: "ana-csrf"})
-	sessions.Create(ctx, &model.Session{IDHash: []byte("admin-session"), CSRFToken: "admin-csrf"})
+	this.userRepositoryInsertSession("ana-session", user.ID)
+	this.Require().True(sessions.Create(ctx, &model.Session{IDHash: []byte("admin-session"), CSRFToken: "admin-csrf"}, ""))
 
 	this.True(repo.Deactivate(ctx, user.ID))
 	this.False(repo.Deactivate(ctx, user.ID))
@@ -148,13 +174,12 @@ func (this *IntegrationSuite) TestUserRepository_Deactivate_WipesSessionsAndOpen
 func (this *IntegrationSuite) TestUserRepository_SetPasswordWithLinkTwice_SetsThePasswordOnceAndWipesSessions() {
 	ctx := context.Background()
 	repo := repository.NewUserRepository(this.Pool)
-	sessions := repository.NewSessionRepository(this.Pool)
 
 	user := &model.User{Email: "ana@x.com", Permission: model.PermissionWrite}
 	this.Require().True(repo.CreateInvited(ctx, user,
 		&model.OneTimeLink{TokenHash: []byte("ana-invite"), Purpose: model.LinkPurposeInvite, ExpiresAt: time.Now().Add(24 * time.Hour)},
 	))
-	sessions.Create(ctx, &model.Session{IDHash: []byte("ana-session"), UserID: null.IntFrom(user.ID), CSRFToken: "ana-csrf"})
+	this.userRepositoryInsertSession("ana-session", user.ID)
 
 	this.True(repo.SetPasswordWithLink(ctx, []byte("ana-invite"), userRepositoryPasswordHash))
 	this.False(repo.SetPasswordWithLink(ctx, []byte("ana-invite"), userRepositoryNewPasswordHash))
@@ -169,7 +194,6 @@ func (this *IntegrationSuite) TestUserRepository_SetPasswordWithLinkTwice_SetsTh
 func (this *IntegrationSuite) TestUserRepository_SetPasswordWithLinkOfADeactivatedUserOrExpired_SetsNothing() {
 	ctx := context.Background()
 	repo := repository.NewUserRepository(this.Pool)
-	links := repository.NewOneTimeLinkRepository(this.Pool)
 
 	expired := &model.User{Email: "ana@x.com", Permission: model.PermissionWrite}
 	this.Require().True(repo.CreateInvited(ctx, expired,
@@ -182,7 +206,11 @@ func (this *IntegrationSuite) TestUserRepository_SetPasswordWithLinkOfADeactivat
 		&model.OneTimeLink{TokenHash: []byte("bob-invite"), Purpose: model.LinkPurposeInvite, ExpiresAt: time.Now().Add(24 * time.Hour)},
 	))
 	this.Require().True(repo.Deactivate(ctx, deactivated.ID))
-	links.ReplaceOpen(ctx, &model.OneTimeLink{TokenHash: []byte("bob-reset"), UserID: deactivated.ID, Purpose: model.LinkPurposeReset, ExpiresAt: time.Now().Add(24 * time.Hour)})
+	_, err := this.Pool.Exec(ctx,
+		`INSERT INTO one_time_links (token_hash, user_id, purpose, expires_at) VALUES ($1, $2, 'reset', now() + interval '1 day')`,
+		[]byte("bob-reset"), deactivated.ID,
+	)
+	this.Require().NoError(err)
 	this.False(repo.SetPasswordWithLink(ctx, []byte("bob-reset"), userRepositoryPasswordHash))
 
 	for _, id := range []int64{expired.ID, deactivated.ID} {
@@ -190,6 +218,52 @@ func (this *IntegrationSuite) TestUserRepository_SetPasswordWithLinkOfADeactivat
 		this.Require().True(ok)
 		this.False(found.PasswordHash.Valid)
 	}
+}
+
+func (this *IntegrationSuite) TestUserRepository_SetPasswordWithLinkWhileReplaceOpenRuns_BothFinishWithoutADeadlock() {
+	ctx := context.Background()
+	repo := repository.NewUserRepository(this.Pool)
+	links := repository.NewOneTimeLinkRepository(this.Pool)
+
+	user := &model.User{Email: "ana@x.com", Permission: model.PermissionWrite}
+	this.Require().True(repo.CreateInvited(ctx, user,
+		&model.OneTimeLink{TokenHash: []byte("ana-invite"), Purpose: model.LinkPurposeInvite, ExpiresAt: time.Now().Add(24 * time.Hour)},
+	))
+
+	userUpdatesOnHold, err := this.Pool.Begin(ctx)
+	this.Require().NoError(err)
+	defer func() { _ = userUpdatesOnHold.Rollback(ctx) }()
+	// SHARE holds back UPDATE users but not SELECT ... FOR UPDATE, so SetPasswordWithLink stops right
+	// before it updates the user, keeping the locks it took until then
+	_, err = userUpdatesOnHold.Exec(ctx, `LOCK TABLE users IN SHARE MODE`)
+	this.Require().NoError(err)
+
+	var set bool
+	setFinished := userRepositoryInBackground(func() {
+		set = repo.SetPasswordWithLink(ctx, []byte("ana-invite"), userRepositoryPasswordHash)
+	})
+	this.userRepositoryAwaitLockWaiters(1)
+
+	reset := &model.OneTimeLink{TokenHash: []byte("ana-reset"), UserID: user.ID, ExpiresAt: time.Now().Add(24 * time.Hour)}
+	var userFound, deactivated bool
+	replaceFinished := userRepositoryInBackground(func() {
+		_, userFound, deactivated = links.ReplaceOpen(ctx, reset)
+	})
+	this.userRepositoryAwaitLockWaiters(2)
+
+	this.Require().NoError(userUpdatesOnHold.Rollback(ctx))
+	this.Nil(<-setFinished)
+	this.Nil(<-replaceFinished)
+
+	this.True(set)
+	this.True(userFound)
+	this.False(deactivated)
+	this.Equal(model.LinkPurposeReset, reset.Purpose)
+	found, ok := repo.FindByID(ctx, user.ID)
+	this.Require().True(ok)
+	this.Equal(userRepositoryPasswordHash, found.PasswordHash.String)
+	_, _, usable := links.FindUsable(ctx, []byte("ana-reset"))
+	this.True(usable)
 }
 
 func (this *IntegrationSuite) TestUserRepository_ChangePasswordKeepingSession_KeepsOnlyTheGivenSession() {
@@ -202,9 +276,9 @@ func (this *IntegrationSuite) TestUserRepository_ChangePasswordKeepingSession_Ke
 		&model.OneTimeLink{TokenHash: []byte("ana-invite"), Purpose: model.LinkPurposeInvite, ExpiresAt: time.Now().Add(24 * time.Hour)},
 	))
 	this.Require().True(repo.SetPasswordWithLink(ctx, []byte("ana-invite"), userRepositoryPasswordHash))
-	sessions.Create(ctx, &model.Session{IDHash: []byte("ana-laptop"), UserID: null.IntFrom(user.ID), CSRFToken: "laptop-csrf"})
-	sessions.Create(ctx, &model.Session{IDHash: []byte("ana-phone"), UserID: null.IntFrom(user.ID), CSRFToken: "phone-csrf"})
-	sessions.Create(ctx, &model.Session{IDHash: []byte("admin-session"), CSRFToken: "admin-csrf"})
+	this.Require().True(sessions.Create(ctx, &model.Session{IDHash: []byte("ana-laptop"), UserID: null.IntFrom(user.ID), CSRFToken: "laptop-csrf"}, userRepositoryPasswordHash))
+	this.Require().True(sessions.Create(ctx, &model.Session{IDHash: []byte("ana-phone"), UserID: null.IntFrom(user.ID), CSRFToken: "phone-csrf"}, userRepositoryPasswordHash))
+	this.Require().True(sessions.Create(ctx, &model.Session{IDHash: []byte("admin-session"), CSRFToken: "admin-csrf"}, ""))
 
 	repo.ChangePasswordKeepingSession(ctx, user.ID, userRepositoryNewPasswordHash, []byte("ana-laptop"))
 
@@ -217,4 +291,27 @@ func (this *IntegrationSuite) TestUserRepository_ChangePasswordKeepingSession_Ke
 	this.False(ok)
 	_, ok = sessions.FindByIDHash(ctx, []byte("admin-session"))
 	this.True(ok)
+}
+
+func (this *IntegrationSuite) TestUserRepository_ChangePasswordKeepingSession_EndsTheOpenLink() {
+	ctx := context.Background()
+	repo := repository.NewUserRepository(this.Pool)
+	links := repository.NewOneTimeLinkRepository(this.Pool)
+
+	user := &model.User{Email: "ana@x.com", Permission: model.PermissionWrite}
+	this.Require().True(repo.CreateInvited(ctx, user,
+		&model.OneTimeLink{TokenHash: []byte("ana-invite"), Purpose: model.LinkPurposeInvite, ExpiresAt: time.Now().Add(24 * time.Hour)},
+	))
+	this.Require().True(repo.SetPasswordWithLink(ctx, []byte("ana-invite"), userRepositoryPasswordHash))
+	_, found, deactivated := links.ReplaceOpen(ctx, &model.OneTimeLink{TokenHash: []byte("ana-reset"), UserID: user.ID, ExpiresAt: time.Now().Add(24 * time.Hour)})
+	this.Require().True(found)
+	this.Require().False(deactivated)
+	_, _, usable := links.FindUsable(ctx, []byte("ana-reset"))
+	this.Require().True(usable)
+
+	repo.ChangePasswordKeepingSession(ctx, user.ID, userRepositoryNewPasswordHash, []byte("ana-laptop"))
+
+	_, _, usable = links.FindUsable(ctx, []byte("ana-reset"))
+	this.False(usable)
+	this.Equal(1, this.countRows("one_time_links"))
 }

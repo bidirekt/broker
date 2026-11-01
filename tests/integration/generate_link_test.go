@@ -5,8 +5,10 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/bidirekt/broker/internal/model"
@@ -31,14 +33,15 @@ func (this *IntegrationSuite) generateLinkFor(userID string) (status int, body s
 	return status, body
 }
 
-func (this *IntegrationSuite) generateLinkPreviousOpenLink(userID int64, purpose model.LinkPurpose) []byte {
+func (this *IntegrationSuite) generateLinkPreviousOpenLink(userID int64) []byte {
 	tokenHash := sha256.Sum256([]byte(generateLinkPreviousToken))
-	repository.NewOneTimeLinkRepository(this.Pool).ReplaceOpen(context.Background(), &model.OneTimeLink{
+	_, found, deactivated := repository.NewOneTimeLinkRepository(this.Pool).ReplaceOpen(context.Background(), &model.OneTimeLink{
 		TokenHash: tokenHash[:],
 		UserID:    userID,
-		Purpose:   purpose,
 		ExpiresAt: time.Now().Add(time.Hour),
 	})
+	this.Require().True(found)
+	this.Require().False(deactivated)
 
 	return tokenHash[:]
 }
@@ -66,7 +69,7 @@ func (this *IntegrationSuite) generateLinkAssertReplaced(userID int64, previousH
 func (this *IntegrationSuite) TestGenerateLink_InvitedUserGetsANewInviteLinkReplacingThePrevious() {
 	userID := this.createActiveUser("ana@x.com", model.PermissionRead, generateLinkPassword)
 	this.setUserState(userID, model.UserInvited)
-	previousHash := this.generateLinkPreviousOpenLink(userID, model.LinkPurposeInvite)
+	previousHash := this.generateLinkPreviousOpenLink(userID)
 
 	status, body := this.generateLinkFor(fmt.Sprint(userID))
 
@@ -77,13 +80,32 @@ func (this *IntegrationSuite) TestGenerateLink_InvitedUserGetsANewInviteLinkRepl
 
 func (this *IntegrationSuite) TestGenerateLink_ActiveUserGetsAResetLinkReplacingThePrevious() {
 	userID := this.createActiveUser("bob@x.com", model.PermissionWrite, generateLinkPassword)
-	previousHash := this.generateLinkPreviousOpenLink(userID, model.LinkPurposeReset)
+	previousHash := this.generateLinkPreviousOpenLink(userID)
 
 	status, body := this.generateLinkFor(fmt.Sprint(userID))
 
 	this.Require().Equal(http.StatusOK, status)
 	this.Contains(body, "bob@x.com")
 	this.generateLinkAssertReplaced(userID, previousHash, body, model.LinkPurposeReset)
+}
+
+func (this *IntegrationSuite) TestGenerateLink_HtmxShowsTheLinkWithoutPushingTheFormURLOrBeingStored() {
+	userID := this.createActiveUser("bob@x.com", model.PermissionWrite, generateLinkPassword)
+	cookie := this.signInAsAdmin()
+	_, _, users := this.getPage("/users", cookie)
+
+	req := httptest.NewRequest("POST", fmt.Sprintf("/users/%d/link", userID), strings.NewReader(""))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Origin", "http://localhost:8080")
+	req.Header.Set("X-CSRF-Token", this.csrfTokenFrom(users))
+	req.Header.Set("HX-Request", "true")
+
+	status, header, body := this.sendPageRequest(req, cookie)
+
+	this.Require().Equal(http.StatusOK, status)
+	this.Regexp(generateLinkInPage, body)
+	this.Equal("false", header.Get("HX-Push-Url"))
+	this.Equal("no-store", header.Get("Cache-Control"))
 }
 
 func (this *IntegrationSuite) TestGenerateLink_RefusesADeactivatedUser() {

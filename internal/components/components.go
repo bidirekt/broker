@@ -2,11 +2,15 @@ package components
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/bidirekt/broker/internal/repository"
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+const startupCleanupTimeout = 5 * time.Second
 
 type Components struct {
 	Server     *fiber.App
@@ -32,7 +36,10 @@ func New() (*Components, error) {
 		return nil, err
 	}
 
-	deleteStaleSessionsAndLinks(pool)
+	if err := deleteStaleSessionsAndLinks(pool); err != nil {
+		pool.Close()
+		return nil, err
+	}
 
 	return &Components{
 		Server:     server,
@@ -42,11 +49,21 @@ func New() (*Components, error) {
 	}, nil
 }
 
-func deleteStaleSessionsAndLinks(pool *pgxpool.Pool) {
-	ctx := context.Background()
+func deleteStaleSessionsAndLinks(pool *pgxpool.Pool) (err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), startupCleanupTimeout)
+	defer cancel()
+
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = fmt.Errorf("failed to delete stale sessions and links: %v", recovered)
+		}
+	}()
+
 	sessions := repository.NewSessionRepository(pool)
 
 	sessions.DeleteAdminSessions(ctx)
 	sessions.DeleteExpired(ctx, sessionIdleLimit, sessionAbsoluteLimit)
 	repository.NewOneTimeLinkRepository(pool).DeleteUsedAndExpired(ctx)
+
+	return nil
 }

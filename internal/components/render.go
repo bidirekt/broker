@@ -41,7 +41,17 @@ func Render(ctx fiber.Ctx, status int, files fs.FS, page string, data any) error
 	}
 
 	ctx.Set(fiber.HeaderContentType, fiber.MIMETextHTMLCharsetUTF8)
+	ctx.Set(fiber.HeaderCacheControl, "no-store")
+	// htmx would push the form's action URL into history, and a reload GETs it
+	if ctx.Method() != fiber.MethodGet && isHtmxRequest(ctx) {
+		ctx.Set("HX-Push-Url", "false")
+	}
+
 	return ctx.Status(status).Send(html.Bytes())
+}
+
+func isHtmxRequest(ctx fiber.Ctx) bool {
+	return ctx.Get("HX-Request") == "true"
 }
 
 func layoutFor(ctx fiber.Ctx) (layout string, csrfToken string) {

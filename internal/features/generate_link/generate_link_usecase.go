@@ -31,53 +31,38 @@ type GenerateLinkOutput struct {
 }
 
 type GenerateLinkUseCase struct {
-	userRepository *repository.UserRepository
 	linkRepository *repository.OneTimeLinkRepository
 	publicURL      string
 }
 
-func NewGenerateLinkUseCase(userRepository *repository.UserRepository, linkRepository *repository.OneTimeLinkRepository, publicURL string) *GenerateLinkUseCase {
-	return &GenerateLinkUseCase{userRepository: userRepository, linkRepository: linkRepository, publicURL: publicURL}
+func NewGenerateLinkUseCase(linkRepository *repository.OneTimeLinkRepository, publicURL string) *GenerateLinkUseCase {
+	return &GenerateLinkUseCase{linkRepository: linkRepository, publicURL: publicURL}
 }
 
 func (this *GenerateLinkUseCase) Execute(ctx context.Context, input GenerateLinkInput) (GenerateLinkOutput, error) {
-	user, found := this.userRepository.FindByID(ctx, input.UserID)
-	if !found {
-		return GenerateLinkOutput{Status: UserNotFound}, nil
-	}
-
-	purpose, ok := linkPurposeFor(user.State())
-	if !ok {
-		return GenerateLinkOutput{Status: UserDeactivated}, nil
-	}
-
 	token, err := components.RandomToken()
 	if err != nil {
 		return GenerateLinkOutput{}, err
 	}
 
-	this.linkRepository.ReplaceOpen(ctx, &model.OneTimeLink{
+	link := &model.OneTimeLink{
 		TokenHash: components.HashToken(token),
-		UserID:    user.ID,
-		Purpose:   purpose,
+		UserID:    input.UserID,
 		ExpiresAt: time.Now().Add(linkLifetime),
-	})
+	}
+	email, found, deactivated := this.linkRepository.ReplaceOpen(ctx, link)
+	if !found {
+		return GenerateLinkOutput{Status: UserNotFound}, nil
+	}
+
+	if deactivated {
+		return GenerateLinkOutput{Status: UserDeactivated}, nil
+	}
 
 	return GenerateLinkOutput{
 		Status:  LinkGenerated,
-		Email:   user.Email,
-		Purpose: purpose,
+		Email:   email,
+		Purpose: link.Purpose,
 		Link:    this.publicURL + setPasswordPath + token,
 	}, nil
-}
-
-func linkPurposeFor(state model.UserState) (model.LinkPurpose, bool) {
-	switch state {
-	case model.UserInvited:
-		return model.LinkPurposeInvite, true
-	case model.UserActive:
-		return model.LinkPurposeReset, true
-	}
-
-	return "", false
 }

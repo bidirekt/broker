@@ -4,8 +4,10 @@ import (
 	"context"
 	"crypto/sha256"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -40,6 +42,17 @@ func (this *IntegrationSuite) TestInviteUser_FormAsksForEmailAndPermission() {
 	this.Contains(body, `<option value="write"`)
 }
 
+func (this *IntegrationSuite) TestInviteUser_HtmxFormAnswersWithoutHXPushUrl() {
+	req := httptest.NewRequest("GET", "/users/invite", nil)
+	req.Header.Set("HX-Request", "true")
+
+	status, header, body := this.sendPageRequest(req, this.signInAsAdmin())
+
+	this.Require().Equal(http.StatusOK, status)
+	this.Contains(body, `<form method="post" action="/users/invite">`)
+	this.Empty(header.Get("HX-Push-Url"))
+}
+
 func (this *IntegrationSuite) TestInviteUser_CreatesAnInvitedUserAndShowsTheLinkOnce() {
 	status, body := this.inviteUser(inviteUserEmail, "read")
 
@@ -65,6 +78,27 @@ func (this *IntegrationSuite) TestInviteUser_CreatesAnInvitedUserAndShowsTheLink
 	_, _, list := this.getPage("/users", this.signInAsAdmin())
 	this.Contains(list, "<td>ana@x.com</td>\n      <td>read</td>\n      <td>invited</td>")
 	this.NotContains(list, match[1])
+}
+
+func (this *IntegrationSuite) TestInviteUser_HtmxInviteShowsTheLinkWithoutPushingTheFormURLOrBeingStored() {
+	cookie := this.signInAsAdmin()
+	_, _, form := this.getPage("/users/invite", cookie)
+
+	req := httptest.NewRequest("POST", "/users/invite", strings.NewReader(url.Values{
+		"email":      {inviteUserEmail},
+		"permission": {"read"},
+	}.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Origin", "http://localhost:8080")
+	req.Header.Set("X-CSRF-Token", this.csrfTokenFrom(form))
+	req.Header.Set("HX-Request", "true")
+
+	status, header, body := this.sendPageRequest(req, cookie)
+
+	this.Require().Equal(http.StatusOK, status)
+	this.Regexp(inviteUserLinkInPage, body)
+	this.Equal("false", header.Get("HX-Push-Url"))
+	this.Equal("no-store", header.Get("Cache-Control"))
 }
 
 func (this *IntegrationSuite) TestInviteUser_RejectsAnEmailInUseInAnotherCase() {

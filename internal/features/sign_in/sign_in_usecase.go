@@ -27,7 +27,8 @@ type SignInInput struct {
 type SignInOutput struct {
 	Status SignInStatus
 	// null when the admin signed in
-	UserID null.Int
+	UserID               null.Int
+	VerifiedPasswordHash string
 }
 
 type SignInUseCase struct {
@@ -59,7 +60,7 @@ func (this *SignInUseCase) Execute(ctx context.Context, input SignInInput) SignI
 		return SignInOutput{Status: InvalidCredentials}
 	}
 
-	return SignInOutput{Status: SignedIn, UserID: null.IntFrom(user.ID)}
+	return SignInOutput{Status: SignedIn, UserID: null.IntFrom(user.ID), VerifiedPasswordHash: user.PasswordHash.String}
 }
 
 func (this *SignInUseCase) signInAdmin(input SignInInput) SignInOutput {

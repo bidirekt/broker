@@ -6,9 +6,8 @@ import (
 )
 
 func Register(kernel *components.Components) {
-	userRepository := repository.NewUserRepository(kernel.Pool)
 	linkRepository := repository.NewOneTimeLinkRepository(kernel.Pool)
-	useCase := NewGenerateLinkUseCase(userRepository, linkRepository, kernel.Settings.PublicURL)
+	useCase := NewGenerateLinkUseCase(linkRepository, kernel.Settings.PublicURL)
 	uiHandler := NewGenerateLinkUiHandler(useCase)
 	kernel.Server.Post("/users/:id/link", uiHandler.Handle)
 }

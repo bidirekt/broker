@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/bidirekt/broker/internal/components"
-	"github.com/bidirekt/broker/internal/model"
 	"github.com/bidirekt/broker/internal/repository"
 	"github.com/gofiber/fiber/v3"
 	"github.com/guregu/null"
@@ -56,9 +55,11 @@ func (this *IntegrationSuite) sendThroughDoor(request doorRequest) (status int, 
 
 func (this *IntegrationSuite) createDoorSession(userID null.Int) []byte {
 	idHash := sha256.Sum256([]byte(doorSessionCookie))
-	repository.NewSessionRepository(this.Pool).Create(context.Background(),
-		&model.Session{IDHash: idHash[:], UserID: userID, CSRFToken: doorCSRFToken},
+	_, err := this.Pool.Exec(context.Background(),
+		`INSERT INTO sessions (id_hash, user_id, csrf_token) VALUES ($1, $2, $3)`,
+		idHash[:], userID, doorCSRFToken,
 	)
+	this.Require().NoError(err)
 	return idHash[:]
 }
 
@@ -230,8 +231,12 @@ func (this *IntegrationSuite) TestSessionDoor_LookalikePrefixStaysBehindTheDoor(
 
 func (this *IntegrationSuite) TestStartSession_SetsCookieThatPassesTheDoor() {
 	this.Components.Server.Get("/sign-in/__start_session", func(ctx fiber.Ctx) error {
-		if err := components.StartSession(ctx, null.Int{}); err != nil {
+		started, err := components.StartSession(ctx, null.Int{}, "")
+		if err != nil {
 			return err
+		}
+		if !started {
+			return ctx.SendStatus(http.StatusUnauthorized)
 		}
 		return ctx.SendStatus(http.StatusNoContent)
 	})

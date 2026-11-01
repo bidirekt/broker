@@ -13,7 +13,7 @@ import (
 const (
 	lockLinkUserQuery = `
 		SELECT
-			id
+			email, active, password_hash IS NOT NULL
 		FROM
 			users
 		WHERE
@@ -64,7 +64,8 @@ func NewOneTimeLinkRepository(pool *pgxpool.Pool) *OneTimeLinkRepository {
 	return &OneTimeLinkRepository{pool: pool}
 }
 
-func (this *OneTimeLinkRepository) ReplaceOpen(ctx context.Context, link *model.OneTimeLink) {
+// ReplaceOpen sets link.Purpose: invite for a user without a password, reset otherwise.
+func (this *OneTimeLinkRepository) ReplaceOpen(ctx context.Context, link *model.OneTimeLink) (email string, found, deactivated bool) {
 	tx, err := this.pool.Begin(ctx)
 	if err != nil {
 		panic(fmt.Errorf("error starting transaction: %w", err))
@@ -73,9 +74,25 @@ func (this *OneTimeLinkRepository) ReplaceOpen(ctx context.Context, link *model.
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Locking the user serializes two concurrent replacements, which would otherwise both delete
-	// the same open link and then clash on the one-open-link-per-user index.
-	if _, err := tx.Exec(ctx, lockLinkUserQuery, link.UserID); err != nil {
+	// the same open link and then clash on the one-open-link-per-user index, and keeps the state
+	// read here, which decides the purpose, unchanged until the new link is committed.
+	var active, hasPassword bool
+	err = tx.QueryRow(ctx, lockLinkUserQuery, link.UserID).Scan(&email, &active, &hasPassword)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", false, false
+	}
+
+	if err != nil {
 		panic(fmt.Errorf("error locking link user: %w", err))
+	}
+
+	if !active {
+		return "", true, true
+	}
+
+	link.Purpose = model.LinkPurposeReset
+	if !hasPassword {
+		link.Purpose = model.LinkPurposeInvite
 	}
 
 	if _, err := tx.Exec(ctx, deleteOpenLinkQuery, link.UserID); err != nil {
@@ -89,6 +106,8 @@ func (this *OneTimeLinkRepository) ReplaceOpen(ctx context.Context, link *model.
 	if err := tx.Commit(ctx); err != nil {
 		panic(fmt.Errorf("error committing transaction: %w", err))
 	}
+
+	return email, true, false
 }
 
 func (this *OneTimeLinkRepository) FindUsable(ctx context.Context, tokenHash []byte) (*model.OneTimeLink, *model.User, bool) {

@@ -74,6 +74,18 @@ const (
 			id = $1 AND NOT active
 	`
 
+	lockUserByLinkQuery = `
+		SELECT
+			u.id
+		FROM
+			users u
+		JOIN
+			one_time_links l ON l.user_id = u.id
+		WHERE
+			l.token_hash = $1
+		FOR UPDATE OF u
+	`
+
 	useLinkQuery = `
 		UPDATE one_time_links
 		SET
@@ -256,7 +268,17 @@ func (this *UserRepository) SetPasswordWithLink(ctx context.Context, tokenHash [
 
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	// the user row is locked before the link, as every writer of users, sessions and links does, so they never deadlock
 	var userID int64
+	err = tx.QueryRow(ctx, lockUserByLinkQuery, tokenHash).Scan(&userID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false
+	}
+
+	if err != nil {
+		panic(fmt.Errorf("error locking link user: %w", err))
+	}
+
 	err = tx.QueryRow(ctx, useLinkQuery, tokenHash).Scan(&userID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false
@@ -300,6 +322,10 @@ func (this *UserRepository) ChangePasswordKeepingSession(
 
 	if _, err := tx.Exec(ctx, deleteUserOtherSessionsQuery, userID, keptSessionIDHash); err != nil {
 		panic(fmt.Errorf("error deleting user other sessions: %w", err))
+	}
+
+	if _, err := tx.Exec(ctx, deleteOpenLinkQuery, userID); err != nil {
+		panic(fmt.Errorf("error deleting user open link: %w", err))
 	}
 
 	if err := tx.Commit(ctx); err != nil {

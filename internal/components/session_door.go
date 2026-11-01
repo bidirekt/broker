@@ -130,7 +130,7 @@ func RequireSameOrigin(ctx fiber.Ctx) error {
 }
 
 func Redirect(ctx fiber.Ctx, path string) error {
-	if ctx.Get("HX-Request") == "true" {
+	if isHtmxRequest(ctx) {
 		ctx.Set("HX-Redirect", path)
 		return ctx.SendStatus(fiber.StatusOK)
 	}
@@ -138,26 +138,26 @@ func Redirect(ctx fiber.Ctx, path string) error {
 	return ctx.Redirect().Status(fiber.StatusSeeOther).To(path)
 }
 
-func StartSession(ctx fiber.Ctx, userID null.Int) error {
+func StartSession(ctx fiber.Ctx, userID null.Int, verifiedPasswordHash string) (started bool, err error) {
 	keeper := fiber.Locals[*sessionKeeper](ctx, sessionKeeperKey{})
 
 	cookieValue, err := RandomToken()
 	if err != nil {
-		return err
+		return false, err
 	}
 	csrfToken, err := RandomToken()
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	keeper.sessions.Create(ctx.Context(), &model.Session{
-		IDHash:    HashToken(cookieValue),
-		UserID:    userID,
-		CSRFToken: csrfToken,
-	})
+	session := &model.Session{IDHash: HashToken(cookieValue), UserID: userID, CSRFToken: csrfToken}
+	if !keeper.sessions.Create(ctx.Context(), session, verifiedPasswordHash) {
+		return false, nil
+	}
+
 	ctx.Cookie(keeper.cookie(cookieValue, int(sessionAbsoluteLimit.Seconds())))
 
-	return nil
+	return true, nil
 }
 
 func ExpireSessionCookie(ctx fiber.Ctx) {

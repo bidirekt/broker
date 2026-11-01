@@ -40,6 +40,7 @@ func (this *IntegrationSuite) TestHappyPath_AppScriptConfiguresHtmx() {
 	this.Equal(http.StatusOK, status)
 	this.Contains(contentType, "javascript")
 	this.Contains(body, "htmx.config.includeIndicatorStyles = false")
+	this.Contains(body, "htmx.config.historyCacheSize = 0")
 	this.Contains(body, "htmx.config.responseHandling")
 }
 

@@ -34,17 +34,26 @@ func (this *SignInUiHandler) SignIn(ctx fiber.Ctx) error {
 	})
 
 	if output.Status == InvalidCredentials {
-		return components.Render(ctx, fiber.StatusUnauthorized, pageFiles, signInTemplate, SignInPage{
-			Identifier: identifier,
-			Message:    InvalidCredentialsMessage,
-		})
+		return this.respondInvalidCredentials(ctx, identifier)
 	}
 
-	if err := components.StartSession(ctx, output.UserID); err != nil {
+	started, err := components.StartSession(ctx, output.UserID, output.VerifiedPasswordHash)
+	if err != nil {
 		return err
 	}
 
+	if !started {
+		return this.respondInvalidCredentials(ctx, identifier)
+	}
+
 	return components.Redirect(ctx, homePath)
+}
+
+func (this *SignInUiHandler) respondInvalidCredentials(ctx fiber.Ctx, identifier string) error {
+	return components.Render(ctx, fiber.StatusUnauthorized, pageFiles, signInTemplate, SignInPage{
+		Identifier: identifier,
+		Message:    InvalidCredentialsMessage,
+	})
 }
 
 func (this *SignInUiHandler) RedirectHome(ctx fiber.Ctx) error {

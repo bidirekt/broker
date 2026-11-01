@@ -2,12 +2,15 @@ package integration_test
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/bidirekt/broker/internal/model"
+	"github.com/gofiber/fiber/v3"
 )
 
 const (
@@ -33,6 +36,16 @@ func (this *IntegrationSuite) postSignInFrom(origin string) int {
 
 	status, _, _ := this.sendPageRequest(req, "")
 	return status
+}
+
+func (this *IntegrationSuite) signInAwaitLockWaiters(count int) {
+	this.Require().Eventually(func() bool {
+		var waiting int
+		err := this.Pool.QueryRow(context.Background(),
+			`SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'`,
+		).Scan(&waiting)
+		return err == nil && waiting == count
+	}, 10*time.Second, 10*time.Millisecond)
 }
 
 func (this *IntegrationSuite) TestSignIn_PageShowsOneFormWithCSP() {
@@ -137,6 +150,44 @@ func (this *IntegrationSuite) TestSignIn_DeactivatedUserAnswers401() {
 	status, _, body := this.postForm("/sign-in", "", "", this.signInForm(signInUserEmail, signInUserPassword))
 	this.Equal(http.StatusUnauthorized, status)
 	this.Contains(body, signInInvalidCredentials)
+}
+
+func (this *IntegrationSuite) TestSignIn_UserDeactivatedWhileSigningInAnswers401WithoutASession() {
+	ctx := context.Background()
+	userID := this.createActiveUser(signInUserEmail, model.PermissionWrite, signInUserPassword)
+
+	deactivation, err := this.Pool.Begin(ctx)
+	this.Require().NoError(err)
+	defer func() { _ = deactivation.Rollback(ctx) }()
+	_, err = deactivation.Exec(ctx, `UPDATE users SET active = false, updated_at = now() WHERE id = $1`, userID)
+	this.Require().NoError(err)
+
+	req := httptest.NewRequest("POST", "/sign-in", strings.NewReader(this.signInForm(signInUserEmail, signInUserPassword).Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Origin", signInPublicURL)
+
+	type signInResult struct {
+		response *http.Response
+		err      error
+	}
+	finished := make(chan signInResult, 1)
+	go func() {
+		response, err := this.Components.Server.Test(req, fiber.TestConfig{Timeout: 10 * time.Second})
+		finished <- signInResult{response: response, err: err}
+	}()
+	this.signInAwaitLockWaiters(1)
+
+	this.Require().NoError(deactivation.Commit(ctx))
+	result := <-finished
+	this.Require().NoError(result.err)
+	defer func() { _ = result.response.Body.Close() }()
+	body, err := io.ReadAll(result.response.Body)
+	this.Require().NoError(err)
+
+	this.Equal(http.StatusUnauthorized, result.response.StatusCode)
+	this.Contains(string(body), signInInvalidCredentials)
+	this.Empty(result.response.Header.Get("Set-Cookie"))
+	this.Equal(0, this.countRows("sessions"))
 }
 
 func (this *IntegrationSuite) TestSignIn_UnknownEmailAnswers401() {

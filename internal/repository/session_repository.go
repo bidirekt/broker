@@ -12,11 +12,24 @@ import (
 )
 
 const (
-	insertSessionQuery = `
+	insertAdminSessionQuery = `
+		INSERT INTO sessions
+			(id_hash, csrf_token)
+		VALUES
+			($1, $2)
+		RETURNING created_at, last_seen_at
+	`
+
+	insertUserSessionQuery = `
 		INSERT INTO sessions
 			(id_hash, user_id, csrf_token)
-		VALUES
-			($1, $2, $3)
+		SELECT
+			$1, id, $3
+		FROM
+			users
+		WHERE
+			id = $2 AND active AND password_hash = $4
+		FOR SHARE
 		RETURNING created_at, last_seen_at
 	`
 
@@ -65,12 +78,26 @@ func NewSessionRepository(pool *pgxpool.Pool) *SessionRepository {
 	return &SessionRepository{pool: pool}
 }
 
-func (this *SessionRepository) Create(ctx context.Context, session *model.Session) {
-	err := this.pool.QueryRow(ctx, insertSessionQuery, session.IDHash, session.UserID, session.CSRFToken).
-		Scan(&session.CreatedAt, &session.LastSeenAt)
+func (this *SessionRepository) Create(ctx context.Context, session *model.Session, verifiedPasswordHash string) (created bool) {
+	var row pgx.Row
+	if session.UserID.Valid {
+		// the user is read again under a share lock, so a deactivation or password change since the
+		// sign-in read it either makes this insert nothing or waits for it and then deletes the session
+		row = this.pool.QueryRow(ctx, insertUserSessionQuery, session.IDHash, session.UserID, session.CSRFToken, verifiedPasswordHash)
+	} else {
+		row = this.pool.QueryRow(ctx, insertAdminSessionQuery, session.IDHash, session.CSRFToken)
+	}
+
+	err := row.Scan(&session.CreatedAt, &session.LastSeenAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false
+	}
+
 	if err != nil {
 		panic(fmt.Errorf("error inserting session: %w", err))
 	}
+
+	return true
 }
 
 func (this *SessionRepository) FindByIDHash(ctx context.Context, idHash []byte) (*model.Session, bool) {

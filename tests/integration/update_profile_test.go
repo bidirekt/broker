@@ -2,8 +2,10 @@ package integration_test
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 
 	"github.com/bidirekt/broker/internal/components"
 	"github.com/bidirekt/broker/internal/model"
@@ -18,7 +20,10 @@ const (
 	profilePasswordChanged      = "password changed"
 	profileAdminPassword        = "integration-admin-password"
 	profileNoAccess             = "you don&#39;t have access"
+	profileLinkInvalid          = "this link is no longer valid, ask your admin for a new one"
 )
+
+var profileResetLinkInPage = regexp.MustCompile(`http://localhost:8080/set-password\?token=([A-Za-z0-9_-]{43})`)
 
 func (this *IntegrationSuite) openProfile(cookie string) (csrfToken string) {
 	status, _, page := this.getPage("/profile", cookie)
@@ -119,6 +124,29 @@ func (this *IntegrationSuite) TestUpdateProfile_Success_EndsOtherSessionsAndKeep
 	})
 	this.Equal(http.StatusUnauthorized, status)
 	this.NotEmpty(this.signInAsUser(profileUserEmail, profileNewPassword))
+}
+
+func (this *IntegrationSuite) TestUpdateProfile_Success_EndsTheOpenResetLink() {
+	userID := this.createActiveUser(profileUserEmail, model.PermissionWrite, profileCurrentPassword)
+	adminCookie := this.signInAsAdmin()
+	_, _, users := this.getPage("/users", adminCookie)
+	status, _, page := this.postForm(fmt.Sprintf("/users/%d/link", userID), adminCookie, this.csrfTokenFrom(users), url.Values{})
+	this.Require().Equal(http.StatusOK, status)
+	match := profileResetLinkInPage.FindStringSubmatch(page)
+	this.Require().Len(match, 2, "page shows no reset link")
+	status, _, _ = this.getPage("/set-password?token="+match[1], "")
+	this.Require().Equal(http.StatusOK, status)
+
+	cookie := this.signInAsUser(profileUserEmail, profileCurrentPassword)
+	status, _, _ = this.postForm("/profile", cookie, this.openProfile(cookie), url.Values{
+		"current_password": {profileCurrentPassword},
+		"new_password":     {profileNewPassword},
+	})
+	this.Require().Equal(http.StatusOK, status)
+
+	status, _, body := this.getPage("/set-password?token="+match[1], "")
+	this.Equal(http.StatusGone, status)
+	this.Contains(body, profileLinkInvalid)
 }
 
 func (this *IntegrationSuite) TestUpdateProfile_AdminGetsTheNoAccessPage() {

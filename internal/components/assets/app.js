@@ -1,4 +1,5 @@
 htmx.config.includeIndicatorStyles = false;
+htmx.config.historyCacheSize = 0;
 htmx.config.responseHandling = [
   { code: "204", swap: false },
   { code: "[23]..", swap: true },
