@@ -205,7 +205,6 @@ deps:
       - components_config
       - components_database
       - components_passwords
-      - components_sessions
       - components_tokens
       - contracts
       - feature_health

@@ -14,11 +14,12 @@ import (
 var pageFiles embed.FS
 
 type SignInUiHandler struct {
-	useCase *SignInUseCase
+	useCase       *SignInUseCase
+	sessionKeeper *sessions.Keeper
 }
 
-func NewSignInUiHandler(useCase *SignInUseCase) *SignInUiHandler {
-	return &SignInUiHandler{useCase: useCase}
+func NewSignInUiHandler(useCase *SignInUseCase, sessionKeeper *sessions.Keeper) *SignInUiHandler {
+	return &SignInUiHandler{useCase: useCase, sessionKeeper: sessionKeeper}
 }
 
 func (this *SignInUiHandler) ShowForm(ctx fiber.Ctx) error {
@@ -26,7 +27,7 @@ func (this *SignInUiHandler) ShowForm(ctx fiber.Ctx) error {
 }
 
 func (this *SignInUiHandler) RequireSameOrigin(ctx fiber.Ctx) error {
-	if !sessions.IsSameOrigin(ctx) {
+	if !this.sessionKeeper.IsSameOrigin(ctx) {
 		return this.respondForbidden(ctx)
 	}
 
@@ -44,7 +45,7 @@ func (this *SignInUiHandler) SignIn(ctx fiber.Ctx) error {
 		return this.respondInvalidCredentials(ctx, email)
 	}
 
-	started, err := sessions.Start(ctx, output.UserID, output.VerifiedPasswordHash)
+	started, err := this.sessionKeeper.Start(ctx, output.UserID, output.VerifiedPasswordHash)
 	if err != nil {
 		return err
 	}

@@ -14,11 +14,12 @@ import (
 var pageFiles embed.FS
 
 type SetupAdminUiHandler struct {
-	useCase *SetupAdminUseCase
+	useCase       *SetupAdminUseCase
+	sessionKeeper *sessions.Keeper
 }
 
-func NewSetupAdminUiHandler(useCase *SetupAdminUseCase) *SetupAdminUiHandler {
-	return &SetupAdminUiHandler{useCase: useCase}
+func NewSetupAdminUiHandler(useCase *SetupAdminUseCase, sessionKeeper *sessions.Keeper) *SetupAdminUiHandler {
+	return &SetupAdminUiHandler{useCase: useCase, sessionKeeper: sessionKeeper}
 }
 
 func (this *SetupAdminUiHandler) ShowForm(ctx fiber.Ctx) error {
@@ -30,7 +31,7 @@ func (this *SetupAdminUiHandler) ShowForm(ctx fiber.Ctx) error {
 }
 
 func (this *SetupAdminUiHandler) SetUp(ctx fiber.Ctx) error {
-	if !sessions.IsSameOrigin(ctx) {
+	if !this.sessionKeeper.IsSameOrigin(ctx) {
 		return this.respondForbidden(ctx)
 	}
 
@@ -54,7 +55,7 @@ func (this *SetupAdminUiHandler) SetUp(ctx fiber.Ctx) error {
 		return pages.Redirect(ctx, signInPath)
 	}
 
-	started, err := sessions.Start(ctx, output.UserID, output.PasswordHash)
+	started, err := this.sessionKeeper.Start(ctx, output.UserID, output.PasswordHash)
 	if err != nil {
 		return err
 	}

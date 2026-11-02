@@ -8,18 +8,19 @@ import (
 )
 
 type SignOutUiHandler struct {
-	useCase *SignOutUseCase
+	useCase       *SignOutUseCase
+	sessionKeeper *sessions.Keeper
 }
 
-func NewSignOutUiHandler(useCase *SignOutUseCase) *SignOutUiHandler {
-	return &SignOutUiHandler{useCase: useCase}
+func NewSignOutUiHandler(useCase *SignOutUseCase, sessionKeeper *sessions.Keeper) *SignOutUiHandler {
+	return &SignOutUiHandler{useCase: useCase, sessionKeeper: sessionKeeper}
 }
 
 func (this *SignOutUiHandler) SignOut(ctx fiber.Ctx) error {
 	session, _ := access.SessionFrom(ctx)
 	this.useCase.Execute(ctx.Context(), SignOutInput{SessionIDHash: session.IDHash})
 
-	sessions.ExpireCookie(ctx)
+	this.sessionKeeper.ExpireCookie(ctx)
 
 	return pages.Redirect(ctx, signInPath)
 }

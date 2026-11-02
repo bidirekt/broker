@@ -8,7 +8,7 @@ import (
 func Register(kernel *components.Components) {
 	userRepository := repository.NewUserRepository(kernel.Pool)
 	useCase := NewSignInUseCase(userRepository)
-	uiHandler := NewSignInUiHandler(useCase)
+	uiHandler := NewSignInUiHandler(useCase, kernel.SessionKeeper)
 	apiHandler := NewSignInApiHandler(useCase, kernel.Settings)
 	limiter := newSignInLimiter()
 	kernel.Server.Get("/sign-in", uiHandler.ShowForm)

@@ -4,15 +4,18 @@ import (
 	"github.com/bidirekt/broker/internal/components/config"
 	"github.com/bidirekt/broker/internal/components/database"
 	"github.com/bidirekt/broker/internal/components/server"
+	"github.com/bidirekt/broker/internal/components/sessions"
+	"github.com/bidirekt/broker/internal/repository"
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Components struct {
-	Server     *fiber.App
-	Pool       *pgxpool.Pool
-	ListenAddr string
-	Settings   config.Settings
+	Server        *fiber.App
+	Pool          *pgxpool.Pool
+	ListenAddr    string
+	Settings      config.Settings
+	SessionKeeper *sessions.Keeper
 }
 
 func New() (*Components, error) {
@@ -25,7 +28,8 @@ func New() (*Components, error) {
 	if err != nil {
 		return nil, err
 	}
-	httpServer := server.New(settings, pool)
+	sessionKeeper := sessions.NewKeeper(settings, repository.NewSessionRepository(pool), repository.NewUserRepository(pool))
+	httpServer := server.New(settings, pool, sessionKeeper)
 
 	if err := database.Migrate(pool); err != nil {
 		pool.Close()
@@ -38,9 +42,10 @@ func New() (*Components, error) {
 	}
 
 	return &Components{
-		Server:     httpServer,
-		Pool:       pool,
-		ListenAddr: config.ListenAddr(),
-		Settings:   settings,
+		Server:        httpServer,
+		Pool:          pool,
+		ListenAddr:    config.ListenAddr(),
+		Settings:      settings,
+		SessionKeeper: sessionKeeper,
 	}, nil
 }
