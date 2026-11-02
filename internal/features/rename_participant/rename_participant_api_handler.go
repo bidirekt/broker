@@ -3,6 +3,7 @@ package rename_participant
 import (
 	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/model"
+	"github.com/bidirekt/broker/internal/validations"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -24,7 +25,7 @@ func (this *RenameParticipantApiHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondInvalidInput(ctx)
 	}
 
-	if requestBody.OldName == "" || requestBody.NewName == "" {
+	if validations.UnpaddedValue(requestBody.OldName) != nil || requestBody.NewName == "" {
 		return this.respondInvalidInput(ctx)
 	}
 

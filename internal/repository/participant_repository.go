@@ -25,6 +25,7 @@ const (
 			(name)
 		VALUES
 			($1)
+		ON CONFLICT (name) DO NOTHING
 		RETURNING id
 	`
 
@@ -85,7 +86,7 @@ func (this *ParticipantRepository) FindByName(ctx context.Context, name string) 
 
 func (this *ParticipantRepository) Create(ctx context.Context, p *model.Participant) (created bool) {
 	err := this.pool.QueryRow(ctx, insertParticipantQuery, p.Name).Scan(&p.ID)
-	if isUniqueViolation(err) {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return false
 	}
 

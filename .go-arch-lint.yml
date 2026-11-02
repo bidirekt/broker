@@ -89,10 +89,10 @@ deps:
     canUse: [fiber]
 
   feature_can_i_deploy:
-    mayDependOn: [contracts, components, components_access, repository, model]
+    mayDependOn: [contracts, components, components_access, repository, model, validations]
     canUse: [fiber, guregu_null]
   feature_create_environment:
-    mayDependOn: [components, components_access, repository, model]
+    mayDependOn: [components, components_access, repository, model, validations]
     canUse: [fiber]
   feature_create_participant:
     mayDependOn: [components, components_access, repository, model, validations]
@@ -122,13 +122,13 @@ deps:
     mayDependOn: [components, components_access, components_pages, repository, model]
     canUse: [fiber]
   feature_publish_contract:
-    mayDependOn: [contracts, components, components_access, repository, model]
+    mayDependOn: [contracts, components, components_access, repository, model, validations]
     canUse: [fiber]
   feature_reactivate_user:
     mayDependOn: [components, components_access, components_pages, repository]
     canUse: [fiber]
   feature_record_deployment:
-    mayDependOn: [components, components_access, repository, model]
+    mayDependOn: [components, components_access, repository, model, validations]
     canUse: [fiber]
   feature_rename_participant:
     mayDependOn: [components, components_access, repository, model, validations]
@@ -146,7 +146,7 @@ deps:
     mayDependOn: [components, components_access, components_pages, components_passwords, repository, validations]
     canUse: [fiber]
   feature_validate_contract:
-    mayDependOn: [contracts, components, components_access, repository, model]
+    mayDependOn: [contracts, components, components_access, repository, model, validations]
     canUse: [fiber]
 
   components:

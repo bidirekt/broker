@@ -124,6 +124,26 @@ func (this *IntegrationSuite) TestRenameParticipant_EmptyNewNameReturns400() {
 	this.NotZero(this.renameParticipantID("pets_service"))
 }
 
+func (this *IntegrationSuite) TestRenameParticipant_PaddedOldNameReturns400() {
+	status, _ := this.post("/api/participants", renamePetsBody)
+	this.Require().Equal(http.StatusOK, status)
+	originalID := this.renameParticipantID("pets_service")
+
+	cases := map[string]string{
+		"trailing space in old name": `{"oldName":"pets_service ","newName":"orders_service"}`,
+		"leading tab in old name":    `{"oldName":"\tpets_service","newName":"orders_service"}`,
+	}
+
+	for name, body := range cases {
+		status, response := this.post("/api/participants/rename", body)
+		this.Equal(http.StatusBadRequest, status, name)
+		this.JSONEq(`{"message":"participant invalid input"}`, response, name)
+	}
+
+	this.Equal(1, this.countRows("participants"))
+	this.Equal(originalID, this.renameParticipantID("pets_service"))
+}
+
 func (this *IntegrationSuite) TestRenameParticipant_SameNameIsNoOpSuccess() {
 	status, _ := this.post("/api/participants", renamePetsBody)
 	this.Require().Equal(http.StatusOK, status)

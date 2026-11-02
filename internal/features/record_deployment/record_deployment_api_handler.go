@@ -3,6 +3,7 @@ package record_deployment
 import (
 	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/model"
+	"github.com/bidirekt/broker/internal/validations"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -24,7 +25,7 @@ func (this *RecordDeploymentApiHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondInvalidInput(ctx)
 	}
 
-	if requestBody.Participant == "" || requestBody.Version == "" || requestBody.Environment == "" {
+	if validations.UnpaddedValue(requestBody.Participant) != nil || validations.UnpaddedValue(requestBody.Version) != nil || validations.UnpaddedValue(requestBody.Environment) != nil {
 		return this.respondInvalidInput(ctx)
 	}
 

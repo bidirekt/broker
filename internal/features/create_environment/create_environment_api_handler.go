@@ -3,6 +3,7 @@ package create_environment
 import (
 	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/model"
+	"github.com/bidirekt/broker/internal/validations"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -24,7 +25,7 @@ func (this *CreateEnvironmentApiHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondInvalidInput(ctx)
 	}
 
-	if requestBody.Environment == "" {
+	if validations.UnpaddedValue(requestBody.Environment) != nil {
 		return this.respondInvalidInput(ctx)
 	}
 

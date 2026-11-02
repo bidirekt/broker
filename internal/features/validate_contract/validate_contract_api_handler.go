@@ -2,12 +2,12 @@ package validate_contract
 
 import (
 	"encoding/json"
-	"strings"
 
 	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/contracts/contractfiles"
 	"github.com/bidirekt/broker/internal/contracts/violation"
 	"github.com/bidirekt/broker/internal/model"
+	"github.com/bidirekt/broker/internal/validations"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -29,7 +29,7 @@ func (this *ValidateContractApiHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondInvalidInput(ctx)
 	}
 
-	if !isUnpaddedValue(requestBody.Participant) || !isUnpaddedValue(requestBody.Environment) || len(requestBody.Contracts) == 0 || contractfiles.HasBlankSource(requestBody.Contracts) {
+	if validations.UnpaddedValue(requestBody.Participant) != nil || validations.UnpaddedValue(requestBody.Environment) != nil || len(requestBody.Contracts) == 0 || contractfiles.HasBlankSource(requestBody.Contracts) {
 		return this.respondInvalidInput(ctx)
 	}
 
@@ -85,8 +85,4 @@ func (this *ValidateContractApiHandler) respondNotFound(ctx fiber.Ctx, message s
 	return ctx.Status(fiber.StatusNotFound).JSON(ValidateContractErrorResponseBody{
 		Message: message,
 	})
-}
-
-func isUnpaddedValue(value string) bool {
-	return value != "" && strings.TrimSpace(value) == value
 }
