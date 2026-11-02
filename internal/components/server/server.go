@@ -42,7 +42,7 @@ func respondError(ctx fiber.Ctx, err error) error {
 	ctx.Response().Header.Del(fiber.HeaderLocation)
 	ctx.Response().Header.Del("HX-Redirect")
 
-	if !isPagePath(ctx) || !asksForPage(ctx) {
+	if !pages.IsPagePath(ctx.Path()) || !asksForPage(ctx) {
 		return ctx.Status(status).JSON(errorResponseBody{Message: message})
 	}
 
@@ -50,14 +50,6 @@ func respondError(ctx fiber.Ctx, err error) error {
 		message = somethingWentWrongMessage
 	}
 	return pages.RenderError(ctx, status, message)
-}
-
-func isUnderPath(path, prefix string) bool {
-	return path == prefix || strings.HasPrefix(path, prefix+"/")
-}
-
-func isPagePath(ctx fiber.Ctx) bool {
-	return !isUnderPath(ctx.Path(), "/api") && !isUnderPath(ctx.Path(), "/health") && !isUnderPath(ctx.Path(), "/assets")
 }
 
 func asksForPage(ctx fiber.Ctx) bool {
@@ -82,7 +74,7 @@ func New(settings config.Settings, pool *pgxpool.Pool) *fiber.App {
 
 	server.Use(recover.New(recover.Config{EnableStackTrace: true}))
 	server.Use(helmet.New(helmet.Config{
-		Next:                  func(ctx fiber.Ctx) bool { return !isPagePath(ctx) },
+		Next:                  func(ctx fiber.Ctx) bool { return !pages.IsPagePath(ctx.Path()) },
 		ContentSecurityPolicy: pageContentSecurityPolicy,
 	}))
 	server.Use(input.Door())
