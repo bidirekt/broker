@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/bidirekt/broker/internal/validations"
 )
@@ -97,6 +98,10 @@ func publicURL() (string, error) {
 	parsed, err := url.Parse(value)
 	if err != nil || parsed.Hostname() == "" || strings.HasSuffix(parsed.Host, ":") || parsed.Scheme+"://"+parsed.Host != value {
 		return "", errors.New("BIDIREKT_PUBLIC_URL must be an origin (scheme://host[:port]) without a path, query, fragment or userinfo")
+	}
+
+	if strings.ContainsFunc(parsed.Host, func(character rune) bool { return character > unicode.MaxASCII }) {
+		return "", errors.New("BIDIREKT_PUBLIC_URL must have an ASCII host (write an international name in its xn-- form)")
 	}
 
 	if parsed.Host != strings.ToLower(parsed.Host) {

@@ -1,9 +1,10 @@
 package update_profile
 
 const (
-	PasswordChangedMessage      string = "password changed"
-	CurrentPasswordWrongMessage string = "the current password is wrong"
-	PasswordInvalidMessage      string = "the password must have 15 to 128 characters"
+	PasswordChangedMessage        string = "password changed"
+	CurrentPasswordWrongMessage   string = "the current password is wrong"
+	PasswordInvalidMessage        string = "the password must have 15 to 128 characters"
+	TooManyProfileAttemptsMessage string = "too many attempts, try again later"
 
 	currentPasswordFormField = "current_password"
 	newPasswordFormField     = "new_password"

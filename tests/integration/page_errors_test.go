@@ -163,6 +163,7 @@ func (this *IntegrationSuite) TestUnhappyPath_UnparsableRequestHeadIsLoggedWitho
 	var logged bytes.Buffer
 	previous := log.Writer()
 	log.SetOutput(&logged)
+	defer log.SetOutput(previous)
 
 	status, _, body := this.sendRawPageErrorsRequest("POST /set-password?token=secret-link-token HTTP/1.1\r\n" +
 		"Host: localhost:8080\r\n" +
@@ -171,7 +172,6 @@ func (this *IntegrationSuite) TestUnhappyPath_UnparsableRequestHeadIsLoggedWitho
 		"Content-Length: abc\r\n\r\n",
 	)
 
-	log.SetOutput(previous)
 	this.Equal(http.StatusBadRequest, status)
 	this.Contains(logged.String(), "failed")
 	for _, secret := range []string{"secret-link-token", "secret-session-cookie", "secret-jwt"} {

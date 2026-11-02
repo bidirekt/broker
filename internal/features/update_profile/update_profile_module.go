@@ -10,5 +10,5 @@ func Register(kernel *components.Components) {
 	useCase := NewUpdateProfileUseCase(userRepository)
 	uiHandler := NewUpdateProfileUiHandler(useCase)
 	kernel.Server.Get(profilePath, uiHandler.ShowForm)
-	kernel.Server.Post(profilePath, uiHandler.UpdateProfile)
+	kernel.Server.Post(profilePath, newUpdateProfileLimiter(), uiHandler.UpdateProfile)
 }

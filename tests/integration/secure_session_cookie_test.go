@@ -55,6 +55,8 @@ func (this *IntegrationSuite) TestSecureSessionCookie_HttpsPublicURLSignsInWithA
 	this.Require().NoError(err)
 	this.Equal(secureCookieName, cookie.Name)
 	this.True(cookie.Secure)
+	this.Equal("/", cookie.Path)
+	this.Empty(cookie.Domain)
 
 	page := httptest.NewRequest("GET", "/users", nil)
 	page.AddCookie(&http.Cookie{Name: secureCookieName, Value: cookie.Value})

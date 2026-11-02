@@ -34,6 +34,7 @@ func TestRead_RefusesAPublicURLThatIsNotAnAllowedOrigin(t *testing.T) {
 		{"https://user:pass@broker.example.com", originRule},
 		{"https://broker.example.com:", originRule},
 		{"https://", originRule},
+		{"https://bücher.example", "BIDIREKT_PUBLIC_URL must have an ASCII host (write an international name in its xn-- form)"},
 		{"https://Broker.Example.com", "BIDIREKT_PUBLIC_URL must have a lower-case host"},
 		{"https://broker.example.com:443", "BIDIREKT_PUBLIC_URL must not write out the default port"},
 		{"http://localhost:80", "BIDIREKT_PUBLIC_URL must not write out the default port"},
@@ -98,7 +99,7 @@ func TestRead_RefusesAMissingAdminPasswordOrOneOutsideFifteenToOneHundredTwentyE
 }
 
 func TestRead_AcceptsAnAllowedPublicURL(t *testing.T) {
-	for _, publicURL := range []string{"https://broker.example.com", "https://broker.example.com:8443", "http://localhost:8080", "http://127.0.0.1:8080", "http://localhost"} {
+	for _, publicURL := range []string{"https://broker.example.com", "https://broker.example.com:8443", "http://localhost:8080", "http://127.0.0.1:8080", "http://localhost", "https://xn--bcher-kva.example"} {
 		t.Run(publicURL, func(t *testing.T) {
 			setValidAuthSettings(t)
 			t.Setenv("BIDIREKT_PUBLIC_URL", publicURL)
