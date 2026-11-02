@@ -6,7 +6,7 @@ import (
 	"crypto/subtle"
 	"strings"
 
-	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/passwords"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/bidirekt/broker/internal/repository"
 	"github.com/guregu/null"
@@ -52,11 +52,11 @@ func (this *SignInUseCase) Execute(ctx context.Context, input SignInInput) SignI
 
 	user, found := this.userRepository.FindByEmail(ctx, input.Identifier)
 	if !found || user.State() != model.UserActive {
-		components.VerifyPassword(input.Password, components.DummyPasswordHash)
+		passwords.Verify(input.Password, passwords.DummyHash)
 		return SignInOutput{Status: InvalidCredentials}
 	}
 
-	if !components.VerifyPassword(input.Password, user.PasswordHash.String) {
+	if !passwords.Verify(input.Password, user.PasswordHash.String) {
 		return SignInOutput{Status: InvalidCredentials}
 	}
 

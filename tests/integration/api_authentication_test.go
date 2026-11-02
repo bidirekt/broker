@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/bearer"
 	"github.com/bidirekt/broker/internal/model"
 )
 
@@ -62,14 +62,14 @@ func (this *IntegrationSuite) TestApiAuthentication_RefusesAMalformedToken() {
 
 func (this *IntegrationSuite) TestApiAuthentication_RefusesAnExpiredToken() {
 	userID := this.createActiveUser(apiAuthenticationEmail, model.PermissionWrite, apiAuthenticationPassword)
-	token, _, err := components.IssueToken(this.Components.Settings, userID, time.Now().Add(-16*time.Minute))
+	token, _, err := bearer.Issue(this.Components.Settings, userID, time.Now().Add(-16*time.Minute))
 	this.Require().NoError(err)
 
 	this.apiAuthenticationAssertRefused(token)
 }
 
 func (this *IntegrationSuite) TestApiAuthentication_RefusesATokenOfAnUnknownUser() {
-	token, _, err := components.IssueToken(this.Components.Settings, 999999, time.Now())
+	token, _, err := bearer.Issue(this.Components.Settings, 999999, time.Now())
 	this.Require().NoError(err)
 
 	this.apiAuthenticationAssertRefused(token)

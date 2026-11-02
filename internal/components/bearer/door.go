@@ -1,8 +1,10 @@
-package components
+package bearer
 
 import (
 	"strings"
 
+	"github.com/bidirekt/broker/internal/components/access"
+	"github.com/bidirekt/broker/internal/components/config"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/bidirekt/broker/internal/repository"
 	"github.com/gofiber/fiber/v3"
@@ -15,12 +17,14 @@ const (
 	unauthenticatedMessage = "unauthenticated"
 )
 
-type bearerKeeper struct {
-	settings Settings
+type keeper struct {
+	settings config.Settings
 	users    *repository.UserRepository
 }
 
-func bearerDoor(keeper *bearerKeeper) fiber.Handler {
+func Door(settings config.Settings, users *repository.UserRepository) fiber.Handler {
+	keeper := &keeper{settings: settings, users: users}
+
 	return func(ctx fiber.Ctx) error {
 		if !isUnderPath(ctx.Path(), apiPath) || ctx.Path() == apiSignInPath {
 			return ctx.Next()
@@ -32,27 +36,31 @@ func bearerDoor(keeper *bearerKeeper) fiber.Handler {
 			return fiber.NewError(fiber.StatusUnauthorized, unauthenticatedMessage)
 		}
 
-		ctx.Locals(principalKey{}, principal)
+		access.GrantPrincipal(ctx, principal)
 
 		return ctx.Next()
 	}
 }
 
-func (this *bearerKeeper) toPrincipal(ctx fiber.Ctx) (Principal, bool) {
+func (this *keeper) toPrincipal(ctx fiber.Ctx) (access.Principal, bool) {
 	token, found := strings.CutPrefix(ctx.Get(fiber.HeaderAuthorization), bearerPrefix)
 	if !found {
-		return Principal{}, false
+		return access.Principal{}, false
 	}
 
-	userID, valid := UserIDFromToken(this.settings, token)
+	userID, valid := UserIDFrom(this.settings, token)
 	if !valid {
-		return Principal{}, false
+		return access.Principal{}, false
 	}
 
 	user, found := this.users.FindByID(ctx.Context(), userID)
 	if !found || user.State() != model.UserActive {
-		return Principal{}, false
+		return access.Principal{}, false
 	}
 
-	return Principal{UserID: user.ID, Permission: user.Permission}, true
+	return access.Principal{UserID: user.ID, Permission: user.Permission}, true
+}
+
+func isUnderPath(path, prefix string) bool {
+	return path == prefix || strings.HasPrefix(path, prefix+"/")
 }

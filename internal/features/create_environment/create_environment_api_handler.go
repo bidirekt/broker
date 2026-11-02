@@ -1,7 +1,7 @@
 package create_environment
 
 import (
-	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/gofiber/fiber/v3"
 )
@@ -15,7 +15,7 @@ func NewCreateEnvironmentApiHandler(useCase *CreateEnvironmentUseCase) *CreateEn
 }
 
 func (this *CreateEnvironmentApiHandler) Handle(ctx fiber.Ctx) error {
-	if err := components.RequirePermission(ctx, model.PermissionWrite); err != nil {
+	if err := access.RequirePermission(ctx, model.PermissionWrite); err != nil {
 		return err
 	}
 

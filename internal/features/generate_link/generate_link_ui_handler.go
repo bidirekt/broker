@@ -4,7 +4,8 @@ import (
 	"embed"
 	"strconv"
 
-	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/access"
+	"github.com/bidirekt/broker/internal/components/pages"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -20,7 +21,7 @@ func NewGenerateLinkUiHandler(useCase *GenerateLinkUseCase) *GenerateLinkUiHandl
 }
 
 func (this *GenerateLinkUiHandler) Handle(ctx fiber.Ctx) error {
-	if err := components.RequireAdmin(ctx); err != nil {
+	if err := access.RequireAdmin(ctx); err != nil {
 		return err
 	}
 
@@ -42,7 +43,7 @@ func (this *GenerateLinkUiHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondWithMessage(ctx, fiber.StatusConflict, UserDeactivatedMessage)
 	}
 
-	return components.Render(ctx, fiber.StatusOK, pageFiles, generateLinkTemplate, GenerateLinkPage{
+	return pages.Render(ctx, fiber.StatusOK, pageFiles, generateLinkTemplate, GenerateLinkPage{
 		Email:   output.Email,
 		Purpose: output.Purpose,
 		Link:    output.Link,
@@ -50,5 +51,5 @@ func (this *GenerateLinkUiHandler) Handle(ctx fiber.Ctx) error {
 }
 
 func (this *GenerateLinkUiHandler) respondWithMessage(ctx fiber.Ctx, status int, message string) error {
-	return components.Render(ctx, status, pageFiles, generateLinkTemplate, GenerateLinkPage{Message: message})
+	return pages.Render(ctx, status, pageFiles, generateLinkTemplate, GenerateLinkPage{Message: message})
 }

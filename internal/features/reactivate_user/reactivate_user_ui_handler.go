@@ -4,7 +4,8 @@ import (
 	"embed"
 	"strconv"
 
-	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/access"
+	"github.com/bidirekt/broker/internal/components/pages"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -20,7 +21,7 @@ func NewReactivateUserUiHandler(useCase *ReactivateUserUseCase) *ReactivateUserU
 }
 
 func (this *ReactivateUserUiHandler) Handle(ctx fiber.Ctx) error {
-	if err := components.RequireAdmin(ctx); err != nil {
+	if err := access.RequireAdmin(ctx); err != nil {
 		return err
 	}
 
@@ -35,9 +36,9 @@ func (this *ReactivateUserUiHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondUserNotFound(ctx)
 	}
 
-	return components.Redirect(ctx, usersPath)
+	return pages.Redirect(ctx, usersPath)
 }
 
 func (this *ReactivateUserUiHandler) respondUserNotFound(ctx fiber.Ctx) error {
-	return components.Render(ctx, fiber.StatusNotFound, pageFiles, reactivateUserTemplate, ReactivateUserPage{Message: UserNotFoundMessage})
+	return pages.Render(ctx, fiber.StatusNotFound, pageFiles, reactivateUserTemplate, ReactivateUserPage{Message: UserNotFoundMessage})
 }

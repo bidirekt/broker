@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/tokens"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/bidirekt/broker/internal/repository"
 	"github.com/bidirekt/broker/internal/validations"
@@ -50,7 +50,7 @@ func (this *InviteUserUseCase) Execute(ctx context.Context, input InviteUserInpu
 		return InviteUserOutput{Status: PermissionInvalid}, nil
 	}
 
-	token, err := components.RandomToken()
+	token, err := tokens.Random()
 	if err != nil {
 		return InviteUserOutput{}, err
 	}
@@ -58,7 +58,7 @@ func (this *InviteUserUseCase) Execute(ctx context.Context, input InviteUserInpu
 	created := this.userRepository.CreateInvited(ctx,
 		&model.User{Email: input.Email, Permission: permission},
 		&model.OneTimeLink{
-			TokenHash: components.HashToken(token),
+			TokenHash: tokens.Hash(token),
 			Purpose:   model.LinkPurposeInvite,
 			ExpiresAt: time.Now().Add(inviteLinkLifetime),
 		},

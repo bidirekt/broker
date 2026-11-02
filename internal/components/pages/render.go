@@ -1,4 +1,4 @@
-package components
+package pages
 
 import (
 	"bytes"
@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"strings"
 
+	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -58,12 +59,12 @@ func isHtmxRequest(ctx fiber.Ctx) bool {
 }
 
 func layoutFor(ctx fiber.Ctx, page any) (layout string, data layoutData) {
-	session, ok := SessionFrom(ctx)
+	session, ok := access.SessionFrom(ctx)
 	if !ok {
 		return signedOutLayout, layoutData{Page: page}
 	}
 
-	principal, _ := PrincipalFrom(ctx)
+	principal, _ := access.PrincipalFrom(ctx)
 
 	return signedInLayout, layoutData{
 		CSRFToken: session.CSRFToken,

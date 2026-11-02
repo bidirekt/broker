@@ -1,7 +1,7 @@
 package can_i_deploy
 
 import (
-	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/gofiber/fiber/v3"
 )
@@ -15,7 +15,7 @@ func NewCanIDeployApiHandler(useCase *CanIDeployUseCase) *CanIDeployApiHandler {
 }
 
 func (this *CanIDeployApiHandler) Handle(ctx fiber.Ctx) error {
-	if err := components.RequirePermission(ctx, model.PermissionRead); err != nil {
+	if err := access.RequirePermission(ctx, model.PermissionRead); err != nil {
 		return err
 	}
 

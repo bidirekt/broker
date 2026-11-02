@@ -1,10 +1,15 @@
-package components
+package server
 
 import (
 	"errors"
 	"log"
 	"strings"
 
+	"github.com/bidirekt/broker/internal/components/bearer"
+	"github.com/bidirekt/broker/internal/components/config"
+	"github.com/bidirekt/broker/internal/components/input"
+	"github.com/bidirekt/broker/internal/components/pages"
+	"github.com/bidirekt/broker/internal/components/sessions"
 	"github.com/bidirekt/broker/internal/repository"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/helmet"
@@ -23,11 +28,6 @@ const pageContentSecurityPolicy = "default-src 'self'; frame-ancestors 'none'"
 
 type errorResponseBody struct {
 	Message string `json:"message"`
-}
-
-type errorPage struct {
-	Status  int
-	Message string
 }
 
 func respondError(ctx fiber.Ctx, err error) error {
@@ -49,7 +49,7 @@ func respondError(ctx fiber.Ctx, err error) error {
 	if fiberErr == nil {
 		message = somethingWentWrongMessage
 	}
-	return Render(ctx, status, templateFiles, "templates/error.html", errorPage{Status: status, Message: message})
+	return pages.RenderError(ctx, status, message)
 }
 
 func isUnderPath(path, prefix string) bool {
@@ -61,23 +61,23 @@ func isPagePath(ctx fiber.Ctx) bool {
 }
 
 func asksForPage(ctx fiber.Ctx) bool {
-	return isHtmxRequest(ctx) || strings.Contains(ctx.Get(fiber.HeaderAccept), "text/html")
+	return ctx.Get("HX-Request") == "true" || strings.Contains(ctx.Get(fiber.HeaderAccept), "text/html")
 }
 
-func createHttpServer(settings Settings, pool *pgxpool.Pool) *fiber.App {
-	config := fiber.Config{
+func New(settings config.Settings, pool *pgxpool.Pool) *fiber.App {
+	appConfig := fiber.Config{
 		BodyLimit:     publishBodyLimit,
 		ErrorHandler:  respondError,
 		CaseSensitive: true,
 		StrictRouting: true,
 	}
 	if len(settings.TrustedProxies) > 0 {
-		config.TrustProxy = true
-		config.TrustProxyConfig = fiber.TrustProxyConfig{Proxies: settings.TrustedProxies}
-		config.ProxyHeader = fiber.HeaderXForwardedFor
-		config.EnableIPValidation = true
+		appConfig.TrustProxy = true
+		appConfig.TrustProxyConfig = fiber.TrustProxyConfig{Proxies: settings.TrustedProxies}
+		appConfig.ProxyHeader = fiber.HeaderXForwardedFor
+		appConfig.EnableIPValidation = true
 	}
-	server := fiber.New(config)
+	server := fiber.New(appConfig)
 	server.Server().SecureErrorLogMessage = true
 
 	server.Use(recover.New(recover.Config{EnableStackTrace: true}))
@@ -85,15 +85,11 @@ func createHttpServer(settings Settings, pool *pgxpool.Pool) *fiber.App {
 		Next:                  func(ctx fiber.Ctx) bool { return !isPagePath(ctx) },
 		ContentSecurityPolicy: pageContentSecurityPolicy,
 	}))
-	server.Use(inputDoor())
+	server.Use(input.Door())
 	serveAssets(server)
 	users := repository.NewUserRepository(pool)
-	server.Use(sessionDoor(&sessionKeeper{
-		settings: settings,
-		sessions: repository.NewSessionRepository(pool),
-		users:    users,
-	}))
-	server.Use(bearerDoor(&bearerKeeper{settings: settings, users: users}))
+	server.Use(sessions.Door(settings, repository.NewSessionRepository(pool), users))
+	server.Use(bearer.Door(settings, users))
 
 	return server
 }

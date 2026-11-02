@@ -1,4 +1,4 @@
-package components
+package input
 
 import (
 	"bytes"
@@ -13,7 +13,7 @@ const invalidInputMessage = "invalid input"
 
 var jsonNULEscape = []byte(`u0000`)
 
-func inputDoor() fiber.Handler {
+func Door() fiber.Handler {
 	return func(ctx fiber.Ctx) error {
 		if !argsAreText(ctx.Request().URI().QueryArgs().All()) || !bodyIsText(ctx) {
 			return fiber.NewError(fiber.StatusBadRequest, invalidInputMessage)

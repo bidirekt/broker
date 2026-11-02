@@ -1,7 +1,7 @@
 package list_environments
 
 import (
-	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/gofiber/fiber/v3"
 )
@@ -15,7 +15,7 @@ func NewListEnvironmentsApiHandler(useCase *ListEnvironmentsUseCase) *ListEnviro
 }
 
 func (this *ListEnvironmentsApiHandler) Handle(ctx fiber.Ctx) error {
-	if err := components.RequirePermission(ctx, model.PermissionRead); err != nil {
+	if err := access.RequirePermission(ctx, model.PermissionRead); err != nil {
 		return err
 	}
 

@@ -1,15 +1,16 @@
-package components
+package bearer
 
 import (
 	"strconv"
 	"time"
 
+	"github.com/bidirekt/broker/internal/components/config"
 	"github.com/golang-jwt/jwt/v5"
 )
 
 // Hardcoded until its source is decided, before any release: the repository is public, so anyone
 // who reads it can forge a token.
-var TokenSigningKey = []byte("kRQ+AHq7X4TKaSzlILIt12cVJ0nb9zc4trUzGTR+KzA=")
+var SigningKey = []byte("kRQ+AHq7X4TKaSzlILIt12cVJ0nb9zc4trUzGTR+KzA=")
 
 const (
 	tokenType           = "at+jwt"
@@ -17,7 +18,7 @@ const (
 	tokenAudienceSuffix = "/api"
 )
 
-func IssueToken(settings Settings, userID int64, issuedAt time.Time) (token string, expiresAt time.Time, err error) {
+func Issue(settings config.Settings, userID int64, issuedAt time.Time) (token string, expiresAt time.Time, err error) {
 	claims := jwt.RegisteredClaims{
 		Issuer:    settings.PublicURL,
 		Audience:  jwt.ClaimStrings{settings.PublicURL + tokenAudienceSuffix},
@@ -29,7 +30,7 @@ func IssueToken(settings Settings, userID int64, issuedAt time.Time) (token stri
 	unsigned := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	unsigned.Header["typ"] = tokenType
 
-	token, err = unsigned.SignedString(TokenSigningKey)
+	token, err = unsigned.SignedString(SigningKey)
 	if err != nil {
 		return "", time.Time{}, err
 	}
@@ -37,10 +38,10 @@ func IssueToken(settings Settings, userID int64, issuedAt time.Time) (token stri
 	return token, claims.ExpiresAt.Time, nil
 }
 
-func UserIDFromToken(settings Settings, token string) (userID int64, valid bool) {
+func UserIDFrom(settings config.Settings, token string) (userID int64, valid bool) {
 	claims := &jwt.RegisteredClaims{}
 	parsed, err := jwt.ParseWithClaims(token, claims,
-		func(*jwt.Token) (any, error) { return TokenSigningKey, nil },
+		func(*jwt.Token) (any, error) { return SigningKey, nil },
 		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
 		jwt.WithIssuer(settings.PublicURL),
 		jwt.WithAudience(settings.PublicURL+tokenAudienceSuffix),

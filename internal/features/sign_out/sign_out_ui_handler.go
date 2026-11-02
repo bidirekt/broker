@@ -1,7 +1,9 @@
 package sign_out
 
 import (
-	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/access"
+	"github.com/bidirekt/broker/internal/components/pages"
+	"github.com/bidirekt/broker/internal/components/sessions"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -14,10 +16,10 @@ func NewSignOutUiHandler(useCase *SignOutUseCase) *SignOutUiHandler {
 }
 
 func (this *SignOutUiHandler) SignOut(ctx fiber.Ctx) error {
-	session, _ := components.SessionFrom(ctx)
+	session, _ := access.SessionFrom(ctx)
 	this.useCase.Execute(ctx.Context(), SignOutInput{SessionIDHash: session.IDHash})
 
-	components.ExpireSessionCookie(ctx)
+	sessions.ExpireCookie(ctx)
 
-	return components.Redirect(ctx, signInPath)
+	return pages.Redirect(ctx, signInPath)
 }

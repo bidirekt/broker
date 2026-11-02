@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"regexp"
 
-	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/passwords"
 	"github.com/bidirekt/broker/internal/model"
 )
 
@@ -108,7 +108,7 @@ func (this *IntegrationSuite) TestUpdateProfile_Success_EndsOtherSessionsAndKeep
 	})
 	this.Equal(http.StatusOK, status)
 	this.Contains(body, profilePasswordChanged)
-	this.True(components.VerifyPassword(profileNewPassword, this.profilePasswordHash(userID)))
+	this.True(passwords.Verify(profileNewPassword, this.profilePasswordHash(userID)))
 
 	status, header, _ := this.getPage("/profile", otherCookie)
 	this.Equal(http.StatusSeeOther, status)

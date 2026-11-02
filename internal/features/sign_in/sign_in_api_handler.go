@@ -6,16 +6,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/bearer"
+	"github.com/bidirekt/broker/internal/components/config"
 	"github.com/gofiber/fiber/v3"
 )
 
 type SignInApiHandler struct {
 	useCase  *SignInUseCase
-	settings components.Settings
+	settings config.Settings
 }
 
-func NewSignInApiHandler(useCase *SignInUseCase, settings components.Settings) *SignInApiHandler {
+func NewSignInApiHandler(useCase *SignInUseCase, settings config.Settings) *SignInApiHandler {
 	return &SignInApiHandler{useCase: useCase, settings: settings}
 }
 
@@ -56,7 +57,7 @@ func (this *SignInApiHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondInvalidCredentials(ctx)
 	}
 
-	token, expiresAt, err := components.IssueToken(this.settings, output.UserID.Int64, time.Now())
+	token, expiresAt, err := bearer.Issue(this.settings, output.UserID.Int64, time.Now())
 	if err != nil {
 		return err
 	}

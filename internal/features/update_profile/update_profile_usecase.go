@@ -3,7 +3,7 @@ package update_profile
 import (
 	"context"
 
-	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/passwords"
 	"github.com/bidirekt/broker/internal/repository"
 	"github.com/bidirekt/broker/internal/validations"
 )
@@ -37,7 +37,7 @@ func NewUpdateProfileUseCase(userRepository *repository.UserRepository) *UpdateP
 
 func (this *UpdateProfileUseCase) Execute(ctx context.Context, input UpdateProfileInput) (UpdateProfileOutput, error) {
 	user, found := this.userRepository.FindByID(ctx, input.UserID)
-	if !found || !components.VerifyPassword(input.CurrentPassword, user.PasswordHash.String) {
+	if !found || !passwords.Verify(input.CurrentPassword, user.PasswordHash.String) {
 		return UpdateProfileOutput{Status: CurrentPasswordWrong}, nil
 	}
 
@@ -45,7 +45,7 @@ func (this *UpdateProfileUseCase) Execute(ctx context.Context, input UpdateProfi
 		return UpdateProfileOutput{Status: PasswordInvalid}, nil
 	}
 
-	passwordHash, err := components.HashPassword(input.NewPassword)
+	passwordHash, err := passwords.Hash(input.NewPassword)
 	if err != nil {
 		return UpdateProfileOutput{}, err
 	}

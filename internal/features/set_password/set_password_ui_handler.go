@@ -3,7 +3,8 @@ package set_password
 import (
 	"embed"
 
-	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/pages"
+	"github.com/bidirekt/broker/internal/components/sessions"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -24,11 +25,11 @@ func (this *SetPasswordUiHandler) ShowForm(ctx fiber.Ctx) error {
 		return this.respondLinkInvalid(ctx)
 	}
 
-	return components.Render(ctx, fiber.StatusOK, pageFiles, setPasswordTemplate, SetPasswordPage{Token: token})
+	return pages.Render(ctx, fiber.StatusOK, pageFiles, setPasswordTemplate, SetPasswordPage{Token: token})
 }
 
 func (this *SetPasswordUiHandler) SetPassword(ctx fiber.Ctx) error {
-	if err := components.RequireSameOrigin(ctx); err != nil {
+	if err := sessions.RequireSameOrigin(ctx); err != nil {
 		return err
 	}
 
@@ -43,7 +44,7 @@ func (this *SetPasswordUiHandler) SetPassword(ctx fiber.Ctx) error {
 
 	switch output.Status {
 	case PasswordInvalid:
-		return components.Render(ctx, fiber.StatusBadRequest, pageFiles, setPasswordTemplate, SetPasswordPage{
+		return pages.Render(ctx, fiber.StatusBadRequest, pageFiles, setPasswordTemplate, SetPasswordPage{
 			Token:   token,
 			Message: PasswordInvalidMessage,
 		})
@@ -51,11 +52,11 @@ func (this *SetPasswordUiHandler) SetPassword(ctx fiber.Ctx) error {
 		return this.respondLinkInvalid(ctx)
 	}
 
-	return components.Redirect(ctx, signInPath)
+	return pages.Redirect(ctx, signInPath)
 }
 
 func (this *SetPasswordUiHandler) respondLinkInvalid(ctx fiber.Ctx) error {
-	return components.Render(ctx, fiber.StatusGone, pageFiles, linkInvalidTemplate, LinkInvalidPage{
+	return pages.Render(ctx, fiber.StatusGone, pageFiles, linkInvalidTemplate, LinkInvalidPage{
 		Message: LinkInvalidMessage,
 	})
 }

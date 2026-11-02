@@ -1,4 +1,4 @@
-package components
+package tokens
 
 import (
 	"crypto/rand"
@@ -6,7 +6,7 @@ import (
 	"encoding/base64"
 )
 
-func RandomToken() (string, error) {
+func Random() (string, error) {
 	value := make([]byte, 32)
 	if _, err := rand.Read(value); err != nil {
 		return "", err
@@ -15,7 +15,7 @@ func RandomToken() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(value), nil
 }
 
-func HashToken(token string) []byte {
+func Hash(token string) []byte {
 	hash := sha256.Sum256([]byte(token))
 	return hash[:]
 }

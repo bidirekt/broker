@@ -3,7 +3,9 @@ package sign_in
 import (
 	"embed"
 
-	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/access"
+	"github.com/bidirekt/broker/internal/components/pages"
+	"github.com/bidirekt/broker/internal/components/sessions"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -19,11 +21,11 @@ func NewSignInUiHandler(useCase *SignInUseCase) *SignInUiHandler {
 }
 
 func (this *SignInUiHandler) ShowForm(ctx fiber.Ctx) error {
-	return components.Render(ctx, fiber.StatusOK, pageFiles, signInTemplate, SignInPage{})
+	return pages.Render(ctx, fiber.StatusOK, pageFiles, signInTemplate, SignInPage{})
 }
 
 func (this *SignInUiHandler) RequireSameOrigin(ctx fiber.Ctx) error {
-	if err := components.RequireSameOrigin(ctx); err != nil {
+	if err := sessions.RequireSameOrigin(ctx); err != nil {
 		return err
 	}
 
@@ -41,7 +43,7 @@ func (this *SignInUiHandler) SignIn(ctx fiber.Ctx) error {
 		return this.respondInvalidCredentials(ctx, identifier)
 	}
 
-	started, err := components.StartSession(ctx, output.UserID, output.VerifiedPasswordHash)
+	started, err := sessions.Start(ctx, output.UserID, output.VerifiedPasswordHash)
 	if err != nil {
 		return err
 	}
@@ -50,7 +52,7 @@ func (this *SignInUiHandler) SignIn(ctx fiber.Ctx) error {
 		return this.respondInvalidCredentials(ctx, identifier)
 	}
 
-	return components.Redirect(ctx, homePath)
+	return pages.Redirect(ctx, homePath)
 }
 
 func (this *SignInUiHandler) Identifier(ctx fiber.Ctx) string {
@@ -58,16 +60,16 @@ func (this *SignInUiHandler) Identifier(ctx fiber.Ctx) string {
 }
 
 func (this *SignInUiHandler) respondInvalidCredentials(ctx fiber.Ctx, identifier string) error {
-	return components.Render(ctx, fiber.StatusUnauthorized, pageFiles, signInTemplate, SignInPage{
+	return pages.Render(ctx, fiber.StatusUnauthorized, pageFiles, signInTemplate, SignInPage{
 		Identifier: identifier,
 		Message:    PageInvalidCredentialsMessage,
 	})
 }
 
 func (this *SignInUiHandler) RedirectHome(ctx fiber.Ctx) error {
-	if principal, _ := components.PrincipalFrom(ctx); principal.IsAdmin {
-		return components.Redirect(ctx, adminHomePath)
+	if principal, _ := access.PrincipalFrom(ctx); principal.IsAdmin {
+		return pages.Redirect(ctx, adminHomePath)
 	}
 
-	return components.Redirect(ctx, userHomePath)
+	return pages.Redirect(ctx, userHomePath)
 }

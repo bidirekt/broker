@@ -1,7 +1,7 @@
 package create_participant
 
 import (
-	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/gofiber/fiber/v3"
 )
@@ -15,7 +15,7 @@ func NewCreateParticipantApiHandler(useCase *CreateParticipantUseCase) *CreatePa
 }
 
 func (this *CreateParticipantApiHandler) Handle(ctx fiber.Ctx) error {
-	if err := components.RequirePermission(ctx, model.PermissionWrite); err != nil {
+	if err := access.RequirePermission(ctx, model.PermissionWrite); err != nil {
 		return err
 	}
 

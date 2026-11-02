@@ -1,10 +1,10 @@
-package components_test
+package passwords_test
 
 import (
 	"strings"
 	"testing"
 
-	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/passwords"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -12,37 +12,37 @@ import (
 const passwordUnderTest = "correct horse battery staple"
 
 func TestHashPasswordThenVerifyPasswordAcceptsTheSamePassword(t *testing.T) {
-	hash, err := components.HashPassword(passwordUnderTest)
+	hash, err := passwords.Hash(passwordUnderTest)
 	require.NoError(t, err)
 
-	assert.True(t, components.VerifyPassword(passwordUnderTest, hash))
+	assert.True(t, passwords.Verify(passwordUnderTest, hash))
 }
 
 func TestVerifyPasswordRejectsAWrongPassword(t *testing.T) {
-	hash, err := components.HashPassword(passwordUnderTest)
+	hash, err := passwords.Hash(passwordUnderTest)
 	require.NoError(t, err)
 
-	assert.False(t, components.VerifyPassword("correct horse battery stapler", hash))
+	assert.False(t, passwords.Verify("correct horse battery stapler", hash))
 }
 
 func TestHashPasswordSaltsEveryHash(t *testing.T) {
-	first, err := components.HashPassword(passwordUnderTest)
+	first, err := passwords.Hash(passwordUnderTest)
 	require.NoError(t, err)
-	second, err := components.HashPassword(passwordUnderTest)
+	second, err := passwords.Hash(passwordUnderTest)
 	require.NoError(t, err)
 
 	assert.NotEqual(t, first, second)
 }
 
 func TestHashPasswordUsesTheArgon2idParameters(t *testing.T) {
-	hash, err := components.HashPassword(passwordUnderTest)
+	hash, err := passwords.Hash(passwordUnderTest)
 	require.NoError(t, err)
 
 	assert.True(t, strings.HasPrefix(hash, "$argon2id$v=19$m=19456,t=2,p=1$"), hash)
 }
 
 func TestVerifyPasswordRejectsMalformedHashes(t *testing.T) {
-	hash, err := components.HashPassword(passwordUnderTest)
+	hash, err := passwords.Hash(passwordUnderTest)
 	require.NoError(t, err)
 	parts := strings.Split(hash, "$")
 	salt, key := parts[4], parts[5]
@@ -68,14 +68,14 @@ func TestVerifyPasswordRejectsMalformedHashes(t *testing.T) {
 
 	for name, encodedHash := range malformed {
 		t.Run(name, func(t *testing.T) {
-			assert.False(t, components.VerifyPassword(passwordUnderTest, encodedHash))
+			assert.False(t, passwords.Verify(passwordUnderTest, encodedHash))
 		})
 	}
 }
 
 func TestDummyPasswordHashIsAValidHashThatRejectsPasswords(t *testing.T) {
-	assert.True(t, strings.HasPrefix(components.DummyPasswordHash, "$argon2id$v=19$m=19456,t=2,p=1$"))
+	assert.True(t, strings.HasPrefix(passwords.DummyHash, "$argon2id$v=19$m=19456,t=2,p=1$"))
 	assert.NotPanics(t, func() {
-		assert.False(t, components.VerifyPassword(passwordUnderTest, components.DummyPasswordHash))
+		assert.False(t, passwords.Verify(passwordUnderTest, passwords.DummyHash))
 	})
 }

@@ -1,7 +1,7 @@
 package rename_participant
 
 import (
-	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/gofiber/fiber/v3"
 )
@@ -15,7 +15,7 @@ func NewRenameParticipantApiHandler(useCase *RenameParticipantUseCase) *RenamePa
 }
 
 func (this *RenameParticipantApiHandler) Handle(ctx fiber.Ctx) error {
-	if err := components.RequirePermission(ctx, model.PermissionWrite); err != nil {
+	if err := access.RequirePermission(ctx, model.PermissionWrite); err != nil {
 		return err
 	}
 

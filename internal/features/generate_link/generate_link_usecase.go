@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/tokens"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/bidirekt/broker/internal/repository"
 )
@@ -40,13 +40,13 @@ func NewGenerateLinkUseCase(linkRepository *repository.OneTimeLinkRepository, pu
 }
 
 func (this *GenerateLinkUseCase) Execute(ctx context.Context, input GenerateLinkInput) (GenerateLinkOutput, error) {
-	token, err := components.RandomToken()
+	token, err := tokens.Random()
 	if err != nil {
 		return GenerateLinkOutput{}, err
 	}
 
 	link := &model.OneTimeLink{
-		TokenHash: components.HashToken(token),
+		TokenHash: tokens.Hash(token),
 		UserID:    input.UserID,
 		ExpiresAt: time.Now().Add(linkLifetime),
 	}

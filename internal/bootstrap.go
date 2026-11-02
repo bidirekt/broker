@@ -2,6 +2,7 @@ package internal
 
 import (
 	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/config"
 	"github.com/bidirekt/broker/internal/features/can_i_deploy"
 	"github.com/bidirekt/broker/internal/features/create_environment"
 	"github.com/bidirekt/broker/internal/features/create_participant"
@@ -55,5 +56,5 @@ func Run() (*components.Components, error) {
 }
 
 func Healthcheck() error {
-	return health.Check(components.ListenAddr())
+	return health.Check(config.ListenAddr())
 }

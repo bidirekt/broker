@@ -3,7 +3,8 @@ package list_users
 import (
 	"embed"
 
-	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/access"
+	"github.com/bidirekt/broker/internal/components/pages"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -19,11 +20,11 @@ func NewListUsersUiHandler(useCase *ListUsersUseCase) *ListUsersUiHandler {
 }
 
 func (this *ListUsersUiHandler) Handle(ctx fiber.Ctx) error {
-	if err := components.RequireAdmin(ctx); err != nil {
+	if err := access.RequireAdmin(ctx); err != nil {
 		return err
 	}
 
 	output := this.useCase.Execute(ctx.Context(), ListUsersInput{})
 
-	return components.Render(ctx, fiber.StatusOK, pageFiles, listUsersTemplate, ListUsersPage{Users: output.Users})
+	return pages.Render(ctx, fiber.StatusOK, pageFiles, listUsersTemplate, ListUsersPage{Users: output.Users})
 }

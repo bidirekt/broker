@@ -16,6 +16,7 @@ import (
 
 	"github.com/bidirekt/broker/internal"
 	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/passwords"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -278,7 +279,7 @@ func (this *IntegrationSuite) csrfTokenFrom(page string) string {
 }
 
 func (this *IntegrationSuite) createActiveUser(email string, permission model.Permission, password string) (userID int64) {
-	passwordHash, err := components.HashPassword(password)
+	passwordHash, err := passwords.Hash(password)
 	this.Require().NoError(err)
 
 	err = this.Pool.QueryRow(context.Background(),

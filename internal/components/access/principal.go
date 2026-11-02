@@ -1,4 +1,4 @@
-package components
+package access
 
 import (
 	"github.com/bidirekt/broker/internal/model"
@@ -16,22 +16,30 @@ type Principal struct {
 	IsAdmin    bool
 }
 
-type CurrentSession struct {
+type Session struct {
 	IDHash    []byte
 	CSRFToken string
 }
 
 type principalKey struct{}
 
-type currentSessionKey struct{}
+type sessionKey struct{}
+
+func GrantPrincipal(ctx fiber.Ctx, principal Principal) {
+	ctx.Locals(principalKey{}, principal)
+}
+
+func GrantSession(ctx fiber.Ctx, session Session) {
+	ctx.Locals(sessionKey{}, session)
+}
 
 func PrincipalFrom(ctx fiber.Ctx) (Principal, bool) {
 	principal, ok := ctx.Locals(principalKey{}).(Principal)
 	return principal, ok
 }
 
-func SessionFrom(ctx fiber.Ctx) (CurrentSession, bool) {
-	session, ok := ctx.Locals(currentSessionKey{}).(CurrentSession)
+func SessionFrom(ctx fiber.Ctx) (Session, bool) {
+	session, ok := ctx.Locals(sessionKey{}).(Session)
 	return session, ok
 }
 

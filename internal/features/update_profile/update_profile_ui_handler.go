@@ -3,7 +3,8 @@ package update_profile
 import (
 	"embed"
 
-	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/access"
+	"github.com/bidirekt/broker/internal/components/pages"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -19,20 +20,20 @@ func NewUpdateProfileUiHandler(useCase *UpdateProfileUseCase) *UpdateProfileUiHa
 }
 
 func (this *UpdateProfileUiHandler) ShowForm(ctx fiber.Ctx) error {
-	if err := components.RequireUser(ctx); err != nil {
+	if err := access.RequireUser(ctx); err != nil {
 		return err
 	}
 
-	return components.Render(ctx, fiber.StatusOK, pageFiles, updateProfileTemplate, UpdateProfilePage{})
+	return pages.Render(ctx, fiber.StatusOK, pageFiles, updateProfileTemplate, UpdateProfilePage{})
 }
 
 func (this *UpdateProfileUiHandler) UpdateProfile(ctx fiber.Ctx) error {
-	if err := components.RequireUser(ctx); err != nil {
+	if err := access.RequireUser(ctx); err != nil {
 		return err
 	}
 
-	principal, _ := components.PrincipalFrom(ctx)
-	session, _ := components.SessionFrom(ctx)
+	principal, _ := access.PrincipalFrom(ctx)
+	session, _ := access.SessionFrom(ctx)
 	output, err := this.useCase.Execute(ctx.Context(), UpdateProfileInput{
 		UserID:          principal.UserID,
 		SessionIDHash:   session.IDHash,
@@ -50,13 +51,13 @@ func (this *UpdateProfileUiHandler) UpdateProfile(ctx fiber.Ctx) error {
 		return this.respondProblem(ctx, PasswordInvalidMessage)
 	}
 
-	return components.Render(ctx, fiber.StatusOK, pageFiles, updateProfileTemplate, UpdateProfilePage{
+	return pages.Render(ctx, fiber.StatusOK, pageFiles, updateProfileTemplate, UpdateProfilePage{
 		Confirmation: PasswordChangedMessage,
 	})
 }
 
 func (this *UpdateProfileUiHandler) respondProblem(ctx fiber.Ctx, message string) error {
-	return components.Render(ctx, fiber.StatusBadRequest, pageFiles, updateProfileTemplate, UpdateProfilePage{
+	return pages.Render(ctx, fiber.StatusBadRequest, pageFiles, updateProfileTemplate, UpdateProfilePage{
 		Problem: message,
 	})
 }

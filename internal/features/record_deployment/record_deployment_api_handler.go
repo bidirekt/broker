@@ -1,7 +1,7 @@
 package record_deployment
 
 import (
-	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/gofiber/fiber/v3"
 )
@@ -15,7 +15,7 @@ func NewRecordDeploymentApiHandler(useCase *RecordDeploymentUseCase) *RecordDepl
 }
 
 func (this *RecordDeploymentApiHandler) Handle(ctx fiber.Ctx) error {
-	if err := components.RequirePermission(ctx, model.PermissionWrite); err != nil {
+	if err := access.RequirePermission(ctx, model.PermissionWrite); err != nil {
 		return err
 	}
 

@@ -3,7 +3,8 @@ package invite_user
 import (
 	"embed"
 
-	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/access"
+	"github.com/bidirekt/broker/internal/components/pages"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -19,15 +20,15 @@ func NewInviteUserUiHandler(useCase *InviteUserUseCase) *InviteUserUiHandler {
 }
 
 func (this *InviteUserUiHandler) ShowForm(ctx fiber.Ctx) error {
-	if err := components.RequireAdmin(ctx); err != nil {
+	if err := access.RequireAdmin(ctx); err != nil {
 		return err
 	}
 
-	return components.Render(ctx, fiber.StatusOK, pageFiles, inviteUserTemplate, InviteUserPage{})
+	return pages.Render(ctx, fiber.StatusOK, pageFiles, inviteUserTemplate, InviteUserPage{})
 }
 
 func (this *InviteUserUiHandler) Invite(ctx fiber.Ctx) error {
-	if err := components.RequireAdmin(ctx); err != nil {
+	if err := access.RequireAdmin(ctx); err != nil {
 		return err
 	}
 
@@ -54,10 +55,10 @@ func (this *InviteUserUiHandler) Invite(ctx fiber.Ctx) error {
 	}
 
 	page.Link = output.Link
-	return components.Render(ctx, fiber.StatusOK, pageFiles, inviteUserTemplate, page)
+	return pages.Render(ctx, fiber.StatusOK, pageFiles, inviteUserTemplate, page)
 }
 
 func (this *InviteUserUiHandler) respondWithMessage(ctx fiber.Ctx, status int, page InviteUserPage, message string) error {
 	page.Message = message
-	return components.Render(ctx, status, pageFiles, inviteUserTemplate, page)
+	return pages.Render(ctx, status, pageFiles, inviteUserTemplate, page)
 }

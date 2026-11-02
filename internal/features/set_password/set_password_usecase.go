@@ -3,7 +3,8 @@ package set_password
 import (
 	"context"
 
-	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/passwords"
+	"github.com/bidirekt/broker/internal/components/tokens"
 	"github.com/bidirekt/broker/internal/repository"
 	"github.com/bidirekt/broker/internal/validations"
 )
@@ -38,7 +39,7 @@ func NewSetPasswordUseCase(
 }
 
 func (this *SetPasswordUseCase) IsLinkUsable(ctx context.Context, token string) bool {
-	_, _, usable := this.oneTimeLinkRepository.FindUsable(ctx, components.HashToken(token))
+	_, _, usable := this.oneTimeLinkRepository.FindUsable(ctx, tokens.Hash(token))
 	return usable
 }
 
@@ -51,12 +52,12 @@ func (this *SetPasswordUseCase) Execute(ctx context.Context, input SetPasswordIn
 		return SetPasswordOutput{Status: LinkInvalid}, nil
 	}
 
-	passwordHash, err := components.HashPassword(input.Password)
+	passwordHash, err := passwords.Hash(input.Password)
 	if err != nil {
 		return SetPasswordOutput{}, err
 	}
 
-	if !this.userRepository.SetPasswordWithLink(ctx, components.HashToken(input.Token), passwordHash) {
+	if !this.userRepository.SetPasswordWithLink(ctx, tokens.Hash(input.Token), passwordHash) {
 		return SetPasswordOutput{Status: LinkInvalid}, nil
 	}
 

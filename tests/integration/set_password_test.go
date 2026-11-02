@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/tokens"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/bidirekt/broker/internal/repository"
 )
@@ -26,23 +26,23 @@ const (
 var setPasswordInviteLinkInPage = regexp.MustCompile(`http://localhost:8080(/set-password\?token=([A-Za-z0-9_-]{43}))`)
 
 func (this *IntegrationSuite) createInvitedUserWithLink(email string) (token string) {
-	token, err := components.RandomToken()
+	token, err := tokens.Random()
 	this.Require().NoError(err)
 
 	this.Require().True(repository.NewUserRepository(this.Pool).CreateInvited(context.Background(),
 		&model.User{Email: email, Permission: model.PermissionWrite},
-		&model.OneTimeLink{TokenHash: components.HashToken(token), Purpose: model.LinkPurposeInvite, ExpiresAt: time.Now().Add(24 * time.Hour)},
+		&model.OneTimeLink{TokenHash: tokens.Hash(token), Purpose: model.LinkPurposeInvite, ExpiresAt: time.Now().Add(24 * time.Hour)},
 	))
 
 	return token
 }
 
 func (this *IntegrationSuite) createResetLink(userID int64) (token string) {
-	token, err := components.RandomToken()
+	token, err := tokens.Random()
 	this.Require().NoError(err)
 
 	_, found, deactivated := repository.NewOneTimeLinkRepository(this.Pool).ReplaceOpen(context.Background(),
-		&model.OneTimeLink{TokenHash: components.HashToken(token), UserID: userID, ExpiresAt: time.Now().Add(24 * time.Hour)},
+		&model.OneTimeLink{TokenHash: tokens.Hash(token), UserID: userID, ExpiresAt: time.Now().Add(24 * time.Hour)},
 	)
 	this.Require().True(found)
 	this.Require().False(deactivated)

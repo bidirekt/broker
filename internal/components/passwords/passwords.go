@@ -1,4 +1,4 @@
-package components
+package passwords
 
 import (
 	"crypto/rand"
@@ -19,9 +19,9 @@ const (
 )
 
 // Verified against when there is no real hash, so a failed sign-in costs the same as a real check.
-const DummyPasswordHash = "$argon2id$v=19$m=19456,t=2,p=1$wo6At9qGGLcoVznCRNlAaw$TydLBTv8pfpcddqiVV/s/+3nCi63wE+cSVA0wv2GQgM"
+const DummyHash = "$argon2id$v=19$m=19456,t=2,p=1$wo6At9qGGLcoVznCRNlAaw$TydLBTv8pfpcddqiVV/s/+3nCi63wE+cSVA0wv2GQgM"
 
-func HashPassword(password string) (string, error) {
+func Hash(password string) (string, error) {
 	salt := make([]byte, saltLength)
 	if _, err := rand.Read(salt); err != nil {
 		return "", err
@@ -30,7 +30,7 @@ func HashPassword(password string) (string, error) {
 	return toPHCString(argon2Memory, argon2Time, argon2Threads, salt, key), nil
 }
 
-func VerifyPassword(password, encodedHash string) bool {
+func Verify(password, encodedHash string) bool {
 	memory, time, threads, salt, key, ok := fromPHCString(encodedHash)
 	if !ok {
 		return false

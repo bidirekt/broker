@@ -5,6 +5,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/bidirekt/broker/internal/components/config"
+	"github.com/bidirekt/broker/internal/components/database"
+	"github.com/bidirekt/broker/internal/components/server"
+	"github.com/bidirekt/broker/internal/components/sessions"
 	"github.com/bidirekt/broker/internal/repository"
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -16,22 +20,22 @@ type Components struct {
 	Server     *fiber.App
 	Pool       *pgxpool.Pool
 	ListenAddr string
-	Settings   Settings
+	Settings   config.Settings
 }
 
 func New() (*Components, error) {
-	settings, err := readSettings()
+	settings, err := config.Read()
 	if err != nil {
 		return nil, err
 	}
 
-	pool, err := createDatabasePool()
+	pool, err := database.Open()
 	if err != nil {
 		return nil, err
 	}
-	server := createHttpServer(settings, pool)
+	httpServer := server.New(settings, pool)
 
-	if err := runMigrations(pool); err != nil {
+	if err := database.Migrate(pool); err != nil {
 		pool.Close()
 		return nil, err
 	}
@@ -42,9 +46,9 @@ func New() (*Components, error) {
 	}
 
 	return &Components{
-		Server:     server,
+		Server:     httpServer,
 		Pool:       pool,
-		ListenAddr: ListenAddr(),
+		ListenAddr: config.ListenAddr(),
 		Settings:   settings,
 	}, nil
 }
@@ -59,10 +63,10 @@ func deleteStaleSessionsAndLinks(pool *pgxpool.Pool) (err error) {
 		}
 	}()
 
-	sessions := repository.NewSessionRepository(pool)
+	sessionRepository := repository.NewSessionRepository(pool)
 
-	sessions.DeleteAdminSessions(ctx)
-	sessions.DeleteExpired(ctx, sessionIdleLimit, sessionAbsoluteLimit)
+	sessionRepository.DeleteAdminSessions(ctx)
+	sessionRepository.DeleteExpired(ctx, sessions.IdleLimit, sessions.AbsoluteLimit)
 	repository.NewOneTimeLinkRepository(pool).DeleteUsedAndExpired(ctx)
 
 	return nil

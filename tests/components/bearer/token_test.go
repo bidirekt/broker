@@ -1,10 +1,11 @@
-package components_test
+package bearer_test
 
 import (
 	"testing"
 	"time"
 
-	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/bearer"
+	"github.com/bidirekt/broker/internal/components/config"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,7 +18,7 @@ const (
 	jwtSubject   = "42"
 )
 
-var jwtSettings = components.Settings{PublicURL: jwtPublicURL}
+var jwtSettings = config.Settings{PublicURL: jwtPublicURL}
 
 func validJWTClaims() jwt.MapClaims {
 	now := time.Now()
@@ -45,10 +46,10 @@ func signJWT(t *testing.T, method jwt.SigningMethod, header map[string]any, clai
 func TestIssueTokenThenUserIDFromTokenReturnsTheUser(t *testing.T) {
 	issuedAt := time.Now()
 
-	token, expiresAt, err := components.IssueToken(jwtSettings, jwtUserID, issuedAt)
+	token, expiresAt, err := bearer.Issue(jwtSettings, jwtUserID, issuedAt)
 	require.NoError(t, err)
 
-	userID, valid := components.UserIDFromToken(jwtSettings, token)
+	userID, valid := bearer.UserIDFrom(jwtSettings, token)
 	assert.True(t, valid)
 	assert.Equal(t, jwtUserID, userID)
 	assert.Equal(t, issuedAt.Add(15*time.Minute).Unix(), expiresAt.Unix())
@@ -57,7 +58,7 @@ func TestIssueTokenThenUserIDFromTokenReturnsTheUser(t *testing.T) {
 func TestIssueTokenWritesTheExpectedHeaderAndClaims(t *testing.T) {
 	issuedAt := time.Now()
 
-	token, _, err := components.IssueToken(jwtSettings, jwtUserID, issuedAt)
+	token, _, err := bearer.Issue(jwtSettings, jwtUserID, issuedAt)
 	require.NoError(t, err)
 
 	claims := jwt.MapClaims{}
@@ -74,10 +75,10 @@ func TestIssueTokenWritesTheExpectedHeaderAndClaims(t *testing.T) {
 }
 
 func TestUserIDFromTokenRefusesAnExpiredToken(t *testing.T) {
-	token, _, err := components.IssueToken(jwtSettings, jwtUserID, time.Now().Add(-16*time.Minute))
+	token, _, err := bearer.Issue(jwtSettings, jwtUserID, time.Now().Add(-16*time.Minute))
 	require.NoError(t, err)
 
-	_, valid := components.UserIDFromToken(jwtSettings, token)
+	_, valid := bearer.UserIDFrom(jwtSettings, token)
 	assert.False(t, valid)
 }
 
@@ -95,30 +96,30 @@ func TestUserIDFromTokenRefusesDefectiveTokens(t *testing.T) {
 	}
 
 	defective := map[string]string{
-		"HS512":           signJWT(t, jwt.SigningMethodHS512, typHeader(), validJWTClaims(), components.TokenSigningKey),
+		"HS512":           signJWT(t, jwt.SigningMethodHS512, typHeader(), validJWTClaims(), bearer.SigningKey),
 		"none":            signJWT(t, jwt.SigningMethodNone, typHeader(), validJWTClaims(), jwt.UnsafeAllowNoneSignatureType),
-		"wrong aud":       signJWT(t, jwt.SigningMethodHS256, typHeader(), withClaim("aud", jwtPublicURL), components.TokenSigningKey),
-		"wrong iss":       signJWT(t, jwt.SigningMethodHS256, typHeader(), withClaim("iss", "http://localhost:9090"), components.TokenSigningKey),
-		"missing typ":     signJWT(t, jwt.SigningMethodHS256, map[string]any{}, validJWTClaims(), components.TokenSigningKey),
-		"wrong typ":       signJWT(t, jwt.SigningMethodHS256, map[string]any{"typ": "JWT"}, validJWTClaims(), components.TokenSigningKey),
-		"missing exp":     signJWT(t, jwt.SigningMethodHS256, typHeader(), withoutClaim("exp"), components.TokenSigningKey),
-		"non-numeric sub": signJWT(t, jwt.SigningMethodHS256, typHeader(), withClaim("sub", "ana"), components.TokenSigningKey),
-		"padded sub":      signJWT(t, jwt.SigningMethodHS256, typHeader(), withClaim("sub", "042"), components.TokenSigningKey),
+		"wrong aud":       signJWT(t, jwt.SigningMethodHS256, typHeader(), withClaim("aud", jwtPublicURL), bearer.SigningKey),
+		"wrong iss":       signJWT(t, jwt.SigningMethodHS256, typHeader(), withClaim("iss", "http://localhost:9090"), bearer.SigningKey),
+		"missing typ":     signJWT(t, jwt.SigningMethodHS256, map[string]any{}, validJWTClaims(), bearer.SigningKey),
+		"wrong typ":       signJWT(t, jwt.SigningMethodHS256, map[string]any{"typ": "JWT"}, validJWTClaims(), bearer.SigningKey),
+		"missing exp":     signJWT(t, jwt.SigningMethodHS256, typHeader(), withoutClaim("exp"), bearer.SigningKey),
+		"non-numeric sub": signJWT(t, jwt.SigningMethodHS256, typHeader(), withClaim("sub", "ana"), bearer.SigningKey),
+		"padded sub":      signJWT(t, jwt.SigningMethodHS256, typHeader(), withClaim("sub", "042"), bearer.SigningKey),
 		"another key":     signJWT(t, jwt.SigningMethodHS256, typHeader(), validJWTClaims(), []byte("another-signing-key-of-32-bytes!")),
 	}
 
 	for name, token := range defective {
 		t.Run(name, func(t *testing.T) {
-			_, valid := components.UserIDFromToken(jwtSettings, token)
+			_, valid := bearer.UserIDFrom(jwtSettings, token)
 			assert.False(t, valid)
 		})
 	}
 }
 
 func TestUserIDFromTokenAcceptsAHandBuiltValidToken(t *testing.T) {
-	token := signJWT(t, jwt.SigningMethodHS256, map[string]any{"typ": "at+jwt"}, validJWTClaims(), components.TokenSigningKey)
+	token := signJWT(t, jwt.SigningMethodHS256, map[string]any{"typ": "at+jwt"}, validJWTClaims(), bearer.SigningKey)
 
-	userID, valid := components.UserIDFromToken(jwtSettings, token)
+	userID, valid := bearer.UserIDFrom(jwtSettings, token)
 	assert.True(t, valid)
 	assert.Equal(t, jwtUserID, userID)
 }

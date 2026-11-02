@@ -4,7 +4,8 @@ import (
 	"embed"
 	"strconv"
 
-	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/access"
+	"github.com/bidirekt/broker/internal/components/pages"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -20,7 +21,7 @@ func NewEditUserUiHandler(useCase *EditUserUseCase) *EditUserUiHandler {
 }
 
 func (this *EditUserUiHandler) ShowForm(ctx fiber.Ctx) error {
-	if err := components.RequireAdmin(ctx); err != nil {
+	if err := access.RequireAdmin(ctx); err != nil {
 		return err
 	}
 
@@ -34,7 +35,7 @@ func (this *EditUserUiHandler) ShowForm(ctx fiber.Ctx) error {
 		return this.respondUserNotFound(ctx)
 	}
 
-	return components.Render(ctx, fiber.StatusOK, pageFiles, editUserTemplate, EditUserPage{
+	return pages.Render(ctx, fiber.StatusOK, pageFiles, editUserTemplate, EditUserPage{
 		UserID:     user.ID,
 		Email:      user.Email,
 		Permission: string(user.Permission),
@@ -42,7 +43,7 @@ func (this *EditUserUiHandler) ShowForm(ctx fiber.Ctx) error {
 }
 
 func (this *EditUserUiHandler) EditUser(ctx fiber.Ctx) error {
-	if err := components.RequireAdmin(ctx); err != nil {
+	if err := access.RequireAdmin(ctx); err != nil {
 		return err
 	}
 
@@ -74,7 +75,7 @@ func (this *EditUserUiHandler) EditUser(ctx fiber.Ctx) error {
 		return this.respondUserNotFound(ctx)
 	}
 
-	return components.Redirect(ctx, usersPath)
+	return pages.Redirect(ctx, usersPath)
 }
 
 func (this *EditUserUiHandler) userIDFrom(ctx fiber.Ctx) (int64, bool) {
@@ -85,12 +86,12 @@ func (this *EditUserUiHandler) userIDFrom(ctx fiber.Ctx) (int64, bool) {
 }
 
 func (this *EditUserUiHandler) respondUserNotFound(ctx fiber.Ctx) error {
-	return components.Render(ctx, fiber.StatusNotFound, pageFiles, editUserTemplate, EditUserPage{
+	return pages.Render(ctx, fiber.StatusNotFound, pageFiles, editUserTemplate, EditUserPage{
 		Message: UserNotFoundMessage,
 	})
 }
 
 func (this *EditUserUiHandler) respondWithMessage(ctx fiber.Ctx, status int, page EditUserPage, message string) error {
 	page.Message = message
-	return components.Render(ctx, status, pageFiles, editUserTemplate, page)
+	return pages.Render(ctx, status, pageFiles, editUserTemplate, page)
 }

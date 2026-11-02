@@ -1,4 +1,4 @@
-package components
+package config
 
 import (
 	"errors"
@@ -21,7 +21,7 @@ func ListenAddr() string {
 	return defaultListenAddr
 }
 
-func databaseURL() (string, error) {
+func DatabaseURL() (string, error) {
 	value := os.Getenv("BIDIREKT_DATABASE_URL")
 	if value == "" {
 		return "", errors.New("BIDIREKT_DATABASE_URL is required")
@@ -32,7 +32,7 @@ func databaseURL() (string, error) {
 
 const defaultDatabaseConnectAttempts = 10
 
-func databaseConnectAttempts() (int, error) {
+func DatabaseConnectAttempts() (int, error) {
 	value := os.Getenv("BIDIREKT_DATABASE_CONNECT_RETRIES")
 	if value == "" {
 		return defaultDatabaseConnectAttempts, nil
@@ -53,7 +53,7 @@ type Settings struct {
 	TrustedProxies []string
 }
 
-func readSettings() (Settings, error) {
+func Read() (Settings, error) {
 	publicURL, err := publicURL()
 	if err != nil {
 		return Settings{}, err
