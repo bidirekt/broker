@@ -22,10 +22,10 @@ var templateFiles embed.FS
 var layouts = template.Must(template.ParseFS(templateFiles, "templates/layout*.html"))
 
 type layoutData struct {
-	CSRFToken string
-	IsAdmin   bool
-	Section   string
-	Page      any
+	CSRFToken    string
+	ManagesUsers bool
+	Section      string
+	Page         any
 }
 
 func Render(ctx fiber.Ctx, status int, files fs.FS, page string, data any) error {
@@ -67,10 +67,10 @@ func layoutFor(ctx fiber.Ctx, page any) (layout string, data layoutData) {
 	principal, _ := access.PrincipalFrom(ctx)
 
 	return signedInLayout, layoutData{
-		CSRFToken: session.CSRFToken,
-		IsAdmin:   principal.IsAdmin,
-		Section:   sectionOf(ctx.Path()),
-		Page:      page,
+		CSRFToken:    session.CSRFToken,
+		ManagesUsers: principal.ManagesUsers(),
+		Section:      sectionOf(ctx.Path()),
+		Page:         page,
 	}
 }
 

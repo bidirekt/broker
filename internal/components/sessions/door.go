@@ -2,13 +2,13 @@ package sessions
 
 import (
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/components/config"
 	"github.com/bidirekt/broker/internal/components/pages"
 	"github.com/bidirekt/broker/internal/components/tokens"
-	"github.com/bidirekt/broker/internal/model"
 	"github.com/bidirekt/broker/internal/repository"
 	"github.com/gofiber/fiber/v3"
 )
@@ -18,14 +18,17 @@ const (
 	AbsoluteLimit = 7 * 24 * time.Hour
 
 	signInPath = "/sign-in"
+	setupPath  = "/setup"
 )
 
-var pagesOutsideSessionDoor = []string{signInPath, "/set-password"}
+var pagesOutsideSessionDoor = []string{signInPath, "/set-password", setupPath}
 
 type keeper struct {
 	settings config.Settings
 	sessions *repository.SessionRepository
 	users    *repository.UserRepository
+	// no row becomes or stops being the admin through the broker, so once true it stays true
+	adminExists atomic.Bool
 }
 
 type keeperKey struct{}
@@ -36,7 +39,15 @@ func Door(settings config.Settings, sessions *repository.SessionRepository, user
 	return func(ctx fiber.Ctx) error {
 		ctx.Locals(keeperKey{}, keeper)
 
-		if isOutsideSessionDoor(ctx.Path()) {
+		if !pages.IsPagePath(ctx.Path()) {
+			return ctx.Next()
+		}
+
+		if !isUnderPath(ctx.Path(), setupPath) && !keeper.isSetUp(ctx) {
+			return pages.Redirect(ctx, setupPath)
+		}
+
+		if isPageOutsideSessionDoor(ctx.Path()) {
 			return ctx.Next()
 		}
 
@@ -56,11 +67,21 @@ func Door(settings config.Settings, sessions *repository.SessionRepository, user
 	}
 }
 
-func isOutsideSessionDoor(path string) bool {
-	if !pages.IsPagePath(path) {
+func (this *keeper) isSetUp(ctx fiber.Ctx) bool {
+	if this.adminExists.Load() {
 		return true
 	}
 
+	if !this.users.AdminExists(ctx.Context()) {
+		return false
+	}
+
+	this.adminExists.Store(true)
+
+	return true
+}
+
+func isPageOutsideSessionDoor(path string) bool {
 	for _, prefix := range pagesOutsideSessionDoor {
 		if isUnderPath(path, prefix) {
 			return true
@@ -92,13 +113,14 @@ func (this *keeper) toPrincipal(ctx fiber.Ctx) (access.Principal, access.Session
 		return access.Principal{}, access.Session{}, false
 	}
 
-	principal := access.Principal{IsAdmin: true}
-	if session.UserID.Valid {
-		user, found := this.users.FindByID(ctx.Context(), session.UserID.Int64)
-		if !found || user.State() != model.UserActive {
-			return access.Principal{}, access.Session{}, false
-		}
-		principal = access.Principal{UserID: user.ID, Permission: user.Permission}
+	user, found := this.users.FindByID(ctx.Context(), session.UserID)
+	if !found {
+		return access.Principal{}, access.Session{}, false
+	}
+
+	principal, active := access.PrincipalOf(user)
+	if !active {
+		return access.Principal{}, access.Session{}, false
 	}
 
 	this.sessions.MarkSeen(ctx.Context(), idHash)

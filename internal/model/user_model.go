@@ -1,6 +1,7 @@
 package model
 
 import (
+	"slices"
 	"time"
 
 	"github.com/guregu/null"
@@ -11,7 +12,19 @@ type Permission string
 const (
 	PermissionRead  Permission = "read"
 	PermissionWrite Permission = "write"
+	PermissionAdmin Permission = "admin"
 )
+
+var permissionLadder = []Permission{PermissionRead, PermissionWrite, PermissionAdmin}
+
+func (this Permission) Includes(needed Permission) bool {
+	held, neededStep := slices.Index(permissionLadder, this), slices.Index(permissionLadder, needed)
+	return neededStep >= 0 && held >= neededStep
+}
+
+func (this Permission) IsGrantable() bool {
+	return this == PermissionRead || this == PermissionWrite
+}
 
 type UserState string
 

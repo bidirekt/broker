@@ -9,10 +9,10 @@ import (
 )
 
 const (
-	signInFailureWindow        = 15 * time.Minute
-	signInFailuresPerIP        = 50
-	signInFailuresPerAccount   = 10
-	signInIdentifierLocalsName = "signInIdentifier"
+	signInFailureWindow      = 15 * time.Minute
+	signInFailuresPerIP      = 50
+	signInFailuresPerAccount = 10
+	signInEmailLocalsName    = "signInEmail"
 )
 
 type signInLimiter struct {
@@ -26,8 +26,8 @@ func newSignInLimiter() *signInLimiter {
 			return ctx.IP()
 		}),
 		perAccount: newSignInFailureLimiter(signInFailuresPerAccount, func(ctx fiber.Ctx) string {
-			identifier, _ := ctx.Locals(signInIdentifierLocalsName).(string)
-			return ctx.IP() + " " + identifier
+			email, _ := ctx.Locals(signInEmailLocalsName).(string)
+			return ctx.IP() + " " + email
 		}),
 	}
 }
@@ -49,9 +49,9 @@ func (this *signInLimiter) PerIP(ctx fiber.Ctx) error {
 	return this.perIP(ctx)
 }
 
-func (this *signInLimiter) PerAccount(identifierFrom func(fiber.Ctx) string) fiber.Handler {
+func (this *signInLimiter) PerAccount(emailFrom func(fiber.Ctx) string) fiber.Handler {
 	return func(ctx fiber.Ctx) error {
-		ctx.Locals(signInIdentifierLocalsName, strings.ToLower(identifierFrom(ctx)))
+		ctx.Locals(signInEmailLocalsName, strings.ToLower(emailFrom(ctx)))
 		return this.perAccount(ctx)
 	}
 }

@@ -8,8 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
-
-	"github.com/bidirekt/broker/internal/validations"
 )
 
 const defaultListenAddr = ":8080"
@@ -49,23 +47,11 @@ func DatabaseConnectAttempts() (int, error) {
 
 type Settings struct {
 	PublicURL      string
-	AdminUsername  string
-	AdminPassword  string
 	TrustedProxies []string
 }
 
 func Read() (Settings, error) {
 	publicURL, err := publicURL()
-	if err != nil {
-		return Settings{}, err
-	}
-
-	adminUsername, err := adminUsername()
-	if err != nil {
-		return Settings{}, err
-	}
-
-	adminPassword, err := adminPassword()
 	if err != nil {
 		return Settings{}, err
 	}
@@ -77,8 +63,6 @@ func Read() (Settings, error) {
 
 	return Settings{
 		PublicURL:      publicURL,
-		AdminUsername:  adminUsername,
-		AdminPassword:  adminPassword,
 		TrustedProxies: trustedProxies,
 	}, nil
 }
@@ -121,32 +105,6 @@ func publicURL() (string, error) {
 
 	if parsed.Scheme == "http" && parsed.Hostname() != "localhost" && parsed.Hostname() != "127.0.0.1" {
 		return "", errors.New("BIDIREKT_PUBLIC_URL must use https, or http on localhost or 127.0.0.1")
-	}
-
-	return value, nil
-}
-
-func adminUsername() (string, error) {
-	value := os.Getenv("BIDIREKT_ADMIN_USERNAME")
-	if value == "" {
-		return "", errors.New("BIDIREKT_ADMIN_USERNAME is required")
-	}
-
-	if strings.Contains(value, "@") {
-		return "", errors.New("BIDIREKT_ADMIN_USERNAME must not contain @")
-	}
-
-	return value, nil
-}
-
-func adminPassword() (string, error) {
-	value := os.Getenv("BIDIREKT_ADMIN_PASSWORD")
-	if value == "" {
-		return "", errors.New("BIDIREKT_ADMIN_PASSWORD is required")
-	}
-
-	if err := validations.Password(value); err != nil {
-		return "", errors.New("BIDIREKT_ADMIN_PASSWORD " + err.Error())
 	}
 
 	return value, nil

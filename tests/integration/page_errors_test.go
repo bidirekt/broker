@@ -33,7 +33,10 @@ func (this *IntegrationSuite) sendPageErrorsRequest(req *http.Request) (status i
 	idHash := sha256.Sum256([]byte(pageErrorsSessionCookie))
 	sessions := repository.NewSessionRepository(this.Pool)
 	if _, found := sessions.FindByIDHash(context.Background(), idHash[:]); !found {
-		sessions.Create(context.Background(), &model.Session{IDHash: idHash[:], CSRFToken: pageErrorsCSRFToken}, "")
+		admin, found := repository.NewUserRepository(this.Pool).FindByID(context.Background(), this.adminID)
+		this.Require().True(found)
+		session := &model.Session{IDHash: idHash[:], UserID: this.adminID, CSRFToken: pageErrorsCSRFToken}
+		this.Require().True(sessions.Create(context.Background(), session, admin.PasswordHash.String))
 	}
 
 	req.AddCookie(&http.Cookie{Name: "bidirekt_session", Value: pageErrorsSessionCookie})

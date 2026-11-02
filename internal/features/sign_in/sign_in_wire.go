@@ -1,26 +1,26 @@
 package sign_in
 
 const (
-	PageInvalidCredentialsMessage string = "invalid email, username or password"
+	PageInvalidCredentialsMessage string = "invalid email or password"
 	ApiInvalidCredentialsMessage  string = "invalid credentials"
 	SignInInvalidInputMessage     string = "sign in invalid input"
 	SignedInMessage               string = "signed in"
 	TooManySignInAttemptsMessage  string = "too many attempts, try again later"
 	ForbiddenMessage              string = "forbidden"
 
-	identifierFormField = "identifier"
-	passwordFormField   = "password"
+	emailFormField    = "email"
+	passwordFormField = "password"
 
-	homePath      = "/"
-	adminHomePath = "/users"
-	userHomePath  = "/profile"
+	homePath    = "/"
+	usersPath   = "/users"
+	profilePath = "/profile"
 
 	signInTemplate = "sign_in.html"
 )
 
 type SignInPage struct {
-	Identifier string
-	Message    string
+	Email   string
+	Message string
 }
 
 type SignInRequestBody struct {

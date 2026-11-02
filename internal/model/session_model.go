@@ -1,14 +1,10 @@
 package model
 
-import (
-	"time"
-
-	"github.com/guregu/null"
-)
+import "time"
 
 type Session struct {
 	IDHash     []byte
-	UserID     null.Int
+	UserID     int64
 	CSRFToken  string
 	CreatedAt  time.Time
 	LastSeenAt time.Time

@@ -18,8 +18,8 @@ const (
 	profileCurrentPasswordWrong = "the current password is wrong"
 	profilePasswordInvalid      = "the password must have 15 to 128 characters"
 	profilePasswordChanged      = "password changed"
-	profileAdminPassword        = "integration-admin-password"
-	profileNoAccess             = "you don&#39;t have access"
+	profileAdminEmail           = "admin@example.com"
+	profileAdminSecret          = "suite-admin-correct-horse"
 	profileLinkInvalid          = "this link is no longer valid, ask your admin for a new one"
 )
 
@@ -119,8 +119,8 @@ func (this *IntegrationSuite) TestUpdateProfile_Success_EndsOtherSessionsAndKeep
 	this.Equal(1, this.countRows("sessions"))
 
 	status, _, _ = this.postForm("/sign-in", "", "", url.Values{
-		"identifier": {profileUserEmail},
-		"password":   {profileCurrentPassword},
+		"email":    {profileUserEmail},
+		"password": {profileCurrentPassword},
 	})
 	this.Equal(http.StatusUnauthorized, status)
 	this.NotEmpty(this.signInAsUser(profileUserEmail, profileNewPassword))
@@ -149,18 +149,16 @@ func (this *IntegrationSuite) TestUpdateProfile_Success_EndsTheOpenResetLink() {
 	this.Contains(body, profileLinkInvalid)
 }
 
-func (this *IntegrationSuite) TestUpdateProfile_AdminGetsTheNoAccessPage() {
+func (this *IntegrationSuite) TestUpdateProfile_AdminChangesItsPasswordAndSignsInWithTheNewOne() {
 	cookie := this.signInAsAdmin()
+	csrfToken := this.openProfile(cookie)
 
-	status, _, body := this.getPage("/profile", cookie)
-	this.Equal(http.StatusForbidden, status)
-	this.Contains(body, profileNoAccess)
-	csrfToken := this.csrfTokenFrom(body)
-
-	status, _, body = this.postForm("/profile", cookie, csrfToken, url.Values{
-		"current_password": {profileAdminPassword},
+	status, _, body := this.postForm("/profile", cookie, csrfToken, url.Values{
+		"current_password": {profileAdminSecret},
 		"new_password":     {profileNewPassword},
 	})
-	this.Equal(http.StatusForbidden, status)
-	this.Contains(body, profileNoAccess)
+	this.Require().Equal(http.StatusOK, status)
+	this.Contains(body, profilePasswordChanged)
+
+	this.NotEmpty(this.signInAsUser(profileAdminEmail, profileNewPassword))
 }

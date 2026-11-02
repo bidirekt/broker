@@ -13,7 +13,6 @@ const (
 type Principal struct {
 	UserID     int64
 	Permission model.Permission
-	IsAdmin    bool
 }
 
 type Session struct {
@@ -24,6 +23,18 @@ type Session struct {
 type principalKey struct{}
 
 type sessionKey struct{}
+
+func PrincipalOf(user *model.User) (Principal, bool) {
+	if user.State() != model.UserActive {
+		return Principal{}, false
+	}
+
+	return Principal{UserID: user.ID, Permission: user.Permission}, true
+}
+
+func (this Principal) ManagesUsers() bool {
+	return this.Permission == model.PermissionAdmin
+}
 
 func GrantPrincipal(ctx fiber.Ctx, principal Principal) {
 	ctx.Locals(principalKey{}, principal)
@@ -43,25 +54,21 @@ func SessionFrom(ctx fiber.Ctx) (Session, bool) {
 	return session, ok
 }
 
-func RequireAdmin(ctx fiber.Ctx) error {
-	if principal, ok := PrincipalFrom(ctx); ok && principal.IsAdmin {
-		return nil
-	}
-
+func NoAccess() error {
 	return fiber.NewError(fiber.StatusForbidden, noAccessMessage)
 }
 
-func RequireUser(ctx fiber.Ctx) error {
-	if principal, ok := PrincipalFrom(ctx); ok && !principal.IsAdmin {
+func RequireAdmin(ctx fiber.Ctx) error {
+	if principal, ok := PrincipalFrom(ctx); ok && principal.ManagesUsers() {
 		return nil
 	}
 
-	return fiber.NewError(fiber.StatusForbidden, noAccessMessage)
+	return NoAccess()
 }
 
 func RequirePermission(ctx fiber.Ctx, permission model.Permission) error {
 	principal, ok := PrincipalFrom(ctx)
-	if ok && (principal.Permission == permission || principal.Permission == model.PermissionWrite) {
+	if ok && principal.Permission.Includes(permission) {
 		return nil
 	}
 

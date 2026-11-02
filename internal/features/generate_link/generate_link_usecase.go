@@ -17,6 +17,7 @@ const (
 	LinkGenerated GenerateLinkStatus = iota
 	UserNotFound
 	UserDeactivated
+	TargetIsTheAdmin
 )
 
 type GenerateLinkInput struct {
@@ -31,15 +32,20 @@ type GenerateLinkOutput struct {
 }
 
 type GenerateLinkUseCase struct {
+	userRepository *repository.UserRepository
 	linkRepository *repository.OneTimeLinkRepository
 	publicURL      string
 }
 
-func NewGenerateLinkUseCase(linkRepository *repository.OneTimeLinkRepository, publicURL string) *GenerateLinkUseCase {
-	return &GenerateLinkUseCase{linkRepository: linkRepository, publicURL: publicURL}
+func NewGenerateLinkUseCase(userRepository *repository.UserRepository, linkRepository *repository.OneTimeLinkRepository, publicURL string) *GenerateLinkUseCase {
+	return &GenerateLinkUseCase{userRepository: userRepository, linkRepository: linkRepository, publicURL: publicURL}
 }
 
 func (this *GenerateLinkUseCase) Execute(ctx context.Context, input GenerateLinkInput) (GenerateLinkOutput, error) {
+	if user, found := this.userRepository.FindByID(ctx, input.UserID); found && user.Permission == model.PermissionAdmin {
+		return GenerateLinkOutput{Status: TargetIsTheAdmin}, nil
+	}
+
 	token, err := tokens.Random()
 	if err != nil {
 		return GenerateLinkOutput{}, err

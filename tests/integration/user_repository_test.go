@@ -6,7 +6,6 @@ import (
 
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/bidirekt/broker/internal/repository"
-	"github.com/guregu/null"
 )
 
 const (
@@ -60,7 +59,7 @@ func (this *IntegrationSuite) TestUserRepository_CreateInvitedWithTheSameEmailIn
 	)
 	this.False(created)
 
-	this.Equal(1, this.countRows("users"))
+	this.Equal(2, this.countRows("users"))
 	this.Equal(1, this.countRows("one_time_links"))
 }
 
@@ -105,7 +104,7 @@ func (this *IntegrationSuite) TestUserRepository_List_OrdersByEmailByteWise() {
 		emails = append(emails, user.Email)
 	}
 
-	this.Equal([]string{"Zed@x.com", "ana@x.com", "bob@x.com"}, emails)
+	this.Equal([]string{"Zed@x.com", "admin@example.com", "ana@x.com", "bob@x.com"}, emails)
 }
 
 func (this *IntegrationSuite) TestUserRepository_UpdateEmailAndPermission_ReportsTheClashAndKeepsSessions() {
@@ -152,7 +151,7 @@ func (this *IntegrationSuite) TestUserRepository_Deactivate_WipesSessionsAndOpen
 		&model.OneTimeLink{TokenHash: []byte("ana-invite"), Purpose: model.LinkPurposeInvite, ExpiresAt: time.Now().Add(24 * time.Hour)},
 	))
 	this.userRepositoryInsertSession("ana-session", user.ID)
-	this.Require().True(sessions.Create(ctx, &model.Session{IDHash: []byte("admin-session"), CSRFToken: "admin-csrf"}, ""))
+	this.userRepositoryInsertSession("admin-session", this.adminID)
 
 	this.True(repo.Deactivate(ctx, user.ID))
 	this.False(repo.Deactivate(ctx, user.ID))
@@ -321,9 +320,9 @@ func (this *IntegrationSuite) TestUserRepository_ChangePasswordKeepingSession_Ke
 		&model.OneTimeLink{TokenHash: []byte("ana-invite"), Purpose: model.LinkPurposeInvite, ExpiresAt: time.Now().Add(24 * time.Hour)},
 	))
 	this.Require().True(repo.SetPasswordWithLink(ctx, []byte("ana-invite"), userRepositoryPasswordHash))
-	this.Require().True(sessions.Create(ctx, &model.Session{IDHash: []byte("ana-laptop"), UserID: null.IntFrom(user.ID), CSRFToken: "laptop-csrf"}, userRepositoryPasswordHash))
-	this.Require().True(sessions.Create(ctx, &model.Session{IDHash: []byte("ana-phone"), UserID: null.IntFrom(user.ID), CSRFToken: "phone-csrf"}, userRepositoryPasswordHash))
-	this.Require().True(sessions.Create(ctx, &model.Session{IDHash: []byte("admin-session"), CSRFToken: "admin-csrf"}, ""))
+	this.Require().True(sessions.Create(ctx, &model.Session{IDHash: []byte("ana-laptop"), UserID: user.ID, CSRFToken: "laptop-csrf"}, userRepositoryPasswordHash))
+	this.Require().True(sessions.Create(ctx, &model.Session{IDHash: []byte("ana-phone"), UserID: user.ID, CSRFToken: "phone-csrf"}, userRepositoryPasswordHash))
+	this.userRepositoryInsertSession("admin-session", this.adminID)
 
 	this.Require().True(repo.ChangePasswordKeepingSession(ctx, user.ID, userRepositoryPasswordHash, userRepositoryNewPasswordHash, []byte("ana-laptop")))
 
@@ -376,8 +375,8 @@ func (this *IntegrationSuite) TestUserRepository_ChangePasswordKeepingSessionAft
 	this.Require().True(found)
 	this.Require().False(deactivated)
 	this.Require().True(repo.SetPasswordWithLink(ctx, []byte("ana-reset"), userRepositoryResetPasswordHash))
-	this.Require().True(sessions.Create(ctx, &model.Session{IDHash: []byte("ana-laptop"), UserID: null.IntFrom(user.ID), CSRFToken: "laptop-csrf"}, userRepositoryResetPasswordHash))
-	this.Require().True(sessions.Create(ctx, &model.Session{IDHash: []byte("ana-phone"), UserID: null.IntFrom(user.ID), CSRFToken: "phone-csrf"}, userRepositoryResetPasswordHash))
+	this.Require().True(sessions.Create(ctx, &model.Session{IDHash: []byte("ana-laptop"), UserID: user.ID, CSRFToken: "laptop-csrf"}, userRepositoryResetPasswordHash))
+	this.Require().True(sessions.Create(ctx, &model.Session{IDHash: []byte("ana-phone"), UserID: user.ID, CSRFToken: "phone-csrf"}, userRepositoryResetPasswordHash))
 
 	this.False(repo.ChangePasswordKeepingSession(ctx, user.ID, userRepositoryPasswordHash, userRepositoryNewPasswordHash, []byte("ana-laptop")))
 

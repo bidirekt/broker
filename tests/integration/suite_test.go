@@ -28,8 +28,8 @@ import (
 
 const (
 	suitePublicURL         = "http://localhost:8080"
-	suiteAdminUsername     = "admin"
-	suiteAdminPassword     = "integration-admin-password"
+	suiteAdminEmail        = "admin@example.com"
+	suiteAdminSecret       = "suite-admin-correct-horse"
 	suiteSessionCookieName = "bidirekt_session"
 	suiteWriterEmail       = "suite-writer@x.com"
 	suiteWriterPassword    = "suite-writer-correct-horse"
@@ -48,6 +48,7 @@ type IntegrationSuite struct {
 	Components  *components.Components
 	Pool        *pgxpool.Pool
 	writerToken string
+	adminID     int64
 	testCount   int
 	clientIP    string
 }
@@ -79,8 +80,6 @@ func (this *IntegrationSuite) SetupSuite() {
 
 	this.Require().NoError(os.Setenv("BIDIREKT_DATABASE_URL", connStr))
 	this.Require().NoError(os.Setenv("BIDIREKT_PUBLIC_URL", suitePublicURL))
-	this.Require().NoError(os.Setenv("BIDIREKT_ADMIN_USERNAME", suiteAdminUsername))
-	this.Require().NoError(os.Setenv("BIDIREKT_ADMIN_PASSWORD", suiteAdminPassword))
 	this.Require().NoError(os.Setenv("BIDIREKT_TRUSTED_PROXIES", "0.0.0.0"))
 
 	this.Components, err = internal.Run()
@@ -128,10 +127,16 @@ func (this *IntegrationSuite) SetupTest() {
 
 	this.createActiveUser(suiteWriterEmail, model.PermissionWrite, suiteWriterPassword)
 	this.writerToken = this.signInToApi(suiteWriterEmail, suiteWriterPassword)
+	this.adminID = this.createActiveUser(suiteAdminEmail, model.PermissionAdmin, suiteAdminSecret)
 }
 
 func (this *IntegrationSuite) deleteSuiteWriter() {
 	_, err := this.Pool.Exec(context.Background(), `DELETE FROM users WHERE email = $1`, suiteWriterEmail)
+	this.Require().NoError(err)
+}
+
+func (this *IntegrationSuite) deleteSuiteAdmin() {
+	_, err := this.Pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, this.adminID)
 	this.Require().NoError(err)
 }
 
@@ -253,15 +258,15 @@ func (this *IntegrationSuite) sendPageRequest(req *http.Request, sessionCookie s
 }
 
 func (this *IntegrationSuite) signInAsAdmin() (sessionCookie string) {
-	return this.signIn(suiteAdminUsername, suiteAdminPassword)
+	return this.signIn(suiteAdminEmail, suiteAdminSecret)
 }
 
 func (this *IntegrationSuite) signInAsUser(email, password string) (sessionCookie string) {
 	return this.signIn(email, password)
 }
 
-func (this *IntegrationSuite) signIn(identifier, password string) (sessionCookie string) {
-	status, header, _ := this.postForm("/sign-in", "", "", url.Values{"identifier": {identifier}, "password": {password}})
+func (this *IntegrationSuite) signIn(email, password string) (sessionCookie string) {
+	status, header, _ := this.postForm("/sign-in", "", "", url.Values{"email": {email}, "password": {password}})
 	this.Require().Equal(http.StatusSeeOther, status)
 
 	cookie, err := http.ParseSetCookie(header.Get("Set-Cookie"))

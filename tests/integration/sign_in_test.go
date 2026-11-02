@@ -16,19 +16,19 @@ import (
 const (
 	signInUserEmail                 = "ana@x.com"
 	signInUserPassword              = "ana-correct-horse-battery"
-	signInInvalidCredentials        = "invalid email, username or password"
+	signInInvalidCredentials        = "invalid email or password"
 	signInPageContentSecurityPolicy = "default-src 'self'; frame-ancestors 'none'"
-	signInAdminUsername             = "admin"
-	signInAdminPassword             = "integration-admin-password"
+	signInSuiteAdminEmail           = "admin@example.com"
+	signInSuiteAdminSecret          = "suite-admin-correct-horse"
 	signInPublicURL                 = "http://localhost:8080"
 )
 
-func (this *IntegrationSuite) signInForm(identifier, password string) url.Values {
-	return url.Values{"identifier": {identifier}, "password": {password}}
+func (this *IntegrationSuite) signInForm(email, password string) url.Values {
+	return url.Values{"email": {email}, "password": {password}}
 }
 
 func (this *IntegrationSuite) postSignInFrom(origin string) int {
-	req := httptest.NewRequest("POST", "/sign-in", strings.NewReader(this.signInForm(signInAdminUsername, signInAdminPassword).Encode()))
+	req := httptest.NewRequest("POST", "/sign-in", strings.NewReader(this.signInForm(signInSuiteAdminEmail, signInSuiteAdminSecret).Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	if origin != "" {
 		req.Header.Set("Origin", origin)
@@ -55,7 +55,10 @@ func (this *IntegrationSuite) TestSignIn_PageShowsOneFormWithCSP() {
 	this.Equal(signInPageContentSecurityPolicy, header.Get("Content-Security-Policy"))
 	this.Equal(1, strings.Count(body, "<form"))
 	this.Contains(body, `<form method="post" action="/sign-in">`)
-	this.Contains(body, "Email or username")
+	this.Contains(body, `<label for="email">Email</label>`)
+	this.NotContains(body, "Email or username")
+	this.Equal(1, strings.Count(body, "username"))
+	this.Contains(body, `autocomplete="username"`)
 	this.Contains(body, "Password")
 	this.NotContains(body, `action="/sign-out"`)
 }
@@ -68,7 +71,7 @@ func (this *IntegrationSuite) TestSignIn_AdminLandsOnUsers() {
 	this.Equal("/users", header.Get("Location"))
 
 	var adminSessions int
-	err := this.Pool.QueryRow(context.Background(), `SELECT count(*) FROM sessions WHERE user_id IS NULL`).Scan(&adminSessions)
+	err := this.Pool.QueryRow(context.Background(), `SELECT count(*) FROM sessions WHERE user_id = $1`, this.adminID).Scan(&adminSessions)
 	this.Require().NoError(err)
 	this.Equal(1, adminSessions)
 }
@@ -97,13 +100,13 @@ func (this *IntegrationSuite) TestSignIn_UserLandsOnProfile() {
 	this.Equal("/profile", header.Get("Location"))
 }
 
-func (this *IntegrationSuite) TestSignIn_AdminNavigationLinksOnlyToUsers() {
+func (this *IntegrationSuite) TestSignIn_AdminNavigationLinksToUsersAndProfile() {
 	cookie := this.signInAsAdmin()
 
 	_, _, body := this.getPage("/users", cookie)
 
 	this.Contains(body, `<a href="/users" aria-current="page">Users</a>`)
-	this.NotContains(body, `href="/profile"`)
+	this.Contains(body, `<a href="/profile">Profile</a>`)
 }
 
 func (this *IntegrationSuite) TestSignIn_UserNavigationLinksOnlyToProfile() {
@@ -124,7 +127,7 @@ func (this *IntegrationSuite) TestSignIn_EmailMatchesIgnoringCase() {
 }
 
 func (this *IntegrationSuite) TestSignIn_HtmxRequestAnswersHXRedirect() {
-	req := httptest.NewRequest("POST", "/sign-in", strings.NewReader(this.signInForm(signInAdminUsername, signInAdminPassword).Encode()))
+	req := httptest.NewRequest("POST", "/sign-in", strings.NewReader(this.signInForm(signInSuiteAdminEmail, signInSuiteAdminSecret).Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Origin", signInPublicURL)
 	req.Header.Set("HX-Request", "true")
@@ -135,7 +138,7 @@ func (this *IntegrationSuite) TestSignIn_HtmxRequestAnswersHXRedirect() {
 	this.Contains(header.Get("Set-Cookie"), "bidirekt_session=")
 }
 
-func (this *IntegrationSuite) TestSignIn_WrongPasswordShowsMessageAndKeepsIdentifier() {
+func (this *IntegrationSuite) TestSignIn_WrongPasswordShowsMessageAndKeepsEmail() {
 	this.createActiveUser(signInUserEmail, model.PermissionWrite, signInUserPassword)
 
 	status, header, body := this.postForm("/sign-in", "", "", this.signInForm(signInUserEmail, "not-the-right-password"))
@@ -147,9 +150,16 @@ func (this *IntegrationSuite) TestSignIn_WrongPasswordShowsMessageAndKeepsIdenti
 	this.Equal(0, this.countRows("sessions"))
 }
 
-func (this *IntegrationSuite) TestSignIn_WrongAdminPasswordAnswers401() {
-	status, _, body := this.postForm("/sign-in", "", "", this.signInForm(signInAdminUsername, "not-the-admin-password"))
+func (this *IntegrationSuite) TestSignIn_AdminWithAWrongPasswordAnswers401() {
+	status, _, body := this.postForm("/sign-in", "", "", this.signInForm(signInSuiteAdminEmail, "not-the-admin-password"))
 	this.Equal(http.StatusUnauthorized, status)
+	this.Contains(body, signInInvalidCredentials)
+}
+
+func (this *IntegrationSuite) TestSignIn_ANameWithoutAnAtAnswersLikeAWrongPassword() {
+	status, header, body := this.postForm("/sign-in", "", "", this.signInForm("admin", signInSuiteAdminSecret))
+	this.Equal(http.StatusUnauthorized, status)
+	this.Empty(header.Get("Set-Cookie"))
 	this.Contains(body, signInInvalidCredentials)
 }
 

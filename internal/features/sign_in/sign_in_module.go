@@ -7,12 +7,12 @@ import (
 
 func Register(kernel *components.Components) {
 	userRepository := repository.NewUserRepository(kernel.Pool)
-	useCase := NewSignInUseCase(userRepository, kernel.Settings.AdminUsername, kernel.Settings.AdminPassword)
+	useCase := NewSignInUseCase(userRepository)
 	uiHandler := NewSignInUiHandler(useCase)
 	apiHandler := NewSignInApiHandler(useCase, kernel.Settings)
 	limiter := newSignInLimiter()
 	kernel.Server.Get("/sign-in", uiHandler.ShowForm)
-	kernel.Server.Post("/sign-in", uiHandler.RequireSameOrigin, limiter.PerIP, limiter.PerAccount(uiHandler.Identifier), uiHandler.SignIn)
+	kernel.Server.Post("/sign-in", uiHandler.RequireSameOrigin, limiter.PerIP, limiter.PerAccount(uiHandler.Email), uiHandler.SignIn)
 	kernel.Server.Get(homePath, uiHandler.RedirectHome)
-	kernel.Server.Post("/api/sign-in", apiHandler.RequireJsonFromPublicOrigin, limiter.PerIP, limiter.PerAccount(apiHandler.Identifier), apiHandler.Handle)
+	kernel.Server.Post("/api/sign-in", apiHandler.RequireJsonFromPublicOrigin, limiter.PerIP, limiter.PerAccount(apiHandler.Email), apiHandler.Handle)
 }

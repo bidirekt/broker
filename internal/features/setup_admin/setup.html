@@ -1,0 +1,17 @@
+{{define "title"}}Create the admin{{end}}
+
+{{define "content"}}
+<section class="narrow">
+<h1>Create the admin</h1>
+{{with .Page.Message}}<p role="alert">{{.}}</p>{{end}}
+<div class="panel">
+<form method="post" action="/setup">
+  <label for="email">Email</label>
+  <input id="email" name="email" type="text" inputmode="email" autocomplete="email" value="{{.Page.Email}}" required autofocus>
+  <label for="password">Password</label>
+  <input id="password" name="password" type="password" autocomplete="new-password" required>
+  <button type="submit">Create the admin</button>
+</form>
+</div>
+</section>
+{{end}}

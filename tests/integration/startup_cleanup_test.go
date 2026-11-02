@@ -9,7 +9,7 @@ import (
 	"github.com/bidirekt/broker/internal/repository"
 )
 
-func (this *IntegrationSuite) TestStartup_DeletesAdminSessionsAndExpiredSessionsAndLinks() {
+func (this *IntegrationSuite) TestStartup_DeletesExpiredSessionsAndLinksAndKeepsTheAdminSession() {
 	ctx := context.Background()
 	users := repository.NewUserRepository(this.Pool)
 	sessions := repository.NewSessionRepository(this.Pool)
@@ -30,9 +30,13 @@ func (this *IntegrationSuite) TestStartup_DeletesAdminSessionsAndExpiredSessions
 	_, err := this.Pool.Exec(ctx, `UPDATE one_time_links SET used_at = now() WHERE token_hash = $1`, []byte("cid-used-link"))
 	this.Require().NoError(err)
 
-	this.Require().True(sessions.Create(ctx, &model.Session{IDHash: []byte("admin-session"), CSRFToken: "admin-csrf"}, ""))
-	for _, idHash := range []string{"ana-fresh-session", "ana-idle-session", "ana-old-session"} {
-		_, err = this.Pool.Exec(ctx, `INSERT INTO sessions (id_hash, user_id, csrf_token) VALUES ($1, $2, $3)`, []byte(idHash), ana.ID, idHash+"-csrf")
+	for idHash, userID := range map[string]int64{
+		"admin-session":     this.adminID,
+		"ana-fresh-session": ana.ID,
+		"ana-idle-session":  ana.ID,
+		"ana-old-session":   ana.ID,
+	} {
+		_, err = this.Pool.Exec(ctx, `INSERT INTO sessions (id_hash, user_id, csrf_token) VALUES ($1, $2, $3)`, []byte(idHash), userID, idHash+"-csrf")
 		this.Require().NoError(err)
 	}
 	_, err = this.Pool.Exec(ctx, `UPDATE sessions SET last_seen_at = now() - interval '9 hours' WHERE id_hash = $1`, []byte("ana-idle-session"))
@@ -44,8 +48,10 @@ func (this *IntegrationSuite) TestStartup_DeletesAdminSessionsAndExpiredSessions
 	this.Require().NoError(err)
 	restarted.Pool.Close()
 
-	this.Equal(1, this.countRows("sessions"))
-	_, found := sessions.FindByIDHash(ctx, []byte("ana-fresh-session"))
+	this.Equal(2, this.countRows("sessions"))
+	_, found := sessions.FindByIDHash(ctx, []byte("admin-session"))
+	this.True(found)
+	_, found = sessions.FindByIDHash(ctx, []byte("ana-fresh-session"))
 	this.True(found)
 
 	this.Equal(1, this.countRows("one_time_links"))

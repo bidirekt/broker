@@ -76,8 +76,8 @@ func (this *IntegrationSuite) postSetPasswordFrom(origin, token string) int {
 	return status
 }
 
-func (this *IntegrationSuite) signInStatus(identifier, password string) int {
-	status, _, _ := this.postForm("/sign-in", "", "", url.Values{"identifier": {identifier}, "password": {password}})
+func (this *IntegrationSuite) signInStatus(email, password string) int {
+	status, _, _ := this.postForm("/sign-in", "", "", url.Values{"email": {email}, "password": {password}})
 	return status
 }
 

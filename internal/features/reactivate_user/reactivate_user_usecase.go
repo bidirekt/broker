@@ -3,6 +3,7 @@ package reactivate_user
 import (
 	"context"
 
+	"github.com/bidirekt/broker/internal/model"
 	"github.com/bidirekt/broker/internal/repository"
 )
 
@@ -12,6 +13,7 @@ const (
 	UserReactivated ReactivateUserStatus = iota
 	UserNotFound
 	UserAlreadyActive
+	TargetIsTheAdmin
 )
 
 type ReactivateUserInput struct {
@@ -31,8 +33,13 @@ func NewReactivateUserUseCase(userRepository *repository.UserRepository) *Reacti
 }
 
 func (this *ReactivateUserUseCase) Execute(ctx context.Context, input ReactivateUserInput) ReactivateUserOutput {
-	if _, found := this.userRepository.FindByID(ctx, input.UserID); !found {
+	user, found := this.userRepository.FindByID(ctx, input.UserID)
+	if !found {
 		return ReactivateUserOutput{Status: UserNotFound}
+	}
+
+	if user.Permission == model.PermissionAdmin {
+		return ReactivateUserOutput{Status: TargetIsTheAdmin}
 	}
 
 	if !this.userRepository.Reactivate(ctx, input.UserID) {

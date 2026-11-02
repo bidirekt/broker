@@ -13,11 +13,10 @@
     <div class="frame topbar-inner">
       <span class="brand">{{template "mark"}}Bidirekt</span>
       <nav class="nav" aria-label="Main">
-        {{if .IsAdmin}}
+        {{if .ManagesUsers}}
         <a href="/users"{{if eq .Section "users"}} aria-current="page"{{end}}>Users</a>
-        {{else}}
-        <a href="/profile"{{if eq .Section "profile"}} aria-current="page"{{end}}>Profile</a>
         {{end}}
+        <a href="/profile"{{if eq .Section "profile"}} aria-current="page"{{end}}>Profile</a>
       </nav>
       <form class="sign-out" method="post" action="/sign-out">
         <button type="submit">Sign out</button>

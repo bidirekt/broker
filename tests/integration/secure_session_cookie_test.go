@@ -14,10 +14,10 @@ import (
 )
 
 const (
-	secureCookiePublicURL     = "https://broker.example.com"
-	secureCookieName          = "__Host-bidirekt_session"
-	secureCookieAdminUsername = "admin"
-	secureCookieAdminPassword = "integration-admin-password"
+	secureCookiePublicURL   = "https://broker.example.com"
+	secureCookieName        = "__Host-bidirekt_session"
+	secureCookieAdminEmail  = "admin@example.com"
+	secureCookieAdminSecret = "suite-admin-correct-horse"
 )
 
 func (this *IntegrationSuite) startSecureCookieApp() *components.Components {
@@ -44,7 +44,7 @@ func (this *IntegrationSuite) secureCookieSend(app *components.Components, req *
 func (this *IntegrationSuite) TestSecureSessionCookie_HttpsPublicURLSignsInWithASecureHostCookieThatOpensPages() {
 	app := this.startSecureCookieApp()
 
-	form := url.Values{"identifier": {secureCookieAdminUsername}, "password": {secureCookieAdminPassword}}
+	form := url.Values{"email": {secureCookieAdminEmail}, "password": {secureCookieAdminSecret}}
 	signIn := httptest.NewRequest("POST", "/sign-in", strings.NewReader(form.Encode()))
 	signIn.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	signIn.Header.Set("Origin", secureCookiePublicURL)

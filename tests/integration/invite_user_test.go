@@ -111,7 +111,7 @@ func (this *IntegrationSuite) TestInviteUser_RejectsAnEmailInUseInAnotherCase() 
 
 	this.Equal(http.StatusConflict, status)
 	this.Contains(body, inviteUserEmailInUse)
-	this.Equal(1, this.countRows("users"))
+	this.Equal(2, this.countRows("users"))
 	this.Equal(1, this.countRows("one_time_links"))
 }
 
@@ -125,7 +125,7 @@ func (this *IntegrationSuite) TestInviteUser_RejectsAMalformedEmail() {
 		this.Contains(body, inviteUserEmailInvalid, email)
 	}
 
-	this.Equal(0, this.countRows("users"))
+	this.Equal(1, this.countRows("users"))
 }
 
 func (this *IntegrationSuite) TestInviteUser_RejectsATamperedPermission() {
@@ -138,7 +138,7 @@ func (this *IntegrationSuite) TestInviteUser_RejectsATamperedPermission() {
 		this.Contains(body, inviteUserPermissionInvalid, permission)
 	}
 
-	this.Equal(0, this.countRows("users"))
+	this.Equal(1, this.countRows("users"))
 }
 
 func (this *IntegrationSuite) TestInviteUser_ChecksTheEmailBeforeThePermission() {

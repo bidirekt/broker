@@ -41,11 +41,11 @@ func (this *IntegrationSuite) TestInputDoor_RefusesTextThatIsNotUTF8OrCarriesNUL
 		send  func() (int, http.Header, string)
 		table string
 	}{
-		{"sign-in identifier with an invalid UTF-8 byte", func() (int, http.Header, string) {
-			return this.postForm("/sign-in", "", "", url.Values{"identifier": {"a\xff@x.io"}, "password": {inputDoorPassword}})
+		{"sign-in email with an invalid UTF-8 byte", func() (int, http.Header, string) {
+			return this.postForm("/sign-in", "", "", url.Values{"email": {"a\xff@x.io"}, "password": {inputDoorPassword}})
 		}, "sessions"},
-		{"sign-in identifier with NUL", func() (int, http.Header, string) {
-			return this.postForm("/sign-in", "", "", url.Values{"identifier": {"a\x00@x.io"}, "password": {inputDoorPassword}})
+		{"sign-in email with NUL", func() (int, http.Header, string) {
+			return this.postForm("/sign-in", "", "", url.Values{"email": {"a\x00@x.io"}, "password": {inputDoorPassword}})
 		}, "sessions"},
 		{"invite email with an invalid UTF-8 byte", func() (int, http.Header, string) {
 			return this.postForm("/users/invite", adminCookie, csrfToken, url.Values{"email": {"a\xff@x.io"}, "permission": {"read"}})
@@ -59,7 +59,7 @@ func (this *IntegrationSuite) TestInputDoor_RefusesTextThatIsNotUTF8OrCarriesNUL
 		{"sign-in as a multipart form", func() (int, http.Header, string) {
 			var body bytes.Buffer
 			form := multipart.NewWriter(&body)
-			this.Require().NoError(form.WriteField("identifier", suiteWriterEmail))
+			this.Require().NoError(form.WriteField("email", suiteWriterEmail))
 			this.Require().NoError(form.WriteField("password", inputDoorPassword))
 			this.Require().NoError(form.Close())
 			req := httptest.NewRequest("POST", "/sign-in", &body)
@@ -67,14 +67,14 @@ func (this *IntegrationSuite) TestInputDoor_RefusesTextThatIsNotUTF8OrCarriesNUL
 			req.Header.Set("Origin", suitePublicURL)
 			return this.sendPageRequest(req, "")
 		}, "sessions"},
-		{"sign-in identifier with NUL in a form content type of mixed case", func() (int, http.Header, string) {
-			req := httptest.NewRequest("POST", "/sign-in", strings.NewReader("identifier=a%00b&password="+inputDoorPassword))
+		{"sign-in email with NUL in a form content type of mixed case", func() (int, http.Header, string) {
+			req := httptest.NewRequest("POST", "/sign-in", strings.NewReader("email=a%00b&password="+inputDoorPassword))
 			req.Header.Set("Content-Type", "Application/X-WWW-Form-Urlencoded")
 			req.Header.Set("Origin", suitePublicURL)
 			return this.sendPageRequest(req, "")
 		}, "sessions"},
-		{"sign-in identifier with NUL in a form content type with a suffix", func() (int, http.Header, string) {
-			req := httptest.NewRequest("POST", "/sign-in", strings.NewReader("identifier=a%00b&password="+inputDoorPassword))
+		{"sign-in email with NUL in a form content type with a suffix", func() (int, http.Header, string) {
+			req := httptest.NewRequest("POST", "/sign-in", strings.NewReader("email=a%00b&password="+inputDoorPassword))
 			req.Header.Set("Content-Type", "application/x-www-form-urlencodedx")
 			req.Header.Set("Origin", suitePublicURL)
 			return this.sendPageRequest(req, "")

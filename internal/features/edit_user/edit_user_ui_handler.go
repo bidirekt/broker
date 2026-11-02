@@ -30,15 +30,18 @@ func (this *EditUserUiHandler) ShowForm(ctx fiber.Ctx) error {
 		return this.respondUserNotFound(ctx)
 	}
 
-	user, found := this.useCase.FindUser(ctx.Context(), userID)
-	if !found {
+	target := this.useCase.FindUser(ctx.Context(), userID)
+	switch target.Status {
+	case UserNotFound:
 		return this.respondUserNotFound(ctx)
+	case TargetIsTheAdmin:
+		return access.NoAccess()
 	}
 
 	return pages.Render(ctx, fiber.StatusOK, pageFiles, editUserTemplate, EditUserPage{
-		UserID:     user.ID,
-		Email:      user.Email,
-		Permission: string(user.Permission),
+		UserID:     target.User.ID,
+		Email:      target.User.Email,
+		Permission: string(target.User.Permission),
 	})
 }
 
@@ -73,6 +76,8 @@ func (this *EditUserUiHandler) EditUser(ctx fiber.Ctx) error {
 		return this.respondWithMessage(ctx, fiber.StatusConflict, page, EmailAlreadyInUseMessage)
 	case UserNotFound:
 		return this.respondUserNotFound(ctx)
+	case TargetIsTheAdmin:
+		return access.NoAccess()
 	}
 
 	return pages.Redirect(ctx, usersPath)

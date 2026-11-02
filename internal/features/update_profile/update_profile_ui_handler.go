@@ -20,18 +20,10 @@ func NewUpdateProfileUiHandler(useCase *UpdateProfileUseCase) *UpdateProfileUiHa
 }
 
 func (this *UpdateProfileUiHandler) ShowForm(ctx fiber.Ctx) error {
-	if err := access.RequireUser(ctx); err != nil {
-		return err
-	}
-
 	return pages.Render(ctx, fiber.StatusOK, pageFiles, updateProfileTemplate, UpdateProfilePage{})
 }
 
 func (this *UpdateProfileUiHandler) UpdateProfile(ctx fiber.Ctx) error {
-	if err := access.RequireUser(ctx); err != nil {
-		return err
-	}
-
 	principal, _ := access.PrincipalFrom(ctx)
 	session, _ := access.SessionFrom(ctx)
 	output, err := this.useCase.Execute(ctx.Context(), UpdateProfileInput{

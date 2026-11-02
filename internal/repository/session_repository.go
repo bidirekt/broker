@@ -12,15 +12,7 @@ import (
 )
 
 const (
-	insertAdminSessionQuery = `
-		INSERT INTO sessions
-			(id_hash, csrf_token)
-		VALUES
-			($1, $2)
-		RETURNING created_at, last_seen_at
-	`
-
-	insertUserSessionQuery = `
+	insertSessionQuery = `
 		INSERT INTO sessions
 			(id_hash, user_id, csrf_token)
 		SELECT
@@ -56,12 +48,6 @@ const (
 			id_hash = $1
 	`
 
-	deleteAdminSessionsQuery = `
-		DELETE FROM sessions
-		WHERE
-			user_id IS NULL
-	`
-
 	deleteExpiredSessionsQuery = `
 		DELETE FROM sessions
 		WHERE
@@ -79,16 +65,12 @@ func NewSessionRepository(pool *pgxpool.Pool) *SessionRepository {
 }
 
 func (this *SessionRepository) Create(ctx context.Context, session *model.Session, verifiedPasswordHash string) (created bool) {
-	var row pgx.Row
-	if session.UserID.Valid {
-		// the user is read again under a share lock, so a deactivation or password change since the
-		// sign-in read it either makes this insert nothing or waits for it and then deletes the session
-		row = this.pool.QueryRow(ctx, insertUserSessionQuery, session.IDHash, session.UserID, session.CSRFToken, verifiedPasswordHash)
-	} else {
-		row = this.pool.QueryRow(ctx, insertAdminSessionQuery, session.IDHash, session.CSRFToken)
-	}
-
-	err := row.Scan(&session.CreatedAt, &session.LastSeenAt)
+	// the user is read again under a share lock, so a deactivation or password change since the
+	// sign-in read it either makes this insert nothing or waits for it and then deletes the session
+	err := this.pool.QueryRow(ctx, insertSessionQuery, session.IDHash, session.UserID, session.CSRFToken, verifiedPasswordHash).Scan(
+		&session.CreatedAt,
+		&session.LastSeenAt,
+	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false
 	}
@@ -129,12 +111,6 @@ func (this *SessionRepository) MarkSeen(ctx context.Context, idHash []byte) {
 func (this *SessionRepository) Delete(ctx context.Context, idHash []byte) {
 	if _, err := this.pool.Exec(ctx, deleteSessionQuery, idHash); err != nil {
 		panic(fmt.Errorf("error deleting session: %w", err))
-	}
-}
-
-func (this *SessionRepository) DeleteAdminSessions(ctx context.Context) {
-	if _, err := this.pool.Exec(ctx, deleteAdminSessionsQuery); err != nil {
-		panic(fmt.Errorf("error deleting admin sessions: %w", err))
 	}
 }
 

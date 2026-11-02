@@ -3,7 +3,6 @@ package sign_in
 import (
 	"encoding/json"
 	"mime"
-	"strings"
 	"time"
 
 	"github.com/bidirekt/broker/internal/components/bearer"
@@ -44,20 +43,16 @@ func (this *SignInApiHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondInvalidInput(ctx)
 	}
 
-	if !strings.Contains(requestBody.Email, "@") {
-		return this.respondInvalidCredentials(ctx)
-	}
-
 	output := this.useCase.Execute(ctx.Context(), SignInInput{
-		Identifier: requestBody.Email,
-		Password:   requestBody.Password,
+		Email:    requestBody.Email,
+		Password: requestBody.Password,
 	})
 
-	if output.Status == InvalidCredentials || !output.UserID.Valid {
+	if output.Status == InvalidCredentials {
 		return this.respondInvalidCredentials(ctx)
 	}
 
-	token, expiresAt, err := bearer.Issue(this.settings, output.UserID.Int64, time.Now())
+	token, expiresAt, err := bearer.Issue(this.settings, output.UserID, time.Now())
 	if err != nil {
 		return err
 	}
@@ -69,7 +64,7 @@ func (this *SignInApiHandler) Handle(ctx fiber.Ctx) error {
 	})
 }
 
-func (this *SignInApiHandler) Identifier(ctx fiber.Ctx) string {
+func (this *SignInApiHandler) Email(ctx fiber.Ctx) string {
 	requestBody := SignInRequestBody{}
 	if err := json.Unmarshal(ctx.Body(), &requestBody); err != nil {
 		return ""

@@ -5,7 +5,6 @@ import (
 
 	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/components/config"
-	"github.com/bidirekt/broker/internal/model"
 	"github.com/bidirekt/broker/internal/repository"
 	"github.com/gofiber/fiber/v3"
 )
@@ -54,11 +53,11 @@ func (this *keeper) toPrincipal(ctx fiber.Ctx) (access.Principal, bool) {
 	}
 
 	user, found := this.users.FindByID(ctx.Context(), userID)
-	if !found || user.State() != model.UserActive {
+	if !found {
 		return access.Principal{}, false
 	}
 
-	return access.Principal{UserID: user.ID, Permission: user.Permission}, true
+	return access.PrincipalOf(user)
 }
 
 func isUnderPath(path, prefix string) bool {

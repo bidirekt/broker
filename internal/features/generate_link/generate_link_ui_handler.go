@@ -41,6 +41,8 @@ func (this *GenerateLinkUiHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondWithMessage(ctx, fiber.StatusNotFound, UserNotFoundMessage)
 	case UserDeactivated:
 		return this.respondWithMessage(ctx, fiber.StatusConflict, UserDeactivatedMessage)
+	case TargetIsTheAdmin:
+		return access.NoAccess()
 	}
 
 	return pages.Render(ctx, fiber.StatusOK, pageFiles, generateLinkTemplate, GenerateLinkPage{

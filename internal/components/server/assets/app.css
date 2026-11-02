@@ -268,14 +268,6 @@ p[role="status"] {
   margin-top: 24px;
 }
 
-.empty {
-  padding: 32px 24px;
-  color: var(--muted);
-  text-align: center;
-  border: 1px dashed var(--control);
-  border-radius: 12px;
-}
-
 table {
   width: 100%;
   border-collapse: collapse;

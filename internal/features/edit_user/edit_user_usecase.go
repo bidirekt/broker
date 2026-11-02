@@ -12,10 +12,12 @@ type EditUserStatus int
 
 const (
 	UserEdited EditUserStatus = iota
+	UserFound
 	EmailInvalid
 	PermissionInvalid
 	EmailAlreadyInUse
 	UserNotFound
+	TargetIsTheAdmin
 )
 
 type EditUserInput struct {
@@ -28,6 +30,11 @@ type EditUserOutput struct {
 	Status EditUserStatus
 }
 
+type FindUserOutput struct {
+	Status EditUserStatus
+	User   *model.User
+}
+
 type EditUserUseCase struct {
 	userRepository *repository.UserRepository
 }
@@ -36,17 +43,30 @@ func NewEditUserUseCase(userRepository *repository.UserRepository) *EditUserUseC
 	return &EditUserUseCase{userRepository: userRepository}
 }
 
-func (this *EditUserUseCase) FindUser(ctx context.Context, userID int64) (*model.User, bool) {
-	return this.userRepository.FindByID(ctx, userID)
+func (this *EditUserUseCase) FindUser(ctx context.Context, userID int64) FindUserOutput {
+	user, found := this.userRepository.FindByID(ctx, userID)
+	if !found {
+		return FindUserOutput{Status: UserNotFound}
+	}
+
+	if user.Permission == model.PermissionAdmin {
+		return FindUserOutput{Status: TargetIsTheAdmin}
+	}
+
+	return FindUserOutput{Status: UserFound, User: user}
 }
 
 func (this *EditUserUseCase) Execute(ctx context.Context, input EditUserInput) EditUserOutput {
+	if target := this.FindUser(ctx, input.UserID); target.Status != UserFound {
+		return EditUserOutput{Status: target.Status}
+	}
+
 	if validations.Email(input.Email) != nil {
 		return EditUserOutput{Status: EmailInvalid}
 	}
 
 	permission := model.Permission(input.Permission)
-	if permission != model.PermissionRead && permission != model.PermissionWrite {
+	if !permission.IsGrantable() {
 		return EditUserOutput{Status: PermissionInvalid}
 	}
 

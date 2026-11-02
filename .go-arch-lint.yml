@@ -24,6 +24,7 @@ components:
   feature_record_deployment:  { in: internal/features/record_deployment }
   feature_rename_participant: { in: internal/features/rename_participant }
   feature_set_password:       { in: internal/features/set_password }
+  feature_setup_admin:        { in: internal/features/setup_admin }
   feature_sign_in:            { in: internal/features/sign_in }
   feature_sign_out:           { in: internal/features/sign_out }
   feature_update_profile:     { in: internal/features/update_profile }
@@ -82,6 +83,7 @@ deps:
       - feature_record_deployment
       - feature_rename_participant
       - feature_set_password
+      - feature_setup_admin
       - feature_sign_in
       - feature_sign_out
       - feature_update_profile
@@ -98,7 +100,7 @@ deps:
     mayDependOn: [components, components_access, repository, model, validations]
     canUse: [fiber]
   feature_deactivate_user:
-    mayDependOn: [components, components_access, components_pages, repository]
+    mayDependOn: [components, components_access, components_pages, repository, model]
     canUse: [fiber]
   feature_edit_user:
     mayDependOn: [components, components_access, components_pages, repository, model, validations]
@@ -125,7 +127,7 @@ deps:
     mayDependOn: [contracts, components, components_access, repository, model, validations]
     canUse: [fiber]
   feature_reactivate_user:
-    mayDependOn: [components, components_access, components_pages, repository]
+    mayDependOn: [components, components_access, components_pages, repository, model]
     canUse: [fiber]
   feature_record_deployment:
     mayDependOn: [components, components_access, repository, model, validations]
@@ -136,9 +138,12 @@ deps:
   feature_set_password:
     mayDependOn: [components, components_pages, components_passwords, components_sessions, components_tokens, repository, validations]
     canUse: [fiber]
+  feature_setup_admin:
+    mayDependOn: [components, components_pages, components_passwords, components_sessions, repository, model, validations]
+    canUse: [fiber]
   feature_sign_in:
     mayDependOn: [components, components_access, components_bearer, components_config, components_pages, components_passwords, components_sessions, repository, model]
-    canUse: [fiber, guregu_null]
+    canUse: [fiber]
   feature_sign_out:
     mayDependOn: [components, components_access, components_pages, components_sessions, repository]
     canUse: [fiber]
@@ -156,10 +161,8 @@ deps:
     mayDependOn: [model]
     canUse: [fiber]
   components_bearer:
-    mayDependOn: [components_access, components_config, repository, model]
+    mayDependOn: [components_access, components_config, repository]
     canUse: [fiber, golang_jwt]
-  components_config:
-    mayDependOn: [validations]
   components_database:
     mayDependOn: [components_config, pkg, migrations]
     canUse: [pgx]
@@ -175,12 +178,12 @@ deps:
     canUse: [fiber, pgx]
   components_sessions:
     mayDependOn: [components_access, components_config, components_pages, components_tokens, repository, model]
-    canUse: [fiber, guregu_null]
+    canUse: [fiber]
   contracts:
     mayDependOn: [contracts, model, validations]
     canUse: [yaml, guregu_null]
   repository:
-    mayDependOn: [model, validations]
+    mayDependOn: [model]
     canUse: [pgx, guregu_null]
 
   model:

@@ -23,8 +23,6 @@ services:
     environment:
       BIDIREKT_DATABASE_URL: postgres://bidirekt:bidirekt@postgres:5432/bidirekt?sslmode=disable
       BIDIREKT_PUBLIC_URL: http://localhost:8080
-      BIDIREKT_ADMIN_USERNAME: admin
-      BIDIREKT_ADMIN_PASSWORD: bidirekt-local-admin
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:

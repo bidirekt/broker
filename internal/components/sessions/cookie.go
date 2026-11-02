@@ -7,7 +7,6 @@ import (
 	"github.com/bidirekt/broker/internal/components/tokens"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/gofiber/fiber/v3"
-	"github.com/guregu/null"
 )
 
 const (
@@ -15,7 +14,7 @@ const (
 	plainSessionCookieName  = "bidirekt_session"
 )
 
-func Start(ctx fiber.Ctx, userID null.Int, verifiedPasswordHash string) (started bool, err error) {
+func Start(ctx fiber.Ctx, userID int64, verifiedPasswordHash string) (started bool, err error) {
 	keeper := fiber.Locals[*keeper](ctx, keeperKey{})
 
 	cookieValue, err := tokens.Random()

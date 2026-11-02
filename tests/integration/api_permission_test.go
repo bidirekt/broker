@@ -13,6 +13,8 @@ import (
 const (
 	apiPermissionReaderEmail    = "rui@x.com"
 	apiPermissionWriterEmail    = "wanda@x.com"
+	apiPermissionAdminEmail     = "admin@example.com"
+	apiPermissionAdminSecret    = "suite-admin-correct-horse"
 	apiPermissionPassword       = "permission-correct-horse-battery"
 	apiPermissionForbidden      = `{"message":"forbidden"}`
 	apiPermissionMalformedBody  = `{"participant":`
@@ -125,6 +127,34 @@ func (this *IntegrationSuite) TestApiPermission_ReadTokenIsAllowedOnEveryReadRou
 			this.Equal(http.StatusOK, status, body)
 		})
 	}
+}
+
+func (this *IntegrationSuite) TestApiPermission_AdminTokenPublishesValidatesRecordsADeploymentAndListsParticipants() {
+	token := this.signInToApi(apiPermissionAdminEmail, apiPermissionAdminSecret)
+
+	validateBody, err := json.Marshal(map[string]any{
+		"participant": "orders",
+		"environment": "production",
+		"contracts":   []contractFragment{{apiPermissionProviderSource, apiPermissionProviderYAML}},
+	})
+	this.Require().NoError(err)
+
+	for _, route := range []apiPermissionRoute{
+		{http.MethodPost, "/api/participants", `{"participant":"orders"}`},
+		{http.MethodPost, "/api/environments", `{"environment":"production"}`},
+		{http.MethodPost, "/api/contracts", this.publishBody("orders", "v1", contractFragment{apiPermissionProviderSource, apiPermissionProviderYAML})},
+		{http.MethodPost, "/api/contracts/validate", string(validateBody)},
+		{http.MethodPost, "/api/deployments", `{"participant":"orders","version":"v1","environment":"production"}`},
+	} {
+		status, body := this.apiPermissionSend(route, token)
+		this.Require().Equal(http.StatusOK, status, route.path+": "+body)
+	}
+
+	status, body := this.apiPermissionSend(apiPermissionRoute{http.MethodGet, "/api/participants", ""}, token)
+	this.Equal(http.StatusOK, status)
+	this.Contains(body, `"orders"`)
+	this.Equal(1, this.countRows("contract_versions"))
+	this.Equal(1, this.countRows("deployments"))
 }
 
 func (this *IntegrationSuite) TestApiPermission_DowngradedUserIsForbiddenAtOnceWithAnExistingToken() {

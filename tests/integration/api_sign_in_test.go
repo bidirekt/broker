@@ -16,8 +16,8 @@ import (
 const (
 	apiSignInEmail              = "ana@x.com"
 	apiSignInPassword           = "ana-correct-horse-battery"
-	apiSignInAdminUsername      = "admin"
-	apiSignInAdminPassword      = "integration-admin-password"
+	apiSignInAdminEmail         = "admin@example.com"
+	apiSignInAdminSecret        = "suite-admin-correct-horse"
 	apiSignInInvalidCredentials = `{"message":"invalid credentials"}`
 	apiSignInInvalidInput       = `{"message":"sign in invalid input"}`
 	apiSignInForbidden          = `{"message":"forbidden"}`
@@ -60,6 +60,24 @@ func (this *IntegrationSuite) TestApiSignIn_ActiveUserGetsAToken() {
 	this.WithinDuration(time.Now().Add(15*time.Minute), expiresAt, 5*time.Second)
 }
 
+func (this *IntegrationSuite) TestApiSignIn_AdminGetsAToken() {
+	status, body := this.post("/api/sign-in", this.apiSignInBody(apiSignInAdminEmail, apiSignInAdminSecret))
+	this.Require().Equal(http.StatusOK, status, body)
+
+	var response struct {
+		Token string `json:"token"`
+	}
+	this.Require().NoError(json.Unmarshal([]byte(body), &response))
+
+	claims := jwt.MapClaims{}
+	_, err := jwt.ParseWithClaims(response.Token, claims,
+		func(*jwt.Token) (any, error) { return bearer.SigningKey, nil },
+		jwt.WithValidMethods([]string{"HS256"}),
+	)
+	this.Require().NoError(err)
+	this.Equal(strconv.FormatInt(this.adminID, 10), claims["sub"])
+}
+
 func (this *IntegrationSuite) TestApiSignIn_RefusesWithOneAnswer() {
 	this.createActiveUser(apiSignInEmail, model.PermissionWrite, apiSignInPassword)
 	invitedID := this.createActiveUser("invited@x.com", model.PermissionWrite, apiSignInPassword)
@@ -68,11 +86,11 @@ func (this *IntegrationSuite) TestApiSignIn_RefusesWithOneAnswer() {
 	this.setUserState(deactivatedID, model.UserDeactivated)
 
 	refused := map[string]string{
-		"wrong password":    this.apiSignInBody(apiSignInEmail, "ana-wrong-horse-battery"),
-		"unknown email":     this.apiSignInBody("nobody@x.com", apiSignInPassword),
-		"invited user":      this.apiSignInBody("invited@x.com", apiSignInPassword),
-		"deactivated user":  this.apiSignInBody("deactivated@x.com", apiSignInPassword),
-		"admin credentials": this.apiSignInBody(apiSignInAdminUsername, apiSignInAdminPassword),
+		"wrong password":   this.apiSignInBody(apiSignInEmail, "ana-wrong-horse-battery"),
+		"unknown email":    this.apiSignInBody("nobody@x.com", apiSignInPassword),
+		"invited user":     this.apiSignInBody("invited@x.com", apiSignInPassword),
+		"deactivated user": this.apiSignInBody("deactivated@x.com", apiSignInPassword),
+		"name without @":   this.apiSignInBody("admin", apiSignInAdminSecret),
 	}
 
 	for name, requestBody := range refused {

@@ -12,7 +12,6 @@ import (
 	"github.com/bidirekt/broker/internal/components/sessions"
 	"github.com/bidirekt/broker/internal/repository"
 	"github.com/gofiber/fiber/v3"
-	"github.com/guregu/null"
 )
 
 const (
@@ -21,6 +20,7 @@ const (
 	doorCSRFToken         = "door-csrf-token"
 	doorPublicURL         = "http://localhost:8080"
 	doorUnknownPage       = "/no-such-page-behind-the-door"
+	doorUserPasswordHash  = "some-hash"
 )
 
 type doorRequest struct {
@@ -50,7 +50,7 @@ func (this *IntegrationSuite) sendThroughDoor(request doorRequest) (status int, 
 	return resp.StatusCode, resp.Header, string(bytes)
 }
 
-func (this *IntegrationSuite) createDoorSession(userID null.Int) []byte {
+func (this *IntegrationSuite) createDoorSession(userID int64) []byte {
 	idHash := sha256.Sum256([]byte(doorSessionCookie))
 	_, err := this.Pool.Exec(context.Background(),
 		`INSERT INTO sessions (id_hash, user_id, csrf_token) VALUES ($1, $2, $3)`,
@@ -60,14 +60,13 @@ func (this *IntegrationSuite) createDoorSession(userID null.Int) []byte {
 	return idHash[:]
 }
 
-func (this *IntegrationSuite) createDoorUser(active bool) null.Int {
-	var id int64
+func (this *IntegrationSuite) createDoorUser(active bool) (userID int64) {
 	err := this.Pool.QueryRow(context.Background(),
-		`INSERT INTO users (email, permission, password_hash, active) VALUES ('ana@x.com', 'write', 'some-hash', $1) RETURNING id`,
-		active,
-	).Scan(&id)
+		`INSERT INTO users (email, permission, password_hash, active) VALUES ('ana@x.com', 'write', $1, $2) RETURNING id`,
+		doorUserPasswordHash, active,
+	).Scan(&userID)
 	this.Require().NoError(err)
-	return null.IntFrom(id)
+	return userID
 }
 
 func (this *IntegrationSuite) TestSessionDoor_WithoutCookie_RedirectsToSignIn() {
@@ -108,14 +107,15 @@ func (this *IntegrationSuite) TestSessionDoor_ActiveUserSession_PassesTheDoorAnd
 }
 
 func (this *IntegrationSuite) TestSessionDoor_AdminSession_PassesTheDoor() {
-	this.createDoorSession(null.Int{})
+	this.createDoorSession(this.adminID)
 
-	status, _, _ := this.sendThroughDoor(doorRequest{method: "GET", path: doorUnknownPage, cookie: doorSessionCookie})
+	status, _, body := this.sendThroughDoor(doorRequest{method: "GET", path: doorUnknownPage, cookie: doorSessionCookie})
 	this.Equal(http.StatusNotFound, status)
+	this.Contains(body, `href="/users"`)
 }
 
 func (this *IntegrationSuite) TestSessionDoor_IdleSession_RedirectsAndIsDeleted() {
-	this.createDoorSession(null.Int{})
+	this.createDoorSession(this.adminID)
 	_, err := this.Pool.Exec(context.Background(), `UPDATE sessions SET last_seen_at = now() - interval '8 hours 1 minute'`)
 	this.Require().NoError(err)
 
@@ -126,7 +126,7 @@ func (this *IntegrationSuite) TestSessionDoor_IdleSession_RedirectsAndIsDeleted(
 }
 
 func (this *IntegrationSuite) TestSessionDoor_SessionOlderThanSevenDays_Redirects() {
-	this.createDoorSession(null.Int{})
+	this.createDoorSession(this.adminID)
 	_, err := this.Pool.Exec(context.Background(), `UPDATE sessions SET created_at = now() - interval '7 days 1 minute'`)
 	this.Require().NoError(err)
 
@@ -144,7 +144,7 @@ func (this *IntegrationSuite) TestSessionDoor_DeactivatedUserSession_Redirects()
 }
 
 func (this *IntegrationSuite) TestSessionDoor_PostWithoutCSRFToken_Answers403() {
-	this.createDoorSession(null.Int{})
+	this.createDoorSession(this.adminID)
 
 	status, header, _ := this.sendThroughDoor(doorRequest{
 		method: "POST", path: doorUnknownPage, cookie: doorSessionCookie,
@@ -155,7 +155,7 @@ func (this *IntegrationSuite) TestSessionDoor_PostWithoutCSRFToken_Answers403() 
 }
 
 func (this *IntegrationSuite) TestSessionDoor_PostWithWrongCSRFToken_Answers403() {
-	this.createDoorSession(null.Int{})
+	this.createDoorSession(this.adminID)
 
 	status, _, _ := this.sendThroughDoor(doorRequest{
 		method: "POST", path: doorUnknownPage, cookie: doorSessionCookie,
@@ -165,7 +165,7 @@ func (this *IntegrationSuite) TestSessionDoor_PostWithWrongCSRFToken_Answers403(
 }
 
 func (this *IntegrationSuite) TestSessionDoor_PostWithForeignOrigin_Answers403() {
-	this.createDoorSession(null.Int{})
+	this.createDoorSession(this.adminID)
 
 	status, _, _ := this.sendThroughDoor(doorRequest{
 		method: "POST", path: doorUnknownPage, cookie: doorSessionCookie,
@@ -175,7 +175,7 @@ func (this *IntegrationSuite) TestSessionDoor_PostWithForeignOrigin_Answers403()
 }
 
 func (this *IntegrationSuite) TestSessionDoor_PostWithoutOrigin_Answers403() {
-	this.createDoorSession(null.Int{})
+	this.createDoorSession(this.adminID)
 
 	status, _, _ := this.sendThroughDoor(doorRequest{
 		method: "POST", path: doorUnknownPage, cookie: doorSessionCookie,
@@ -185,7 +185,7 @@ func (this *IntegrationSuite) TestSessionDoor_PostWithoutOrigin_Answers403() {
 }
 
 func (this *IntegrationSuite) TestSessionDoor_PostWithCSRFHeaderAndOrigin_PassesTheDoor() {
-	this.createDoorSession(null.Int{})
+	this.createDoorSession(this.adminID)
 
 	status, _, _ := this.sendThroughDoor(doorRequest{
 		method: "POST", path: doorUnknownPage, cookie: doorSessionCookie,
@@ -214,7 +214,7 @@ func (this *IntegrationSuite) TestSessionDoor_LeavesSignInAndSetPasswordSubPaths
 }
 
 func (this *IntegrationSuite) TestSessionDoor_AnotherCaseOfAPagePathIsNotRouted() {
-	this.createDoorSession(null.Int{})
+	this.createDoorSession(this.adminID)
 
 	for _, path := range []string{"/USERS", "/SIGN-IN"} {
 		status, _, _ := this.sendThroughDoor(doorRequest{method: "GET", path: path, cookie: doorSessionCookie})
@@ -236,8 +236,9 @@ func (this *IntegrationSuite) TestSessionDoor_LookalikePrefixStaysBehindTheDoor(
 }
 
 func (this *IntegrationSuite) TestStartSession_SetsCookieThatPassesTheDoor() {
+	userID := this.createDoorUser(true)
 	this.Components.Server.Get("/sign-in/__start_session", func(ctx fiber.Ctx) error {
-		started, err := sessions.Start(ctx, null.Int{}, "")
+		started, err := sessions.Start(ctx, userID, doorUserPasswordHash)
 		if err != nil {
 			return err
 		}

@@ -6,7 +6,6 @@ import (
 
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/bidirekt/broker/internal/repository"
-	"github.com/guregu/null"
 )
 
 const (
@@ -45,25 +44,7 @@ func (this *IntegrationSuite) sessionRepositoryCreateActiveUser() (userID int64)
 }
 
 func sessionRepositoryUserSession(idHash string, userID int64) *model.Session {
-	return &model.Session{IDHash: []byte(idHash), UserID: null.IntFrom(userID), CSRFToken: idHash + "-csrf"}
-}
-
-func (this *IntegrationSuite) TestSessionRepository_Create_StoresTheAdminSessionFoundByIDHash() {
-	ctx := context.Background()
-	repo := repository.NewSessionRepository(this.Pool)
-
-	session := &model.Session{IDHash: []byte("admin-session"), CSRFToken: "admin-csrf"}
-	this.True(repo.Create(ctx, session, ""))
-
-	found, ok := repo.FindByIDHash(ctx, []byte("admin-session"))
-	this.Require().True(ok)
-	this.Equal([]byte("admin-session"), found.IDHash)
-	this.False(found.UserID.Valid)
-	this.Equal("admin-csrf", found.CSRFToken)
-	this.False(found.CreatedAt.IsZero())
-
-	_, ok = repo.FindByIDHash(ctx, []byte("unknown-session"))
-	this.False(ok)
+	return &model.Session{IDHash: []byte(idHash), UserID: userID, CSRFToken: idHash + "-csrf"}
 }
 
 func (this *IntegrationSuite) TestSessionRepository_Create_StoresTheSessionOfAnActiveUserWithTheVerifiedPassword() {
@@ -77,7 +58,7 @@ func (this *IntegrationSuite) TestSessionRepository_Create_StoresTheSessionOfAnA
 
 	found, ok := repo.FindByIDHash(ctx, []byte("ana-session"))
 	this.Require().True(ok)
-	this.Equal(null.IntFrom(userID), found.UserID)
+	this.Equal(userID, found.UserID)
 	this.Equal("ana-session-csrf", found.CSRFToken)
 }
 
@@ -164,7 +145,7 @@ func (this *IntegrationSuite) TestSessionRepository_CreateCommittedFirst_IsDelet
 	sameIDHash, err := this.Pool.Begin(ctx)
 	this.Require().NoError(err)
 	defer func() { _ = sameIDHash.Rollback(ctx) }()
-	_, err = sameIDHash.Exec(ctx, `INSERT INTO sessions (id_hash, csrf_token) VALUES ($1, 'held-csrf')`, []byte("ana-session"))
+	_, err = sameIDHash.Exec(ctx, `INSERT INTO sessions (id_hash, user_id, csrf_token) VALUES ($1, $2, 'held-csrf')`, []byte("ana-session"), userID)
 	this.Require().NoError(err)
 
 	var created bool
@@ -190,14 +171,15 @@ func (this *IntegrationSuite) TestSessionRepository_CreateCommittedFirst_IsDelet
 func (this *IntegrationSuite) TestSessionRepository_MarkSeen_BumpsLastSeenAt() {
 	ctx := context.Background()
 	repo := repository.NewSessionRepository(this.Pool)
+	userID := this.sessionRepositoryCreateActiveUser()
 
-	this.Require().True(repo.Create(ctx, &model.Session{IDHash: []byte("admin-session"), CSRFToken: "admin-csrf"}, ""))
+	this.Require().True(repo.Create(ctx, sessionRepositoryUserSession("ana-session", userID), sessionRepositoryPasswordHash))
 	_, err := this.Pool.Exec(ctx, `UPDATE sessions SET last_seen_at = now() - interval '1 hour'`)
 	this.Require().NoError(err)
 
-	repo.MarkSeen(ctx, []byte("admin-session"))
+	repo.MarkSeen(ctx, []byte("ana-session"))
 
-	found, ok := repo.FindByIDHash(ctx, []byte("admin-session"))
+	found, ok := repo.FindByIDHash(ctx, []byte("ana-session"))
 	this.Require().True(ok)
 	this.WithinDuration(time.Now(), found.LastSeenAt, time.Minute)
 }
@@ -205,9 +187,10 @@ func (this *IntegrationSuite) TestSessionRepository_MarkSeen_BumpsLastSeenAt() {
 func (this *IntegrationSuite) TestSessionRepository_Delete_RemovesOnlyThatSession() {
 	ctx := context.Background()
 	repo := repository.NewSessionRepository(this.Pool)
+	userID := this.sessionRepositoryCreateActiveUser()
 
-	this.Require().True(repo.Create(ctx, &model.Session{IDHash: []byte("first-session"), CSRFToken: "first-csrf"}, ""))
-	this.Require().True(repo.Create(ctx, &model.Session{IDHash: []byte("second-session"), CSRFToken: "second-csrf"}, ""))
+	this.Require().True(repo.Create(ctx, sessionRepositoryUserSession("first-session", userID), sessionRepositoryPasswordHash))
+	this.Require().True(repo.Create(ctx, sessionRepositoryUserSession("second-session", userID), sessionRepositoryPasswordHash))
 
 	repo.Delete(ctx, []byte("first-session"))
 
@@ -217,29 +200,13 @@ func (this *IntegrationSuite) TestSessionRepository_Delete_RemovesOnlyThatSessio
 	this.True(ok)
 }
 
-func (this *IntegrationSuite) TestSessionRepository_DeleteAdminSessions_KeepsUserSessions() {
-	ctx := context.Background()
-	repo := repository.NewSessionRepository(this.Pool)
-
-	userID := this.sessionRepositoryCreateActiveUser()
-	this.Require().True(repo.Create(ctx, sessionRepositoryUserSession("ana-session", userID), sessionRepositoryPasswordHash))
-	this.Require().True(repo.Create(ctx, &model.Session{IDHash: []byte("admin-session"), CSRFToken: "admin-csrf"}, ""))
-
-	repo.DeleteAdminSessions(ctx)
-
-	_, ok := repo.FindByIDHash(ctx, []byte("admin-session"))
-	this.False(ok)
-	found, ok := repo.FindByIDHash(ctx, []byte("ana-session"))
-	this.Require().True(ok)
-	this.Equal(null.IntFrom(userID), found.UserID)
-}
-
 func (this *IntegrationSuite) TestSessionRepository_DeleteExpired_RemovesIdleAndOldSessions() {
 	ctx := context.Background()
 	repo := repository.NewSessionRepository(this.Pool)
+	userID := this.sessionRepositoryCreateActiveUser()
 
 	for _, idHash := range []string{"idle-session", "old-session", "fresh-session"} {
-		this.Require().True(repo.Create(ctx, &model.Session{IDHash: []byte(idHash), CSRFToken: idHash}, ""))
+		this.Require().True(repo.Create(ctx, sessionRepositoryUserSession(idHash, userID), sessionRepositoryPasswordHash))
 	}
 	_, err := this.Pool.Exec(ctx, `UPDATE sessions SET last_seen_at = now() - interval '9 hours' WHERE id_hash = $1`, []byte("idle-session"))
 	this.Require().NoError(err)

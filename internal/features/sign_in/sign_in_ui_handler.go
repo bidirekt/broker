@@ -33,14 +33,14 @@ func (this *SignInUiHandler) RequireSameOrigin(ctx fiber.Ctx) error {
 }
 
 func (this *SignInUiHandler) SignIn(ctx fiber.Ctx) error {
-	identifier := this.Identifier(ctx)
+	email := this.Email(ctx)
 	output := this.useCase.Execute(ctx.Context(), SignInInput{
-		Identifier: identifier,
-		Password:   ctx.FormValue(passwordFormField),
+		Email:    email,
+		Password: ctx.FormValue(passwordFormField),
 	})
 
 	if output.Status == InvalidCredentials {
-		return this.respondInvalidCredentials(ctx, identifier)
+		return this.respondInvalidCredentials(ctx, email)
 	}
 
 	started, err := sessions.Start(ctx, output.UserID, output.VerifiedPasswordHash)
@@ -49,27 +49,27 @@ func (this *SignInUiHandler) SignIn(ctx fiber.Ctx) error {
 	}
 
 	if !started {
-		return this.respondInvalidCredentials(ctx, identifier)
+		return this.respondInvalidCredentials(ctx, email)
 	}
 
 	return pages.Redirect(ctx, homePath)
 }
 
-func (this *SignInUiHandler) Identifier(ctx fiber.Ctx) string {
-	return ctx.FormValue(identifierFormField)
+func (this *SignInUiHandler) Email(ctx fiber.Ctx) string {
+	return ctx.FormValue(emailFormField)
 }
 
-func (this *SignInUiHandler) respondInvalidCredentials(ctx fiber.Ctx, identifier string) error {
+func (this *SignInUiHandler) respondInvalidCredentials(ctx fiber.Ctx, email string) error {
 	return pages.Render(ctx, fiber.StatusUnauthorized, pageFiles, signInTemplate, SignInPage{
-		Identifier: identifier,
-		Message:    PageInvalidCredentialsMessage,
+		Email:   email,
+		Message: PageInvalidCredentialsMessage,
 	})
 }
 
 func (this *SignInUiHandler) RedirectHome(ctx fiber.Ctx) error {
-	if principal, _ := access.PrincipalFrom(ctx); principal.IsAdmin {
-		return pages.Redirect(ctx, adminHomePath)
+	if principal, _ := access.PrincipalFrom(ctx); principal.ManagesUsers() {
+		return pages.Redirect(ctx, usersPath)
 	}
 
-	return pages.Redirect(ctx, userHomePath)
+	return pages.Redirect(ctx, profilePath)
 }

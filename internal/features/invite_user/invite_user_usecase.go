@@ -46,7 +46,7 @@ func (this *InviteUserUseCase) Execute(ctx context.Context, input InviteUserInpu
 	}
 
 	permission := model.Permission(input.Permission)
-	if permission != model.PermissionRead && permission != model.PermissionWrite {
+	if !permission.IsGrantable() {
 		return InviteUserOutput{Status: PermissionInvalid}, nil
 	}
 

@@ -19,6 +19,7 @@ import (
 	"github.com/bidirekt/broker/internal/features/record_deployment"
 	"github.com/bidirekt/broker/internal/features/rename_participant"
 	"github.com/bidirekt/broker/internal/features/set_password"
+	"github.com/bidirekt/broker/internal/features/setup_admin"
 	"github.com/bidirekt/broker/internal/features/sign_in"
 	"github.com/bidirekt/broker/internal/features/sign_out"
 	"github.com/bidirekt/broker/internal/features/update_profile"
@@ -51,6 +52,7 @@ func Run() (*components.Components, error) {
 	deactivate_user.Register(kernel)
 	reactivate_user.Register(kernel)
 	set_password.Register(kernel)
+	setup_admin.Register(kernel)
 
 	return kernel, nil
 }

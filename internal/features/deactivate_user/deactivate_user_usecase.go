@@ -3,6 +3,7 @@ package deactivate_user
 import (
 	"context"
 
+	"github.com/bidirekt/broker/internal/model"
 	"github.com/bidirekt/broker/internal/repository"
 )
 
@@ -12,6 +13,7 @@ const (
 	UserDeactivated DeactivateUserStatus = iota
 	UserNotFound
 	UserAlreadyDeactivated
+	TargetIsTheAdmin
 )
 
 type DeactivateUserInput struct {
@@ -31,8 +33,13 @@ func NewDeactivateUserUseCase(userRepository *repository.UserRepository) *Deacti
 }
 
 func (this *DeactivateUserUseCase) Execute(ctx context.Context, input DeactivateUserInput) DeactivateUserOutput {
-	if _, found := this.userRepository.FindByID(ctx, input.UserID); !found {
+	user, found := this.userRepository.FindByID(ctx, input.UserID)
+	if !found {
 		return DeactivateUserOutput{Status: UserNotFound}
+	}
+
+	if user.Permission == model.PermissionAdmin {
+		return DeactivateUserOutput{Status: TargetIsTheAdmin}
 	}
 
 	if !this.userRepository.Deactivate(ctx, input.UserID) {

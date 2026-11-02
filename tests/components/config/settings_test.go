@@ -1,20 +1,14 @@
 package config_test
 
 import (
-	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/bidirekt/broker/internal/components/config"
 	"github.com/stretchr/testify/assert"
 )
 
-const adminPassword = "a-valid-admin-password"
-
 func setValidAuthSettings(t *testing.T) {
 	t.Setenv("BIDIREKT_PUBLIC_URL", "https://broker.example.com")
-	t.Setenv("BIDIREKT_ADMIN_USERNAME", "admin")
-	t.Setenv("BIDIREKT_ADMIN_PASSWORD", adminPassword)
 }
 
 func TestRead_RefusesAPublicURLThatIsNotAnAllowedOrigin(t *testing.T) {
@@ -51,45 +45,6 @@ func TestRead_RefusesAPublicURLThatIsNotAnAllowedOrigin(t *testing.T) {
 		t.Run(refusal.publicURL, func(t *testing.T) {
 			setValidAuthSettings(t)
 			t.Setenv("BIDIREKT_PUBLIC_URL", refusal.publicURL)
-
-			_, err := config.Read()
-
-			assert.EqualError(t, err, refusal.message)
-		})
-	}
-}
-
-func TestRead_RefusesAMissingAdminUsernameOrOneWithAnAt(t *testing.T) {
-	for _, refusal := range []struct {
-		username string
-		message  string
-	}{
-		{"", "BIDIREKT_ADMIN_USERNAME is required"},
-		{"admin@example.com", "BIDIREKT_ADMIN_USERNAME must not contain @"},
-	} {
-		t.Run(refusal.username, func(t *testing.T) {
-			setValidAuthSettings(t)
-			t.Setenv("BIDIREKT_ADMIN_USERNAME", refusal.username)
-
-			_, err := config.Read()
-
-			assert.EqualError(t, err, refusal.message)
-		})
-	}
-}
-
-func TestRead_RefusesAMissingAdminPasswordOrOneOutsideFifteenToOneHundredTwentyEightCharacters(t *testing.T) {
-	for _, refusal := range []struct {
-		password string
-		message  string
-	}{
-		{"", "BIDIREKT_ADMIN_PASSWORD is required"},
-		{"fourteen-chars", "BIDIREKT_ADMIN_PASSWORD must have 15 to 128 characters"},
-		{strings.Repeat("p", 129), "BIDIREKT_ADMIN_PASSWORD must have 15 to 128 characters"},
-	} {
-		t.Run(strconv.Itoa(len(refusal.password)), func(t *testing.T) {
-			setValidAuthSettings(t)
-			t.Setenv("BIDIREKT_ADMIN_PASSWORD", refusal.password)
 
 			_, err := config.Read()
 

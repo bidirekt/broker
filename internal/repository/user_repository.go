@@ -19,6 +19,14 @@ const (
 		RETURNING id, active, created_at, updated_at
 	`
 
+	insertAdminQuery = `
+		INSERT INTO users
+			(email, permission, password_hash)
+		VALUES
+			($1, 'admin', $2)
+		RETURNING id, permission, active, created_at, updated_at
+	`
+
 	findUserByIDQuery = `
 		SELECT
 			id, email, permission, password_hash, active, created_at, updated_at
@@ -35,6 +43,17 @@ const (
 			users
 		WHERE
 			lower(email) = lower($1)
+	`
+
+	adminExistsQuery = `
+		SELECT EXISTS (
+			SELECT
+				1
+			FROM
+				users
+			WHERE
+				permission = 'admin'
+		)
 	`
 
 	listUsersQuery = `
@@ -170,6 +189,20 @@ func (this *UserRepository) CreateInvited(ctx context.Context, user *model.User,
 	return true
 }
 
+func (this *UserRepository) CreateAdmin(ctx context.Context, admin *model.User, passwordHash string) (created bool) {
+	err := this.pool.QueryRow(ctx, insertAdminQuery, admin.Email, passwordHash).
+		Scan(&admin.ID, &admin.Permission, &admin.Active, &admin.CreatedAt, &admin.UpdatedAt)
+	if isUniqueViolation(err) {
+		return false
+	}
+
+	if err != nil {
+		panic(fmt.Errorf("error inserting the admin: %w", err))
+	}
+
+	return true
+}
+
 func (this *UserRepository) FindByID(ctx context.Context, id int64) (*model.User, bool) {
 	return this.findOne(ctx, findUserByIDQuery, id)
 }
@@ -194,6 +227,15 @@ func (this *UserRepository) findOne(ctx context.Context, query string, arg any) 
 	}
 
 	return user, true
+}
+
+func (this *UserRepository) AdminExists(ctx context.Context) bool {
+	var exists bool
+	if err := this.pool.QueryRow(ctx, adminExistsQuery).Scan(&exists); err != nil {
+		panic(fmt.Errorf("error checking whether the admin exists: %w", err))
+	}
+
+	return exists
 }
 
 func (this *UserRepository) List(ctx context.Context) []*model.User {

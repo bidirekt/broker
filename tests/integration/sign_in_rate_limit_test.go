@@ -18,8 +18,8 @@ import (
 
 const (
 	rateLimitPublicURL      = "http://localhost:8080"
-	rateLimitAdminUsername  = "admin"
-	rateLimitAdminPassword  = "integration-admin-password"
+	rateLimitAdminEmail     = "admin@example.com"
+	rateLimitAdminSecret    = "suite-admin-correct-horse"
 	rateLimitAnaEmail       = "ana@x.com"
 	rateLimitBiaEmail       = "bia@x.com"
 	rateLimitPassword       = "rate-limit-correct-horse"
@@ -50,8 +50,8 @@ func (this *IntegrationSuite) rateLimitSend(app *components.Components, req *htt
 	return resp.StatusCode, string(bytes)
 }
 
-func (this *IntegrationSuite) rateLimitPageSignIn(app *components.Components, forwardedFor, identifier, password string) (status int, body string) {
-	form := url.Values{"identifier": {identifier}, "password": {password}}
+func (this *IntegrationSuite) rateLimitPageSignIn(app *components.Components, forwardedFor, email, password string) (status int, body string) {
+	form := url.Values{"email": {email}, "password": {password}}
 	req := httptest.NewRequest("POST", "/sign-in", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Origin", rateLimitPublicURL)
@@ -60,8 +60,8 @@ func (this *IntegrationSuite) rateLimitPageSignIn(app *components.Components, fo
 	return this.rateLimitSend(app, req, forwardedFor)
 }
 
-func (this *IntegrationSuite) rateLimitCrossSitePageSignIn(app *components.Components, forwardedFor, identifier, password string) (status int, body string) {
-	form := url.Values{"identifier": {identifier}, "password": {password}}
+func (this *IntegrationSuite) rateLimitCrossSitePageSignIn(app *components.Components, forwardedFor, email, password string) (status int, body string) {
+	form := url.Values{"email": {email}, "password": {password}}
 	req := httptest.NewRequest("POST", "/sign-in", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Origin", rateLimitForeignOrigin)
@@ -132,20 +132,20 @@ func (this *IntegrationSuite) TestSignInRateLimit_FiftyFirstFailureFromOneIPIsRe
 
 	for account := range 5 {
 		for attempt := range 10 {
-			identifier := fmt.Sprintf("intruder-%d", account)
+			email := fmt.Sprintf("intruder-%d", account)
 			signIn := this.rateLimitPageSignIn
 			if attempt%2 == 1 {
 				signIn = this.rateLimitApiSignIn
 			}
-			status, _ := signIn(app, clientIP, identifier, rateLimitWrongPassword)
+			status, _ := signIn(app, clientIP, email, rateLimitWrongPassword)
 			this.Require().Equal(http.StatusUnauthorized, status)
 		}
 	}
 
-	status, _ := this.rateLimitPageSignIn(app, clientIP, rateLimitAdminUsername, rateLimitAdminPassword)
+	status, _ := this.rateLimitPageSignIn(app, clientIP, rateLimitAdminEmail, rateLimitAdminSecret)
 	this.Equal(http.StatusTooManyRequests, status)
 
-	status, _ = this.rateLimitPageSignIn(app, "203.0.113.21", rateLimitAdminUsername, rateLimitAdminPassword)
+	status, _ = this.rateLimitPageSignIn(app, "203.0.113.21", rateLimitAdminEmail, rateLimitAdminSecret)
 	this.Equal(http.StatusSeeOther, status)
 }
 
@@ -175,14 +175,14 @@ func (this *IntegrationSuite) TestSignInRateLimit_SpoofedLeftEntryOfForwardedFor
 	const clientIP = "203.0.113.40"
 
 	for attempt := range 10 {
-		status, _ := this.rateLimitPageSignIn(app, fmt.Sprintf("192.0.2.%d, %s", attempt, clientIP), rateLimitAdminUsername, rateLimitWrongPassword)
+		status, _ := this.rateLimitPageSignIn(app, fmt.Sprintf("192.0.2.%d, %s", attempt, clientIP), rateLimitAdminEmail, rateLimitWrongPassword)
 		this.Require().Equal(http.StatusUnauthorized, status)
 	}
 
-	status, _ := this.rateLimitPageSignIn(app, "198.51.100.7, "+clientIP, rateLimitAdminUsername, rateLimitWrongPassword)
+	status, _ := this.rateLimitPageSignIn(app, "198.51.100.7, "+clientIP, rateLimitAdminEmail, rateLimitWrongPassword)
 	this.Equal(http.StatusTooManyRequests, status)
 
-	status, _ = this.rateLimitPageSignIn(app, clientIP+", 203.0.113.41", rateLimitAdminUsername, rateLimitWrongPassword)
+	status, _ = this.rateLimitPageSignIn(app, clientIP+", 203.0.113.41", rateLimitAdminEmail, rateLimitWrongPassword)
 	this.Equal(http.StatusUnauthorized, status)
 }
 
@@ -191,11 +191,11 @@ func (this *IntegrationSuite) TestSignInRateLimit_ForwardedForFromAnUntrustedSou
 	app := this.startRateLimitedApp()
 
 	for attempt := range 10 {
-		status, _ := this.rateLimitPageSignIn(app, fmt.Sprintf("203.0.113.%d", 50+attempt), rateLimitAdminUsername, rateLimitWrongPassword)
+		status, _ := this.rateLimitPageSignIn(app, fmt.Sprintf("203.0.113.%d", 50+attempt), rateLimitAdminEmail, rateLimitWrongPassword)
 		this.Require().Equal(http.StatusUnauthorized, status)
 	}
 
-	status, _ := this.rateLimitPageSignIn(app, "203.0.113.99", rateLimitAdminUsername, rateLimitWrongPassword)
+	status, _ := this.rateLimitPageSignIn(app, "203.0.113.99", rateLimitAdminEmail, rateLimitWrongPassword)
 	this.Equal(http.StatusTooManyRequests, status)
 }
 
@@ -237,15 +237,15 @@ func (this *IntegrationSuite) TestSignInRateLimit_CrossSitePostsDoNotBlockTheIP(
 	const clientIP = "203.0.113.80"
 
 	for attempt := range 51 {
-		identifier := fmt.Sprintf("intruder-%d", attempt)
+		email := fmt.Sprintf("intruder-%d", attempt)
 		signIn := this.rateLimitCrossSitePageSignIn
 		if attempt%2 == 1 {
 			signIn = this.rateLimitCrossSiteApiSignIn
 		}
-		status, _ := signIn(app, clientIP, identifier, rateLimitWrongPassword)
+		status, _ := signIn(app, clientIP, email, rateLimitWrongPassword)
 		this.Require().Equal(http.StatusForbidden, status)
 	}
 
-	status, _ := this.rateLimitPageSignIn(app, clientIP, rateLimitAdminUsername, rateLimitAdminPassword)
+	status, _ := this.rateLimitPageSignIn(app, clientIP, rateLimitAdminEmail, rateLimitAdminSecret)
 	this.Equal(http.StatusSeeOther, status)
 }

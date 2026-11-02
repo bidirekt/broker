@@ -173,7 +173,7 @@ func (this *IntegrationSuite) TestReactivateUser_ASignInThatReadTheUserBeforeThe
 	userID := this.createActiveUser(reactivateUserEmail, model.PermissionWrite, reactivateUserPassword)
 
 	signInStatus := this.reactivateUserDeactivateRacing(userID, func(string, string) int {
-		return this.reactivateUserSendForm("/sign-in", "", "", url.Values{"identifier": {reactivateUserEmail}, "password": {reactivateUserPassword}})
+		return this.reactivateUserSendForm("/sign-in", "", "", url.Values{"email": {reactivateUserEmail}, "password": {reactivateUserPassword}})
 	})
 	this.Require().Equal(http.StatusUnauthorized, signInStatus)
 

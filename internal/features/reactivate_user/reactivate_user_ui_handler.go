@@ -32,8 +32,11 @@ func (this *ReactivateUserUiHandler) Handle(ctx fiber.Ctx) error {
 	}
 
 	output := this.useCase.Execute(ctx.Context(), ReactivateUserInput{UserID: userID})
-	if output.Status == UserNotFound {
+	switch output.Status {
+	case UserNotFound:
 		return this.respondUserNotFound(ctx)
+	case TargetIsTheAdmin:
+		return access.NoAccess()
 	}
 
 	return pages.Redirect(ctx, usersPath)

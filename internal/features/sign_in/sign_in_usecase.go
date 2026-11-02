@@ -2,14 +2,10 @@ package sign_in
 
 import (
 	"context"
-	"crypto/sha256"
-	"crypto/subtle"
-	"strings"
 
 	"github.com/bidirekt/broker/internal/components/passwords"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/bidirekt/broker/internal/repository"
-	"github.com/guregu/null"
 )
 
 type SignInStatus int
@@ -20,37 +16,26 @@ const (
 )
 
 type SignInInput struct {
-	Identifier string
-	Password   string
+	Email    string
+	Password string
 }
 
 type SignInOutput struct {
-	Status SignInStatus
-	// null when the admin signed in
-	UserID               null.Int
+	Status               SignInStatus
+	UserID               int64
 	VerifiedPasswordHash string
 }
 
 type SignInUseCase struct {
 	userRepository *repository.UserRepository
-	adminUsername  string
-	adminPassword  string
 }
 
-func NewSignInUseCase(userRepository *repository.UserRepository, adminUsername, adminPassword string) *SignInUseCase {
-	return &SignInUseCase{
-		userRepository: userRepository,
-		adminUsername:  adminUsername,
-		adminPassword:  adminPassword,
-	}
+func NewSignInUseCase(userRepository *repository.UserRepository) *SignInUseCase {
+	return &SignInUseCase{userRepository: userRepository}
 }
 
 func (this *SignInUseCase) Execute(ctx context.Context, input SignInInput) SignInOutput {
-	if !strings.Contains(input.Identifier, "@") {
-		return this.signInAdmin(input)
-	}
-
-	user, found := this.userRepository.FindByEmail(ctx, input.Identifier)
+	user, found := this.userRepository.FindByEmail(ctx, input.Email)
 	if !found || user.State() != model.UserActive {
 		passwords.Verify(input.Password, passwords.DummyHash)
 		return SignInOutput{Status: InvalidCredentials}
@@ -60,22 +45,5 @@ func (this *SignInUseCase) Execute(ctx context.Context, input SignInInput) SignI
 		return SignInOutput{Status: InvalidCredentials}
 	}
 
-	return SignInOutput{Status: SignedIn, UserID: null.IntFrom(user.ID), VerifiedPasswordHash: user.PasswordHash.String}
-}
-
-func (this *SignInUseCase) signInAdmin(input SignInInput) SignInOutput {
-	usernameMatches := equalInConstantTime(input.Identifier, this.adminUsername)
-	passwordMatches := equalInConstantTime(input.Password, this.adminPassword)
-	if usernameMatches&passwordMatches != 1 {
-		return SignInOutput{Status: InvalidCredentials}
-	}
-
-	return SignInOutput{Status: SignedIn}
-}
-
-// both sides are hashed first because subtle.ConstantTimeCompare returns early on a length difference
-func equalInConstantTime(given, expected string) int {
-	givenHash := sha256.Sum256([]byte(given))
-	expectedHash := sha256.Sum256([]byte(expected))
-	return subtle.ConstantTimeCompare(givenHash[:], expectedHash[:])
+	return SignInOutput{Status: SignedIn, UserID: user.ID, VerifiedPasswordHash: user.PasswordHash.String}
 }

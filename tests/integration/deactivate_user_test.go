@@ -147,7 +147,7 @@ func (this *IntegrationSuite) TestDeactivateUser_EndsTheSessionsTheSignInAndTheP
 	this.Equal(http.StatusSeeOther, status)
 	this.Equal("/sign-in", header.Get("Location"))
 
-	status, _, _ = this.postForm("/sign-in", "", "", url.Values{"identifier": {deactivateUserEmail}, "password": {deactivateUserPassword}})
+	status, _, _ = this.postForm("/sign-in", "", "", url.Values{"email": {deactivateUserEmail}, "password": {deactivateUserPassword}})
 	this.Equal(http.StatusUnauthorized, status)
 
 	status, _, body := this.getPage("/set-password?token="+deactivateUserLinkToken, "")
@@ -159,7 +159,7 @@ func (this *IntegrationSuite) TestDeactivateUser_ASignInThatReadTheUserBeforeThe
 	userID := this.createActiveUser(deactivateUserEmail, model.PermissionWrite, deactivateUserPassword)
 
 	signInStatus := this.deactivateUserRacing(userID, func(string, string) int {
-		return this.deactivateUserSendForm("/sign-in", "", "", url.Values{"identifier": {deactivateUserEmail}, "password": {deactivateUserPassword}})
+		return this.deactivateUserSendForm("/sign-in", "", "", url.Values{"email": {deactivateUserEmail}, "password": {deactivateUserPassword}})
 	})
 
 	this.Equal(http.StatusUnauthorized, signInStatus)

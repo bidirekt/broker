@@ -1,7 +1,7 @@
 CREATE TABLE users (
   id             BIGSERIAL PRIMARY KEY,
   email          text NOT NULL,
-  permission     text NOT NULL CHECK (permission IN ('read', 'write')),
+  permission     text NOT NULL CHECK (permission IN ('read', 'write', 'admin')),
   password_hash  text NULL,  -- NULL = invited, password not set yet
   active         boolean NOT NULL DEFAULT true,
   created_at     timestamptz NOT NULL DEFAULT now(),
@@ -9,10 +9,11 @@ CREATE TABLE users (
 );
 
 CREATE UNIQUE INDEX users_email_unique ON users (lower(email));
+CREATE UNIQUE INDEX users_one_admin ON users (permission) WHERE permission = 'admin';
 
 CREATE TABLE sessions (
   id_hash       bytea PRIMARY KEY,  -- SHA-256 of the cookie value
-  user_id       BIGINT NULL REFERENCES users(id),  -- NULL = the admin
+  user_id       BIGINT NOT NULL REFERENCES users(id),
   csrf_token    text NOT NULL,
   created_at    timestamptz NOT NULL DEFAULT now(),
   last_seen_at  timestamptz NOT NULL DEFAULT now()

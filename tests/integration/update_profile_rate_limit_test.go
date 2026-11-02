@@ -64,7 +64,7 @@ func (this *IntegrationSuite) profileLimitPostForm(app *components.Components, p
 }
 
 func (this *IntegrationSuite) profileLimitSignIn(app *components.Components, email string) (sessionCookie, csrfToken string) {
-	status, header, _ := this.profileLimitPostForm(app, "/sign-in", "", "", url.Values{"identifier": {email}, "password": {profileLimitPassword}})
+	status, header, _ := this.profileLimitPostForm(app, "/sign-in", "", "", url.Values{"email": {email}, "password": {profileLimitPassword}})
 	this.Require().Equal(http.StatusSeeOther, status)
 
 	cookie, err := http.ParseSetCookie(header.Get("Set-Cookie"))

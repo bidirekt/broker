@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -10,7 +11,7 @@ import (
 
 const (
 	listUsersPassword   = "list-users-correct-horse"
-	listUsersEmptyState = "No users yet — invite the first one"
+	listUsersAdminEmail = "admin@example.com"
 )
 
 func (this *IntegrationSuite) TestListUsers_AdminSeesEveryUserByteWiseWithPermissionAndState() {
@@ -25,7 +26,6 @@ func (this *IntegrationSuite) TestListUsers_AdminSeesEveryUserByteWiseWithPermis
 	this.Require().Equal(http.StatusOK, status)
 	this.Equal("text/html; charset=utf-8", header.Get("Content-Type"))
 	this.Contains(body, `href="/users/invite"`)
-	this.NotContains(body, listUsersEmptyState)
 
 	zoe := strings.Index(body, "<td>Zoe@x.com</td>")
 	ana := strings.Index(body, "<td>ana@x.com</td>")
@@ -42,26 +42,20 @@ func (this *IntegrationSuite) TestListUsers_AdminSeesEveryUserByteWiseWithPermis
 }
 
 func (this *IntegrationSuite) TestListUsers_HtmxPageAnswersWithoutHXPushUrlAndIsNotStored() {
-	this.deleteSuiteWriter()
-
 	req := httptest.NewRequest("GET", "/users", nil)
 	req.Header.Set("HX-Request", "true")
 
-	status, header, body := this.sendPageRequest(req, this.signInAsAdmin())
+	status, header, _ := this.sendPageRequest(req, this.signInAsAdmin())
 
 	this.Require().Equal(http.StatusOK, status)
-	this.Contains(body, listUsersEmptyState)
 	this.Empty(header.Get("HX-Push-Url"))
 	this.Equal("no-store", header.Get("Cache-Control"))
 }
 
-func (this *IntegrationSuite) TestListUsers_ShowsTheEmptyStateWithoutUsers() {
-	this.deleteSuiteWriter()
-
+func (this *IntegrationSuite) TestListUsers_ShowsTheAdminRowAsAdminWithoutActions() {
 	status, _, body := this.getPage("/users", this.signInAsAdmin())
 
 	this.Require().Equal(http.StatusOK, status)
-	this.Contains(body, listUsersEmptyState)
-	this.Contains(body, `href="/users/invite"`)
-	this.NotContains(body, "<table>")
+	this.Contains(body, "<td>"+listUsersAdminEmail+"</td>\n      <td>admin</td>\n      <td>active</td>")
+	this.NotContains(body, fmt.Sprintf("/users/%d/", this.adminID))
 }

@@ -22,10 +22,7 @@ func deleteStaleSessionsAndLinks(pool *pgxpool.Pool) (err error) {
 		}
 	}()
 
-	sessionRepository := repository.NewSessionRepository(pool)
-
-	sessionRepository.DeleteAdminSessions(ctx)
-	sessionRepository.DeleteExpired(ctx, sessions.IdleLimit, sessions.AbsoluteLimit)
+	repository.NewSessionRepository(pool).DeleteExpired(ctx, sessions.IdleLimit, sessions.AbsoluteLimit)
 	repository.NewOneTimeLinkRepository(pool).DeleteUsedAndExpired(ctx)
 
 	return nil
