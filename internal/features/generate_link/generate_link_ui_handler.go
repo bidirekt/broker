@@ -6,6 +6,7 @@ import (
 
 	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/components/pages"
+	"github.com/bidirekt/broker/internal/components/respond"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -21,8 +22,8 @@ func NewGenerateLinkUiHandler(useCase *GenerateLinkUseCase) *GenerateLinkUiHandl
 }
 
 func (this *GenerateLinkUiHandler) Handle(ctx fiber.Ctx) error {
-	if err := access.RequireAdmin(ctx); err != nil {
-		return err
+	if !access.IsAdmin(ctx) {
+		return this.respondForbidden(ctx)
 	}
 
 	rawUserID := ctx.Params(userIDParam)
@@ -42,7 +43,7 @@ func (this *GenerateLinkUiHandler) Handle(ctx fiber.Ctx) error {
 	case UserDeactivated:
 		return this.respondWithMessage(ctx, fiber.StatusConflict, UserDeactivatedMessage)
 	case TargetIsTheAdmin:
-		return access.NoAccess()
+		return this.respondForbidden(ctx)
 	}
 
 	return pages.Render(ctx, fiber.StatusOK, pageFiles, generateLinkTemplate, GenerateLinkPage{
@@ -50,6 +51,10 @@ func (this *GenerateLinkUiHandler) Handle(ctx fiber.Ctx) error {
 		Purpose: output.Purpose,
 		Link:    output.Link,
 	})
+}
+
+func (this *GenerateLinkUiHandler) respondForbidden(ctx fiber.Ctx) error {
+	return respond.Problem(ctx, fiber.StatusForbidden, access.NoAccessMessage)
 }
 
 func (this *GenerateLinkUiHandler) respondWithMessage(ctx fiber.Ctx, status int, message string) error {

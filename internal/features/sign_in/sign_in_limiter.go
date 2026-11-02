@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bidirekt/broker/internal/components/respond"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/limiter"
 )
@@ -39,8 +40,8 @@ func newSignInFailureLimiter(maxFailures int, key func(fiber.Ctx) string) fiber.
 		LimiterMiddleware:      limiter.SlidingWindow{},
 		SkipSuccessfulRequests: true,
 		KeyGenerator:           key,
-		LimitReached: func(fiber.Ctx) error {
-			return fiber.NewError(fiber.StatusTooManyRequests, TooManySignInAttemptsMessage)
+		LimitReached: func(ctx fiber.Ctx) error {
+			return respond.Problem(ctx, fiber.StatusTooManyRequests, TooManySignInAttemptsMessage)
 		},
 	})
 }

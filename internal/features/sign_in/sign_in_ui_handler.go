@@ -5,6 +5,7 @@ import (
 
 	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/components/pages"
+	"github.com/bidirekt/broker/internal/components/respond"
 	"github.com/bidirekt/broker/internal/components/sessions"
 	"github.com/gofiber/fiber/v3"
 )
@@ -25,8 +26,8 @@ func (this *SignInUiHandler) ShowForm(ctx fiber.Ctx) error {
 }
 
 func (this *SignInUiHandler) RequireSameOrigin(ctx fiber.Ctx) error {
-	if err := sessions.RequireSameOrigin(ctx); err != nil {
-		return err
+	if !sessions.IsSameOrigin(ctx) {
+		return this.respondForbidden(ctx)
 	}
 
 	return ctx.Next()
@@ -57,6 +58,10 @@ func (this *SignInUiHandler) SignIn(ctx fiber.Ctx) error {
 
 func (this *SignInUiHandler) Email(ctx fiber.Ctx) string {
 	return ctx.FormValue(emailFormField)
+}
+
+func (this *SignInUiHandler) respondForbidden(ctx fiber.Ctx) error {
+	return respond.Problem(ctx, fiber.StatusForbidden, access.ForbiddenMessage)
 }
 
 func (this *SignInUiHandler) respondInvalidCredentials(ctx fiber.Ctx, email string) error {

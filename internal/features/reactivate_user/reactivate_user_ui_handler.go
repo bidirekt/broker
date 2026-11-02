@@ -6,6 +6,7 @@ import (
 
 	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/components/pages"
+	"github.com/bidirekt/broker/internal/components/respond"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -21,8 +22,8 @@ func NewReactivateUserUiHandler(useCase *ReactivateUserUseCase) *ReactivateUserU
 }
 
 func (this *ReactivateUserUiHandler) Handle(ctx fiber.Ctx) error {
-	if err := access.RequireAdmin(ctx); err != nil {
-		return err
+	if !access.IsAdmin(ctx) {
+		return this.respondForbidden(ctx)
 	}
 
 	rawUserID := ctx.Params(userIDParam)
@@ -36,10 +37,14 @@ func (this *ReactivateUserUiHandler) Handle(ctx fiber.Ctx) error {
 	case UserNotFound:
 		return this.respondUserNotFound(ctx)
 	case TargetIsTheAdmin:
-		return access.NoAccess()
+		return this.respondForbidden(ctx)
 	}
 
 	return pages.Redirect(ctx, usersPath)
+}
+
+func (this *ReactivateUserUiHandler) respondForbidden(ctx fiber.Ctx) error {
+	return respond.Problem(ctx, fiber.StatusForbidden, access.NoAccessMessage)
 }
 
 func (this *ReactivateUserUiHandler) respondUserNotFound(ctx fiber.Ctx) error {

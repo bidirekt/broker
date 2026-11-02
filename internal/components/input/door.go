@@ -5,6 +5,7 @@ import (
 	"iter"
 	"unicode/utf8"
 
+	"github.com/bidirekt/broker/internal/components/respond"
 	"github.com/gofiber/fiber/v3"
 	"github.com/valyala/fasthttp"
 )
@@ -16,7 +17,7 @@ var jsonNULEscape = []byte(`u0000`)
 func Door() fiber.Handler {
 	return func(ctx fiber.Ctx) error {
 		if !argsAreText(ctx.Request().URI().QueryArgs().All()) || !bodyIsText(ctx) {
-			return fiber.NewError(fiber.StatusBadRequest, invalidInputMessage)
+			return respond.Problem(ctx, fiber.StatusBadRequest, invalidInputMessage)
 		}
 
 		return ctx.Next()

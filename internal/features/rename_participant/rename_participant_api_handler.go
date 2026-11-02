@@ -16,8 +16,8 @@ func NewRenameParticipantApiHandler(useCase *RenameParticipantUseCase) *RenamePa
 }
 
 func (this *RenameParticipantApiHandler) Handle(ctx fiber.Ctx) error {
-	if err := access.RequirePermission(ctx, model.PermissionWrite); err != nil {
-		return err
+	if !access.Allows(ctx, model.PermissionWrite) {
+		return this.respondForbidden(ctx)
 	}
 
 	requestBody := &RenameParticipantRequestBody{}
@@ -47,6 +47,12 @@ func (this *RenameParticipantApiHandler) Handle(ctx fiber.Ctx) error {
 
 	return ctx.Status(fiber.StatusOK).JSON(RenameParticipantResponseBody{
 		Message: ParticipantRenamedMessage,
+	})
+}
+
+func (this *RenameParticipantApiHandler) respondForbidden(ctx fiber.Ctx) error {
+	return ctx.Status(fiber.StatusForbidden).JSON(RenameParticipantResponseBody{
+		Message: access.ForbiddenMessage,
 	})
 }
 

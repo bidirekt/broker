@@ -5,6 +5,7 @@ import (
 
 	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/components/pages"
+	"github.com/bidirekt/broker/internal/components/respond"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -20,16 +21,16 @@ func NewInviteUserUiHandler(useCase *InviteUserUseCase) *InviteUserUiHandler {
 }
 
 func (this *InviteUserUiHandler) ShowForm(ctx fiber.Ctx) error {
-	if err := access.RequireAdmin(ctx); err != nil {
-		return err
+	if !access.IsAdmin(ctx) {
+		return this.respondForbidden(ctx)
 	}
 
 	return pages.Render(ctx, fiber.StatusOK, pageFiles, inviteUserTemplate, InviteUserPage{})
 }
 
 func (this *InviteUserUiHandler) Invite(ctx fiber.Ctx) error {
-	if err := access.RequireAdmin(ctx); err != nil {
-		return err
+	if !access.IsAdmin(ctx) {
+		return this.respondForbidden(ctx)
 	}
 
 	page := InviteUserPage{
@@ -56,6 +57,10 @@ func (this *InviteUserUiHandler) Invite(ctx fiber.Ctx) error {
 
 	page.Link = output.Link
 	return pages.Render(ctx, fiber.StatusOK, pageFiles, inviteUserTemplate, page)
+}
+
+func (this *InviteUserUiHandler) respondForbidden(ctx fiber.Ctx) error {
+	return respond.Problem(ctx, fiber.StatusForbidden, access.NoAccessMessage)
 }
 
 func (this *InviteUserUiHandler) respondWithMessage(ctx fiber.Ctx, status int, page InviteUserPage, message string) error {

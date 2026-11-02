@@ -6,8 +6,8 @@ import (
 )
 
 const (
-	noAccessMessage     = "you don't have access"
-	forbiddenApiMessage = "forbidden"
+	NoAccessMessage  = "you don't have access"
+	ForbiddenMessage = "forbidden"
 )
 
 type Principal struct {
@@ -54,23 +54,12 @@ func SessionFrom(ctx fiber.Ctx) (Session, bool) {
 	return session, ok
 }
 
-func NoAccess() error {
-	return fiber.NewError(fiber.StatusForbidden, noAccessMessage)
-}
-
-func RequireAdmin(ctx fiber.Ctx) error {
-	if principal, ok := PrincipalFrom(ctx); ok && principal.ManagesUsers() {
-		return nil
-	}
-
-	return NoAccess()
-}
-
-func RequirePermission(ctx fiber.Ctx, permission model.Permission) error {
+func IsAdmin(ctx fiber.Ctx) bool {
 	principal, ok := PrincipalFrom(ctx)
-	if ok && principal.Permission.Includes(permission) {
-		return nil
-	}
+	return ok && principal.ManagesUsers()
+}
 
-	return fiber.NewError(fiber.StatusForbidden, forbiddenApiMessage)
+func Allows(ctx fiber.Ctx, permission model.Permission) bool {
+	principal, ok := PrincipalFrom(ctx)
+	return ok && principal.Permission.Includes(permission)
 }

@@ -6,3 +6,7 @@ type ListEnvironmentsResponseBody struct {
 	Message      string   `json:"message"`
 	Environments []string `json:"environments"`
 }
+
+type ListEnvironmentsErrorResponseBody struct {
+	Message string `json:"message"`
+}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/components/pages"
+	"github.com/bidirekt/broker/internal/components/respond"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -21,8 +22,8 @@ func NewEditUserUiHandler(useCase *EditUserUseCase) *EditUserUiHandler {
 }
 
 func (this *EditUserUiHandler) ShowForm(ctx fiber.Ctx) error {
-	if err := access.RequireAdmin(ctx); err != nil {
-		return err
+	if !access.IsAdmin(ctx) {
+		return this.respondForbidden(ctx)
 	}
 
 	userID, ok := this.userIDFrom(ctx)
@@ -35,7 +36,7 @@ func (this *EditUserUiHandler) ShowForm(ctx fiber.Ctx) error {
 	case UserNotFound:
 		return this.respondUserNotFound(ctx)
 	case TargetIsTheAdmin:
-		return access.NoAccess()
+		return this.respondForbidden(ctx)
 	}
 
 	return pages.Render(ctx, fiber.StatusOK, pageFiles, editUserTemplate, EditUserPage{
@@ -46,8 +47,8 @@ func (this *EditUserUiHandler) ShowForm(ctx fiber.Ctx) error {
 }
 
 func (this *EditUserUiHandler) EditUser(ctx fiber.Ctx) error {
-	if err := access.RequireAdmin(ctx); err != nil {
-		return err
+	if !access.IsAdmin(ctx) {
+		return this.respondForbidden(ctx)
 	}
 
 	userID, ok := this.userIDFrom(ctx)
@@ -77,7 +78,7 @@ func (this *EditUserUiHandler) EditUser(ctx fiber.Ctx) error {
 	case UserNotFound:
 		return this.respondUserNotFound(ctx)
 	case TargetIsTheAdmin:
-		return access.NoAccess()
+		return this.respondForbidden(ctx)
 	}
 
 	return pages.Redirect(ctx, usersPath)
@@ -88,6 +89,10 @@ func (this *EditUserUiHandler) userIDFrom(ctx fiber.Ctx) (int64, bool) {
 	userID, err := strconv.ParseInt(rawUserID, 10, 64)
 
 	return userID, err == nil && strconv.FormatInt(userID, 10) == rawUserID
+}
+
+func (this *EditUserUiHandler) respondForbidden(ctx fiber.Ctx) error {
+	return respond.Problem(ctx, fiber.StatusForbidden, access.NoAccessMessage)
 }
 
 func (this *EditUserUiHandler) respondUserNotFound(ctx fiber.Ctx) error {

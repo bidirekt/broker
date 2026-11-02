@@ -5,6 +5,7 @@ import (
 
 	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/components/pages"
+	"github.com/bidirekt/broker/internal/components/respond"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -20,11 +21,15 @@ func NewListUsersUiHandler(useCase *ListUsersUseCase) *ListUsersUiHandler {
 }
 
 func (this *ListUsersUiHandler) Handle(ctx fiber.Ctx) error {
-	if err := access.RequireAdmin(ctx); err != nil {
-		return err
+	if !access.IsAdmin(ctx) {
+		return this.respondForbidden(ctx)
 	}
 
 	output := this.useCase.Execute(ctx.Context(), ListUsersInput{})
 
 	return pages.Render(ctx, fiber.StatusOK, pageFiles, listUsersTemplate, ListUsersPage{Users: output.Users})
+}
+
+func (this *ListUsersUiHandler) respondForbidden(ctx fiber.Ctx) error {
+	return respond.Problem(ctx, fiber.StatusForbidden, access.NoAccessMessage)
 }

@@ -15,8 +15,8 @@ func NewCreateParticipantApiHandler(useCase *CreateParticipantUseCase) *CreatePa
 }
 
 func (this *CreateParticipantApiHandler) Handle(ctx fiber.Ctx) error {
-	if err := access.RequirePermission(ctx, model.PermissionWrite); err != nil {
-		return err
+	if !access.Allows(ctx, model.PermissionWrite) {
+		return this.respondForbidden(ctx)
 	}
 
 	requestBody := &CreateParticipantRequestBody{}
@@ -41,6 +41,12 @@ func (this *CreateParticipantApiHandler) Handle(ctx fiber.Ctx) error {
 
 	return ctx.Status(fiber.StatusOK).JSON(CreateParticipantResponseBody{
 		Message: ParticipantCreatedMessage,
+	})
+}
+
+func (this *CreateParticipantApiHandler) respondForbidden(ctx fiber.Ctx) error {
+	return ctx.Status(fiber.StatusForbidden).JSON(CreateParticipantResponseBody{
+		Message: access.ForbiddenMessage,
 	})
 }
 

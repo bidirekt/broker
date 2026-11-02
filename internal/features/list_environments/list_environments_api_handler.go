@@ -15,8 +15,8 @@ func NewListEnvironmentsApiHandler(useCase *ListEnvironmentsUseCase) *ListEnviro
 }
 
 func (this *ListEnvironmentsApiHandler) Handle(ctx fiber.Ctx) error {
-	if err := access.RequirePermission(ctx, model.PermissionRead); err != nil {
-		return err
+	if !access.Allows(ctx, model.PermissionRead) {
+		return this.respondForbidden(ctx)
 	}
 
 	output := this.useCase.Execute(ctx.Context(), ListEnvironmentsInput{})
@@ -24,5 +24,11 @@ func (this *ListEnvironmentsApiHandler) Handle(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusOK).JSON(ListEnvironmentsResponseBody{
 		Message:      EnvironmentsListedMessage,
 		Environments: output.Environments,
+	})
+}
+
+func (this *ListEnvironmentsApiHandler) respondForbidden(ctx fiber.Ctx) error {
+	return ctx.Status(fiber.StatusForbidden).JSON(ListEnvironmentsErrorResponseBody{
+		Message: access.ForbiddenMessage,
 	})
 }

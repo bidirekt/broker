@@ -3,12 +3,12 @@ package server
 import (
 	"errors"
 	"log"
-	"strings"
 
 	"github.com/bidirekt/broker/internal/components/bearer"
 	"github.com/bidirekt/broker/internal/components/config"
 	"github.com/bidirekt/broker/internal/components/input"
 	"github.com/bidirekt/broker/internal/components/pages"
+	"github.com/bidirekt/broker/internal/components/respond"
 	"github.com/bidirekt/broker/internal/components/sessions"
 	"github.com/bidirekt/broker/internal/repository"
 	"github.com/gofiber/fiber/v3"
@@ -26,34 +26,22 @@ const somethingWentWrongMessage = "something went wrong"
 
 const pageContentSecurityPolicy = "default-src 'self'; frame-ancestors 'none'"
 
-type errorResponseBody struct {
-	Message string `json:"message"`
-}
-
 func respondError(ctx fiber.Ctx, err error) error {
 	log.Printf("request %s %s failed: %v", ctx.Method(), ctx.Path(), err)
-
-	status, message := fiber.StatusInternalServerError, internalErrorMessage
-	var fiberErr *fiber.Error
-	if errors.As(err, &fiberErr) {
-		status, message = fiberErr.Code, fiberErr.Message
-	}
 
 	ctx.Response().Header.Del(fiber.HeaderLocation)
 	ctx.Response().Header.Del("HX-Redirect")
 
-	if !pages.IsPagePath(ctx.Path()) || !asksForPage(ctx) {
-		return ctx.Status(status).JSON(errorResponseBody{Message: message})
+	var fiberErr *fiber.Error
+	if errors.As(err, &fiberErr) {
+		return respond.Problem(ctx, fiberErr.Code, fiberErr.Message)
 	}
 
-	if fiberErr == nil {
+	message := internalErrorMessage
+	if respond.PageRequested(ctx) {
 		message = somethingWentWrongMessage
 	}
-	return pages.RenderError(ctx, status, message)
-}
-
-func asksForPage(ctx fiber.Ctx) bool {
-	return ctx.Get("HX-Request") == "true" || strings.Contains(ctx.Get(fiber.HeaderAccept), "text/html")
+	return respond.Problem(ctx, fiber.StatusInternalServerError, message)
 }
 
 func New(settings config.Settings, pool *pgxpool.Pool) *fiber.App {

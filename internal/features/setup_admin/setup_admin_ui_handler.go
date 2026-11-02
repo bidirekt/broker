@@ -3,7 +3,9 @@ package setup_admin
 import (
 	"embed"
 
+	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/components/pages"
+	"github.com/bidirekt/broker/internal/components/respond"
 	"github.com/bidirekt/broker/internal/components/sessions"
 	"github.com/gofiber/fiber/v3"
 )
@@ -21,15 +23,15 @@ func NewSetupAdminUiHandler(useCase *SetupAdminUseCase) *SetupAdminUiHandler {
 
 func (this *SetupAdminUiHandler) ShowForm(ctx fiber.Ctx) error {
 	if this.useCase.IsSetUp(ctx.Context()) {
-		return fiber.ErrNotFound
+		return respond.NotFound(ctx)
 	}
 
 	return pages.Render(ctx, fiber.StatusOK, pageFiles, setupTemplate, SetupPage{})
 }
 
 func (this *SetupAdminUiHandler) SetUp(ctx fiber.Ctx) error {
-	if err := sessions.RequireSameOrigin(ctx); err != nil {
-		return err
+	if !sessions.IsSameOrigin(ctx) {
+		return this.respondForbidden(ctx)
 	}
 
 	page := SetupPage{Email: ctx.FormValue(emailFormField)}
@@ -43,7 +45,7 @@ func (this *SetupAdminUiHandler) SetUp(ctx fiber.Ctx) error {
 
 	switch output.Status {
 	case AlreadySetUp:
-		return fiber.ErrNotFound
+		return respond.NotFound(ctx)
 	case EmailInvalid:
 		return this.respondProblem(ctx, page, EmailInvalidMessage)
 	case PasswordInvalid:
@@ -62,6 +64,10 @@ func (this *SetupAdminUiHandler) SetUp(ctx fiber.Ctx) error {
 	}
 
 	return pages.Redirect(ctx, usersPath)
+}
+
+func (this *SetupAdminUiHandler) respondForbidden(ctx fiber.Ctx) error {
+	return respond.Problem(ctx, fiber.StatusForbidden, access.ForbiddenMessage)
 }
 
 func (this *SetupAdminUiHandler) respondProblem(ctx fiber.Ctx, page SetupPage, message string) error {

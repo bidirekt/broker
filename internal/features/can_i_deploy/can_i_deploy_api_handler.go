@@ -16,8 +16,8 @@ func NewCanIDeployApiHandler(useCase *CanIDeployUseCase) *CanIDeployApiHandler {
 }
 
 func (this *CanIDeployApiHandler) Handle(ctx fiber.Ctx) error {
-	if err := access.RequirePermission(ctx, model.PermissionRead); err != nil {
-		return err
+	if !access.Allows(ctx, model.PermissionRead) {
+		return this.respondForbidden(ctx)
 	}
 
 	requestBody := &CanIDeployRequestBody{}
@@ -51,6 +51,12 @@ func (this *CanIDeployApiHandler) Handle(ctx fiber.Ctx) error {
 		Environment: requestBody.Environment,
 		Deployable:  output.Deployable,
 		Results:     output.Results,
+	})
+}
+
+func (this *CanIDeployApiHandler) respondForbidden(ctx fiber.Ctx) error {
+	return ctx.Status(fiber.StatusForbidden).JSON(CanIDeployErrorResponseBody{
+		Message: access.ForbiddenMessage,
 	})
 }
 

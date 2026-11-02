@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/bidirekt/broker/internal/components/access"
+	"github.com/bidirekt/broker/internal/components/respond"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/limiter"
 )
@@ -24,8 +25,8 @@ func newUpdateProfileLimiter() fiber.Handler {
 			principal, _ := access.PrincipalFrom(ctx)
 			return strconv.FormatInt(principal.UserID, 10)
 		},
-		LimitReached: func(fiber.Ctx) error {
-			return fiber.NewError(fiber.StatusTooManyRequests, TooManyProfileAttemptsMessage)
+		LimitReached: func(ctx fiber.Ctx) error {
+			return respond.Problem(ctx, fiber.StatusTooManyRequests, TooManyProfileAttemptsMessage)
 		},
 	})
 }

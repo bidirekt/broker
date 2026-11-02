@@ -20,8 +20,8 @@ func NewValidateContractApiHandler(useCase *ValidateContractUseCase) *ValidateCo
 }
 
 func (this *ValidateContractApiHandler) Handle(ctx fiber.Ctx) error {
-	if err := access.RequirePermission(ctx, model.PermissionRead); err != nil {
-		return err
+	if !access.Allows(ctx, model.PermissionRead) {
+		return this.respondForbidden(ctx)
 	}
 
 	requestBody := &ValidateContractRequestBody{}
@@ -59,6 +59,12 @@ func (this *ValidateContractApiHandler) Handle(ctx fiber.Ctx) error {
 		Environment: output.Environment,
 		Deployable:  output.Deployable,
 		Results:     output.Results,
+	})
+}
+
+func (this *ValidateContractApiHandler) respondForbidden(ctx fiber.Ctx) error {
+	return ctx.Status(fiber.StatusForbidden).JSON(ValidateContractErrorResponseBody{
+		Message: access.ForbiddenMessage,
 	})
 }
 

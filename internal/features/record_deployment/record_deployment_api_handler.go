@@ -16,8 +16,8 @@ func NewRecordDeploymentApiHandler(useCase *RecordDeploymentUseCase) *RecordDepl
 }
 
 func (this *RecordDeploymentApiHandler) Handle(ctx fiber.Ctx) error {
-	if err := access.RequirePermission(ctx, model.PermissionWrite); err != nil {
-		return err
+	if !access.Allows(ctx, model.PermissionWrite) {
+		return this.respondForbidden(ctx)
 	}
 
 	requestBody := &RecordDeploymentRequestBody{}
@@ -48,6 +48,12 @@ func (this *RecordDeploymentApiHandler) Handle(ctx fiber.Ctx) error {
 
 	return ctx.Status(fiber.StatusOK).JSON(RecordDeploymentResponseBody{
 		Message: DeploymentRecordedMessage,
+	})
+}
+
+func (this *RecordDeploymentApiHandler) respondForbidden(ctx fiber.Ctx) error {
+	return ctx.Status(fiber.StatusForbidden).JSON(RecordDeploymentResponseBody{
+		Message: access.ForbiddenMessage,
 	})
 }
 

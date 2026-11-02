@@ -16,8 +16,8 @@ func NewCreateEnvironmentApiHandler(useCase *CreateEnvironmentUseCase) *CreateEn
 }
 
 func (this *CreateEnvironmentApiHandler) Handle(ctx fiber.Ctx) error {
-	if err := access.RequirePermission(ctx, model.PermissionWrite); err != nil {
-		return err
+	if !access.Allows(ctx, model.PermissionWrite) {
+		return this.respondForbidden(ctx)
 	}
 
 	requestBody := &CreateEnvironmentRequestBody{}
@@ -40,6 +40,12 @@ func (this *CreateEnvironmentApiHandler) Handle(ctx fiber.Ctx) error {
 
 	return ctx.Status(fiber.StatusOK).JSON(CreateEnvironmentResponseBody{
 		Message: EnvironmentCreatedMessage,
+	})
+}
+
+func (this *CreateEnvironmentApiHandler) respondForbidden(ctx fiber.Ctx) error {
+	return ctx.Status(fiber.StatusForbidden).JSON(CreateEnvironmentResponseBody{
+		Message: access.ForbiddenMessage,
 	})
 }
 

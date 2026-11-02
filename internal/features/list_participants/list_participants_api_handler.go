@@ -15,8 +15,8 @@ func NewListParticipantsApiHandler(useCase *ListParticipantsUseCase) *ListPartic
 }
 
 func (this *ListParticipantsApiHandler) Handle(ctx fiber.Ctx) error {
-	if err := access.RequirePermission(ctx, model.PermissionRead); err != nil {
-		return err
+	if !access.Allows(ctx, model.PermissionRead) {
+		return this.respondForbidden(ctx)
 	}
 
 	output := this.useCase.Execute(ctx.Context(), ListParticipantsInput{})
@@ -24,5 +24,11 @@ func (this *ListParticipantsApiHandler) Handle(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusOK).JSON(ListParticipantsResponseBody{
 		Message:      ParticipantsListedMessage,
 		Participants: output.Participants,
+	})
+}
+
+func (this *ListParticipantsApiHandler) respondForbidden(ctx fiber.Ctx) error {
+	return ctx.Status(fiber.StatusForbidden).JSON(ListParticipantsErrorResponseBody{
+		Message: access.ForbiddenMessage,
 	})
 }

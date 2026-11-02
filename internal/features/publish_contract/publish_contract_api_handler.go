@@ -20,8 +20,8 @@ func NewPublishContractApiHandler(useCase *PublishContractUseCase) *PublishContr
 }
 
 func (this *PublishContractApiHandler) Handle(ctx fiber.Ctx) error {
-	if err := access.RequirePermission(ctx, model.PermissionWrite); err != nil {
-		return err
+	if !access.Allows(ctx, model.PermissionWrite) {
+		return this.respondForbidden(ctx)
 	}
 
 	requestBody := &PublishContractRequestBody{}
@@ -54,6 +54,12 @@ func (this *PublishContractApiHandler) Handle(ctx fiber.Ctx) error {
 	}
 
 	return this.respondSuccess(ctx)
+}
+
+func (this *PublishContractApiHandler) respondForbidden(ctx fiber.Ctx) error {
+	return ctx.Status(fiber.StatusForbidden).JSON(PublishContractResponseBody{
+		Message: access.ForbiddenMessage,
+	})
 }
 
 func (this *PublishContractApiHandler) respondParticipantNotFound(ctx fiber.Ctx) error {

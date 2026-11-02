@@ -3,7 +3,9 @@ package set_password
 import (
 	"embed"
 
+	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/components/pages"
+	"github.com/bidirekt/broker/internal/components/respond"
 	"github.com/bidirekt/broker/internal/components/sessions"
 	"github.com/gofiber/fiber/v3"
 )
@@ -29,8 +31,8 @@ func (this *SetPasswordUiHandler) ShowForm(ctx fiber.Ctx) error {
 }
 
 func (this *SetPasswordUiHandler) SetPassword(ctx fiber.Ctx) error {
-	if err := sessions.RequireSameOrigin(ctx); err != nil {
-		return err
+	if !sessions.IsSameOrigin(ctx) {
+		return this.respondForbidden(ctx)
 	}
 
 	token := ctx.FormValue(tokenField)
@@ -53,6 +55,10 @@ func (this *SetPasswordUiHandler) SetPassword(ctx fiber.Ctx) error {
 	}
 
 	return pages.Redirect(ctx, signInPath)
+}
+
+func (this *SetPasswordUiHandler) respondForbidden(ctx fiber.Ctx) error {
+	return respond.Problem(ctx, fiber.StatusForbidden, access.ForbiddenMessage)
 }
 
 func (this *SetPasswordUiHandler) respondLinkInvalid(ctx fiber.Ctx) error {

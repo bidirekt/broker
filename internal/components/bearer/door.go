@@ -5,6 +5,7 @@ import (
 
 	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/components/config"
+	"github.com/bidirekt/broker/internal/components/respond"
 	"github.com/bidirekt/broker/internal/repository"
 	"github.com/gofiber/fiber/v3"
 )
@@ -32,7 +33,7 @@ func Door(settings config.Settings, users *repository.UserRepository) fiber.Hand
 		principal, ok := keeper.toPrincipal(ctx)
 		if !ok {
 			ctx.Set(fiber.HeaderWWWAuthenticate, "Bearer")
-			return fiber.NewError(fiber.StatusUnauthorized, unauthenticatedMessage)
+			return respond.Problem(ctx, fiber.StatusUnauthorized, unauthenticatedMessage)
 		}
 
 		access.GrantPrincipal(ctx, principal)

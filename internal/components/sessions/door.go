@@ -8,6 +8,7 @@ import (
 	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/components/config"
 	"github.com/bidirekt/broker/internal/components/pages"
+	"github.com/bidirekt/broker/internal/components/respond"
 	"github.com/bidirekt/broker/internal/components/tokens"
 	"github.com/bidirekt/broker/internal/repository"
 	"github.com/gofiber/fiber/v3"
@@ -60,7 +61,7 @@ func Door(settings config.Settings, sessions *repository.SessionRepository, user
 		access.GrantSession(ctx, session)
 
 		if !isSafeMethod(ctx.Method()) && !keeper.carriesCSRFProof(ctx, session) {
-			return fiber.NewError(fiber.StatusForbidden, forbiddenPageMessage)
+			return respond.Problem(ctx, fiber.StatusForbidden, access.ForbiddenMessage)
 		}
 
 		return ctx.Next()
