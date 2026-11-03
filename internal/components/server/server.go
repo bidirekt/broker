@@ -44,7 +44,7 @@ func respondError(ctx fiber.Ctx, err error) error {
 	return respond.Problem(ctx, fiber.StatusInternalServerError, message)
 }
 
-func New(settings config.Settings, pool *pgxpool.Pool) *fiber.App {
+func New(settings config.Settings, pool *pgxpool.Pool, sessionKeeper *sessions.Keeper) *fiber.App {
 	appConfig := fiber.Config{
 		BodyLimit:     publishBodyLimit,
 		ErrorHandler:  respondError,
@@ -67,9 +67,8 @@ func New(settings config.Settings, pool *pgxpool.Pool) *fiber.App {
 	}))
 	server.Use(input.Door())
 	serveAssets(server)
-	users := repository.NewUserRepository(pool)
-	server.Use(sessions.Door(settings, repository.NewSessionRepository(pool), users))
-	server.Use(bearer.Door(settings, users))
+	server.Use(sessionKeeper.Door)
+	server.Use(bearer.Door(settings, repository.NewUserRepository(pool)))
 
 	return server
 }

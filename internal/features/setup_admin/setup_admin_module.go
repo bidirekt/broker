@@ -8,7 +8,7 @@ import (
 func Register(kernel *components.Components) {
 	userRepository := repository.NewUserRepository(kernel.Pool)
 	useCase := NewSetupAdminUseCase(userRepository)
-	uiHandler := NewSetupAdminUiHandler(useCase)
+	uiHandler := NewSetupAdminUiHandler(useCase, kernel.SessionKeeper)
 	kernel.Server.Get("/setup", uiHandler.ShowForm)
 	kernel.Server.Post("/setup", uiHandler.SetUp)
 }

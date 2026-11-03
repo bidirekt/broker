@@ -14,9 +14,7 @@ const (
 	plainSessionCookieName  = "bidirekt_session"
 )
 
-func Start(ctx fiber.Ctx, userID int64, verifiedPasswordHash string) (started bool, err error) {
-	keeper := fiber.Locals[*keeper](ctx, keeperKey{})
-
+func (this *Keeper) Start(ctx fiber.Ctx, userID int64, verifiedPasswordHash string) (started bool, err error) {
 	cookieValue, err := tokens.Random()
 	if err != nil {
 		return false, err
@@ -27,23 +25,22 @@ func Start(ctx fiber.Ctx, userID int64, verifiedPasswordHash string) (started bo
 	}
 
 	session := &model.Session{IDHash: tokens.Hash(cookieValue), UserID: userID, CSRFToken: csrfToken}
-	if !keeper.sessions.Create(ctx.Context(), session, verifiedPasswordHash) {
+	if !this.sessions.Create(ctx.Context(), session, verifiedPasswordHash) {
 		return false, nil
 	}
 
-	ctx.Cookie(keeper.cookie(cookieValue, int(AbsoluteLimit.Seconds())))
+	ctx.Cookie(this.cookie(cookieValue, int(AbsoluteLimit.Seconds())))
 
 	return true, nil
 }
 
-func ExpireCookie(ctx fiber.Ctx) {
-	keeper := fiber.Locals[*keeper](ctx, keeperKey{})
-	cookie := keeper.cookie("", 0)
+func (this *Keeper) ExpireCookie(ctx fiber.Ctx) {
+	cookie := this.cookie("", 0)
 	cookie.Expires = time.Unix(0, 0)
 	ctx.Cookie(cookie)
 }
 
-func (this *keeper) cookie(value string, maxAge int) *fiber.Cookie {
+func (this *Keeper) cookie(value string, maxAge int) *fiber.Cookie {
 	return &fiber.Cookie{
 		Name:     this.cookieName(),
 		Value:    value,
@@ -55,7 +52,7 @@ func (this *keeper) cookie(value string, maxAge int) *fiber.Cookie {
 	}
 }
 
-func (this *keeper) cookieName() string {
+func (this *Keeper) cookieName() string {
 	if this.isSecure() {
 		return secureSessionCookieName
 	}
@@ -63,6 +60,6 @@ func (this *keeper) cookieName() string {
 	return plainSessionCookieName
 }
 
-func (this *keeper) isSecure() bool {
+func (this *Keeper) isSecure() bool {
 	return strings.HasPrefix(this.settings.PublicURL, "https://")
 }

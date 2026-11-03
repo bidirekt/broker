@@ -14,11 +14,12 @@ import (
 var pageFiles embed.FS
 
 type SetPasswordUiHandler struct {
-	useCase *SetPasswordUseCase
+	useCase       *SetPasswordUseCase
+	sessionKeeper *sessions.Keeper
 }
 
-func NewSetPasswordUiHandler(useCase *SetPasswordUseCase) *SetPasswordUiHandler {
-	return &SetPasswordUiHandler{useCase: useCase}
+func NewSetPasswordUiHandler(useCase *SetPasswordUseCase, sessionKeeper *sessions.Keeper) *SetPasswordUiHandler {
+	return &SetPasswordUiHandler{useCase: useCase, sessionKeeper: sessionKeeper}
 }
 
 func (this *SetPasswordUiHandler) ShowForm(ctx fiber.Ctx) error {
@@ -31,7 +32,7 @@ func (this *SetPasswordUiHandler) ShowForm(ctx fiber.Ctx) error {
 }
 
 func (this *SetPasswordUiHandler) SetPassword(ctx fiber.Ctx) error {
-	if !sessions.IsSameOrigin(ctx) {
+	if !this.sessionKeeper.IsSameOrigin(ctx) {
 		return this.respondForbidden(ctx)
 	}
 

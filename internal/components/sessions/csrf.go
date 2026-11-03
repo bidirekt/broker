@@ -9,7 +9,7 @@ import (
 
 const csrfTokenHeader = "X-CSRF-Token"
 
-func (this *keeper) carriesCSRFProof(ctx fiber.Ctx, session access.Session) bool {
+func (this *Keeper) carriesCSRFProof(ctx fiber.Ctx, session access.Session) bool {
 	if !this.isSameOrigin(ctx) {
 		return false
 	}
@@ -19,10 +19,10 @@ func (this *keeper) carriesCSRFProof(ctx fiber.Ctx, session access.Session) bool
 	return token != "" && subtle.ConstantTimeCompare([]byte(token), []byte(session.CSRFToken)) == 1
 }
 
-func (this *keeper) isSameOrigin(ctx fiber.Ctx) bool {
+func (this *Keeper) isSameOrigin(ctx fiber.Ctx) bool {
 	return ctx.Get(fiber.HeaderOrigin) == this.settings.PublicURL
 }
 
-func IsSameOrigin(ctx fiber.Ctx) bool {
-	return fiber.Locals[*keeper](ctx, keeperKey{}).isSameOrigin(ctx)
+func (this *Keeper) IsSameOrigin(ctx fiber.Ctx) bool {
+	return this.isSameOrigin(ctx)
 }

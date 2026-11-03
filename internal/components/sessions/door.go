@@ -24,7 +24,7 @@ const (
 
 var pagesOutsideSessionDoor = []string{signInPath, "/set-password", setupPath}
 
-type keeper struct {
+type Keeper struct {
 	settings config.Settings
 	sessions *repository.SessionRepository
 	users    *repository.UserRepository
@@ -32,43 +32,39 @@ type keeper struct {
 	adminExists atomic.Bool
 }
 
-type keeperKey struct{}
-
-func Door(settings config.Settings, sessions *repository.SessionRepository, users *repository.UserRepository) fiber.Handler {
-	keeper := &keeper{settings: settings, sessions: sessions, users: users}
-
-	return func(ctx fiber.Ctx) error {
-		ctx.Locals(keeperKey{}, keeper)
-
-		if !pages.IsPagePath(ctx.Path()) {
-			return ctx.Next()
-		}
-
-		if !isUnderPath(ctx.Path(), setupPath) && !keeper.isSetUp(ctx) {
-			return pages.Redirect(ctx, setupPath)
-		}
-
-		if isPageOutsideSessionDoor(ctx.Path()) {
-			return ctx.Next()
-		}
-
-		principal, session, ok := keeper.toPrincipal(ctx)
-		if !ok {
-			return pages.Redirect(ctx, signInPath)
-		}
-
-		access.GrantPrincipal(ctx, principal)
-		access.GrantSession(ctx, session)
-
-		if !isSafeMethod(ctx.Method()) && !keeper.carriesCSRFProof(ctx, session) {
-			return respond.Problem(ctx, fiber.StatusForbidden, access.ForbiddenMessage)
-		}
-
-		return ctx.Next()
-	}
+func NewKeeper(settings config.Settings, sessions *repository.SessionRepository, users *repository.UserRepository) *Keeper {
+	return &Keeper{settings: settings, sessions: sessions, users: users}
 }
 
-func (this *keeper) isSetUp(ctx fiber.Ctx) bool {
+func (this *Keeper) Door(ctx fiber.Ctx) error {
+	if !pages.IsPagePath(ctx.Path()) {
+		return ctx.Next()
+	}
+
+	if !isUnderPath(ctx.Path(), setupPath) && !this.isSetUp(ctx) {
+		return pages.Redirect(ctx, setupPath)
+	}
+
+	if isPageOutsideSessionDoor(ctx.Path()) {
+		return ctx.Next()
+	}
+
+	principal, session, ok := this.toPrincipal(ctx)
+	if !ok {
+		return pages.Redirect(ctx, signInPath)
+	}
+
+	access.GrantPrincipal(ctx, principal)
+	access.GrantSession(ctx, session)
+
+	if !isSafeMethod(ctx.Method()) && !this.carriesCSRFProof(ctx, session) {
+		return respond.Problem(ctx, fiber.StatusForbidden, access.ForbiddenMessage)
+	}
+
+	return ctx.Next()
+}
+
+func (this *Keeper) isSetUp(ctx fiber.Ctx) bool {
 	if this.adminExists.Load() {
 		return true
 	}
@@ -96,7 +92,7 @@ func isSafeMethod(method string) bool {
 	return method == fiber.MethodGet || method == fiber.MethodHead
 }
 
-func (this *keeper) toPrincipal(ctx fiber.Ctx) (access.Principal, access.Session, bool) {
+func (this *Keeper) toPrincipal(ctx fiber.Ctx) (access.Principal, access.Session, bool) {
 	cookieValue := ctx.Cookies(this.cookieName())
 	if cookieValue == "" {
 		return access.Principal{}, access.Session{}, false

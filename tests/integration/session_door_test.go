@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bidirekt/broker/internal/components/sessions"
 	"github.com/bidirekt/broker/internal/repository"
 	"github.com/gofiber/fiber/v3"
 )
@@ -238,7 +237,7 @@ func (this *IntegrationSuite) TestSessionDoor_LookalikePrefixStaysBehindTheDoor(
 func (this *IntegrationSuite) TestStartSession_SetsCookieThatPassesTheDoor() {
 	userID := this.createDoorUser(true)
 	this.Components.Server.Get("/sign-in/__start_session", func(ctx fiber.Ctx) error {
-		started, err := sessions.Start(ctx, userID, doorUserPasswordHash)
+		started, err := this.Components.SessionKeeper.Start(ctx, userID, doorUserPasswordHash)
 		if err != nil {
 			return err
 		}
@@ -270,7 +269,7 @@ func (this *IntegrationSuite) TestStartSession_SetsCookieThatPassesTheDoor() {
 
 func (this *IntegrationSuite) TestExpireSessionCookie_ClearsTheCookie() {
 	this.Components.Server.Get("/sign-in/__expire_session", func(ctx fiber.Ctx) error {
-		sessions.ExpireCookie(ctx)
+		this.Components.SessionKeeper.ExpireCookie(ctx)
 		return ctx.SendStatus(http.StatusNoContent)
 	})
 

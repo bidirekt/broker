@@ -8,6 +8,6 @@ import (
 func Register(kernel *components.Components) {
 	sessionRepository := repository.NewSessionRepository(kernel.Pool)
 	useCase := NewSignOutUseCase(sessionRepository)
-	uiHandler := NewSignOutUiHandler(useCase)
+	uiHandler := NewSignOutUiHandler(useCase, kernel.SessionKeeper)
 	kernel.Server.Post(signOutPath, uiHandler.SignOut)
 }
