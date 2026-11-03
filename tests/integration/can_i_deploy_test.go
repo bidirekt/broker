@@ -1258,3 +1258,26 @@ func (this *IntegrationSuite) TestCanIDeploy_UnknownEnvironmentReturns404() {
 
 	this.Equal(0, this.countRows("compatibility_checks"))
 }
+
+func (this *IntegrationSuite) TestCanIDeploy_PaddedParticipantVersionOrEnvironmentReturns400() {
+	status, _ := this.post("/api/participants", `{"participant":"api"}`)
+	this.Require().Equal(http.StatusOK, status)
+
+	status, _ = this.post("/api/contracts", this.publishBody("api", "v1", contractFragment{"api.yaml", apiV1ProviderContract}))
+	this.Require().Equal(http.StatusOK, status)
+
+	status, _ = this.post("/api/environments", `{"environment":"production"}`)
+	this.Require().Equal(http.StatusOK, status)
+
+	cases := map[string]string{
+		"trailing space in participant":   `{"participant":"api ","version":"v1","environment":"production"}`,
+		"leading space in version":        `{"participant":"api","version":" v1","environment":"production"}`,
+		"trailing newline in environment": `{"participant":"api","version":"v1","environment":"production\n"}`,
+	}
+
+	for name, body := range cases {
+		status, response := this.post("/api/can-i-deploy", body)
+		this.Equal(http.StatusBadRequest, status, name)
+		this.JSONEq(`{"message":"can-i-deploy invalid input"}`, response, name)
+	}
+}

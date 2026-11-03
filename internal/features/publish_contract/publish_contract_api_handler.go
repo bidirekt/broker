@@ -2,10 +2,12 @@ package publish_contract
 
 import (
 	"encoding/json"
-	"strings"
 
+	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/contracts/contractfiles"
 	"github.com/bidirekt/broker/internal/contracts/violation"
+	"github.com/bidirekt/broker/internal/model"
+	"github.com/bidirekt/broker/internal/validations"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -18,12 +20,16 @@ func NewPublishContractApiHandler(useCase *PublishContractUseCase) *PublishContr
 }
 
 func (this *PublishContractApiHandler) Handle(ctx fiber.Ctx) error {
+	if !access.Allows(ctx, model.PermissionWrite) {
+		return this.respondForbidden(ctx)
+	}
+
 	requestBody := &PublishContractRequestBody{}
 	if err := json.Unmarshal(ctx.Body(), requestBody); err != nil {
 		return this.respondInvalidInput(ctx)
 	}
 
-	if !isUnpaddedValue(requestBody.ServiceName) || !isUnpaddedValue(requestBody.Version) || len(requestBody.Contracts) == 0 || contractfiles.HasBlankSource(requestBody.Contracts) {
+	if validations.UnpaddedValue(requestBody.ServiceName) != nil || validations.UnpaddedValue(requestBody.Version) != nil || len(requestBody.Contracts) == 0 || contractfiles.HasBlankSource(requestBody.Contracts) {
 		return this.respondInvalidInput(ctx)
 	}
 
@@ -48,6 +54,12 @@ func (this *PublishContractApiHandler) Handle(ctx fiber.Ctx) error {
 	}
 
 	return this.respondSuccess(ctx)
+}
+
+func (this *PublishContractApiHandler) respondForbidden(ctx fiber.Ctx) error {
+	return ctx.Status(fiber.StatusForbidden).JSON(PublishContractResponseBody{
+		Message: access.ForbiddenMessage,
+	})
 }
 
 func (this *PublishContractApiHandler) respondParticipantNotFound(ctx fiber.Ctx) error {
@@ -85,8 +97,4 @@ func (this *PublishContractApiHandler) respondSuccess(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusOK).JSON(PublishContractResponseBody{
 		Message: ContractPublishSuccessfulMessage,
 	})
-}
-
-func isUnpaddedValue(value string) bool {
-	return value != "" && strings.TrimSpace(value) == value
 }

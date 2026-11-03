@@ -25,11 +25,26 @@ func (this *IntegrationSuite) health(method string) (status int, response string
 func (this *IntegrationSuite) TestHappyPath_HealthReportsStatusAndVersions() {
 	status, body := this.health("GET")
 	this.Equal(http.StatusOK, status)
-	this.JSONEq(`{"status":"ok","brokerVersion":"dev","apiVersion":1}`, body)
+	this.JSONEq(`{"status":"ok","brokerVersion":"dev","apiVersion":2}`, body)
 }
 
 func (this *IntegrationSuite) TestUnhappyPath_PostHealthIsNotRouted() {
 	status, body := this.health("POST")
 	this.Equal(http.StatusMethodNotAllowed, status)
 	this.JSONEq(`{"message":"Method Not Allowed"}`, body)
+}
+
+func (this *IntegrationSuite) TestUnhappyPath_HealthIsRoutedOnlyAtItsExactPath() {
+	cookie := this.signInAsAdmin()
+
+	for _, path := range []string{"/HEALTH", "/health/"} {
+		req := httptest.NewRequest("GET", path, nil)
+		req.AddCookie(&http.Cookie{Name: "bidirekt_session", Value: cookie})
+
+		resp, err := this.Components.Server.Test(req, fiber.TestConfig{Timeout: 10 * time.Second})
+		this.Require().NoError(err)
+		_ = resp.Body.Close()
+
+		this.Equal(http.StatusNotFound, resp.StatusCode, path)
+	}
 }

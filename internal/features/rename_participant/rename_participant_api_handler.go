@@ -1,6 +1,11 @@
 package rename_participant
 
-import "github.com/gofiber/fiber/v3"
+import (
+	"github.com/bidirekt/broker/internal/components/access"
+	"github.com/bidirekt/broker/internal/model"
+	"github.com/bidirekt/broker/internal/validations"
+	"github.com/gofiber/fiber/v3"
+)
 
 type RenameParticipantApiHandler struct {
 	useCase *RenameParticipantUseCase
@@ -11,12 +16,16 @@ func NewRenameParticipantApiHandler(useCase *RenameParticipantUseCase) *RenamePa
 }
 
 func (this *RenameParticipantApiHandler) Handle(ctx fiber.Ctx) error {
+	if !access.Allows(ctx, model.PermissionWrite) {
+		return this.respondForbidden(ctx)
+	}
+
 	requestBody := &RenameParticipantRequestBody{}
 	if err := ctx.Bind().JSON(requestBody); err != nil {
 		return this.respondInvalidInput(ctx)
 	}
 
-	if requestBody.OldName == "" || requestBody.NewName == "" {
+	if validations.UnpaddedValue(requestBody.OldName) != nil || requestBody.NewName == "" {
 		return this.respondInvalidInput(ctx)
 	}
 
@@ -38,6 +47,12 @@ func (this *RenameParticipantApiHandler) Handle(ctx fiber.Ctx) error {
 
 	return ctx.Status(fiber.StatusOK).JSON(RenameParticipantResponseBody{
 		Message: ParticipantRenamedMessage,
+	})
+}
+
+func (this *RenameParticipantApiHandler) respondForbidden(ctx fiber.Ctx) error {
+	return ctx.Status(fiber.StatusForbidden).JSON(RenameParticipantResponseBody{
+		Message: access.ForbiddenMessage,
 	})
 }
 

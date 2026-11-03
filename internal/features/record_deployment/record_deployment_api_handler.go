@@ -1,6 +1,11 @@
 package record_deployment
 
-import "github.com/gofiber/fiber/v3"
+import (
+	"github.com/bidirekt/broker/internal/components/access"
+	"github.com/bidirekt/broker/internal/model"
+	"github.com/bidirekt/broker/internal/validations"
+	"github.com/gofiber/fiber/v3"
+)
 
 type RecordDeploymentApiHandler struct {
 	useCase *RecordDeploymentUseCase
@@ -11,12 +16,16 @@ func NewRecordDeploymentApiHandler(useCase *RecordDeploymentUseCase) *RecordDepl
 }
 
 func (this *RecordDeploymentApiHandler) Handle(ctx fiber.Ctx) error {
+	if !access.Allows(ctx, model.PermissionWrite) {
+		return this.respondForbidden(ctx)
+	}
+
 	requestBody := &RecordDeploymentRequestBody{}
 	if err := ctx.Bind().JSON(requestBody); err != nil {
 		return this.respondInvalidInput(ctx)
 	}
 
-	if requestBody.Participant == "" || requestBody.Version == "" || requestBody.Environment == "" {
+	if validations.UnpaddedValue(requestBody.Participant) != nil || validations.UnpaddedValue(requestBody.Version) != nil || validations.UnpaddedValue(requestBody.Environment) != nil {
 		return this.respondInvalidInput(ctx)
 	}
 
@@ -39,6 +48,12 @@ func (this *RecordDeploymentApiHandler) Handle(ctx fiber.Ctx) error {
 
 	return ctx.Status(fiber.StatusOK).JSON(RecordDeploymentResponseBody{
 		Message: DeploymentRecordedMessage,
+	})
+}
+
+func (this *RecordDeploymentApiHandler) respondForbidden(ctx fiber.Ctx) error {
+	return ctx.Status(fiber.StatusForbidden).JSON(RecordDeploymentResponseBody{
+		Message: access.ForbiddenMessage,
 	})
 }
 

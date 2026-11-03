@@ -1,6 +1,11 @@
 package create_environment
 
-import "github.com/gofiber/fiber/v3"
+import (
+	"github.com/bidirekt/broker/internal/components/access"
+	"github.com/bidirekt/broker/internal/model"
+	"github.com/bidirekt/broker/internal/validations"
+	"github.com/gofiber/fiber/v3"
+)
 
 type CreateEnvironmentApiHandler struct {
 	useCase *CreateEnvironmentUseCase
@@ -11,12 +16,16 @@ func NewCreateEnvironmentApiHandler(useCase *CreateEnvironmentUseCase) *CreateEn
 }
 
 func (this *CreateEnvironmentApiHandler) Handle(ctx fiber.Ctx) error {
+	if !access.Allows(ctx, model.PermissionWrite) {
+		return this.respondForbidden(ctx)
+	}
+
 	requestBody := &CreateEnvironmentRequestBody{}
 	if err := ctx.Bind().JSON(requestBody); err != nil {
 		return this.respondInvalidInput(ctx)
 	}
 
-	if requestBody.Environment == "" {
+	if validations.UnpaddedValue(requestBody.Environment) != nil {
 		return this.respondInvalidInput(ctx)
 	}
 
@@ -31,6 +40,12 @@ func (this *CreateEnvironmentApiHandler) Handle(ctx fiber.Ctx) error {
 
 	return ctx.Status(fiber.StatusOK).JSON(CreateEnvironmentResponseBody{
 		Message: EnvironmentCreatedMessage,
+	})
+}
+
+func (this *CreateEnvironmentApiHandler) respondForbidden(ctx fiber.Ctx) error {
+	return ctx.Status(fiber.StatusForbidden).JSON(CreateEnvironmentResponseBody{
+		Message: access.ForbiddenMessage,
 	})
 }
 

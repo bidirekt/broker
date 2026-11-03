@@ -10,11 +10,11 @@ import (
 const recoveredParticipantBody = `{"participant":"recovered_service"}`
 
 func (this *IntegrationSuite) TestPanicInHandler_Returns500AndServerKeepsServing() {
-	this.Components.Server.Post("/__panic", func(fiber.Ctx) error {
+	this.Components.Server.Post("/api/__panic", func(fiber.Ctx) error {
 		panic("handler exploded")
 	})
 
-	status, body := this.post("/__panic", `{}`)
+	status, body := this.post("/api/__panic", `{}`)
 	this.Equal(http.StatusInternalServerError, status)
 	this.JSONEq(`{"message":"internal error"}`, body)
 

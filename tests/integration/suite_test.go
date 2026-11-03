@@ -5,14 +5,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/bidirekt/broker/internal"
 	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/passwords"
+	"github.com/bidirekt/broker/internal/model"
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/suite"
@@ -21,6 +26,17 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
+const (
+	suitePublicURL         = "http://localhost:8080"
+	suiteAdminEmail        = "admin@example.com"
+	suiteAdminSecret       = "suite-admin-correct-horse"
+	suiteSessionCookieName = "bidirekt_session"
+	suiteWriterEmail       = "suite-writer@x.com"
+	suiteWriterPassword    = "suite-writer-correct-horse"
+)
+
+var csrfTokenInPage = regexp.MustCompile(`"X-CSRF-Token": "([^"]+)"`)
+
 func TestIntegrationSuite(t *testing.T) {
 	suite.Run(t, new(IntegrationSuite))
 }
@@ -28,9 +44,13 @@ func TestIntegrationSuite(t *testing.T) {
 type IntegrationSuite struct {
 	suite.Suite
 
-	container  *postgres.PostgresContainer
-	Components *components.Components
-	Pool       *pgxpool.Pool
+	container   *postgres.PostgresContainer
+	Components  *components.Components
+	Pool        *pgxpool.Pool
+	writerToken string
+	adminID     int64
+	testCount   int
+	clientIP    string
 }
 
 func (this *IntegrationSuite) SetupSuite() {
@@ -59,6 +79,8 @@ func (this *IntegrationSuite) SetupSuite() {
 	this.Require().NoError(err)
 
 	this.Require().NoError(os.Setenv("BIDIREKT_DATABASE_URL", connStr))
+	this.Require().NoError(os.Setenv("BIDIREKT_PUBLIC_URL", suitePublicURL))
+	this.Require().NoError(os.Setenv("BIDIREKT_TRUSTED_PROXIES", "0.0.0.0"))
 
 	this.Components, err = internal.Run()
 	this.Require().NoError(err)
@@ -91,29 +113,76 @@ func (this *IntegrationSuite) SetupTest() {
 			contract_versions,
 			contracts,
 			participants,
-			environments
+			environments,
+			sessions,
+			one_time_links,
+			users
 			RESTART IDENTITY CASCADE`,
 	)
 
 	this.Require().NoError(err)
+
+	this.testCount++
+	this.clientIP = fmt.Sprintf("10.%d.%d.%d", this.testCount>>16&255, this.testCount>>8&255, this.testCount&255)
+
+	this.createActiveUser(suiteWriterEmail, model.PermissionWrite, suiteWriterPassword)
+	this.writerToken = this.signInToApi(suiteWriterEmail, suiteWriterPassword)
+	this.adminID = this.createActiveUser(suiteAdminEmail, model.PermissionAdmin, suiteAdminSecret)
+}
+
+func (this *IntegrationSuite) deleteSuiteWriter() {
+	_, err := this.Pool.Exec(context.Background(), `DELETE FROM users WHERE email = $1`, suiteWriterEmail)
+	this.Require().NoError(err)
+}
+
+func (this *IntegrationSuite) deleteSuiteAdmin() {
+	_, err := this.Pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, this.adminID)
+	this.Require().NoError(err)
+}
+
+func (this *IntegrationSuite) signInToApi(email, password string) (token string) {
+	requestBody, err := json.Marshal(map[string]string{"email": email, "password": password})
+	this.Require().NoError(err)
+
+	status, _, body := this.postWithToken("/api/sign-in", "", string(requestBody))
+	this.Require().Equal(http.StatusOK, status, body)
+
+	var response struct {
+		Token string `json:"token"`
+	}
+	this.Require().NoError(json.Unmarshal([]byte(body), &response))
+
+	return response.Token
 }
 
 func (this *IntegrationSuite) post(path, body string) (status int, response string) {
-	req := httptest.NewRequest("POST", path, strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := this.Components.Server.Test(req, fiber.TestConfig{Timeout: 10 * time.Second})
-	this.Require().NoError(err)
-	defer func() { _ = resp.Body.Close() }()
-
-	bytes, err := io.ReadAll(resp.Body)
-	this.Require().NoError(err)
-
-	return resp.StatusCode, string(bytes)
+	status, _, response = this.postWithToken(path, this.writerToken, body)
+	return status, response
 }
 
 func (this *IntegrationSuite) get(path string) (status int, response string) {
+	status, _, response = this.getWithToken(path, this.writerToken)
+	return status, response
+}
+
+func (this *IntegrationSuite) postWithToken(path, token, body string) (status int, header http.Header, response string) {
+	req := httptest.NewRequest("POST", path, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	return this.sendApiRequest(req, token)
+}
+
+func (this *IntegrationSuite) getWithToken(path, token string) (status int, header http.Header, response string) {
 	req := httptest.NewRequest("GET", path, nil)
+
+	return this.sendApiRequest(req, token)
+}
+
+func (this *IntegrationSuite) sendApiRequest(req *http.Request, token string) (status int, header http.Header, response string) {
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	req.Header.Set("X-Forwarded-For", this.clientIP)
 
 	resp, err := this.Components.Server.Test(req, fiber.TestConfig{Timeout: 10 * time.Second})
 	this.Require().NoError(err)
@@ -122,7 +191,7 @@ func (this *IntegrationSuite) get(path string) (status int, response string) {
 	bytes, err := io.ReadAll(resp.Body)
 	this.Require().NoError(err)
 
-	return resp.StatusCode, string(bytes)
+	return resp.StatusCode, resp.Header, string(bytes)
 }
 
 type contractFragment struct {
@@ -152,4 +221,89 @@ func (this *IntegrationSuite) countRows(table string) int {
 	).Scan(&count)
 	this.Require().NoError(err)
 	return count
+}
+
+func (this *IntegrationSuite) getPage(path, sessionCookie string) (status int, header http.Header, body string) {
+	req := httptest.NewRequest("GET", path, nil)
+
+	return this.sendPageRequest(req, sessionCookie)
+}
+
+func (this *IntegrationSuite) postForm(path, sessionCookie, csrfToken string, form url.Values) (status int, header http.Header, body string) {
+	req := httptest.NewRequest("POST", path, strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Origin", suitePublicURL)
+	if csrfToken != "" {
+		req.Header.Set("X-CSRF-Token", csrfToken)
+	}
+
+	return this.sendPageRequest(req, sessionCookie)
+}
+
+func (this *IntegrationSuite) sendPageRequest(req *http.Request, sessionCookie string) (status int, header http.Header, body string) {
+	req.Header.Set("Accept", "text/html")
+	if sessionCookie != "" {
+		req.AddCookie(&http.Cookie{Name: suiteSessionCookieName, Value: sessionCookie})
+	}
+	req.Header.Set("X-Forwarded-For", this.clientIP)
+
+	resp, err := this.Components.Server.Test(req, fiber.TestConfig{Timeout: 10 * time.Second})
+	this.Require().NoError(err)
+	defer func() { _ = resp.Body.Close() }()
+
+	bytes, err := io.ReadAll(resp.Body)
+	this.Require().NoError(err)
+
+	return resp.StatusCode, resp.Header, string(bytes)
+}
+
+func (this *IntegrationSuite) signInAsAdmin() (sessionCookie string) {
+	return this.signIn(suiteAdminEmail, suiteAdminSecret)
+}
+
+func (this *IntegrationSuite) signInAsUser(email, password string) (sessionCookie string) {
+	return this.signIn(email, password)
+}
+
+func (this *IntegrationSuite) signIn(email, password string) (sessionCookie string) {
+	status, header, _ := this.postForm("/sign-in", "", "", url.Values{"email": {email}, "password": {password}})
+	this.Require().Equal(http.StatusSeeOther, status)
+
+	cookie, err := http.ParseSetCookie(header.Get("Set-Cookie"))
+	this.Require().NoError(err)
+	this.Require().Equal(suiteSessionCookieName, cookie.Name)
+
+	return cookie.Value
+}
+
+func (this *IntegrationSuite) csrfTokenFrom(page string) string {
+	match := csrfTokenInPage.FindStringSubmatch(page)
+	this.Require().Len(match, 2, "page carries no CSRF token")
+
+	return match[1]
+}
+
+func (this *IntegrationSuite) createActiveUser(email string, permission model.Permission, password string) (userID int64) {
+	passwordHash, err := passwords.Hash(password)
+	this.Require().NoError(err)
+
+	err = this.Pool.QueryRow(context.Background(),
+		`INSERT INTO users (email, permission, password_hash) VALUES ($1, $2, $3) RETURNING id`,
+		email, permission, passwordHash,
+	).Scan(&userID)
+	this.Require().NoError(err)
+
+	return userID
+}
+
+func (this *IntegrationSuite) setUserState(userID int64, state model.UserState) {
+	query := map[model.UserState]string{
+		model.UserInvited:     `UPDATE users SET password_hash = NULL, active = true WHERE id = $1`,
+		model.UserActive:      `UPDATE users SET active = true WHERE id = $1 AND password_hash IS NOT NULL`,
+		model.UserDeactivated: `UPDATE users SET active = false WHERE id = $1`,
+	}[state]
+
+	tag, err := this.Pool.Exec(context.Background(), query, userID)
+	this.Require().NoError(err)
+	this.Require().EqualValues(1, tag.RowsAffected(), "user %d cannot be set %s", userID, state)
 }

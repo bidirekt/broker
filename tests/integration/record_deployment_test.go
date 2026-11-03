@@ -233,6 +233,24 @@ func (this *IntegrationSuite) TestRecordDeployment_EmptyVersionReturns400() {
 	this.Equal(0, this.countRows("deployments"))
 }
 
+func (this *IntegrationSuite) TestRecordDeployment_PaddedParticipantVersionOrEnvironmentReturns400() {
+	this.seedApiParticipantContractAndProductionEnv()
+
+	cases := map[string]string{
+		"trailing space in participant":   `{"participant":"api ","version":"v1","environment":"production"}`,
+		"leading space in version":        `{"participant":"api","version":" v1","environment":"production"}`,
+		"trailing newline in environment": `{"participant":"api","version":"v1","environment":"production\n"}`,
+	}
+
+	for name, body := range cases {
+		status, response := this.post("/api/deployments", body)
+		this.Equal(http.StatusBadRequest, status, name)
+		this.JSONEq(`{"message":"deployment invalid input"}`, response, name)
+	}
+
+	this.Equal(0, this.countRows("deployments"))
+}
+
 func (this *IntegrationSuite) TestRecordDeployment_UnknownParticipantReturns404() {
 	status, body := this.post("/api/deployments", `{"participant":"unknown","version":"v1","environment":"production"}`)
 	this.Equal(http.StatusNotFound, status)
