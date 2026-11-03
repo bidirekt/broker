@@ -85,18 +85,20 @@ func (this *PublishContractUseCase) Execute(ctx context.Context, input PublishCo
 		return PublishContractOutput{Status: ContractPublishSuccessful}, nil
 	}
 
-	this.upsert(ctx, uploadedContract)
+	if !this.upsert(ctx, uploadedContract) {
+		return PublishContractOutput{Status: ContractParticipantNotFound}, nil
+	}
 
 	return PublishContractOutput{Status: ContractPublishSuccessful}, nil
 }
 
-func (this *PublishContractUseCase) upsert(ctx context.Context, uploadedContract *model.UploadedContract) {
+func (this *PublishContractUseCase) upsert(ctx context.Context, uploadedContract *model.UploadedContract) (upserted bool) {
 	current, existing := this.contractRepository.GetLatestContractByName(ctx, uploadedContract.ParticipantName)
 	if !existing {
-		this.contractRepository.Create(ctx, uploadedContract)
-
-		return
+		return this.contractRepository.Create(ctx, uploadedContract)
 	}
 
 	this.contractRepository.Update(ctx, uploadedContract, current, contract_differ.DiffContracts(current, uploadedContract))
+
+	return true
 }

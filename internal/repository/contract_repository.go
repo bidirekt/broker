@@ -27,6 +27,16 @@ const (
 		WHERE cv.participant_id = $1 AND cv.version = $2
 	`
 
+	lockContractParticipantQuery = `
+		SELECT
+			1
+		FROM
+			participants
+		WHERE
+			id = $1 AND name = $2
+		FOR SHARE
+	`
+
 	insertContractQuery = `
 		INSERT INTO contracts
 			(participant_id, checksum)
@@ -384,13 +394,23 @@ func (this *ContractRepository) LoadChecksumForVersion(ctx context.Context, part
 func (this *ContractRepository) Create(
 	ctx context.Context,
 	contract *model.UploadedContract,
-) {
+) (created bool) {
 	tx, err := this.pool.Begin(ctx)
 	if err != nil {
 		panic(fmt.Errorf("error starting transaction: %w", err))
 	}
 
 	defer func() { _ = tx.Rollback(ctx) }()
+
+	// the hashes carry the name the participant was read with, so a rename since then makes this write nothing
+	tag, err := tx.Exec(ctx, lockContractParticipantQuery, contract.ParticipantID, contract.ParticipantName)
+	if err != nil {
+		panic(fmt.Errorf("error locking contract participant: %w", err))
+	}
+
+	if tag.RowsAffected() == 0 {
+		return false
+	}
 
 	this.insertContract(ctx, tx, contract)
 	this.insertContractVersion(ctx, tx, contract)
@@ -409,6 +429,8 @@ func (this *ContractRepository) Create(
 	if err := tx.Commit(ctx); err != nil {
 		panic(fmt.Errorf("error committing transaction: %w", err))
 	}
+
+	return true
 }
 
 func (this *ContractRepository) Update(

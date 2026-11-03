@@ -2,7 +2,13 @@ package integration_test
 
 import (
 	"context"
+	"io"
 	"net/http"
+	"net/http/httptest"
+	"strings"
+	"time"
+
+	"github.com/gofiber/fiber/v3"
 )
 
 const (
@@ -157,6 +163,81 @@ func (this *IntegrationSuite) TestRenameParticipant_SameNameIsNoOpSuccess() {
 	this.Equal(originalID, this.renameParticipantID("pets_service"))
 }
 
+func (this *IntegrationSuite) TestRenameParticipant_AFirstPublishWaitingBehindIt_AnswersNotFoundAndWritesNothing() {
+	ctx := context.Background()
+	status, _ := this.post("/api/participants", renamePetsBody)
+	this.Require().Equal(http.StatusOK, status)
+	originalID := this.renameParticipantID("pets_service")
+	publish := this.publishBody("pets_service", "v1", contractFragment{"api.yaml", renameV1ContractBody})
+
+	sameNewName, err := this.Pool.Begin(ctx)
+	this.Require().NoError(err)
+	defer func() { _ = sameNewName.Rollback(ctx) }()
+	_, err = sameNewName.Exec(ctx, `INSERT INTO participants (name) VALUES ('orders_service')`)
+	this.Require().NoError(err)
+
+	var renameStatus int
+	renameFinished := renameParticipantInBackground(func() {
+		renameStatus, _ = this.renameParticipantSend("/api/participants/rename", `{"oldName":"pets_service","newName":"orders_service"}`)
+	})
+	this.renameParticipantAwaitLockWaiters(1)
+
+	var publishStatus int
+	var publishResponse string
+	publishFinished := renameParticipantInBackground(func() {
+		publishStatus, publishResponse = this.renameParticipantSend("/api/contracts", publish)
+	})
+	this.renameParticipantAwaitLockWaiters(2)
+
+	this.Require().NoError(sameNewName.Rollback(ctx))
+	this.Require().Nil(<-renameFinished)
+	this.Require().Nil(<-publishFinished)
+
+	this.Equal(http.StatusOK, renameStatus)
+	this.Equal(http.StatusNotFound, publishStatus)
+	this.JSONEq(`{"message":"contract participant not found"}`, publishResponse)
+	this.Equal(0, this.countRows("contracts"))
+	this.Equal(originalID, this.renameParticipantID("orders_service"))
+}
+
+func (this *IntegrationSuite) TestRenameParticipant_WaitingBehindAFirstPublish_IsRefusedAsPublishedAndKeepsTheName() {
+	ctx := context.Background()
+	status, _ := this.post("/api/participants", renamePetsBody)
+	this.Require().Equal(http.StatusOK, status)
+	originalID := this.renameParticipantID("pets_service")
+	publish := this.publishBody("pets_service", "v1", contractFragment{"api.yaml", renameV1ContractBody})
+
+	resourceWritesOnHold, err := this.Pool.Begin(ctx)
+	this.Require().NoError(err)
+	defer func() { _ = resourceWritesOnHold.Rollback(ctx) }()
+	_, err = resourceWritesOnHold.Exec(ctx, `LOCK TABLE resources IN SHARE MODE`)
+	this.Require().NoError(err)
+
+	var publishStatus int
+	publishFinished := renameParticipantInBackground(func() {
+		publishStatus, _ = this.renameParticipantSend("/api/contracts", publish)
+	})
+	this.renameParticipantAwaitLockWaiters(1)
+
+	var renameStatus int
+	var renameResponse string
+	renameFinished := renameParticipantInBackground(func() {
+		renameStatus, renameResponse = this.renameParticipantSend("/api/participants/rename", `{"oldName":"pets_service","newName":"orders_service"}`)
+	})
+	this.renameParticipantAwaitLockWaiters(2)
+
+	this.Require().NoError(resourceWritesOnHold.Rollback(ctx))
+	this.Require().Nil(<-publishFinished)
+	this.Require().Nil(<-renameFinished)
+
+	this.Equal(http.StatusOK, publishStatus)
+	this.Equal(http.StatusConflict, renameStatus)
+	this.JSONEq(`{"message":"participant has published contracts, create a new participant and switch every consumer's consumes to it"}`, renameResponse)
+	this.Equal(1, this.countRows("contracts"))
+	this.Equal(1, this.countRows("participants"))
+	this.Equal(originalID, this.renameParticipantID("pets_service"))
+}
+
 func (this *IntegrationSuite) renameParticipantID(name string) int64 {
 	var id int64
 	err := this.Pool.QueryRow(context.Background(),
@@ -164,4 +245,44 @@ func (this *IntegrationSuite) renameParticipantID(name string) int64 {
 	).Scan(&id)
 	this.Require().NoError(err)
 	return id
+}
+
+func renameParticipantInBackground(send func()) (finished <-chan any) {
+	panicked := make(chan any, 1)
+	go func() {
+		defer func() { panicked <- recover() }()
+		send()
+	}()
+
+	return panicked
+}
+
+func (this *IntegrationSuite) renameParticipantAwaitLockWaiters(count int) {
+	this.Require().Eventually(func() bool {
+		var waiting int
+		err := this.Pool.QueryRow(context.Background(),
+			`SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'`,
+		).Scan(&waiting)
+		return err == nil && waiting == count
+	}, 10*time.Second, 10*time.Millisecond)
+}
+
+func (this *IntegrationSuite) renameParticipantSend(path, body string) (status int, response string) {
+	req := httptest.NewRequest("POST", path, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+this.writerToken)
+	req.Header.Set("X-Forwarded-For", this.clientIP)
+
+	resp, err := this.Components.Server.Test(req, fiber.TestConfig{Timeout: 10 * time.Second})
+	if err != nil {
+		panic(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	bytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		panic(err)
+	}
+
+	return resp.StatusCode, string(bytes)
 }
