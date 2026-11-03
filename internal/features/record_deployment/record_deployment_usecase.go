@@ -64,9 +64,9 @@ func (this *RecordDeploymentUseCase) Execute(ctx context.Context, input RecordDe
 	}
 
 	deployment := model.NewDeployment(participant, input.Version, environment)
-	this.deploymentRepository.Insert(ctx, deployment)
+	recorded := this.deploymentRepository.Insert(ctx, deployment)
 
-	if deployment.Rollback {
+	if recorded && deployment.Rollback {
 		return RecordDeploymentOutput{Status: DeploymentRolledBack}
 	}
 

@@ -3,6 +3,7 @@ package integration_test
 import (
 	"context"
 	"net/http"
+	"time"
 )
 
 const (
@@ -123,6 +124,57 @@ func (this *IntegrationSuite) TestRecordDeployment_TwiceSameTupleIsIdempotent() 
 	this.Equal("v1", version)
 	this.Equal(this.lookupParticipantID("api"), participantID)
 	this.Equal(this.lookupEnvironmentID("production"), environmentID)
+}
+
+func recordDeploymentInBackground(write func()) (finished <-chan any) {
+	panicked := make(chan any, 1)
+	go func() {
+		defer func() { panicked <- recover() }()
+		write()
+	}()
+
+	return panicked
+}
+
+func (this *IntegrationSuite) recordDeploymentAwaitLockWaiters(count int) {
+	this.Require().Eventually(func() bool {
+		var waiting int
+		err := this.Pool.QueryRow(context.Background(),
+			`SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'`,
+		).Scan(&waiting)
+		return err == nil && waiting == count
+	}, 10*time.Second, 10*time.Millisecond)
+}
+
+func (this *IntegrationSuite) TestRecordDeployment_ConcurrentSameTuple_RecordsOneRow() {
+	this.seedApiParticipantContractAndProductionEnv()
+
+	ctx := context.Background()
+	participantOnHold, err := this.Pool.Begin(ctx)
+	this.Require().NoError(err)
+	defer func() { _ = participantOnHold.Rollback(ctx) }()
+	_, err = participantOnHold.Exec(ctx, `SELECT 1 FROM participants WHERE id = $1 FOR UPDATE`, this.lookupParticipantID("api"))
+	this.Require().NoError(err)
+
+	const deploys = 3
+	statuses := make([]int, deploys)
+	bodies := make([]string, deploys)
+	finished := make([]<-chan any, deploys)
+	for i := range deploys {
+		finished[i] = recordDeploymentInBackground(func() {
+			statuses[i], bodies[i] = this.post("/api/deployments", apiV1DeploymentBody)
+		})
+	}
+	this.recordDeploymentAwaitLockWaiters(deploys)
+
+	this.Require().NoError(participantOnHold.Rollback(ctx))
+	for i := range deploys {
+		this.Nil(<-finished[i])
+		this.Equal(http.StatusOK, statuses[i])
+		this.JSONEq(`{"message":"deployment recorded"}`, bodies[i])
+	}
+
+	this.Equal(1, this.countRows("deployments"))
 }
 
 func (this *IntegrationSuite) TestRecordDeployment_RollbackWritesNewRow() {

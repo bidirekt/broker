@@ -12,6 +12,10 @@ import (
 )
 
 const (
+	lockParticipantForDeploymentQuery = `
+		SELECT 1 FROM participants WHERE id = $1 FOR NO KEY UPDATE
+	`
+
 	insertDeploymentQuery = `
 		WITH prior AS (
 			SELECT version, deployed_at
@@ -65,8 +69,19 @@ func NewDeploymentRepository(pool *pgxpool.Pool) *DeploymentRepository {
 	return &DeploymentRepository{pool: pool}
 }
 
-func (this *DeploymentRepository) Insert(ctx context.Context, d *model.Deployment) {
-	err := this.pool.QueryRow(
+func (this *DeploymentRepository) Insert(ctx context.Context, d *model.Deployment) (recorded bool) {
+	tx, err := this.pool.Begin(ctx)
+	if err != nil {
+		panic(fmt.Errorf("error starting transaction: %w", err))
+	}
+
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if _, err := tx.Exec(ctx, lockParticipantForDeploymentQuery, d.Participant.ID); err != nil {
+		panic(fmt.Errorf("error locking participant for deployment: %w", err))
+	}
+
+	err = tx.QueryRow(
 		ctx,
 		insertDeploymentQuery,
 		d.Participant.ID,
@@ -74,11 +89,18 @@ func (this *DeploymentRepository) Insert(ctx context.Context, d *model.Deploymen
 		d.Environment.ID,
 	).Scan(&d.ID, &d.Rollback, &d.DeployedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return
+		return false
 	}
+
 	if err != nil {
 		panic(fmt.Errorf("error inserting deployment: %w", err))
 	}
+
+	if err := tx.Commit(ctx); err != nil {
+		panic(fmt.Errorf("error committing transaction: %w", err))
+	}
+
+	return true
 }
 
 func (this *DeploymentRepository) CurrentVersionInEnv(ctx context.Context, participantID int64, environmentID int64) (string, bool) {
