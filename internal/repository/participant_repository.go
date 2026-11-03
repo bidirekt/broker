@@ -29,29 +29,33 @@ const (
 		RETURNING id
 	`
 
-	renameParticipantQuery = `
-		WITH participant AS (
-			SELECT
-				id,
-				EXISTS (SELECT 1 FROM contracts WHERE participant_id = participants.id) AS published
-			FROM
-				participants
-			WHERE
-				name = $1
-		),
-		renamed AS (
-			UPDATE participants
-			SET
-				name = $2
-			FROM
-				participant
-			WHERE
-				participants.id = participant.id AND NOT participant.published
-		)
+	lockParticipantByNameQuery = `
 		SELECT
-			published
+			id
 		FROM
-			participant
+			participants
+		WHERE
+			name = $1
+		FOR UPDATE
+	`
+
+	participantPublishedQuery = `
+		SELECT EXISTS (
+			SELECT
+				1
+			FROM
+				contracts
+			WHERE
+				participant_id = $1
+		)
+	`
+
+	renameParticipantQuery = `
+		UPDATE participants
+		SET
+			name = $2
+		WHERE
+			id = $1
 	`
 
 	listParticipantNamesQuery = `
@@ -98,11 +102,33 @@ func (this *ParticipantRepository) Create(ctx context.Context, p *model.Particip
 }
 
 func (this *ParticipantRepository) Rename(ctx context.Context, oldName, newName string) (found, conflict, published bool) {
-	err := this.pool.QueryRow(ctx, renameParticipantQuery, oldName, newName).Scan(&published)
+	tx, err := this.pool.Begin(ctx)
+	if err != nil {
+		panic(fmt.Errorf("error starting transaction: %w", err))
+	}
+
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var id int64
+	err = tx.QueryRow(ctx, lockParticipantByNameQuery, oldName).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, false, false
 	}
 
+	if err != nil {
+		panic(fmt.Errorf("error locking participant: %w", err))
+	}
+
+	// its own statement, so its snapshot sees a first publish that committed while the lock was awaited
+	if err := tx.QueryRow(ctx, participantPublishedQuery, id).Scan(&published); err != nil {
+		panic(fmt.Errorf("error checking whether the participant is published: %w", err))
+	}
+
+	if published {
+		return true, false, true
+	}
+
+	_, err = tx.Exec(ctx, renameParticipantQuery, id, newName)
 	if isUniqueViolation(err) {
 		return false, true, false
 	}
@@ -111,7 +137,11 @@ func (this *ParticipantRepository) Rename(ctx context.Context, oldName, newName 
 		panic(fmt.Errorf("error renaming participant: %w", err))
 	}
 
-	return true, false, published
+	if err := tx.Commit(ctx); err != nil {
+		panic(fmt.Errorf("error committing transaction: %w", err))
+	}
+
+	return true, false, false
 }
 
 func (this *ParticipantRepository) ListNames(ctx context.Context) []string {

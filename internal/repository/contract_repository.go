@@ -27,6 +27,16 @@ const (
 		WHERE cv.participant_id = $1 AND cv.version = $2
 	`
 
+	lockContractParticipantQuery = `
+		SELECT
+			1
+		FROM
+			participants
+		WHERE
+			id = $1 AND name = $2
+		FOR SHARE
+	`
+
 	insertContractQuery = `
 		INSERT INTO contracts
 			(participant_id, checksum)
@@ -88,7 +98,7 @@ const (
 			($1, $2, $3)
 	`
 
-	getLatestContractByName = `
+	getLatestContractByParticipantID = `
 		SELECT
 			c.id,
 			(SELECT version FROM contract_versions WHERE contract_id = c.id ORDER BY id DESC LIMIT 1),
@@ -127,7 +137,7 @@ const (
 			LEFT JOIN schemas s ON s.id = rb.schema_id
 			WHERE rb.resource_id = r.id AND rb.contract_id = c.id
 		) bodies ON true
-		WHERE pa.name = $1
+		WHERE c.participant_id = $1
 		  AND c.id = (SELECT MAX(id) FROM contracts WHERE participant_id = pa.id)
 		  AND rv.change_type = 'added'
 		ORDER BY r.id
@@ -384,13 +394,23 @@ func (this *ContractRepository) LoadChecksumForVersion(ctx context.Context, part
 func (this *ContractRepository) Create(
 	ctx context.Context,
 	contract *model.UploadedContract,
-) {
+) (created bool) {
 	tx, err := this.pool.Begin(ctx)
 	if err != nil {
 		panic(fmt.Errorf("error starting transaction: %w", err))
 	}
 
 	defer func() { _ = tx.Rollback(ctx) }()
+
+	// the hashes carry the name the participant was read with, so a rename since then makes this write nothing
+	tag, err := tx.Exec(ctx, lockContractParticipantQuery, contract.ParticipantID, contract.ParticipantName)
+	if err != nil {
+		panic(fmt.Errorf("error locking contract participant: %w", err))
+	}
+
+	if tag.RowsAffected() == 0 {
+		return false
+	}
 
 	this.insertContract(ctx, tx, contract)
 	this.insertContractVersion(ctx, tx, contract)
@@ -409,6 +429,8 @@ func (this *ContractRepository) Create(
 	if err := tx.Commit(ctx); err != nil {
 		panic(fmt.Errorf("error committing transaction: %w", err))
 	}
+
+	return true
 }
 
 func (this *ContractRepository) Update(
@@ -607,11 +629,11 @@ func (this *ContractRepository) insertResourceBodies(
 	}
 }
 
-func (this *ContractRepository) GetLatestContractByName(
+func (this *ContractRepository) GetLatestContractByParticipantID(
 	ctx context.Context,
-	participantName string,
+	participantID int64,
 ) (*model.PersistedContract, bool) {
-	rows, err := this.pool.Query(ctx, getLatestContractByName, participantName)
+	rows, err := this.pool.Query(ctx, getLatestContractByParticipantID, participantID)
 	if err != nil {
 		panic(fmt.Errorf("error loading contract tree: %w", err))
 	}
