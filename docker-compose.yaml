@@ -23,6 +23,7 @@ services:
     environment:
       BIDIREKT_DATABASE_URL: postgres://bidirekt:bidirekt@postgres:5432/bidirekt?sslmode=disable
       BIDIREKT_PUBLIC_URL: http://localhost:8080
+      BIDIREKT_TOKEN_SIGNING_KEY: 7gmc2J1gbHNvk40aKN1IkgrFL0Q9gs3tS7vubJ1616E=
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:

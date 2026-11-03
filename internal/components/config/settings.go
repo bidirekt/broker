@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"errors"
 	"net"
 	"net/url"
@@ -46,8 +47,9 @@ func DatabaseConnectAttempts() (int, error) {
 }
 
 type Settings struct {
-	PublicURL      string
-	TrustedProxies []string
+	PublicURL       string
+	TrustedProxies  []string
+	TokenSigningKey []byte
 }
 
 func Read() (Settings, error) {
@@ -61,9 +63,15 @@ func Read() (Settings, error) {
 		return Settings{}, err
 	}
 
+	tokenSigningKey, err := tokenSigningKey()
+	if err != nil {
+		return Settings{}, err
+	}
+
 	return Settings{
-		PublicURL:      publicURL,
-		TrustedProxies: trustedProxies,
+		PublicURL:       publicURL,
+		TrustedProxies:  trustedProxies,
+		TokenSigningKey: tokenSigningKey,
 	}, nil
 }
 
@@ -134,4 +142,18 @@ func isIPOrCIDR(entry string) bool {
 	}
 
 	return net.ParseIP(entry) != nil
+}
+
+func tokenSigningKey() ([]byte, error) {
+	value := os.Getenv("BIDIREKT_TOKEN_SIGNING_KEY")
+	if value == "" {
+		return nil, errors.New("BIDIREKT_TOKEN_SIGNING_KEY is required")
+	}
+
+	key, err := base64.StdEncoding.DecodeString(value)
+	if err != nil || len(key) < 32 {
+		return nil, errors.New("BIDIREKT_TOKEN_SIGNING_KEY must be base64 of at least 32 bytes, such as the output of openssl rand -base64 32")
+	}
+
+	return key, nil
 }

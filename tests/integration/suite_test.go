@@ -28,6 +28,7 @@ import (
 
 const (
 	suitePublicURL         = "http://localhost:8080"
+	suiteTokenSigningKey   = "c3VpdGUtdG9rZW4tc2lnbmluZy1rZXktMzItYnl0ZXM="
 	suiteAdminEmail        = "admin@example.com"
 	suiteAdminSecret       = "suite-admin-correct-horse"
 	suiteSessionCookieName = "bidirekt_session"
@@ -80,6 +81,7 @@ func (this *IntegrationSuite) SetupSuite() {
 
 	this.Require().NoError(os.Setenv("BIDIREKT_DATABASE_URL", connStr))
 	this.Require().NoError(os.Setenv("BIDIREKT_PUBLIC_URL", suitePublicURL))
+	this.Require().NoError(os.Setenv("BIDIREKT_TOKEN_SIGNING_KEY", suiteTokenSigningKey))
 	this.Require().NoError(os.Setenv("BIDIREKT_TRUSTED_PROXIES", "0.0.0.0"))
 
 	this.Components, err = internal.Run()
