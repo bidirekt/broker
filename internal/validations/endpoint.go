@@ -2,9 +2,12 @@ package validations
 
 import (
 	"errors"
+	"regexp"
 	"strings"
 	"unicode"
 )
+
+var literalSegment = regexp.MustCompile(`^[A-Za-z0-9._~-]+$`)
 
 func Endpoint(value string) error {
 	if !strings.HasPrefix(value, "/") || strings.ContainsFunc(value, unicode.IsControl) {
@@ -24,17 +27,10 @@ func Endpoint(value string) error {
 			return errors.New("dynamic path segments must use *")
 		}
 
-		if segment == "" || strings.ContainsFunc(segment, isOutsideSegmentAllowlist) {
+		if !literalSegment.MatchString(segment) {
 			return errors.New("malformed path")
 		}
 	}
 
 	return nil
-}
-
-func isOutsideSegmentAllowlist(character rune) bool {
-	return (character < 'A' || character > 'Z') &&
-		(character < 'a' || character > 'z') &&
-		(character < '0' || character > '9') &&
-		!strings.ContainsRune("-._~", character)
 }
