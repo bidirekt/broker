@@ -35,7 +35,8 @@ func (this *ContractBreakingChange) IsPropertyBreak() bool {
 	return this.Reason != ReasonProviderResourceNotFound &&
 		this.Reason != ReasonProviderResourceInteractionNotFound &&
 		this.Reason != ReasonProviderResourceNotDeployedInEnvironment &&
-		this.Reason != ReasonProviderResourceRemovedButStillConsumed
+		this.Reason != ReasonProviderResourceRemovedButStillConsumed &&
+		this.Reason != ReasonProviderResourceInteractionRemovedButStillConsumed
 }
 
 type IncompatibleItem struct {
