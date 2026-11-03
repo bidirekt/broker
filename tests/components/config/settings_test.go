@@ -1,14 +1,19 @@
 package config_test
 
 import (
+	"encoding/base64"
 	"testing"
 
 	"github.com/bidirekt/broker/internal/components/config"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+const tokenSigningKey = "test-token-signing-key-32-bytes!"
 
 func setValidAuthSettings(t *testing.T) {
 	t.Setenv("BIDIREKT_PUBLIC_URL", "https://broker.example.com")
+	t.Setenv("BIDIREKT_TOKEN_SIGNING_KEY", base64.StdEncoding.EncodeToString([]byte(tokenSigningKey)))
 }
 
 func TestRead_RefusesAPublicURLThatIsNotAnAllowedOrigin(t *testing.T) {
@@ -102,6 +107,38 @@ func TestRead_AcceptsTrustedProxiesThatAreIPsOrCIDRs(t *testing.T) {
 			_, err := config.Read()
 
 			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestRead_ReturnsTheTokenSigningKeyDecodedFromBase64(t *testing.T) {
+	setValidAuthSettings(t)
+
+	settings, err := config.Read()
+
+	require.NoError(t, err)
+	assert.Equal(t, []byte(tokenSigningKey), settings.TokenSigningKey)
+}
+
+func TestRead_RefusesATokenSigningKeyThatIsMissingOrNotBase64OfAtLeast32Bytes(t *testing.T) {
+	const keyRule = "BIDIREKT_TOKEN_SIGNING_KEY must be base64 of at least 32 bytes, such as the output of openssl rand -base64 32"
+
+	for _, refusal := range []struct {
+		name            string
+		tokenSigningKey string
+		message         string
+	}{
+		{"missing", "", "BIDIREKT_TOKEN_SIGNING_KEY is required"},
+		{"not base64", tokenSigningKey, keyRule},
+		{"31 bytes", base64.StdEncoding.EncodeToString([]byte(tokenSigningKey[:31])), keyRule},
+	} {
+		t.Run(refusal.name, func(t *testing.T) {
+			setValidAuthSettings(t)
+			t.Setenv("BIDIREKT_TOKEN_SIGNING_KEY", refusal.tokenSigningKey)
+
+			_, err := config.Read()
+
+			assert.EqualError(t, err, refusal.message)
 		})
 	}
 }

@@ -18,7 +18,7 @@ const (
 	jwtSubject   = "42"
 )
 
-var jwtSettings = config.Settings{PublicURL: jwtPublicURL}
+var jwtSettings = config.Settings{PublicURL: jwtPublicURL, TokenSigningKey: []byte("test-token-signing-key-32-bytes!")}
 
 func validJWTClaims() jwt.MapClaims {
 	now := time.Now()
@@ -82,6 +82,15 @@ func TestUserIDFromTokenRefusesAnExpiredToken(t *testing.T) {
 	assert.False(t, valid)
 }
 
+func TestUserIDFromTokenRefusesATokenIssuedWithAnotherKey(t *testing.T) {
+	anotherKeySettings := config.Settings{PublicURL: jwtPublicURL, TokenSigningKey: []byte("another-signing-key-of-32-bytes!")}
+	token, _, err := bearer.Issue(anotherKeySettings, jwtUserID, time.Now())
+	require.NoError(t, err)
+
+	_, valid := bearer.UserIDFrom(jwtSettings, token)
+	assert.False(t, valid)
+}
+
 func TestUserIDFromTokenRefusesDefectiveTokens(t *testing.T) {
 	typHeader := func() map[string]any { return map[string]any{"typ": "at+jwt"} }
 	withClaim := func(name string, value any) jwt.MapClaims {
@@ -96,15 +105,15 @@ func TestUserIDFromTokenRefusesDefectiveTokens(t *testing.T) {
 	}
 
 	defective := map[string]string{
-		"HS512":           signJWT(t, jwt.SigningMethodHS512, typHeader(), validJWTClaims(), bearer.SigningKey),
+		"HS512":           signJWT(t, jwt.SigningMethodHS512, typHeader(), validJWTClaims(), jwtSettings.TokenSigningKey),
 		"none":            signJWT(t, jwt.SigningMethodNone, typHeader(), validJWTClaims(), jwt.UnsafeAllowNoneSignatureType),
-		"wrong aud":       signJWT(t, jwt.SigningMethodHS256, typHeader(), withClaim("aud", jwtPublicURL), bearer.SigningKey),
-		"wrong iss":       signJWT(t, jwt.SigningMethodHS256, typHeader(), withClaim("iss", "http://localhost:9090"), bearer.SigningKey),
-		"missing typ":     signJWT(t, jwt.SigningMethodHS256, map[string]any{}, validJWTClaims(), bearer.SigningKey),
-		"wrong typ":       signJWT(t, jwt.SigningMethodHS256, map[string]any{"typ": "JWT"}, validJWTClaims(), bearer.SigningKey),
-		"missing exp":     signJWT(t, jwt.SigningMethodHS256, typHeader(), withoutClaim("exp"), bearer.SigningKey),
-		"non-numeric sub": signJWT(t, jwt.SigningMethodHS256, typHeader(), withClaim("sub", "ana"), bearer.SigningKey),
-		"padded sub":      signJWT(t, jwt.SigningMethodHS256, typHeader(), withClaim("sub", "042"), bearer.SigningKey),
+		"wrong aud":       signJWT(t, jwt.SigningMethodHS256, typHeader(), withClaim("aud", jwtPublicURL), jwtSettings.TokenSigningKey),
+		"wrong iss":       signJWT(t, jwt.SigningMethodHS256, typHeader(), withClaim("iss", "http://localhost:9090"), jwtSettings.TokenSigningKey),
+		"missing typ":     signJWT(t, jwt.SigningMethodHS256, map[string]any{}, validJWTClaims(), jwtSettings.TokenSigningKey),
+		"wrong typ":       signJWT(t, jwt.SigningMethodHS256, map[string]any{"typ": "JWT"}, validJWTClaims(), jwtSettings.TokenSigningKey),
+		"missing exp":     signJWT(t, jwt.SigningMethodHS256, typHeader(), withoutClaim("exp"), jwtSettings.TokenSigningKey),
+		"non-numeric sub": signJWT(t, jwt.SigningMethodHS256, typHeader(), withClaim("sub", "ana"), jwtSettings.TokenSigningKey),
+		"padded sub":      signJWT(t, jwt.SigningMethodHS256, typHeader(), withClaim("sub", "042"), jwtSettings.TokenSigningKey),
 		"another key":     signJWT(t, jwt.SigningMethodHS256, typHeader(), validJWTClaims(), []byte("another-signing-key-of-32-bytes!")),
 	}
 
@@ -117,7 +126,7 @@ func TestUserIDFromTokenRefusesDefectiveTokens(t *testing.T) {
 }
 
 func TestUserIDFromTokenAcceptsAHandBuiltValidToken(t *testing.T) {
-	token := signJWT(t, jwt.SigningMethodHS256, map[string]any{"typ": "at+jwt"}, validJWTClaims(), bearer.SigningKey)
+	token := signJWT(t, jwt.SigningMethodHS256, map[string]any{"typ": "at+jwt"}, validJWTClaims(), jwtSettings.TokenSigningKey)
 
 	userID, valid := bearer.UserIDFrom(jwtSettings, token)
 	assert.True(t, valid)

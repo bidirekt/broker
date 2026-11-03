@@ -8,10 +8,6 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// Hardcoded until its source is decided, before any release: the repository is public, so anyone
-// who reads it can forge a token.
-var SigningKey = []byte("kRQ+AHq7X4TKaSzlILIt12cVJ0nb9zc4trUzGTR+KzA=")
-
 const (
 	tokenType           = "at+jwt"
 	tokenLifetime       = 15 * time.Minute
@@ -30,7 +26,7 @@ func Issue(settings config.Settings, userID int64, issuedAt time.Time) (token st
 	unsigned := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	unsigned.Header["typ"] = tokenType
 
-	token, err = unsigned.SignedString(SigningKey)
+	token, err = unsigned.SignedString(settings.TokenSigningKey)
 	if err != nil {
 		return "", time.Time{}, err
 	}
@@ -41,7 +37,7 @@ func Issue(settings config.Settings, userID int64, issuedAt time.Time) (token st
 func UserIDFrom(settings config.Settings, token string) (userID int64, valid bool) {
 	claims := &jwt.RegisteredClaims{}
 	parsed, err := jwt.ParseWithClaims(token, claims,
-		func(*jwt.Token) (any, error) { return SigningKey, nil },
+		func(*jwt.Token) (any, error) { return settings.TokenSigningKey, nil },
 		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
 		jwt.WithIssuer(settings.PublicURL),
 		jwt.WithAudience(settings.PublicURL+tokenAudienceSuffix),

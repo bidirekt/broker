@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bidirekt/broker/internal/components/bearer"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -47,7 +46,7 @@ func (this *IntegrationSuite) TestApiSignIn_ActiveUserGetsAToken() {
 
 	claims := jwt.MapClaims{}
 	_, err := jwt.ParseWithClaims(response.Token, claims,
-		func(*jwt.Token) (any, error) { return bearer.SigningKey, nil },
+		func(*jwt.Token) (any, error) { return this.Components.Settings.TokenSigningKey, nil },
 		jwt.WithValidMethods([]string{"HS256"}),
 	)
 	this.Require().NoError(err)
@@ -71,7 +70,7 @@ func (this *IntegrationSuite) TestApiSignIn_AdminGetsAToken() {
 
 	claims := jwt.MapClaims{}
 	_, err := jwt.ParseWithClaims(response.Token, claims,
-		func(*jwt.Token) (any, error) { return bearer.SigningKey, nil },
+		func(*jwt.Token) (any, error) { return this.Components.Settings.TokenSigningKey, nil },
 		jwt.WithValidMethods([]string{"HS256"}),
 	)
 	this.Require().NoError(err)
