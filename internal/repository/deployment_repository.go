@@ -29,12 +29,13 @@ const (
 			LIMIT 1
 		)
 		INSERT INTO deployments
-			(participant_id, version, environment_id, rollback)
+			(participant_id, version, environment_id, rollback, deployed_at)
 		SELECT
 			$1,
 			$2,
 			$3,
-			EXISTS (SELECT 1 FROM prior WHERE version = $2)
+			EXISTS (SELECT 1 FROM prior WHERE version = $2),
+			clock_timestamp()
 		WHERE COALESCE((SELECT version FROM latest), '') <> $2
 		RETURNING id, rollback, deployed_at
 	`

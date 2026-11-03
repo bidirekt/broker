@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 const (
@@ -136,10 +138,21 @@ func recordDeploymentInBackground(write func()) (finished <-chan any) {
 	return panicked
 }
 
+func (this *IntegrationSuite) recordDeploymentConnect() *pgx.Conn {
+	ctx := context.Background()
+	conn, err := pgx.ConnectConfig(ctx, this.Pool.Config().ConnConfig)
+	this.Require().NoError(err)
+	this.T().Cleanup(func() { _ = conn.Close(ctx) })
+
+	return conn
+}
+
 func (this *IntegrationSuite) recordDeploymentAwaitLockWaiters(count int) {
+	lockWaiters := this.recordDeploymentConnect()
+
 	this.Require().Eventually(func() bool {
 		var waiting int
-		err := this.Pool.QueryRow(context.Background(),
+		err := lockWaiters.QueryRow(context.Background(),
 			`SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'`,
 		).Scan(&waiting)
 		return err == nil && waiting == count
@@ -150,7 +163,7 @@ func (this *IntegrationSuite) TestRecordDeployment_ConcurrentSameTuple_RecordsOn
 	this.seedApiParticipantContractAndProductionEnv()
 
 	ctx := context.Background()
-	participantOnHold, err := this.Pool.Begin(ctx)
+	participantOnHold, err := this.recordDeploymentConnect().Begin(ctx)
 	this.Require().NoError(err)
 	defer func() { _ = participantOnHold.Rollback(ctx) }()
 	_, err = participantOnHold.Exec(ctx, `SELECT 1 FROM participants WHERE id = $1 FOR UPDATE`, this.lookupParticipantID("api"))
@@ -175,6 +188,33 @@ func (this *IntegrationSuite) TestRecordDeployment_ConcurrentSameTuple_RecordsOn
 	}
 
 	this.Equal(1, this.countRows("deployments"))
+}
+
+func (this *IntegrationSuite) TestRecordDeployment_WaitingOnTheParticipantLock_IsTimestampedAfterTheWait() {
+	this.seedApiParticipantContractAndProductionEnv()
+
+	ctx := context.Background()
+	participantOnHold, err := this.recordDeploymentConnect().Begin(ctx)
+	this.Require().NoError(err)
+	defer func() { _ = participantOnHold.Rollback(ctx) }()
+	_, err = participantOnHold.Exec(ctx, `SELECT 1 FROM participants WHERE id = $1 FOR UPDATE`, this.lookupParticipantID("api"))
+	this.Require().NoError(err)
+
+	var status int
+	finished := recordDeploymentInBackground(func() {
+		status, _ = this.post("/api/deployments", apiV1DeploymentBody)
+	})
+	this.recordDeploymentAwaitLockWaiters(1)
+
+	var duringTheWait time.Time
+	this.Require().NoError(participantOnHold.QueryRow(ctx, `SELECT clock_timestamp()`).Scan(&duringTheWait))
+	this.Require().NoError(participantOnHold.Rollback(ctx))
+	this.Require().Nil(<-finished)
+	this.Require().Equal(http.StatusOK, status)
+
+	var deployedAt time.Time
+	this.Require().NoError(this.Pool.QueryRow(ctx, `SELECT deployed_at FROM deployments`).Scan(&deployedAt))
+	this.Greater(deployedAt, duringTheWait)
 }
 
 func (this *IntegrationSuite) TestRecordDeployment_RollbackWritesNewRow() {
