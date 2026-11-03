@@ -244,6 +244,14 @@ schemas:
         type: string
 `
 
+const validateColonParamEndpointYAML = `provides:
+  rest:
+    "/pets/:petId":
+      get:
+        responses:
+          200: ~
+`
+
 func (this *IntegrationSuite) mustPostForValidate(path, body string) {
 	status, response := this.post(path, body)
 	this.Require().Equalf(http.StatusOK, status, "POST %s: %s", path, response)
@@ -485,6 +493,18 @@ func (this *IntegrationSuite) TestValidateContract_SchemaNameWithADot_Rejected()
 	this.Equal(http.StatusBadRequest, status)
 	this.JSONEq(`{"message":"contract validation failed","violations":[`+
 		`{"code":"schema.name_syntax","path":"schemas;Pet.v2","source":"api.yaml","details":{"key":"Pet.v2","error":"must not contain \".\", \"[\", \"]\", \"{\", \"}\" or \";\""}}`+
+		`]}`, body)
+}
+
+func (this *IntegrationSuite) TestValidateContract_ColonParamEndpoint_Rejected() {
+	this.setupForValidate("pets_service")
+
+	status, body := this.post("/api/contracts/validate",
+		this.validateBody("pets_service", "production", validateFile{"api.yaml", validateColonParamEndpointYAML}))
+
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"endpoint.syntax","path":"provides;rest;/pets/:petId","source":"api.yaml","details":{"key":"/pets/:petId","error":"dynamic path segments must use *"}}`+
 		`]}`, body)
 }
 

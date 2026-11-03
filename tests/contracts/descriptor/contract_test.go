@@ -259,7 +259,7 @@ func TestContract_JsonDecodificadoSegueOMesmoCaminho(t *testing.T) {
 	assert.Equal(t, "api.yaml", violations[0].Source)
 }
 
-func TestContract_EndpointComParametroReprovaEmProvidesEConsumes(t *testing.T) {
+func TestContract_EndpointWithAParameterIsRejectedInProvidesAndConsumes(t *testing.T) {
 	source := `provides:
   rest:
     "/users/{userId}":
