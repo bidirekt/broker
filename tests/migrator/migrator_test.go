@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -222,7 +223,7 @@ func (this *MigratorSuite) TestReturnsErrorOnInvalidSQL() {
 	err := m.Migrate()
 
 	this.Error(err)
-	this.Equal(0, this.countMigrations())
+	this.False(this.tableExists("schema_migrations"))
 }
 
 func (this *MigratorSuite) TestRollsBackAllPendingWhenAnyMigrationFails() {
@@ -233,7 +234,7 @@ func (this *MigratorSuite) TestRollsBackAllPendingWhenAnyMigrationFails() {
 	err := m.Migrate()
 
 	this.Error(err)
-	this.Equal(0, this.countMigrations())
+	this.False(this.tableExists("schema_migrations"))
 	this.False(this.tableExists("foo"))
 }
 
@@ -252,4 +253,34 @@ func (this *MigratorSuite) TestPanicsOnInvalidTimestamp() {
 
 	m := migrator.New(this.pool, os.DirFS(this.dir), "public.schema_migrations")
 	this.Panics(func() { _ = m.Migrate() })
+}
+
+func (this *MigratorSuite) TestConcurrentMigratorsApplyEachMigrationOnce() {
+	this.writeMigration("20260101000000_create_foo.sql", "CREATE TABLE foo (id SERIAL PRIMARY KEY);")
+	this.writeMigration("20260102000000_create_bar.sql", "CREATE TABLE bar (id SERIAL PRIMARY KEY);")
+
+	const migrators = 8
+	start := make(chan struct{})
+	errs := make(chan error, migrators)
+	var wg sync.WaitGroup
+	for range migrators {
+		wg.Go(func() {
+			m := migrator.New(this.pool, os.DirFS(this.dir), "public.schema_migrations")
+			<-start
+			errs <- m.Migrate()
+		})
+	}
+	close(start)
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		this.NoError(err)
+	}
+	this.Equal(
+		[]string{"20260101000000_create_foo.sql", "20260102000000_create_bar.sql"},
+		this.appliedMigrations(),
+	)
+	this.True(this.tableExists("foo"))
+	this.True(this.tableExists("bar"))
 }
