@@ -19,7 +19,7 @@ func vocabularyDocument(t *testing.T, source string) any {
 	return document
 }
 
-func TestEndpoint_RejeitaSegmentoDinamicoComChaves(t *testing.T) {
+func TestEndpoint_RejectsADynamicSegmentWithBraces(t *testing.T) {
 	subject := descriptor.Map(descriptor.Endpoint, descriptor.Object(descriptor.Fields{}))
 
 	violations := descriptor.Validate(subject, map[string]any{"/users/{id}": nil}, "api.yaml")
