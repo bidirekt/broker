@@ -719,12 +719,6 @@ func scanPersistedContractTree(rows pgx.Rows) *model.PersistedContract {
 	return contract
 }
 
-type CurrentConsumerInEnv struct {
-	ParticipantID   int64
-	ParticipantName string
-	Version         string
-}
-
 func (this *ContractRepository) GetProviderResourceByConsumerResource(
 	ctx context.Context,
 	providerHash string,
