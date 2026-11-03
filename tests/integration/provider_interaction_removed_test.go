@@ -147,8 +147,6 @@ func (this *IntegrationSuite) deployForInteractionRemoved(participant, version s
 		`{"participant":"`+participant+`","version":"`+version+`","environment":"production"}`)
 }
 
-// setupForInteractionRemoved deploys petstore_api 1.0.0 and petstore_web 1.0.0, which consumes
-// every interaction petstore_api offers.
 func (this *IntegrationSuite) setupForInteractionRemoved() {
 	this.mustPostForInteractionRemoved("/api/environments", `{"environment":"production"}`)
 	this.mustPostForInteractionRemoved("/api/participants", `{"participant":"petstore_api"}`)
