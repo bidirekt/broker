@@ -47,7 +47,7 @@ func TestRemovedProviderBreaksOncePerConsumer(t *testing.T) {
 		stillConsumingResource(5, "mobile", "v2"),
 	}
 
-	results := compatibility_checker.CheckRemovedProviderResource(removed, consumers)
+	results := compatibility_checker.CheckRemovedProviderResource(removed, nil, consumers)
 
 	assert.Len(t, results, 2)
 
@@ -88,6 +88,7 @@ func TestRemovedProviderWithoutConsumersHasNoBreak(t *testing.T) {
 	results := compatibility_checker.CheckRemovedProviderResource(
 		removedProviderResource(),
 		nil,
+		nil,
 	)
 
 	assert.Empty(t, results)
@@ -97,6 +98,7 @@ func TestRemovedProviderResultKeepsTheRealContractIDInAnyOrder(t *testing.T) {
 	removal := func() *compatibility_checker.IncompatibleItem {
 		results := compatibility_checker.CheckRemovedProviderResource(
 			removedProviderResource(),
+			nil,
 			[]model.PersistedResource{stillConsumingResource(3, "web", "v7")},
 		)
 
@@ -132,4 +134,143 @@ func TestRemovedProviderResultKeepsTheRealContractIDInAnyOrder(t *testing.T) {
 		assert.Equal(t, null.StringFrom("v7"), result.IncompatibleCounterpart.ParticipantVersion)
 		assert.Len(t, result.Breaks, 1)
 	}
+}
+
+func liveUsersProviderResource(method string, interaction model.Interaction, status string) model.PersistedResource {
+	resource := model.PersistedResource{
+		Direction:          model.Provides,
+		Interaction:        interaction,
+		Endpoint:           "/users",
+		Method:             method,
+		ParticipantName:    "users",
+		ParticipantVersion: null.StringFrom("v2"),
+	}
+
+	if status != "" {
+		resource.ResponseStatusCode = null.StringFrom(status)
+	}
+
+	return resource
+}
+
+func TestRemovedProvider_StatusChangeOnSurvivingMethod_BreaksAsInteractionRemovedWithSortedStatuses(t *testing.T) {
+	removed := removedProviderResource()
+	removedSibling := liveUsersProviderResource("get", model.RestResponse, "500")
+	removedSibling.Removed = true
+	consumedSameMethod := stillConsumingResource(3, "web", "v7")
+	consumedSameMethod.ResponseStatusCode = null.StringFrom("201")
+	checkedResources := map[string]model.PersistedResource{
+		"removed":      *removed,
+		"404":          liveUsersProviderResource("get", model.RestResponse, "404"),
+		"204":          liveUsersProviderResource("get", model.RestResponse, "204"),
+		"2XX":          liveUsersProviderResource("get", model.RestResponse, "2XX"),
+		"request":      liveUsersProviderResource("get", model.RestRequest, ""),
+		"other method": liveUsersProviderResource("post", model.RestResponse, "201"),
+		"removed 500":  removedSibling,
+		"consumed 201": consumedSameMethod,
+	}
+
+	results := compatibility_checker.CheckRemovedProviderResource(
+		removed,
+		checkedResources,
+		[]model.PersistedResource{stillConsumingResource(3, "web", "v7")},
+	)
+
+	assert.Len(t, results, 1)
+	web := results[0]
+	assert.False(t, web.Deployable)
+	assert.Zero(t, web.IncompatibleCounterpart.ContractID)
+	assert.Len(t, web.Breaks, 1)
+	assert.Equal(
+		t,
+		compatibility_checker.ReasonProviderResourceInteractionRemovedButStillConsumed,
+		web.Breaks[0].Reason,
+	)
+	assert.Equal(t, map[string]string{"providerStatuses": "204, 2XX, 404"}, web.Breaks[0].Details)
+	assert.False(t, web.Breaks[0].IsPropertyBreak())
+	assert.Same(t, removed, web.Breaks[0].CheckedResource)
+	assert.Equal(t, "web", web.Breaks[0].ConsumerName())
+	assert.Equal(t, "200", web.Breaks[0].InteractionKey())
+}
+
+func TestRemovedProvider_RequestDroppedOnSurvivingMethod_BreaksAsInteractionRemovedWithoutDetails(t *testing.T) {
+	removed := removedProviderResource()
+	removed.Interaction = model.RestRequest
+	removed.ResponseStatusCode = null.String{}
+	consumer := stillConsumingResource(3, "web", "v7")
+	consumer.Interaction = model.RestRequest
+	consumer.ResponseStatusCode = null.String{}
+	checkedResources := map[string]model.PersistedResource{
+		"removed": *removed,
+		"201":     liveUsersProviderResource("get", model.RestResponse, "201"),
+	}
+
+	results := compatibility_checker.CheckRemovedProviderResource(
+		removed,
+		checkedResources,
+		[]model.PersistedResource{consumer},
+	)
+
+	assert.Len(t, results, 1)
+	assert.Len(t, results[0].Breaks, 1)
+	assert.Equal(
+		t,
+		compatibility_checker.ReasonProviderResourceInteractionRemovedButStillConsumed,
+		results[0].Breaks[0].Reason,
+	)
+	assert.Nil(t, results[0].Breaks[0].Details)
+	assert.Equal(t, "request", results[0].Breaks[0].InteractionKey())
+	assert.False(t, results[0].Breaks[0].IsPropertyBreak())
+}
+
+func TestRemovedProvider_ResponseDroppedWhereOnlyARequestRemains_BreaksAsInteractionRemovedWithoutDetails(t *testing.T) {
+	removed := removedProviderResource()
+	checkedResources := map[string]model.PersistedResource{
+		"removed": *removed,
+		"request": liveUsersProviderResource("get", model.RestRequest, ""),
+	}
+
+	results := compatibility_checker.CheckRemovedProviderResource(
+		removed,
+		checkedResources,
+		[]model.PersistedResource{stillConsumingResource(3, "web", "v7")},
+	)
+
+	assert.Len(t, results, 1)
+	assert.Len(t, results[0].Breaks, 1)
+	assert.Equal(
+		t,
+		compatibility_checker.ReasonProviderResourceInteractionRemovedButStillConsumed,
+		results[0].Breaks[0].Reason,
+	)
+	assert.Nil(t, results[0].Breaks[0].Details)
+}
+
+func TestRemovedProvider_MethodGoneWhileEndpointRemains_KeepsTheRemovedReason(t *testing.T) {
+	removed := removedProviderResource()
+	consumedSameMethod := stillConsumingResource(3, "web", "v7")
+	consumedSameMethod.ResponseStatusCode = null.StringFrom("204")
+	removedSibling := liveUsersProviderResource("get", model.RestResponse, "204")
+	removedSibling.Removed = true
+	checkedResources := map[string]model.PersistedResource{
+		"removed":      *removed,
+		"removed 204":  removedSibling,
+		"other method": liveUsersProviderResource("post", model.RestResponse, "201"),
+		"consumed 204": consumedSameMethod,
+	}
+
+	results := compatibility_checker.CheckRemovedProviderResource(
+		removed,
+		checkedResources,
+		[]model.PersistedResource{stillConsumingResource(3, "web", "v7")},
+	)
+
+	assert.Len(t, results, 1)
+	assert.Len(t, results[0].Breaks, 1)
+	assert.Equal(
+		t,
+		compatibility_checker.ReasonProviderResourceRemovedButStillConsumed,
+		results[0].Breaks[0].Reason,
+	)
+	assert.Nil(t, results[0].Breaks[0].Details)
 }

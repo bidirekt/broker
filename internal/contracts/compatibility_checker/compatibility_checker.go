@@ -39,7 +39,7 @@ func (this *CompatibilityChecker) Check(
 	for _, resource := range contract.Resources {
 		if resource.Removed {
 			if resource.Direction == model.Provides {
-				this.checkRemovedProvider(resource, counterparts, report)
+				this.checkRemovedProvider(resource, contract.Resources, counterparts, report)
 			}
 
 			continue
