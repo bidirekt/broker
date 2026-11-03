@@ -31,6 +31,17 @@ func TestEndpoint_RejectsADynamicSegmentWithBraces(t *testing.T) {
 	assert.Contains(t, violations[0].Details["error"], "dynamic path segments must use *")
 }
 
+func TestEndpoint_RejectsADynamicSegmentWithAColon(t *testing.T) {
+	subject := descriptor.Map(descriptor.Endpoint, descriptor.Object(descriptor.Fields{}))
+
+	violations := descriptor.Validate(subject, map[string]any{"/pets/:petId": nil}, "api.yaml")
+
+	require.Len(t, violations, 1)
+	assert.Equal(t, "endpoint.syntax", violations[0].ErrorCode)
+	assert.Equal(t, "/pets/:petId", violations[0].Path)
+	assert.Equal(t, map[string]string{"key": "/pets/:petId", "error": "dynamic path segments must use *"}, violations[0].Details)
+}
+
 func TestEndpoint_NormalizaBarraFinalAntesDeJulgar(t *testing.T) {
 	subject := descriptor.Map(descriptor.Endpoint, descriptor.Object(descriptor.Fields{}))
 
