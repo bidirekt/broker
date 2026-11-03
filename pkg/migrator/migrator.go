@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS %s (
 );
 `
 
+const lockMigrationsSQL = `SELECT pg_advisory_xact_lock(hashtext($1));`
+
 const selectMigrationSQL = `SELECT COUNT(*) FROM %s WHERE migration = $1;`
 
 const insertMigrationSQL = `INSERT INTO %s (migration) VALUES ($1);`
@@ -52,10 +54,6 @@ func New(
 }
 
 func (this *Migrator) Migrate() error {
-	if err := this.ensureMigrationsTable(); err != nil {
-		return fmt.Errorf("error ensuring migrations table: %w", err)
-	}
-
 	migrationFiles, err := this.getMigrationFiles()
 	if err != nil {
 		return fmt.Errorf("error reading migrations directory: %w", err)
@@ -67,6 +65,14 @@ func (this *Migrator) Migrate() error {
 		return fmt.Errorf("error starting migrations transaction: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+
+	if _, err := tx.Exec(ctx, lockMigrationsSQL, this.migrationsTable); err != nil {
+		return fmt.Errorf("error locking migrations: %w", err)
+	}
+
+	if err := this.ensureMigrationsTable(ctx, tx); err != nil {
+		return fmt.Errorf("error ensuring migrations table: %w", err)
+	}
 
 	for _, migrationFile := range migrationFiles {
 		applied, err := this.isMigrationApplied(ctx, tx, migrationFile)
@@ -96,7 +102,7 @@ func (this *Migrator) Migrate() error {
 	return nil
 }
 
-func (this *Migrator) ensureMigrationsTable() error {
+func (this *Migrator) ensureMigrationsTable(ctx context.Context, tx pgx.Tx) error {
 	var sql string
 
 	// only a qualified name identifies a schema to create; an unqualified one resolves
@@ -107,7 +113,7 @@ func (this *Migrator) ensureMigrationsTable() error {
 
 	sql += fmt.Sprintf(ensureMigrationsTableSQL, this.migrationsTable)
 
-	if _, err := this.pool.Exec(context.Background(), sql); err != nil {
+	if _, err := tx.Exec(ctx, sql); err != nil {
 		return err
 	}
 
