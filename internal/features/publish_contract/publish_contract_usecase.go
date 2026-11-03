@@ -93,7 +93,7 @@ func (this *PublishContractUseCase) Execute(ctx context.Context, input PublishCo
 }
 
 func (this *PublishContractUseCase) upsert(ctx context.Context, uploadedContract *model.UploadedContract) (upserted bool) {
-	current, existing := this.contractRepository.GetLatestContractByName(ctx, uploadedContract.ParticipantName)
+	current, existing := this.contractRepository.GetLatestContractByParticipantID(ctx, uploadedContract.ParticipantID)
 	if !existing {
 		return this.contractRepository.Create(ctx, uploadedContract)
 	}

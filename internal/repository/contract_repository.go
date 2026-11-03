@@ -98,7 +98,7 @@ const (
 			($1, $2, $3)
 	`
 
-	getLatestContractByName = `
+	getLatestContractByParticipantID = `
 		SELECT
 			c.id,
 			(SELECT version FROM contract_versions WHERE contract_id = c.id ORDER BY id DESC LIMIT 1),
@@ -137,7 +137,7 @@ const (
 			LEFT JOIN schemas s ON s.id = rb.schema_id
 			WHERE rb.resource_id = r.id AND rb.contract_id = c.id
 		) bodies ON true
-		WHERE pa.name = $1
+		WHERE c.participant_id = $1
 		  AND c.id = (SELECT MAX(id) FROM contracts WHERE participant_id = pa.id)
 		  AND rv.change_type = 'added'
 		ORDER BY r.id
@@ -629,11 +629,11 @@ func (this *ContractRepository) insertResourceBodies(
 	}
 }
 
-func (this *ContractRepository) GetLatestContractByName(
+func (this *ContractRepository) GetLatestContractByParticipantID(
 	ctx context.Context,
-	participantName string,
+	participantID int64,
 ) (*model.PersistedContract, bool) {
-	rows, err := this.pool.Query(ctx, getLatestContractByName, participantName)
+	rows, err := this.pool.Query(ctx, getLatestContractByParticipantID, participantID)
 	if err != nil {
 		panic(fmt.Errorf("error loading contract tree: %w", err))
 	}
