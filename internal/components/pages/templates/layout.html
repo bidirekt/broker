@@ -15,6 +15,7 @@
       <nav class="nav" aria-label="Main">
         <a href="/participants"{{if eq .Section "participants"}} aria-current="page"{{end}}>Participants</a>
         <a href="/environments"{{if eq .Section "environments"}} aria-current="page"{{end}}>Environments</a>
+        <a href="/compatibility"{{if eq .Section "compatibility"}} aria-current="page"{{end}}>Compatibility</a>
         {{if .ManagesUsers}}
         <a href="/users"{{if eq .Section "users"}} aria-current="page"{{end}}>Users</a>
         {{end}}

@@ -26,6 +26,7 @@ import (
 	"github.com/bidirekt/broker/internal/features/set_password"
 	"github.com/bidirekt/broker/internal/features/setup_admin"
 	"github.com/bidirekt/broker/internal/features/show_check"
+	"github.com/bidirekt/broker/internal/features/show_compatibility"
 	"github.com/bidirekt/broker/internal/features/show_contract_version"
 	"github.com/bidirekt/broker/internal/features/show_environment"
 	"github.com/bidirekt/broker/internal/features/show_participant_relations"
@@ -75,6 +76,7 @@ func Run() (*components.Components, error) {
 	show_participant_relations.Register(kernel)
 	list_environment_pages.Register(kernel)
 	show_environment.Register(kernel)
+	show_compatibility.Register(kernel)
 
 	return kernel, nil
 }
