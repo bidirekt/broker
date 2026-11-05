@@ -2,6 +2,7 @@ package set_password
 
 import (
 	"context"
+	"time"
 
 	"github.com/bidirekt/broker/internal/components/passwords"
 	"github.com/bidirekt/broker/internal/components/tokens"
@@ -13,6 +14,7 @@ type SetPasswordStatus int
 
 const (
 	PasswordSet SetPasswordStatus = iota
+	LinkFound
 	PasswordInvalid
 	LinkInvalid
 )
@@ -24,6 +26,12 @@ type SetPasswordInput struct {
 
 type SetPasswordOutput struct {
 	Status SetPasswordStatus
+}
+
+type FindLinkOutput struct {
+	Status    SetPasswordStatus
+	Email     string
+	ExpiresAt time.Time
 }
 
 type SetPasswordUseCase struct {
@@ -38,9 +46,13 @@ func NewSetPasswordUseCase(
 	return &SetPasswordUseCase{userRepository: userRepository, oneTimeLinkRepository: oneTimeLinkRepository}
 }
 
-func (this *SetPasswordUseCase) IsLinkUsable(ctx context.Context, token string) bool {
-	_, _, usable := this.oneTimeLinkRepository.FindUsable(ctx, tokens.Hash(token))
-	return usable
+func (this *SetPasswordUseCase) FindLink(ctx context.Context, token string) FindLinkOutput {
+	link, user, usable := this.oneTimeLinkRepository.FindUsable(ctx, tokens.Hash(token))
+	if !usable {
+		return FindLinkOutput{Status: LinkInvalid}
+	}
+
+	return FindLinkOutput{Status: LinkFound, Email: user.Email, ExpiresAt: link.ExpiresAt}
 }
 
 func (this *SetPasswordUseCase) Execute(ctx context.Context, input SetPasswordInput) (SetPasswordOutput, error) {
@@ -48,7 +60,7 @@ func (this *SetPasswordUseCase) Execute(ctx context.Context, input SetPasswordIn
 		return SetPasswordOutput{Status: PasswordInvalid}, nil
 	}
 
-	if !this.IsLinkUsable(ctx, input.Token) {
+	if this.FindLink(ctx, input.Token).Status != LinkFound {
 		return SetPasswordOutput{Status: LinkInvalid}, nil
 	}
 

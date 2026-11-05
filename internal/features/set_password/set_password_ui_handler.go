@@ -24,7 +24,7 @@ func NewSetPasswordUiHandler(useCase *SetPasswordUseCase, sessionKeeper *session
 
 func (this *SetPasswordUiHandler) ShowForm(ctx fiber.Ctx) error {
 	token := ctx.Query(tokenField)
-	if !this.useCase.IsLinkUsable(ctx.Context(), token) {
+	if this.useCase.FindLink(ctx.Context(), token).Status != LinkFound {
 		return this.respondLinkInvalid(ctx)
 	}
 
