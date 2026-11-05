@@ -37,6 +37,16 @@ const (
 		ORDER BY
 			name COLLATE "C"
 	`
+
+	renameEnvironmentByNameQuery = `
+		UPDATE
+			environments
+		SET
+			name = $2
+		WHERE
+			name = $1
+		RETURNING id
+	`
 )
 
 type EnvironmentRepository struct {
@@ -84,4 +94,26 @@ func (this *EnvironmentRepository) ListNames(ctx context.Context) []string {
 	}
 
 	return names
+}
+
+func (this *EnvironmentRepository) RenameByName(ctx context.Context, oldName, newName string) (found, conflict bool) {
+	return this.rename(ctx, renameEnvironmentByNameQuery, oldName, newName)
+}
+
+func (this *EnvironmentRepository) rename(ctx context.Context, query string, key any, newName string) (found, conflict bool) {
+	var id int64
+	err := this.pool.QueryRow(ctx, query, key, newName).Scan(&id)
+	if isUniqueViolation(err) {
+		return true, true
+	}
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, false
+	}
+
+	if err != nil {
+		panic(fmt.Errorf("error renaming environment: %w", err))
+	}
+
+	return true, false
 }

@@ -32,6 +32,7 @@ var apiAuthenticationRoutes = []apiAuthenticationRoute{
 	{http.MethodPost, "/api/participants"},
 	{http.MethodPost, "/api/participants/rename"},
 	{http.MethodPost, "/api/environments"},
+	{http.MethodPost, "/api/environments/rename"},
 }
 
 func (this *IntegrationSuite) apiAuthenticationRequest(route apiAuthenticationRoute) *http.Request {

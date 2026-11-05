@@ -119,6 +119,8 @@ func (this *IntegrationSuite) TestInputDoor_RefusesTextThatIsNotUTF8OrCarriesNUL
 			`{"environment":"a\\\u0000"}`, "environments"},
 		{"rename oldName with NUL", "/api/participants/rename", this.writerToken,
 			`{"oldName":"a\u0000","newName":"b"}`, "participants"},
+		{"rename environment newName with NUL", "/api/environments/rename", this.writerToken,
+			`{"oldName":"production","newName":"a\u0000"}`, "environments"},
 		{"deployment version with NUL", "/api/deployments", this.writerToken,
 			`{"participant":"pets","version":"a\u0000","environment":"production"}`, "deployments"},
 		{"can-i-deploy environment with NUL", "/api/can-i-deploy", this.writerToken,

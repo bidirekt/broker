@@ -22,6 +22,7 @@ components:
   feature_publish_contract:   { in: internal/features/publish_contract }
   feature_reactivate_user:    { in: internal/features/reactivate_user }
   feature_record_deployment:  { in: internal/features/record_deployment }
+  feature_rename_environment: { in: internal/features/rename_environment }
   feature_rename_participant: { in: internal/features/rename_participant }
   feature_set_password:       { in: internal/features/set_password }
   feature_setup_admin:        { in: internal/features/setup_admin }
@@ -82,6 +83,7 @@ deps:
       - feature_publish_contract
       - feature_reactivate_user
       - feature_record_deployment
+      - feature_rename_environment
       - feature_rename_participant
       - feature_set_password
       - feature_setup_admin
@@ -131,6 +133,9 @@ deps:
     mayDependOn: [components, components_access, components_pages, components_respond, repository, model]
     canUse: [fiber]
   feature_record_deployment:
+    mayDependOn: [components, components_access, repository, model, validations]
+    canUse: [fiber]
+  feature_rename_environment:
     mayDependOn: [components, components_access, repository, model, validations]
     canUse: [fiber]
   feature_rename_participant:
