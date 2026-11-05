@@ -19,7 +19,7 @@ const (
 //go:embed templates
 var templateFiles embed.FS
 
-var layouts = template.Must(template.ParseFS(templateFiles, "templates/layout*.html"))
+var layouts = template.Must(template.ParseFS(templateFiles, "templates/layout*.html", "templates/partial_*.html"))
 
 type layoutData struct {
 	CSRFToken    string
