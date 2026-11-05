@@ -98,7 +98,7 @@ const (
 			($1, $2, $3)
 	`
 
-	getLatestContractByParticipantID = `
+	getLatestSnapshotByParticipantID = `
 		SELECT
 			c.id,
 			(SELECT version FROM contract_versions WHERE contract_id = c.id ORDER BY id DESC LIMIT 1),
@@ -639,7 +639,7 @@ func (this *ContractRepository) insertResourceBodies(
 	}
 }
 
-func (this *ContractRepository) GetLatestContractByParticipantID(
+func (this *ContractRepository) GetLatestSnapshotByParticipantID(
 	ctx context.Context,
 	participantID int64,
 ) (*model.PersistedContract, bool) {
@@ -651,7 +651,7 @@ func (this *ContractRepository) latestSnapshot(
 	q querier,
 	participantID int64,
 ) (*model.PersistedContract, bool) {
-	rows, err := q.Query(ctx, getLatestContractByParticipantID, participantID)
+	rows, err := q.Query(ctx, getLatestSnapshotByParticipantID, participantID)
 	if err != nil {
 		panic(fmt.Errorf("error loading contract tree: %w", err))
 	}

@@ -179,7 +179,7 @@ func (this *IntegrationSuite) TestContractRepository_NullableFieldRoundTripsThro
 	this.Equal(model.Field{Type: "string"}, byVersion.Schemas["Account"]["nickname"], "contract by version")
 	this.Equal(byVersion.Schemas, providerResource.Schemas, "contract by version")
 
-	latest, found := repo.GetLatestContractByParticipantID(ctx, byVersion.ParticipantID)
+	latest, found := repo.GetLatestSnapshotByParticipantID(ctx, byVersion.ParticipantID)
 	this.Require().True(found)
 	this.True(latest.Schemas["Account"]["avatar"].Nullable, "latest contract")
 	this.True(onlyNullableRoundTripResource(latest).Schemas["Account"]["avatar"].Nullable, "latest contract")
@@ -341,7 +341,7 @@ func (this *IntegrationSuite) assertEveryReadReturnsTheFileResourceWithAnUndescr
 	this.Equal(undescribed, providerResource.Bodies, "contract by version")
 	this.Equal(model.Schemas{}, byVersion.Schemas, "contract by version")
 
-	latest, found := repo.GetLatestContractByParticipantID(ctx, byVersion.ParticipantID)
+	latest, found := repo.GetLatestSnapshotByParticipantID(ctx, byVersion.ParticipantID)
 	this.Require().True(found, "latest contract")
 	this.Require().Len(latest.Resources, 1, "latest contract")
 	this.Equal(undescribed, onlyUndescribedBodyResource(latest).Bodies, "latest contract")
@@ -443,7 +443,7 @@ func (this *IntegrationSuite) TestContractRepository_RemovedResource_ComesBackRe
 	}
 	this.Equal(model.Schemas{}, second.Schemas)
 
-	latest, found := repo.GetLatestContractByParticipantID(ctx, second.ParticipantID)
+	latest, found := repo.GetLatestSnapshotByParticipantID(ctx, second.ParticipantID)
 	this.Require().True(found)
 	this.Len(latest.Resources, 1)
 }
@@ -754,7 +754,7 @@ func (this *IntegrationSuite) TestContractRepository_CounterpartReads_CarryTheCa
 	}, consumers[0].Schemas)
 	this.Equal(null.StringFrom("1"), consumers[0].ParticipantVersion)
 
-	latest, found := repo.GetLatestContractByParticipantID(ctx, provider.ParticipantID)
+	latest, found := repo.GetLatestSnapshotByParticipantID(ctx, provider.ParticipantID)
 	this.Require().True(found)
 	this.True(latest.Schemas["Account"]["avatar"].Nullable)
 	counterparts := repo.LoadCounterparts(ctx, latest, environmentID)
