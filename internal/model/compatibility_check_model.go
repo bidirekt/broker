@@ -10,6 +10,7 @@ import (
 type CompatibilityCheck struct {
 	ID              int64
 	ParticipantID   int64
+	ParticipantName string
 	ContractID      int64
 	Version         string
 	EnvironmentID   int64

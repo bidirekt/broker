@@ -26,6 +26,7 @@ components:
   feature_rename_participant: { in: internal/features/rename_participant }
   feature_set_password:       { in: internal/features/set_password }
   feature_setup_admin:        { in: internal/features/setup_admin }
+  feature_show_check:         { in: internal/features/show_check }
   feature_sign_in:            { in: internal/features/sign_in }
   feature_sign_out:           { in: internal/features/sign_out }
   feature_update_profile:     { in: internal/features/update_profile }
@@ -36,6 +37,7 @@ components:
   components_tokens:        { in: internal/components/tokens }
   components_input:         { in: internal/components/input }
   components_access:        { in: internal/components/access }
+  components_breakreport:   { in: internal/components/breakreport }
   components_pages:         { in: internal/components/pages }
   components_respond:       { in: internal/components/respond }
   components_bearer:        { in: internal/components/bearer }
@@ -87,6 +89,7 @@ deps:
       - feature_rename_participant
       - feature_set_password
       - feature_setup_admin
+      - feature_show_check
       - feature_sign_in
       - feature_sign_out
       - feature_update_profile
@@ -147,6 +150,9 @@ deps:
   feature_setup_admin:
     mayDependOn: [components, components_access, components_pages, components_passwords, components_respond, components_sessions, repository, model, validations]
     canUse: [fiber]
+  feature_show_check:
+    mayDependOn: [components, components_access, components_breakreport, components_pages, components_respond, repository, model]
+    canUse: [fiber, guregu_null]
   feature_sign_in:
     mayDependOn: [components, components_access, components_bearer, components_config, components_pages, components_passwords, components_respond, components_sessions, repository, model]
     canUse: [fiber]
@@ -166,6 +172,8 @@ deps:
   components_access:
     mayDependOn: [model]
     canUse: [fiber]
+  components_breakreport:
+    mayDependOn: [model]
   components_bearer:
     mayDependOn: [components_access, components_config, components_respond, repository]
     canUse: [fiber, golang_jwt]
@@ -207,6 +215,7 @@ deps:
       - bootstrap
       - components
       - components_bearer
+      - components_breakreport
       - components_config
       - components_database
       - components_pages
