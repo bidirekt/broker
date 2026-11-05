@@ -209,6 +209,7 @@ deps:
       - components_bearer
       - components_config
       - components_database
+      - components_pages
       - components_passwords
       - components_tokens
       - contracts

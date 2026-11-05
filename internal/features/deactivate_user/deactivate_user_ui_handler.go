@@ -1,8 +1,6 @@
 package deactivate_user
 
 import (
-	"strconv"
-
 	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/components/pages"
 	"github.com/bidirekt/broker/internal/components/respond"
@@ -22,9 +20,8 @@ func (this *DeactivateUserUiHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondForbidden(ctx)
 	}
 
-	rawUserID := ctx.Params(userIDParam)
-	userID, err := strconv.ParseInt(rawUserID, 10, 64)
-	if err != nil || strconv.FormatInt(userID, 10) != rawUserID {
+	userID, ok := pages.ParsePositiveInteger(ctx.Params(userIDParam))
+	if !ok {
 		return this.respondUserNotFound(ctx)
 	}
 

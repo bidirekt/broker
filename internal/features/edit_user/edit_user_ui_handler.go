@@ -2,7 +2,6 @@ package edit_user
 
 import (
 	"embed"
-	"strconv"
 
 	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/components/pages"
@@ -26,7 +25,7 @@ func (this *EditUserUiHandler) ShowForm(ctx fiber.Ctx) error {
 		return this.respondForbidden(ctx)
 	}
 
-	userID, ok := this.userIDFrom(ctx)
+	userID, ok := pages.ParsePositiveInteger(ctx.Params(userIDParam))
 	if !ok {
 		return this.respondUserNotFound(ctx)
 	}
@@ -51,7 +50,7 @@ func (this *EditUserUiHandler) EditUser(ctx fiber.Ctx) error {
 		return this.respondForbidden(ctx)
 	}
 
-	userID, ok := this.userIDFrom(ctx)
+	userID, ok := pages.ParsePositiveInteger(ctx.Params(userIDParam))
 	if !ok {
 		return this.respondUserNotFound(ctx)
 	}
@@ -82,13 +81,6 @@ func (this *EditUserUiHandler) EditUser(ctx fiber.Ctx) error {
 	}
 
 	return pages.Redirect(ctx, usersPath)
-}
-
-func (this *EditUserUiHandler) userIDFrom(ctx fiber.Ctx) (int64, bool) {
-	rawUserID := ctx.Params(userIDParam)
-	userID, err := strconv.ParseInt(rawUserID, 10, 64)
-
-	return userID, err == nil && strconv.FormatInt(userID, 10) == rawUserID
 }
 
 func (this *EditUserUiHandler) respondForbidden(ctx fiber.Ctx) error {
