@@ -117,7 +117,7 @@ func (this *IntegrationSuite) TestSetupAdmin_CreatesTheAdminAndSignsItIn() {
 
 	status, header, _ := this.setupAdminPost(app, setupAdminEmail, setupAdminPassword)
 	this.Require().Equal(http.StatusSeeOther, status)
-	this.Equal("/users", header.Get("Location"))
+	this.Equal("/", header.Get("Location"))
 	cookie := this.setupAdminCookieFrom(header)
 
 	status, _, body := this.setupAdminGet(app, "/users", cookie)
@@ -135,14 +135,14 @@ func (this *IntegrationSuite) TestSetupAdmin_TheNewAdminSignsInOnTheSignInPageAn
 		url.Values{"email": {setupAdminEmail}, "password": {setupAdminPassword}}))
 	this.Require().Equal(http.StatusSeeOther, status)
 
-	status, header, _ = this.setupAdminGet(app, "/", this.setupAdminCookieFrom(header))
-	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/users", header.Get("Location"))
+	status, _, body := this.setupAdminGet(app, "/", this.setupAdminCookieFrom(header))
+	this.Equal(http.StatusOK, status)
+	this.Contains(body, "<h1>Overview</h1>")
 
 	apiSignIn := httptest.NewRequest("POST", "/api/sign-in",
 		strings.NewReader(`{"email":"`+setupAdminEmail+`","password":"`+setupAdminPassword+`"}`))
 	apiSignIn.Header.Set("Content-Type", "application/json")
-	status, _, body := this.setupAdminSend(app, apiSignIn)
+	status, _, body = this.setupAdminSend(app, apiSignIn)
 	this.Require().Equal(http.StatusOK, status, body)
 
 	var response struct {

@@ -40,6 +40,7 @@ components:
   feature_list_environment_pages: { in: internal/features/list_environment_pages }
   feature_show_environment: { in: internal/features/show_environment }
   feature_show_compatibility: { in: internal/features/show_compatibility }
+  feature_show_overview: { in: internal/features/show_overview }
   components:                 { in: internal/components }
   components_config:        { in: internal/components/config }
   components_passwords:     { in: internal/components/passwords }
@@ -112,6 +113,7 @@ deps:
       - feature_list_environment_pages
       - feature_show_environment
       - feature_show_compatibility
+      - feature_show_overview
     canUse: [fiber]
 
   feature_can_i_deploy:
@@ -209,6 +211,9 @@ deps:
     mayDependOn: [components, components_access, components_pages, components_respond, repository, model]
     canUse: [fiber, guregu_null]
   feature_show_compatibility:
+    mayDependOn: [components, components_access, components_breakreport, components_pages, components_respond, repository, model]
+    canUse: [fiber]
+  feature_show_overview:
     mayDependOn: [components, components_access, components_breakreport, components_pages, components_respond, repository, model]
     canUse: [fiber]
 

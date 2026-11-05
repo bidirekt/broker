@@ -8,7 +8,7 @@ const (
 	passwordFormField = "password"
 
 	signInPath = "/sign-in"
-	usersPath  = "/users"
+	homePath   = "/"
 
 	setupTemplate = "setup.html"
 )

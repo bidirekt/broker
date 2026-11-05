@@ -65,12 +65,12 @@ func (this *IntegrationSuite) TestSignIn_PageShowsOneFormWithCSP() {
 	this.NotContains(body, `action="/sign-out"`)
 }
 
-func (this *IntegrationSuite) TestSignIn_AdminLandsOnUsers() {
+func (this *IntegrationSuite) TestSignIn_AdminLandsOnTheOverview() {
 	cookie := this.signInAsAdmin()
 
-	status, header, _ := this.getPage("/", cookie)
-	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/users", header.Get("Location"))
+	status, _, body := this.getPage("/", cookie)
+	this.Equal(http.StatusOK, status)
+	this.Contains(body, "<h1>Overview</h1>")
 
 	var adminSessions int
 	err := this.Pool.QueryRow(context.Background(), `SELECT count(*) FROM sessions WHERE user_id = $1`, this.adminID).Scan(&adminSessions)
@@ -89,7 +89,7 @@ func (this *IntegrationSuite) TestSignIn_SignedInPagesCarryTheSessionCSRFToken()
 	this.Equal(csrfToken, this.csrfTokenFrom(body))
 }
 
-func (this *IntegrationSuite) TestSignIn_UserLandsOnProfile() {
+func (this *IntegrationSuite) TestSignIn_UserLandsOnTheOverview() {
 	this.createActiveUser(signInUserEmail, model.PermissionWrite, signInUserPassword)
 
 	status, header, _ := this.postForm("/sign-in", "", "", this.signInForm(signInUserEmail, signInUserPassword))
@@ -97,9 +97,9 @@ func (this *IntegrationSuite) TestSignIn_UserLandsOnProfile() {
 	this.Equal("/", header.Get("Location"))
 
 	cookie := this.signInAsUser(signInUserEmail, signInUserPassword)
-	status, header, _ = this.getPage("/", cookie)
-	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/profile", header.Get("Location"))
+	status, _, body := this.getPage("/", cookie)
+	this.Equal(http.StatusOK, status)
+	this.Contains(body, "<h1>Overview</h1>")
 }
 
 func (this *IntegrationSuite) TestSignIn_AdminNavigationLinksToUsersAndProfile() {

@@ -78,11 +78,3 @@ func (this *SignInUiHandler) respondInvalidCredentials(ctx fiber.Ctx, email stri
 		Message: PageInvalidCredentialsMessage,
 	})
 }
-
-func (this *SignInUiHandler) RedirectHome(ctx fiber.Ctx) error {
-	if principal, _ := access.PrincipalFrom(ctx); principal.ManagesUsers() {
-		return pages.Redirect(ctx, usersPath)
-	}
-
-	return pages.Redirect(ctx, profilePath)
-}

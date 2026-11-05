@@ -13,6 +13,5 @@ func Register(kernel *components.Components) {
 	limiter := newSignInLimiter(uiHandler.RespondTooManyAttempts)
 	kernel.Server.Get("/sign-in", uiHandler.ShowForm)
 	kernel.Server.Post("/sign-in", uiHandler.RequireSameOrigin, limiter.PerIP, limiter.PerAccount(uiHandler.Email), uiHandler.SignIn)
-	kernel.Server.Get(homePath, uiHandler.RedirectHome)
 	kernel.Server.Post("/api/sign-in", apiHandler.RequireJsonFromPublicOrigin, limiter.PerIP, limiter.PerAccount(apiHandler.Email), apiHandler.Handle)
 }

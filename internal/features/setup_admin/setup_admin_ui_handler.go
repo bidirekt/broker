@@ -64,7 +64,7 @@ func (this *SetupAdminUiHandler) SetUp(ctx fiber.Ctx) error {
 		return pages.Redirect(ctx, signInPath)
 	}
 
-	return pages.Redirect(ctx, usersPath)
+	return pages.Redirect(ctx, homePath)
 }
 
 func (this *SetupAdminUiHandler) respondForbidden(ctx fiber.Ctx) error {

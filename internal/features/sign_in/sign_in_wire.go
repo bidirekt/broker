@@ -10,9 +10,7 @@ const (
 	emailFormField    = "email"
 	passwordFormField = "password"
 
-	homePath    = "/"
-	usersPath   = "/users"
-	profilePath = "/profile"
+	homePath = "/"
 
 	signInTemplate = "sign_in.html"
 )

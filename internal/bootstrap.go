@@ -29,6 +29,7 @@ import (
 	"github.com/bidirekt/broker/internal/features/show_compatibility"
 	"github.com/bidirekt/broker/internal/features/show_contract_version"
 	"github.com/bidirekt/broker/internal/features/show_environment"
+	"github.com/bidirekt/broker/internal/features/show_overview"
 	"github.com/bidirekt/broker/internal/features/show_participant_relations"
 	"github.com/bidirekt/broker/internal/features/show_participant_versions"
 	"github.com/bidirekt/broker/internal/features/sign_in"
@@ -77,6 +78,7 @@ func Run() (*components.Components, error) {
 	list_environment_pages.Register(kernel)
 	show_environment.Register(kernel)
 	show_compatibility.Register(kernel)
+	show_overview.Register(kernel)
 
 	return kernel, nil
 }
