@@ -14,18 +14,18 @@ import (
 const (
 	insertCompatibilityCheckQuery = `
 		INSERT INTO compatibility_checks
-			(participant_id, contract_id, version, environment_id, deployable)
+			(participant_id, contract_id, version, environment_id, environment_name, deployable, report)
 		VALUES
-			($1, $2, $3, $4, $5)
+			($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id, created_at
 	`
 
 	insertCompatibilityCheckResultQuery = `
 		INSERT INTO compatibility_check_results
 			(check_id, counterpart_name, counterpart_participant_id, counterpart_version,
-			 verdict_contract_id_one, verdict_contract_id_two, deployable)
+			 verdict_contract_id_one, verdict_contract_id_two, deployable, role)
 		VALUES
-			($1, $2, $3, $4, $5, $6, $7)
+			($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id
 	`
 
@@ -126,7 +126,9 @@ func (this *CompatibilityRepository) insertCheck(
 		check.ContractID,
 		check.Version,
 		check.EnvironmentID,
+		check.EnvironmentName,
 		check.Deployable,
+		check.Report,
 	).Scan(&check.ID, &check.CreatedAt); err != nil {
 		panic(fmt.Errorf("error inserting compatibility check: %w", err))
 	}
@@ -147,6 +149,7 @@ func (this *CompatibilityRepository) insertCheckResult(
 		result.VerdictContractIDOne,
 		result.VerdictContractIDTwo,
 		result.Deployable,
+		result.Role,
 	).Scan(&result.ID); err != nil {
 		panic(fmt.Errorf("error inserting compatibility check result: %w", err))
 	}

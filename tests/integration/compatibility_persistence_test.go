@@ -380,6 +380,7 @@ func (this *IntegrationSuite) TestCompatibilityPersistence_RecordingTheSamePairT
 			VerdictContractIDOne:     null.IntFrom(contractIDOne),
 			VerdictContractIDTwo:     null.IntFrom(contractIDTwo),
 			Deployable:               true,
+			Role:                     model.CounterpartProvider,
 		}}
 
 		newVerdicts := []model.CompatibilityVerdict{{

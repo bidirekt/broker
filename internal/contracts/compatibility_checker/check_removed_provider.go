@@ -35,6 +35,7 @@ func CheckRemovedProviderResource(
 		result.Counterpart.ParticipantID = consumerResource.ParticipantID
 		result.Counterpart.ParticipantName = consumerResource.ParticipantName
 		result.Counterpart.ParticipantVersion = consumerResource.ParticipantVersion
+		result.Counterpart.Role = model.CounterpartConsumer
 
 		removal := NewProviderResourceRemovedButStillConsumed(removedResource, &consumerResource)
 		if methodRemains {

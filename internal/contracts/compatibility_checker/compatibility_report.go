@@ -14,6 +14,7 @@ type Counterpart struct {
 	ContractID         int64
 	ParticipantName    string
 	ParticipantVersion null.String
+	Role               model.CounterpartRole
 }
 
 type CounterpartResult struct {
@@ -145,6 +146,8 @@ func (this *ContractCompatibilityReport) AppendResult(counterpartName string, re
 	if !existing.Counterpart.ParticipantVersion.Valid {
 		existing.Counterpart.ParticipantVersion = result.Counterpart.ParticipantVersion
 	}
+
+	existing.Counterpart.Role = existing.Counterpart.Role.MergedWith(result.Counterpart.Role)
 
 	existing.Counterpart.ParticipantName = counterpartName
 

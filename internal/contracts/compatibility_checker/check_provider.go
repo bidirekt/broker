@@ -21,6 +21,7 @@ func (this *CompatibilityChecker) checkProvider(
 		result.Counterpart.ContractID = consumerResource.ContractID
 		result.Counterpart.ParticipantVersion = consumerResource.ParticipantVersion
 		result.Counterpart.ParticipantName = consumerResource.ParticipantName
+		result.Counterpart.Role = model.CounterpartConsumer
 
 		pair := pairs.resolve(ctx, consumerResource.ContractID)
 

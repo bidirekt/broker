@@ -13,9 +13,10 @@ func (this *ContractRepository) LoadCounterparts(
 	environmentID int64,
 ) model.ResourceCounterparts {
 	counterparts := model.ResourceCounterparts{
-		Providers:        make(map[string]model.PersistedResource),
-		Consumers:        make(map[string][]model.PersistedResource),
-		ProviderStatuses: make(map[string][]string),
+		Providers:          make(map[string]model.PersistedResource),
+		Consumers:          make(map[string][]model.PersistedResource),
+		ProviderStatuses:   make(map[string][]string),
+		UnmatchedProviders: make(map[string]model.RegisteredProvider),
 	}
 
 	providersQueried := make(map[string]bool)
@@ -34,6 +35,10 @@ func (this *ContractRepository) LoadCounterparts(
 				counterparts.Providers[resource.ProviderHash] = provider
 
 				continue
+			}
+
+			if registered, isParticipant := this.loadRegisteredProvider(ctx, resource.ConsumedProvider.String, environmentID); isParticipant {
+				counterparts.UnmatchedProviders[resource.ProviderHash] = registered
 			}
 
 			if statuses, declaresMethod := this.loadDeployedProviderStatuses(ctx, resource, environmentID); declaresMethod {

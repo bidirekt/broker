@@ -18,8 +18,14 @@ func (this *CompatibilityChecker) checkConsumer(
 	providerResource, found := counterparts.Providers[consumerResource.ProviderHash]
 
 	result := NewCounterpartResult()
+	result.Counterpart.Role = model.CounterpartProvider
 
 	if !found {
+		if registered, isParticipant := counterparts.UnmatchedProviders[consumerResource.ProviderHash]; isParticipant {
+			result.Counterpart.ParticipantID = registered.ParticipantID
+			result.Counterpart.ParticipantVersion = registered.DeployedVersion
+		}
+
 		notFound := NewProviderResourceNotFound(&consumerResource)
 		if providerStatuses, declaresMethod := counterparts.ProviderStatuses[consumerResource.ProviderHash]; declaresMethod {
 			notFound = NewProviderResourceInteractionNotFound(&consumerResource, providerStatuses)

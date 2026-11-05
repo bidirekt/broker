@@ -299,6 +299,18 @@ const (
 			rv.change_type = 'added'
 	`
 
+	registeredProviderQuery = `
+		SELECT
+			pa.id,
+			cd.version
+		FROM
+			participants pa
+		LEFT JOIN
+			current_deployments cd ON cd.participant_id = pa.id AND cd.environment_id = $2
+		WHERE
+			pa.name = $1
+	`
+
 	deployedProviderStatusesQuery = `
 		SELECT
 			COUNT(*) > 0,
@@ -793,6 +805,25 @@ func (this *ContractRepository) loadProviderResource(
 	provider.Schemas = this.loadSchemasAt(ctx, this.pool, catalogs, provider.ContractID)
 
 	return provider, true
+}
+
+func (this *ContractRepository) loadRegisteredProvider(
+	ctx context.Context,
+	participantName string,
+	environmentID int64,
+) (model.RegisteredProvider, bool) {
+	var registered model.RegisteredProvider
+
+	err := this.pool.QueryRow(ctx, registeredProviderQuery, participantName, environmentID).
+		Scan(&registered.ParticipantID, &registered.DeployedVersion)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.RegisteredProvider{}, false
+	}
+	if err != nil {
+		panic(fmt.Errorf("error loading registered provider: %w", err))
+	}
+
+	return registered, true
 }
 
 func (this *ContractRepository) loadDeployedProviderStatuses(

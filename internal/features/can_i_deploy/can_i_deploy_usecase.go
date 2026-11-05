@@ -2,6 +2,8 @@ package can_i_deploy
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
 	"github.com/bidirekt/broker/internal/contracts/compatibility_checker"
 	"github.com/bidirekt/broker/internal/model"
@@ -92,12 +94,19 @@ func (this *CanIDeployUseCase) recordCheck(
 	deployable bool,
 	report *compatibility_checker.ContractCompatibilityReport,
 ) {
+	storedReport, err := json.Marshal(report.Hierarchical)
+	if err != nil {
+		panic(fmt.Errorf("error encoding compatibility check report: %w", err))
+	}
+
 	check := &model.CompatibilityCheck{
-		ParticipantID: contract.ParticipantID,
-		ContractID:    contract.ID,
-		Version:       contract.Version,
-		EnvironmentID: environment.ID,
-		Deployable:    deployable,
+		ParticipantID:   contract.ParticipantID,
+		ContractID:      contract.ID,
+		Version:         contract.Version,
+		EnvironmentID:   environment.ID,
+		EnvironmentName: environment.Name,
+		Deployable:      deployable,
+		Report:          storedReport,
 	}
 
 	results := make([]model.CompatibilityCheckResult, 0, len(report.Results))
@@ -110,6 +119,7 @@ func (this *CanIDeployUseCase) recordCheck(
 			CounterpartName:    counterpartName,
 			CounterpartVersion: counterpart.ParticipantVersion,
 			Deployable:         item.Deployable,
+			Role:               counterpart.Role,
 		}
 
 		if counterpart.ParticipantID > 0 {
