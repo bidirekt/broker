@@ -1,0 +1,56 @@
+{{define "title"}}{{.Page.Header.Participant.Name}}{{end}}
+
+{{define "content"}}
+{{with .Page}}
+{{$participant := .Header.Participant.Name}}
+<nav class="crumbs" aria-label="Breadcrumbs"><a href="/participants">participants</a><span aria-hidden="true">/</span><span aria-current="page">{{$participant}}</span></nav>
+<div class="head">
+  <div>
+    <h1 class="mono">{{$participant}}</h1>
+    {{if .Header.LatestVersion.Valid}}
+    <div class="sub badges"><span>Latest <span class="ver">{{.Header.LatestVersion.String}}</span></span>{{range .Header.DeployedNow}}<span class="badge env">{{.Environment.Name}} <span class="v">{{.Version}}</span></span>{{else}}<span class="badge quiet">not deployed</span>{{end}}</div>
+    {{else}}
+    <p class="sub">never published</p>
+    {{end}}
+  </div>
+  {{if $.CanWrite}}<div class="acts">{{if .Header.LatestVersion.Valid}}<a class="btn" aria-disabled="true">Rename</a>{{else}}<a class="btn" href="/participants/{{$participant}}/rename">Rename</a>{{end}}</div>{{end}}
+</div>
+{{if and $.CanWrite .Header.LatestVersion.Valid}}<p class="disabled-note">participant has published contracts, create a new participant and switch every consumer's consumes to it</p>{{end}}
+<nav class="tabs" aria-label="Participant">
+  <a href="/participants/{{$participant}}" aria-current="page">Versions <span class="count">{{.Header.VersionCount}}</span></a>
+  <a href="/participants/{{$participant}}/deployments">Deployments <span class="count">{{.Header.DeploymentCount}}</span></a>
+  <a href="/participants/{{$participant}}/checks">Checks <span class="count">{{.Header.CheckCount}}</span></a>
+  <a href="/participants/{{$participant}}/relations">Relations <span class="count">{{.Header.RelationCount}}</span></a>
+</nav>
+<section class="sheet">
+  {{if .Versions}}
+  <table class="t stack">
+    <thead>
+      <tr>
+        <th scope="col">Version</th>
+        <th scope="col">Published</th>
+        <th scope="col">Deployed now</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Versions}}
+      <tr>
+        <td data-l="Version">{{if .URL}}<a class="ver" href="{{.URL}}">{{.Version}}</a>{{else}}<span class="ver">{{.Version}}</span>{{end}}</td>
+        <td data-l="Published">{{listTime .PublishedAt}}</td>
+        <td data-l="Deployed now">{{if .DeployedIn}}<span class="badges">{{range .DeployedIn}}<span class="badge env">{{.Name}}</span>{{end}}</span>{{else}}<span class="muted">not deployed</span>{{end}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  {{template "pager" .Pager}}
+  {{else}}
+  <div class="empty">
+    <div class="ic">{{template "icon_package" 20}}</div>
+    <h2 class="h2">No versions yet</h2>
+    <p>Publish this participant's contract from CI. Until the first publish you can still rename it.</p>
+    <code class="cmd">bidirekt publish</code>
+  </div>
+  {{end}}
+</section>
+{{end}}
+{{end}}

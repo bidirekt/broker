@@ -114,11 +114,12 @@ func TestSortsCounterpartsByName(t *testing.T) {
 	assert.Equal(t, []string{"petstore_api", "petstore_reviews", "petstore_users"}, names)
 }
 
-func TestKeepsTheStoredRoleAndVersion(t *testing.T) {
+func TestKeepsTheStoredRoleVersionAndRegistration(t *testing.T) {
 	api := counterpartNamed(t, fromStoredCheck(t, consumerSideCheck()), "petstore_api")
 
 	assert.Equal(t, model.CounterpartBoth, api.Role)
 	assert.Equal(t, "1.4.0", api.Version)
+	assert.True(t, api.Registered)
 	assert.False(t, api.Deployable)
 }
 
@@ -301,14 +302,14 @@ func TestCheckWithoutAStoredReportListsTheCounterpartsWithoutCounts(t *testing.T
 		Environment: checkEnvironment,
 		Counterparts: []breakreport.StoredCounterpart{
 			{Name: "petstore_reviews", Deployable: true},
-			{Name: "petstore_api", Version: "1.4.0"},
+			{Name: "petstore_api", Version: "1.4.0", Registered: true},
 		},
 	})
 
 	assert.False(t, report.Stored)
 	assert.Zero(t, report.Breaks)
 	assert.Equal(t, []breakreport.Counterpart{
-		{Name: "petstore_api", Version: "1.4.0"},
+		{Name: "petstore_api", Version: "1.4.0", Registered: true},
 		{Name: "petstore_reviews", Deployable: true},
 	}, report.Counterparts)
 }

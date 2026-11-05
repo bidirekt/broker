@@ -1,0 +1,34 @@
+{{define "title"}}Rename {{.Page.Name}}{{end}}
+
+{{define "content"}}
+<nav class="crumbs" aria-label="Breadcrumbs"><a href="/participants">participants</a><span aria-hidden="true">/</span><a href="/participants/{{.Page.Name}}">{{.Page.Name}}</a><span aria-hidden="true">/</span><span aria-current="page">rename</span></nav>
+<div class="head">
+  <div>
+    <h1>Rename {{.Page.Name}}</h1>
+    <p class="sub">Possible only until the first publish. Contracts and pipelines refer to a participant by name.</p>
+  </div>
+</div>
+<div class="formgrid">
+  <form class="sheet formcard" method="post" action="/participants/{{.Page.Name}}/rename">
+    <div class="form">
+      {{with .Page.Alert}}<div class="alert" role="alert">{{template "icon_error" 14}}<span>{{.}}</span></div>{{end}}
+      <div class="warn" role="note"><span>Another participant's <code>consumes</code> and the CI that use <span class="mono">{{.Page.Name}}</span> stop finding it under the old name.</span></div>
+      <div class="field">
+        <label for="name">New name</label>
+        <input class="input mono" id="name" name="name" type="text" autocomplete="off" value="{{.Page.NewName}}" required autofocus{{if eq .Page.Field "name"}} aria-invalid="true" aria-describedby="name-err"{{end}}>
+        {{if eq .Page.Field "name"}}<p class="err" id="name-err">{{template "icon_error" 14}}<span>{{.Page.Message}}</span></p>{{end}}
+        <p class="hint">Lowercase letters, digits and underscores, like <code>petstore_web</code>.</p>
+      </div>
+    </div>
+    <div class="form-foot"><button type="submit" class="btn primary"{{if .Page.Alert}} aria-disabled="true"{{end}}>Rename</button><a class="btn" href="/participants/{{.Page.Name}}">Cancel</a></div>
+  </form>
+  <aside class="sheet aside" aria-label="About renaming">
+    <h2>About renaming</h2>
+    <ul>
+      <li>Allowed only before the first publish.</li>
+      <li>Consumers name the provider in their <code>consumes</code> block, so a published name can't change.</li>
+      <li>To move on from a published name, create a new participant and switch every consumer to it.</li>
+    </ul>
+  </aside>
+</div>
+{{end}}

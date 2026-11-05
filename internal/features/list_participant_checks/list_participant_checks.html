@@ -1,0 +1,78 @@
+{{define "title"}}{{.Page.Header.Participant.Name}} · Checks{{end}}
+
+{{define "content"}}
+{{with .Page}}
+{{$name := .Header.Participant.Name}}
+<nav class="crumbs" aria-label="Breadcrumbs"><span>participants</span><span aria-hidden="true">/</span><span aria-current="page">{{$name}}</span></nav>
+<div class="head">
+  <div>
+    <h1><span class="name">{{$name}}</span></h1>
+    <div class="badges">
+      <span>Latest {{if .Header.LatestVersion.Valid}}<span class="ver">{{.Header.LatestVersion.String}}</span>{{else}}<span class="muted">never published</span>{{end}}</span>
+      {{range .Header.Deployed}}<span class="badge env">{{.Environment.Name}} <span class="v">{{.Version}}</span></span>{{else}}{{if .Header.LatestVersion.Valid}}<span class="badge quiet">not deployed</span>{{end}}{{end}}
+    </div>
+  </div>
+  {{if $.CanWrite}}<div class="acts">{{if .Header.LatestVersion.Valid}}<a class="btn" aria-disabled="true">Rename</a>{{else}}<a class="btn" href="/participants/{{$name}}/rename">Rename</a>{{end}}</div>{{end}}
+</div>
+{{if and $.CanWrite .Header.LatestVersion.Valid}}<p class="disabled-note">participant has published contracts, create a new participant and switch every consumer's consumes to it</p>{{end}}
+<nav class="tabs" aria-label="Participant">
+  <a href="/participants/{{$name}}">Versions <span class="count">{{.Header.Versions}}</span></a>
+  <a href="/participants/{{$name}}/deployments">Deployments <span class="count">{{.Header.Deployments}}</span></a>
+  <a href="/participants/{{$name}}/checks" aria-current="page">Checks <span class="count">{{.Header.Checks}}</span></a>
+  <a href="/participants/{{$name}}/relations">Relations <span class="count">{{.Header.Relations}}</span></a>
+</nav>
+<section class="sheet">
+  {{if .Checks}}
+  <table class="t stack">
+    <thead>
+      <tr>
+        <th scope="col">Check</th>
+        <th scope="col">Version</th>
+        <th scope="col">Environment</th>
+        <th scope="col">Answer</th>
+        <th scope="col">Compared with</th>
+        <th scope="col">Asked</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Checks}}
+      <tr>
+        <td data-l="Check"><a class="mono" href="/checks/{{.Check.ID}}">#{{.Check.ID}}</a></td>
+        <td data-l="Version"><span class="ver">{{.Check.Version}}</span></td>
+        <td data-l="Environment"><span class="name">{{.Check.EnvironmentName}}</span></td>
+        <td data-l="Answer">{{if .Check.Deployable}}<span class="badge yes">{{template "icon_check" 12}}yes</span>{{else}}<span class="badge no">{{template "icon_x" 12}}no{{if .Report.Stored}} · {{template "breaks" .Report.Breaks}}{{end}}</span>{{end}}</td>
+        <td data-l="Compared with">
+          <div class="badges">
+            {{range .Shown}}<span>{{template "role" .Role}}<span class="badge cpb{{if .Breaks}} no{{else if not .Version}} quiet{{end}}">{{.Name}} <span class="v">{{if .Version}}{{.Version}}{{else}}no version{{end}}</span>{{if .Breaks}} · {{template "breaks" .Breaks}}{{end}}</span></span>{{end}}
+            {{if .More}}<a class="badge more" href="/checks/{{.Check.ID}}">+{{.More}} more</a>{{end}}
+            {{if and .Report.Stored (not .Report.Counterparts)}}<span class="muted">nothing deployed shares an endpoint</span>{{end}}
+          </div>
+        </td>
+        <td data-l="Asked">{{listTime .Check.CreatedAt}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  {{template "pager" .Pager}}
+  {{else if .Header.LatestVersion.Valid}}
+  <div class="empty">
+    <div class="ic">{{template "icon_check" 20}}</div>
+    <h2 class="h2">No checks yet</h2>
+    <p>Ask whether a version of <span class="name">{{$name}}</span> can be deployed, and the answer shows up here.</p>
+    <code class="cmd">bidirekt can-i-deploy</code>
+  </div>
+  {{else}}
+  <div class="empty">
+    <div class="ic">{{template "icon_check" 20}}</div>
+    <h2 class="h2">Nothing published yet</h2>
+    <p><span class="name">{{$name}}</span> has no contract versions, so it has no checks.</p>
+    <code class="cmd">bidirekt publish</code>
+  </div>
+  {{end}}
+</section>
+{{end}}
+{{end}}
+
+{{define "role"}}{{if eq . "both"}}<span class="role">PROVIDER · CONSUMER</span>{{else if eq . "provider"}}<span class="role">PROVIDER</span>{{else if eq . "consumer"}}<span class="role">CONSUMER</span>{{end}}{{end}}
+
+{{define "breaks"}}{{.}} {{if eq . 1}}break{{else}}breaks{{end}}{{end}}

@@ -42,6 +42,7 @@ type Counterpart struct {
 	Name       string
 	Role       model.CounterpartRole
 	Version    string
+	Registered bool
 	Deployable bool
 	Breaks     int
 	Endpoints  []Endpoint
@@ -105,6 +106,7 @@ func FromStoredCheck(check StoredCheck) (Report, error) {
 			report.Counterparts = append(report.Counterparts, Counterpart{
 				Name:       counterpart.Name,
 				Version:    counterpart.Version,
+				Registered: counterpart.Registered,
 				Deployable: counterpart.Deployable,
 			})
 		}
@@ -139,6 +141,7 @@ func toCounterpart(check StoredCheck, stored StoredCounterpart, result storedRes
 		Name:       stored.Name,
 		Role:       stored.Role,
 		Version:    stored.Version,
+		Registered: stored.Registered,
 		Deployable: stored.Deployable,
 	}
 

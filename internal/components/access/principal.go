@@ -38,6 +38,10 @@ func (this Principal) ManagesUsers() bool {
 	return this.Permission == model.PermissionAdmin
 }
 
+func (this Principal) CanWrite() bool {
+	return this.Permission.Includes(model.PermissionWrite)
+}
+
 func GrantPrincipal(ctx fiber.Ctx, principal Principal) {
 	ctx.Locals(principalKey{}, principal)
 }

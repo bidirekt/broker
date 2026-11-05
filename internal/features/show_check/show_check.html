@@ -2,7 +2,7 @@
 
 {{define "content"}}
 {{with .Page}}
-<nav class="crumbs" aria-label="Breadcrumbs"><span>participants</span><span aria-hidden="true">/</span><span>{{.Check.ParticipantName}}</span><span aria-hidden="true">/</span><span>{{.Check.Version}}</span><span aria-hidden="true">/</span><span aria-current="page">check #{{.Check.ID}}</span></nav>
+<nav class="crumbs" aria-label="Breadcrumbs"><a href="/participants">participants</a><span aria-hidden="true">/</span><a href="{{.ParticipantURL}}">{{.Check.ParticipantName}}</a><span aria-hidden="true">/</span>{{if .VersionURL}}<a href="{{.VersionURL}}">{{.Check.Version}}</a>{{else}}<span>{{.Check.Version}}</span>{{end}}<span aria-hidden="true">/</span><span aria-current="page">check #{{.Check.ID}}</span></nav>
 <section class="sheet">
   <div class="verdict {{if .Check.Deployable}}yes{{else}}no{{end}}">
     <div class="ic">{{if .Check.Deployable}}{{template "icon_check" 20}}{{else}}{{template "icon_x" 20}}{{end}}</div>
@@ -11,8 +11,8 @@
       <h1><span class="name">{{.Check.ParticipantName}}</span> <span class="ver">{{.Check.Version}}</span> {{if .Check.Deployable}}can be deployed{{else}}cannot be deployed{{end}} to <span class="name">{{.Check.EnvironmentName}}</span></h1>
       <dl class="kv">
         <div><dt>Check</dt><dd>#{{.Check.ID}}</dd></div>
-        <div><dt>Participant</dt><dd><span class="name">{{.Check.ParticipantName}}</span></dd></div>
-        <div><dt>Version</dt><dd><span class="ver">{{.Check.Version}}</span></dd></div>
+        <div><dt>Participant</dt><dd><a class="name" href="{{.ParticipantURL}}">{{.Check.ParticipantName}}</a></dd></div>
+        <div><dt>Version</dt><dd>{{if .VersionURL}}<a class="ver" href="{{.VersionURL}}">{{.Check.Version}}</a>{{else}}<span class="ver">{{.Check.Version}}</span>{{end}}</dd></div>
         <div><dt>Environment</dt><dd><span class="name">{{.Check.EnvironmentName}}</span></dd></div>
         <div><dt>Checked</dt><dd>{{detailTime .Check.CreatedAt}}</dd></div>
       </dl>
@@ -30,10 +30,10 @@
 <section class="sheet">
   <div class="sheet-head"><h2 class="h2">compared with</h2></div>
   <p class="pad muted">the details of this check were not stored</p>
-  {{if .Report.Counterparts}}
+  {{if .Counterparts}}
   <ul class="list">
-    {{range .Report.Counterparts}}
-    <li>{{template "answer" .Deployable}}<span class="name">{{.Name}}</span>{{template "version" .Version}}</li>
+    {{range .Counterparts}}
+    <li>{{template "answer" .Deployable}}{{template "counterpart_name" .}}{{template "counterpart_version" .}}</li>
     {{end}}
   </ul>
   {{end}}
@@ -45,6 +45,7 @@
 {{$counterpart := .Name}}
 <details class="cp" open>
   <summary>{{template "role" .Role}}<span class="who-cp">{{.Name}}</span>{{if .Version}}<span class="ver">{{.Version}}</span><span class="badge env">{{$check.EnvironmentName}}</span>{{else}}<span class="muted">no version</span>{{end}}<span class="badge no nb">{{template "icon_x" 12}}no · {{.Breaks}} {{if eq .Breaks 1}}break{{else}}breaks{{end}}</span></summary>
+  {{if .ParticipantURL}}<div class="cp-links"><a href="{{.ParticipantURL}}">{{.Name}}</a>{{if .VersionURL}}<span aria-hidden="true">·</span><a href="{{.VersionURL}}">version {{.Version}}</a>{{end}}</div>{{end}}
   {{if .Endpoints}}
   <p class="group-label">Endpoints</p>
   {{range .Endpoints}}
@@ -81,17 +82,17 @@
 {{if .Compatible}}
 <section class="sheet">
   <ul class="list">
-    <li>{{template "icon_check" 14}}<span>Also compared with, and compatible:</span>{{range .Compatible}}<span>{{template "role" .Role}}<span class="name">{{.Name}}</span> {{template "version" .Version}}</span>{{end}}</li>
+    <li>{{template "icon_check" 14}}<span>Also compared with, and compatible:</span>{{range .Compatible}}<span>{{template "role" .Role}}{{template "counterpart_name" .}} {{template "counterpart_version" .}}</span>{{end}}</li>
   </ul>
 </section>
 {{end}}
 {{else}}
 <section class="sheet">
   <div class="sheet-head"><h2 class="h2">compared with</h2></div>
-  {{if .Report.Counterparts}}
+  {{if .Counterparts}}
   <ul class="list">
-    {{range .Report.Counterparts}}
-    <li>{{template "answer" .Deployable}}<span class="name">{{.Name}}</span>{{template "version" .Version}}{{template "role" .Role}}</li>
+    {{range .Counterparts}}
+    <li>{{template "answer" .Deployable}}{{template "counterpart_name" .}}{{template "counterpart_version" .}}{{template "role" .Role}}</li>
     {{end}}
   </ul>
   {{else}}
@@ -103,6 +104,10 @@
 {{end}}
 
 {{define "role"}}{{if eq . "both"}}<span class="role">PROVIDER · CONSUMER</span>{{else if eq . "provider"}}<span class="role">PROVIDER</span>{{else if eq . "consumer"}}<span class="role">CONSUMER</span>{{end}}{{end}}
+
+{{define "counterpart_name"}}{{if .ParticipantURL}}<a class="name" href="{{.ParticipantURL}}">{{.Name}}</a>{{else}}<span class="name">{{.Name}}</span>{{end}}{{end}}
+
+{{define "counterpart_version"}}{{if .VersionURL}}<a class="ver" href="{{.VersionURL}}">{{.Version}}</a>{{else}}{{template "version" .Version}}{{end}}{{end}}
 
 {{define "version"}}{{if .}}<span class="ver">{{.}}</span>{{else}}<span class="muted">no version</span>{{end}}{{end}}
 

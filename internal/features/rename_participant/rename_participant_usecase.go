@@ -15,6 +15,7 @@ const (
 	ParticipantAlreadyExists
 	ParticipantHasPublishedContracts
 	ParticipantNameInvalid
+	ParticipantRenameable
 )
 
 type RenameParticipantInput struct {
@@ -32,6 +33,19 @@ type RenameParticipantUseCase struct {
 
 func NewRenameParticipantUseCase(participantRepository *repository.ParticipantRepository) *RenameParticipantUseCase {
 	return &RenameParticipantUseCase{participantRepository: participantRepository}
+}
+
+func (this *RenameParticipantUseCase) FindTarget(ctx context.Context, name string) RenameParticipantOutput {
+	published, found := this.participantRepository.FindPublishedByName(ctx, name)
+	if !found {
+		return RenameParticipantOutput{Status: ParticipantNotFound}
+	}
+
+	if published {
+		return RenameParticipantOutput{Status: ParticipantHasPublishedContracts}
+	}
+
+	return RenameParticipantOutput{Status: ParticipantRenameable}
 }
 
 func (this *RenameParticipantUseCase) Execute(ctx context.Context, input RenameParticipantInput) RenameParticipantOutput {

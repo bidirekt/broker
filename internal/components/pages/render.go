@@ -26,6 +26,7 @@ type layoutData struct {
 	CSRFToken    string
 	Email        string
 	ManagesUsers bool
+	CanWrite     bool
 	Section      string
 	Notice       string
 	Page         any
@@ -73,6 +74,7 @@ func layoutFor(ctx fiber.Ctx, page any) (layout string, data layoutData) {
 		CSRFToken:    session.CSRFToken,
 		Email:        principal.Email,
 		ManagesUsers: principal.ManagesUsers(),
+		CanWrite:     principal.CanWrite(),
 		Section:      sectionOf(ctx.Path()),
 		Notice:       session.Message,
 		Page:         page,

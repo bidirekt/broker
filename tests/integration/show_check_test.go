@@ -245,7 +245,58 @@ func (this *IntegrationSuite) TestShowCheck_SummaryCarriesNoLinkAndEnvironmentNa
 	this.Contains(summaries[2][1], `no · 2 breaks`)
 	this.Contains(summaries[3][1], `no · 1 break</span>`)
 	this.NotContains(body, `href="/environments`)
-	this.NotContains(body, `href="/participants`)
+}
+
+func (this *IntegrationSuite) TestShowCheck_LinksTheCheckedParticipantAndItsVersion() {
+	checkPath := this.consumerSideCheckForShowCheck()
+
+	_, _, body := this.getPage(checkPath, this.signInAsAdmin())
+
+	this.Contains(body, `<nav class="crumbs" aria-label="Breadcrumbs"><a href="/participants">participants</a><span aria-hidden="true">/</span><a href="/participants/petstore_web">petstore_web</a><span aria-hidden="true">/</span><a href="/participants/petstore_web/versions/2.3.0">2.3.0</a><span aria-hidden="true">/</span><span aria-current="page">check #`)
+	this.Contains(body, `<div><dt>Participant</dt><dd><a class="name" href="/participants/petstore_web">petstore_web</a></dd></div>`)
+	this.Contains(body, `<div><dt>Version</dt><dd><a class="ver" href="/participants/petstore_web/versions/2.3.0">2.3.0</a></dd></div>`)
+}
+
+func (this *IntegrationSuite) TestShowCheck_LinksRegisteredCounterpartsOutsideTheSummaryAndTheirVersionsOnlyWhenTheyHaveOne() {
+	checkPath := this.consumerSideCheckForShowCheck()
+
+	_, _, body := this.getPage(checkPath, this.signInAsAdmin())
+
+	this.Contains(body, `</summary>
+  <div class="cp-links"><a href="/participants/petstore_api">petstore_api</a><span aria-hidden="true">·</span><a href="/participants/petstore_api/versions/1.4.0">version 1.4.0</a></div>`)
+	this.Contains(body, `</summary>
+  <div class="cp-links"><a href="/participants/petstore_admin">petstore_admin</a></div>`)
+	this.Contains(body, `</summary>
+  <div class="cp-links"><a href="/participants/petstore_reviews">petstore_reviews</a></div>`)
+	this.Equal(3, strings.Count(body, `<div class="cp-links">`))
+	this.NotContains(body, `href="/participants/ghost`)
+}
+
+func (this *IntegrationSuite) TestShowCheck_VersionLinksArePathEscapedAndDotVersionsHaveNoURL() {
+	this.createForShowCheck([]string{"production"}, []string{"petstore_api", "petstore_reviews"})
+	this.publishForShowCheck("petstore_api", "..", showCheckAPIv1Contract)
+	this.deployForShowCheck("petstore_api", "..", "production")
+	this.publishForShowCheck("petstore_reviews", "1.0/beta rc", showCheckReviewsConsumerContract)
+	checkPath := this.checkForShowCheck("petstore_reviews", "1.0/beta rc")
+
+	_, _, body := this.getPage(checkPath, this.signInAsAdmin())
+
+	this.Contains(body, `<a href="/participants/petstore_reviews/versions/1.0%2Fbeta%20rc">1.0/beta rc</a>`)
+	this.Contains(body, `<a class="ver" href="/participants/petstore_reviews/versions/1.0%2Fbeta%20rc">1.0/beta rc</a>`)
+	this.Contains(body, `<a class="name" href="/participants/petstore_api">petstore_api</a><span class="ver">..</span>`)
+	this.NotContains(body, `/participants/petstore_api/versions/`)
+}
+
+func (this *IntegrationSuite) TestShowCheck_DotVersionOfTheCheckedParticipantHasNoURL() {
+	this.createForShowCheck([]string{"production"}, []string{"petstore_reviews"})
+	this.publishForShowCheck("petstore_reviews", ".", showCheckReviewsContract)
+	checkPath := this.checkForShowCheck("petstore_reviews", ".")
+
+	_, _, body := this.getPage(checkPath, this.signInAsAdmin())
+
+	this.Contains(body, `<a href="/participants/petstore_reviews">petstore_reviews</a><span aria-hidden="true">/</span><span>.</span><span aria-hidden="true">/</span>`)
+	this.Contains(body, `<div><dt>Version</dt><dd><span class="ver">.</span></dd></div>`)
+	this.NotContains(body, `/versions/`)
 }
 
 func (this *IntegrationSuite) TestShowCheck_ShowsAProviderSideNoWithRemovedOncePerEndpointAndTheCompatibleCounterparts() {
@@ -268,7 +319,7 @@ func (this *IntegrationSuite) TestShowCheck_ShowsAProviderSideNoWithRemovedOnceP
 	this.Contains(body, `<b class="name">petstore_api</b> now answers <code>GET /pets/*</code> only with 200, but <b class="name">petstore_web</b> still reads response 404`)
 
 	this.Contains(body, `Also compared with, and compatible:`)
-	this.Contains(body, `<span class="role">CONSUMER</span><span class="name">petstore_reviews</span> <span class="ver">1.0.0</span>`)
+	this.Contains(body, `<span class="role">CONSUMER</span><a class="name" href="/participants/petstore_reviews">petstore_reviews</a> <a class="ver" href="/participants/petstore_reviews/versions/1.0.0">1.0.0</a>`)
 }
 
 func (this *IntegrationSuite) TestShowCheck_YesListsTheComparedCounterparts() {
@@ -284,7 +335,7 @@ func (this *IntegrationSuite) TestShowCheck_YesListsTheComparedCounterparts() {
 	this.Contains(body, `yes · can be deployed`)
 	this.Contains(body, `<span class="ver">1.0.0</span> can be deployed to <span class="name">production</span>`)
 	this.Contains(body, `<h2 class="h2">compared with</h2>`)
-	this.Contains(body, `<span class="name">petstore_api</span><span class="ver">1.4.0</span><span class="role">PROVIDER</span>`)
+	this.Contains(body, `<a class="name" href="/participants/petstore_api">petstore_api</a><a class="ver" href="/participants/petstore_api/versions/1.4.0">1.4.0</a><span class="role">PROVIDER</span>`)
 	this.NotContains(body, `class="stats"`)
 	this.NotContains(body, `<details`)
 }
@@ -324,8 +375,8 @@ func (this *IntegrationSuite) TestShowCheck_CheckWithoutAStoredReportSaysSoWithT
 	this.Require().Equal(http.StatusOK, status, body)
 	this.Contains(body, `cannot be deployed to <span class="name">live</span>`)
 	this.Contains(body, `the details of this check were not stored`)
-	this.Contains(body, `<span class="name">petstore_reviews</span><span class="ver">1.0.0</span>`)
-	this.Contains(body, `<span class="name">petstore_web</span><span class="ver">2.2.0</span>`)
+	this.Contains(body, `<a class="name" href="/participants/petstore_reviews">petstore_reviews</a><a class="ver" href="/participants/petstore_reviews/versions/1.0.0">1.0.0</a>`)
+	this.Contains(body, `<a class="name" href="/participants/petstore_web">petstore_web</a><a class="ver" href="/participants/petstore_web/versions/2.2.0">2.2.0</a>`)
 	this.NotContains(body, `class="role"`)
 	this.NotContains(body, `class="stats"`)
 	this.NotContains(body, `<details`)
