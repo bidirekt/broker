@@ -11,10 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var (
-	ErrProviderResourceNotFound = errors.New("provider resource not found")
-)
-
 const (
 	hasContractForVersionQuery = `
 		SELECT EXISTS(SELECT 1 FROM contract_versions WHERE participant_id = $1 AND version = $2)
@@ -718,11 +714,11 @@ func scanPersistedContractTree(rows pgx.Rows) *model.PersistedContract {
 	return contract
 }
 
-func (this *ContractRepository) GetProviderResourceByConsumerResource(
+func (this *ContractRepository) GetProviderResourceByProviderHashAndEnvironmentID(
 	ctx context.Context,
 	providerHash string,
 	environmentID int64,
-) (model.PersistedResource, error) {
+) (model.PersistedResource, bool) {
 	return this.loadProviderResource(ctx, schemaCatalogs{}, providerHash, environmentID)
 }
 
@@ -739,7 +735,7 @@ func (this *ContractRepository) loadProviderResource(
 	catalogs schemaCatalogs,
 	providerHash string,
 	environmentID int64,
-) (model.PersistedResource, error) {
+) (model.PersistedResource, bool) {
 	rows, err := this.pool.Query(
 		ctx,
 		loadProviderResourceWithDeploymentsQuery,
@@ -798,12 +794,12 @@ func (this *ContractRepository) loadProviderResource(
 	rows.Close()
 
 	if !found {
-		return model.PersistedResource{}, ErrProviderResourceNotFound
+		return model.PersistedResource{}, false
 	}
 
 	provider.Schemas = this.loadSchemasAt(ctx, this.pool, catalogs, provider.ContractID)
 
-	return provider, nil
+	return provider, true
 }
 
 func (this *ContractRepository) loadDeployedProviderStatuses(

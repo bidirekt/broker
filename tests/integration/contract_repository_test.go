@@ -166,8 +166,8 @@ func (this *IntegrationSuite) TestContractRepository_NullableFieldRoundTripsThro
 	this.True(latest.Schemas["Account"]["avatar"].Nullable, "latest contract")
 	this.True(onlyNullableRoundTripResource(latest).Schemas["Account"]["avatar"].Nullable, "latest contract")
 
-	provider, err := repo.GetProviderResourceByConsumerResource(ctx, providerResource.ProviderHash, environmentID)
-	this.Require().NoError(err)
+	provider, found := repo.GetProviderResourceByProviderHashAndEnvironmentID(ctx, providerResource.ProviderHash, environmentID)
+	this.Require().True(found)
 	this.True(provider.Schemas["Account"]["avatar"].Nullable, "provider resource of a consumer")
 	this.False(provider.Schemas["Account"]["nickname"].Nullable, "provider resource of a consumer")
 
@@ -328,8 +328,8 @@ func (this *IntegrationSuite) assertEveryReadReturnsTheFileResourceWithAnUndescr
 	this.Require().Len(latest.Resources, 1, "latest contract")
 	this.Equal(undescribed, onlyUndescribedBodyResource(latest).Bodies, "latest contract")
 
-	provider, err := repo.GetProviderResourceByConsumerResource(ctx, providerResource.ProviderHash, environmentID)
-	this.Require().NoError(err, "provider resource of a consumer")
+	provider, found := repo.GetProviderResourceByProviderHashAndEnvironmentID(ctx, providerResource.ProviderHash, environmentID)
+	this.Require().True(found, "provider resource of a consumer")
 	this.Equal("/files/*", provider.Endpoint, "provider resource of a consumer")
 	this.Equal(undescribed, provider.Bodies, "provider resource of a consumer")
 	this.Equal(map[string]string{"production": providerVersion}, provider.DeployedVersions, "provider resource of a consumer")
@@ -723,8 +723,8 @@ func (this *IntegrationSuite) TestContractRepository_CounterpartReads_CarryTheCa
 		{Source: "widget.yaml", SchemaName: null.StringFrom("Profile")},
 	}, consumer.Bodies)
 
-	provider, err := repo.GetProviderResourceByConsumerResource(ctx, consumer.ProviderHash, environmentID)
-	this.Require().NoError(err)
+	provider, found := repo.GetProviderResourceByProviderHashAndEnvironmentID(ctx, consumer.ProviderHash, environmentID)
+	this.Require().True(found)
 	this.Equal(model.Field{Type: "string"}, provider.Schemas["Account"]["avatar"])
 	this.Equal([]model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Account")}}, provider.Bodies)
 

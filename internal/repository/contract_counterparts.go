@@ -30,8 +30,7 @@ func (this *ContractRepository) LoadCounterparts(
 
 			providersQueried[resource.ProviderHash] = true
 
-			provider, err := this.loadProviderResource(ctx, catalogs, resource.ProviderHash, environmentID)
-			if err == nil {
+			if provider, found := this.loadProviderResource(ctx, catalogs, resource.ProviderHash, environmentID); found {
 				counterparts.Providers[resource.ProviderHash] = provider
 
 				continue
