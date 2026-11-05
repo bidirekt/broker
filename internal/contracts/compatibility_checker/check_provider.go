@@ -16,11 +16,11 @@ func (this *CompatibilityChecker) checkProvider(
 	consumers := counterparts.Consumers[providerResource.ProviderHash]
 
 	for _, consumerResource := range consumers {
-		result := NewIncompatibleItem()
-		result.IncompatibleCounterpart.ParticipantID = consumerResource.ParticipantID
-		result.IncompatibleCounterpart.ContractID = consumerResource.ContractID
-		result.IncompatibleCounterpart.ParticipantVersion = consumerResource.ParticipantVersion
-		result.IncompatibleCounterpart.ParticipantName = consumerResource.ParticipantName
+		result := NewCounterpartResult()
+		result.Counterpart.ParticipantID = consumerResource.ParticipantID
+		result.Counterpart.ContractID = consumerResource.ContractID
+		result.Counterpart.ParticipantVersion = consumerResource.ParticipantVersion
+		result.Counterpart.ParticipantName = consumerResource.ParticipantName
 
 		pair := pairs.resolve(ctx, consumerResource.ContractID)
 

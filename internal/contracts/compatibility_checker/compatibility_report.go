@@ -9,58 +9,35 @@ import (
 	"github.com/guregu/null"
 )
 
-type IncompatibleCounterpart struct {
-	ParticipantID      int64       `json:"-"`
-	ContractID         int64       `json:"-"`
-	ParticipantName    string      `json:"participantName"`
-	ParticipantVersion null.String `json:"participantVersion"`
+type Counterpart struct {
+	ParticipantID      int64
+	ContractID         int64
+	ParticipantName    string
+	ParticipantVersion null.String
 }
 
-// InteractionKey is the wire spelling of the checked resource's interaction: "request"
-// for requests, the raw status code for responses.
-func (this *ContractBreakingChange) InteractionKey() string {
-	switch this.CheckedResource.Interaction {
-	case model.RestRequest:
-		return "request"
-	case model.RestResponse:
-		return this.CheckedResource.ResponseStatusCode.String
-	default:
-		return this.CheckedResource.Interaction.String()
-	}
-}
-
-// IsPropertyBreak reports whether the break comes from a property diff, as opposed to the
-// environment checks that depend on deployments and never become a stored verdict.
-func (this *ContractBreakingChange) IsPropertyBreak() bool {
-	return this.Reason != ReasonProviderResourceNotFound &&
-		this.Reason != ReasonProviderResourceInteractionNotFound &&
-		this.Reason != ReasonProviderResourceNotDeployedInEnvironment &&
-		this.Reason != ReasonProviderResourceRemovedButStillConsumed &&
-		this.Reason != ReasonProviderResourceInteractionRemovedButStillConsumed
-}
-
-type IncompatibleItem struct {
-	Deployable              bool                     `json:"deployable"`
-	IncompatibleCounterpart IncompatibleCounterpart  `json:"incompatibleCounterpart"`
-	Breaks                  []ContractBreakingChange `json:"breaks"`
+type CounterpartResult struct {
+	Deployable  bool
+	Counterpart Counterpart
+	Breaks      []ContractBreakingChange
 	// CachedBreaks come from a stored verdict: they carry their own tree keys instead of a
 	// checked resource, and the pair they belong to is already persisted.
-	CachedBreaks  []model.VerdictBreak `json:"-"`
-	VerdictCached bool                 `json:"-"`
+	CachedBreaks  []model.VerdictBreak
+	VerdictCached bool
 }
 
-func NewIncompatibleItem() *IncompatibleItem {
-	return &IncompatibleItem{
+func NewCounterpartResult() *CounterpartResult {
+	return &CounterpartResult{
 		Breaks: make([]ContractBreakingChange, 0),
 	}
 }
 
-func (this *IncompatibleItem) AppendContractBreakChange(b ContractBreakingChange) {
+func (this *CounterpartResult) AppendContractBreakChange(b ContractBreakingChange) {
 	this.Breaks = append(this.Breaks, b)
 	this.Deployable = false
 }
 
-func (this *IncompatibleItem) AppendCachedBreakChange(b model.VerdictBreak) {
+func (this *CounterpartResult) AppendCachedBreakChange(b model.VerdictBreak) {
 	this.CachedBreaks = append(this.CachedBreaks, b)
 	this.Deployable = false
 }
@@ -81,7 +58,7 @@ type ContractCompatibilityReport struct {
 	ParticipantName string
 	Version         string
 	Environment     string
-	Results         map[string]IncompatibleItem
+	Results         map[string]CounterpartResult
 	Hierarchical    map[string]Hierarchical
 }
 
@@ -92,14 +69,14 @@ func NewContractCompatibilityReport(
 		ParticipantName: participantName,
 		Version:         version,
 		Environment:     environment,
-		Results:         make(map[string]IncompatibleItem),
+		Results:         make(map[string]CounterpartResult),
 		Hierarchical:    make(map[string]Hierarchical),
 	}
 }
 
-func (this *ContractCompatibilityReport) AppendResult(dependency string, result *IncompatibleItem) {
+func (this *ContractCompatibilityReport) AppendResult(counterpartName string, result *CounterpartResult) {
 
-	hierarchical, exists := this.Hierarchical[dependency]
+	hierarchical, exists := this.Hierarchical[counterpartName]
 	if !exists {
 		hierarchical = Hierarchical{
 			Deployable: true,
@@ -108,7 +85,7 @@ func (this *ContractCompatibilityReport) AppendResult(dependency string, result 
 	}
 
 	if !hierarchical.Version.Valid {
-		hierarchical.Version = result.IncompatibleCounterpart.ParticipantVersion
+		hierarchical.Version = result.Counterpart.ParticipantVersion
 	}
 
 	for _, breakChange := range result.Breaks {
@@ -143,9 +120,9 @@ func (this *ContractCompatibilityReport) AppendResult(dependency string, result 
 		)
 	}
 
-	this.Hierarchical[dependency] = hierarchical
+	this.Hierarchical[counterpartName] = hierarchical
 
-	existing := this.Results[dependency]
+	existing := this.Results[counterpartName]
 
 	if existing.Breaks == nil {
 		existing.Breaks = []ContractBreakingChange{}
@@ -157,23 +134,23 @@ func (this *ContractCompatibilityReport) AppendResult(dependency string, result 
 
 	// Merged field by field: items of the same counterpart arrive in map order, and the ones
 	// that carry no contract must not stop a later one from filling it in.
-	if existing.IncompatibleCounterpart.ParticipantID == 0 {
-		existing.IncompatibleCounterpart.ParticipantID = result.IncompatibleCounterpart.ParticipantID
+	if existing.Counterpart.ParticipantID == 0 {
+		existing.Counterpart.ParticipantID = result.Counterpart.ParticipantID
 	}
 
-	if existing.IncompatibleCounterpart.ContractID == 0 {
-		existing.IncompatibleCounterpart.ContractID = result.IncompatibleCounterpart.ContractID
+	if existing.Counterpart.ContractID == 0 {
+		existing.Counterpart.ContractID = result.Counterpart.ContractID
 	}
 
-	if !existing.IncompatibleCounterpart.ParticipantVersion.Valid {
-		existing.IncompatibleCounterpart.ParticipantVersion = result.IncompatibleCounterpart.ParticipantVersion
+	if !existing.Counterpart.ParticipantVersion.Valid {
+		existing.Counterpart.ParticipantVersion = result.Counterpart.ParticipantVersion
 	}
 
-	existing.IncompatibleCounterpart.ParticipantName = dependency
+	existing.Counterpart.ParticipantName = counterpartName
 
 	existing.Deployable = len(existing.Breaks)+len(existing.CachedBreaks) == 0
 
-	this.Results[dependency] = existing
+	this.Results[counterpartName] = existing
 }
 
 func (this *ContractCompatibilityReport) Deployable() bool {

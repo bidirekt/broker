@@ -213,7 +213,7 @@ func TestCachedPropertyBreaksCarryTheRoleOfTheCurrentCheck(t *testing.T) {
 		}
 
 		t.Run(string(tc.reason)+" in "+tc.interaction+" replayed to the consumer", func(t *testing.T) {
-			item := compatibility_checker.NewIncompatibleItem()
+			item := compatibility_checker.NewCounterpartResult()
 			item.AppendCachedBreakChange(stored)
 
 			report := compatibility_checker.NewContractCompatibilityReport(petstoreWeb, "2.0.0", production)
@@ -227,7 +227,7 @@ func TestCachedPropertyBreaksCarryTheRoleOfTheCurrentCheck(t *testing.T) {
 		})
 
 		t.Run(string(tc.reason)+" in "+tc.interaction+" replayed to the provider", func(t *testing.T) {
-			item := compatibility_checker.NewIncompatibleItem()
+			item := compatibility_checker.NewCounterpartResult()
 			item.AppendCachedBreakChange(stored)
 
 			report := compatibility_checker.NewContractCompatibilityReport(petstoreAPI, "4.0.0", production)
@@ -263,7 +263,7 @@ func TestFreshBreaksOfAnInteractionAreSortedByProperty(t *testing.T) {
 }
 
 func TestCachedBreaksOfAnInteractionAreSortedByProperty(t *testing.T) {
-	item := compatibility_checker.NewIncompatibleItem()
+	item := compatibility_checker.NewCounterpartResult()
 	for _, property := range []string{"$.weight", "$.photoUrl"} {
 		item.AppendCachedBreakChange(model.VerdictBreak{
 			Endpoint:    "/pets",
@@ -292,14 +292,14 @@ func TestReportIsDeployableOnlyWhenEveryResultIs(t *testing.T) {
 
 	t.Run("with every result deployable", func(t *testing.T) {
 		report := compatibility_checker.NewContractCompatibilityReport(petstoreAPI, "4.0.0", production)
-		report.AppendResult(petstoreWeb, compatibility_checker.NewIncompatibleItem())
-		report.AppendResult(petstoreMobile, compatibility_checker.NewIncompatibleItem())
+		report.AppendResult(petstoreWeb, compatibility_checker.NewCounterpartResult())
+		report.AppendResult(petstoreMobile, compatibility_checker.NewCounterpartResult())
 
 		assert.True(t, report.Deployable())
 	})
 
 	t.Run("with one result not deployable", func(t *testing.T) {
-		broken := compatibility_checker.NewIncompatibleItem()
+		broken := compatibility_checker.NewCounterpartResult()
 		broken.AppendCachedBreakChange(model.VerdictBreak{
 			Endpoint:    "/pets",
 			Method:      "post",
@@ -309,7 +309,7 @@ func TestReportIsDeployableOnlyWhenEveryResultIs(t *testing.T) {
 		})
 
 		report := compatibility_checker.NewContractCompatibilityReport(petstoreAPI, "4.0.0", production)
-		report.AppendResult(petstoreWeb, compatibility_checker.NewIncompatibleItem())
+		report.AppendResult(petstoreWeb, compatibility_checker.NewCounterpartResult())
 		report.AppendResult(petstoreMobile, broken)
 
 		assert.False(t, report.Deployable())

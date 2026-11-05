@@ -39,6 +39,29 @@ type ContractBreakingChange struct {
 	Details             map[string]string        `json:"details,omitempty"`
 }
 
+// InteractionKey is the wire spelling of the checked resource's interaction: "request"
+// for requests, the raw status code for responses.
+func (this *ContractBreakingChange) InteractionKey() string {
+	switch this.CheckedResource.Interaction {
+	case model.RestRequest:
+		return "request"
+	case model.RestResponse:
+		return this.CheckedResource.ResponseStatusCode.String
+	default:
+		return this.CheckedResource.Interaction.String()
+	}
+}
+
+// IsPropertyBreak reports whether the break comes from a property diff, as opposed to the
+// environment checks that depend on deployments and never become a stored verdict.
+func (this *ContractBreakingChange) IsPropertyBreak() bool {
+	return this.Reason != ReasonProviderResourceNotFound &&
+		this.Reason != ReasonProviderResourceInteractionNotFound &&
+		this.Reason != ReasonProviderResourceNotDeployedInEnvironment &&
+		this.Reason != ReasonProviderResourceRemovedButStillConsumed &&
+		this.Reason != ReasonProviderResourceInteractionRemovedButStillConsumed
+}
+
 func (this *ContractBreakingChange) ConsumerResource() *model.PersistedResource {
 	if this.CheckedResource.IsConsumer() {
 		return this.CheckedResource

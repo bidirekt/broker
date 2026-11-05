@@ -17,7 +17,7 @@ func (this *CompatibilityChecker) checkRemovedProvider(
 	consumers := counterparts.Consumers[removedResource.ProviderHash]
 
 	for _, result := range CheckRemovedProviderResource(&removedResource, checkedResources, consumers) {
-		report.AppendResult(result.IncompatibleCounterpart.ParticipantName, result)
+		report.AppendResult(result.Counterpart.ParticipantName, result)
 	}
 }
 
@@ -25,16 +25,16 @@ func CheckRemovedProviderResource(
 	removedResource *model.PersistedResource,
 	checkedResources map[string]model.PersistedResource,
 	consumers []model.PersistedResource,
-) []*IncompatibleItem {
-	results := make([]*IncompatibleItem, 0, len(consumers))
+) []*CounterpartResult {
+	results := make([]*CounterpartResult, 0, len(consumers))
 	providerStatuses, methodRemains := remainingProviderStatuses(removedResource, checkedResources)
 
 	for _, consumerResource := range consumers {
 		// ContractID is left zeroed so this break alone never persists a verdict for the pair.
-		result := NewIncompatibleItem()
-		result.IncompatibleCounterpart.ParticipantID = consumerResource.ParticipantID
-		result.IncompatibleCounterpart.ParticipantName = consumerResource.ParticipantName
-		result.IncompatibleCounterpart.ParticipantVersion = consumerResource.ParticipantVersion
+		result := NewCounterpartResult()
+		result.Counterpart.ParticipantID = consumerResource.ParticipantID
+		result.Counterpart.ParticipantName = consumerResource.ParticipantName
+		result.Counterpart.ParticipantVersion = consumerResource.ParticipantVersion
 
 		removal := NewProviderResourceRemovedButStillConsumed(removedResource, &consumerResource)
 		if methodRemains {

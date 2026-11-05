@@ -17,7 +17,7 @@ func (this *CompatibilityChecker) checkConsumer(
 ) {
 	providerResource, found := counterparts.Providers[consumerResource.ProviderHash]
 
-	incompatibleItem := NewIncompatibleItem()
+	result := NewCounterpartResult()
 
 	if !found {
 		notFound := NewProviderResourceNotFound(&consumerResource)
@@ -25,43 +25,43 @@ func (this *CompatibilityChecker) checkConsumer(
 			notFound = NewProviderResourceInteractionNotFound(&consumerResource, providerStatuses)
 		}
 
-		incompatibleItem.AppendContractBreakChange(notFound)
+		result.AppendContractBreakChange(notFound)
 
-		report.AppendResult(consumerResource.ConsumedProvider.String, incompatibleItem)
+		report.AppendResult(consumerResource.ConsumedProvider.String, result)
 
 		return
 	}
 
 	version, deployed := providerResource.DeployedVersionIn(environment.Name)
 	if !deployed {
-		incompatibleItem.IncompatibleCounterpart.ParticipantID = providerResource.ParticipantID
+		result.Counterpart.ParticipantID = providerResource.ParticipantID
 
-		incompatibleItem.AppendContractBreakChange(NewProviderResourceNotDeployed(
+		result.AppendContractBreakChange(NewProviderResourceNotDeployed(
 			&consumerResource,
 			providerResource.DeployedEnvironments(),
 		))
 
-		report.AppendResult(consumerResource.ConsumedProvider.String, incompatibleItem)
+		report.AppendResult(consumerResource.ConsumedProvider.String, result)
 
 		return
 	}
 
 	providerResource.ParticipantVersion = null.StringFrom(version)
-	incompatibleItem.IncompatibleCounterpart.ParticipantID = providerResource.ParticipantID
-	incompatibleItem.IncompatibleCounterpart.ContractID = providerResource.ContractID
-	incompatibleItem.IncompatibleCounterpart.ParticipantVersion = providerResource.ParticipantVersion
-	incompatibleItem.IncompatibleCounterpart.ParticipantName = providerResource.ParticipantName
+	result.Counterpart.ParticipantID = providerResource.ParticipantID
+	result.Counterpart.ContractID = providerResource.ContractID
+	result.Counterpart.ParticipantVersion = providerResource.ParticipantVersion
+	result.Counterpart.ParticipantName = providerResource.ParticipantName
 
 	pair := pairs.resolve(ctx, providerResource.ContractID)
 
 	if pair.hit() {
-		incompatibleItem.VerdictCached = true
-		pair.replay(incompatibleItem)
+		result.VerdictCached = true
+		pair.replay(result)
 	} else {
 		for _, breakingChange := range checkResources(&consumerResource, &providerResource) {
-			incompatibleItem.AppendContractBreakChange(breakingChange)
+			result.AppendContractBreakChange(breakingChange)
 		}
 	}
 
-	report.AppendResult(consumerResource.ConsumedProvider.String, incompatibleItem)
+	report.AppendResult(consumerResource.ConsumedProvider.String, result)
 }

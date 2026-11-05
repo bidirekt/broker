@@ -301,20 +301,20 @@ func TestReportAppendMergesResultsPerCounterpart(t *testing.T) {
 
 	report := compatibility_checker.NewContractCompatibilityReport("unknown", "unknown", "unknwonw")
 
-	withoutIdentity := compatibility_checker.NewIncompatibleItem()
+	withoutIdentity := compatibility_checker.NewCounterpartResult()
 	withoutIdentity.AppendContractBreakChange(consumerChecked)
 	report.AppendResult("api", withoutIdentity)
 
-	withIdentity := compatibility_checker.NewIncompatibleItem()
-	withIdentity.IncompatibleCounterpart = compatibility_checker.IncompatibleCounterpart{
+	withIdentity := compatibility_checker.NewCounterpartResult()
+	withIdentity.Counterpart = compatibility_checker.Counterpart{
 		ParticipantID:      7,
 		ParticipantVersion: null.StringFrom("v1"),
 	}
 	withIdentity.AppendContractBreakChange(providerChecked)
 	report.AppendResult("api", withIdentity)
 
-	auth := compatibility_checker.NewIncompatibleItem()
-	auth.IncompatibleCounterpart = compatibility_checker.IncompatibleCounterpart{
+	auth := compatibility_checker.NewCounterpartResult()
+	auth.Counterpart = compatibility_checker.Counterpart{
 		ParticipantID:      9,
 		ParticipantVersion: null.StringFrom("v2"),
 	}
@@ -325,16 +325,16 @@ func TestReportAppendMergesResultsPerCounterpart(t *testing.T) {
 	apiResult := report.Results["api"]
 	assert.Len(t, apiResult.Breaks, 2)
 	assert.False(t, apiResult.Deployable)
-	assert.Equal(t, int64(7), apiResult.IncompatibleCounterpart.ParticipantID)
-	assert.Equal(t, "api", apiResult.IncompatibleCounterpart.ParticipantName)
-	assert.Equal(t, null.StringFrom("v1"), apiResult.IncompatibleCounterpart.ParticipantVersion)
+	assert.Equal(t, int64(7), apiResult.Counterpart.ParticipantID)
+	assert.Equal(t, "api", apiResult.Counterpart.ParticipantName)
+	assert.Equal(t, null.StringFrom("v1"), apiResult.Counterpart.ParticipantVersion)
 
 	authResult := report.Results["auth"]
 	assert.Empty(t, authResult.Breaks)
 	assert.True(t, authResult.Deployable)
-	assert.Equal(t, int64(9), authResult.IncompatibleCounterpart.ParticipantID)
-	assert.Equal(t, "auth", authResult.IncompatibleCounterpart.ParticipantName)
-	assert.Equal(t, null.StringFrom("v2"), authResult.IncompatibleCounterpart.ParticipantVersion)
+	assert.Equal(t, int64(9), authResult.Counterpart.ParticipantID)
+	assert.Equal(t, "auth", authResult.Counterpart.ParticipantName)
+	assert.Equal(t, null.StringFrom("v2"), authResult.Counterpart.ParticipantVersion)
 }
 
 func TestHierarchicalNodeWireKeys(t *testing.T) {
@@ -374,7 +374,7 @@ func TestHierarchicalGroupsBreaksByInteraction(t *testing.T) {
 	requestBreak := thingsBreak(consumerRequest, providerResponse, compatibility_checker.ReasonPropertyMissingInProvider, "user")
 	responseBreak := thingsBreak(consumerResponse, providerResponse, compatibility_checker.ReasonPropertyTypeMismatch, "id")
 
-	item := compatibility_checker.NewIncompatibleItem()
+	item := compatibility_checker.NewCounterpartResult()
 	item.AppendContractBreakChange(requestBreak)
 	item.AppendContractBreakChange(responseBreak)
 
@@ -392,15 +392,15 @@ func TestHierarchicalAccumulatesAcrossAppends(t *testing.T) {
 	consumerResponse := consumerResource()
 	providerResponse := providerResource()
 
-	first := compatibility_checker.NewIncompatibleItem()
+	first := compatibility_checker.NewCounterpartResult()
 	report := compatibility_checker.NewContractCompatibilityReport("front", "v1", "production")
 	report.AppendResult("api", first)
 
 	assert.True(t, report.Hierarchical["api"].Deployable)
 	assert.Equal(t, null.String{}, report.Hierarchical["api"].Version)
 
-	second := compatibility_checker.NewIncompatibleItem()
-	second.IncompatibleCounterpart = compatibility_checker.IncompatibleCounterpart{
+	second := compatibility_checker.NewCounterpartResult()
+	second.Counterpart = compatibility_checker.Counterpart{
 		ParticipantID:      7,
 		ParticipantVersion: null.StringFrom("3.1.0"),
 	}
@@ -411,7 +411,7 @@ func TestHierarchicalAccumulatesAcrossAppends(t *testing.T) {
 	assert.False(t, node.Deployable)
 	assert.Equal(t, null.StringFrom("3.1.0"), node.Version)
 
-	notFound := compatibility_checker.NewIncompatibleItem()
+	notFound := compatibility_checker.NewCounterpartResult()
 	notFound.AppendContractBreakChange(compatibility_checker.NewProviderResourceNotFound(consumerResponse))
 	report.AppendResult("ghost", notFound)
 

@@ -104,7 +104,7 @@ func (this *CanIDeployUseCase) recordCheck(
 	breaksByPair := make(map[[2]int64][]model.VerdictBreak)
 
 	for counterpartName, item := range report.Results {
-		counterpart := item.IncompatibleCounterpart
+		counterpart := item.Counterpart
 
 		result := model.CompatibilityCheckResult{
 			CounterpartName:    counterpartName,
