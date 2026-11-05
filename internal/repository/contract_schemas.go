@@ -81,6 +81,7 @@ type schemaCatalogs map[int64]model.Schemas
 
 func (this *ContractRepository) loadSchemasAt(
 	ctx context.Context,
+	q querier,
 	catalogs schemaCatalogs,
 	contractID int64,
 ) model.Schemas {
@@ -88,7 +89,7 @@ func (this *ContractRepository) loadSchemasAt(
 		return schemas
 	}
 
-	rows, err := this.pool.Query(ctx, schemasAtContractQuery, contractID)
+	rows, err := q.Query(ctx, schemasAtContractQuery, contractID)
 	if err != nil {
 		panic(fmt.Errorf("error loading schemas: %w", err))
 	}

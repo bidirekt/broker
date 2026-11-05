@@ -34,7 +34,7 @@ const (
 			participants
 		WHERE
 			id = $1 AND name = $2
-		FOR SHARE
+		FOR NO KEY UPDATE
 	`
 
 	insertContractQuery = `
@@ -378,10 +378,10 @@ func (this *ContractRepository) HasContractForVersion(ctx context.Context, parti
 	return exists
 }
 
-func (this *ContractRepository) LoadChecksumForVersion(ctx context.Context, participantID int64, version string) (string, bool) {
+func (this *ContractRepository) loadChecksumForVersion(ctx context.Context, tx pgx.Tx, participantID int64, version string) (string, bool) {
 	var checksum string
 
-	err := this.pool.QueryRow(ctx, loadChecksumForVersionQuery, participantID, version).Scan(&checksum)
+	err := tx.QueryRow(ctx, loadChecksumForVersionQuery, participantID, version).Scan(&checksum)
 	if err == nil {
 		return checksum, true
 	}
@@ -391,10 +391,11 @@ func (this *ContractRepository) LoadChecksumForVersion(ctx context.Context, part
 	panic(fmt.Errorf("error loading checksum for version: %w", err))
 }
 
-func (this *ContractRepository) Create(
+func (this *ContractRepository) Publish(
 	ctx context.Context,
 	contract *model.UploadedContract,
-) (created bool) {
+	diff func(*model.PersistedContract) model.ContractDiff,
+) (found, conflict bool) {
 	tx, err := this.pool.Begin(ctx)
 	if err != nil {
 		panic(fmt.Errorf("error starting transaction: %w", err))
@@ -409,9 +410,33 @@ func (this *ContractRepository) Create(
 	}
 
 	if tag.RowsAffected() == 0 {
-		return false
+		return false, false
 	}
 
+	if checksum, exists := this.loadChecksumForVersion(ctx, tx, contract.ParticipantID, contract.Version); exists {
+		return true, checksum != contract.Checksum()
+	}
+
+	if !this.aliasVersionToSnapshot(ctx, tx, contract) {
+		if current, exists := this.latestSnapshot(ctx, tx, contract.ParticipantID); exists {
+			this.insertNextSnapshot(ctx, tx, contract, current, diff(current))
+		} else {
+			this.insertFirstSnapshot(ctx, tx, contract)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		panic(fmt.Errorf("error committing transaction: %w", err))
+	}
+
+	return true, false
+}
+
+func (this *ContractRepository) insertFirstSnapshot(
+	ctx context.Context,
+	tx pgx.Tx,
+	contract *model.UploadedContract,
+) {
 	this.insertContract(ctx, tx, contract)
 	this.insertContractVersion(ctx, tx, contract)
 
@@ -425,27 +450,15 @@ func (this *ContractRepository) Create(
 	}
 
 	this.insertResourceBodies(ctx, tx, contract)
-
-	if err := tx.Commit(ctx); err != nil {
-		panic(fmt.Errorf("error committing transaction: %w", err))
-	}
-
-	return true
 }
 
-func (this *ContractRepository) Update(
+func (this *ContractRepository) insertNextSnapshot(
 	ctx context.Context,
+	tx pgx.Tx,
 	next *model.UploadedContract,
 	current *model.PersistedContract,
 	diff model.ContractDiff,
 ) {
-	tx, err := this.pool.Begin(ctx)
-	if err != nil {
-		panic(fmt.Errorf("error starting transaction: %w", err))
-	}
-
-	defer func() { _ = tx.Rollback(ctx) }()
-
 	this.insertContract(ctx, tx, next)
 	this.insertContractVersion(ctx, tx, next)
 
@@ -473,20 +486,17 @@ func (this *ContractRepository) Update(
 	}
 
 	this.insertResourceBodies(ctx, tx, next)
-
-	if err := tx.Commit(ctx); err != nil {
-		panic(fmt.Errorf("error committing transaction: %w", err))
-	}
 }
 
-// AliasVersionToSnapshot points a new version at an existing snapshot with the same
+// aliasVersionToSnapshot points a new version at an existing snapshot with the same
 // content, reporting whether one matched. The alias still stamps its own contract content:
 // the files are a property of the version, not of the snapshot they resolve to.
-func (this *ContractRepository) AliasVersionToSnapshot(
+func (this *ContractRepository) aliasVersionToSnapshot(
 	ctx context.Context,
+	tx pgx.Tx,
 	contract *model.UploadedContract,
 ) bool {
-	tag, err := this.pool.Exec(
+	tag, err := tx.Exec(
 		ctx,
 		aliasVersionToSnapshotQuery,
 		contract.ParticipantID,
@@ -633,12 +643,20 @@ func (this *ContractRepository) GetLatestContractByParticipantID(
 	ctx context.Context,
 	participantID int64,
 ) (*model.PersistedContract, bool) {
-	rows, err := this.pool.Query(ctx, getLatestContractByParticipantID, participantID)
+	return this.latestSnapshot(ctx, this.pool, participantID)
+}
+
+func (this *ContractRepository) latestSnapshot(
+	ctx context.Context,
+	q querier,
+	participantID int64,
+) (*model.PersistedContract, bool) {
+	rows, err := q.Query(ctx, getLatestContractByParticipantID, participantID)
 	if err != nil {
 		panic(fmt.Errorf("error loading contract tree: %w", err))
 	}
 
-	return this.withSchemas(ctx, scanPersistedContractTree(rows))
+	return this.withSchemas(ctx, q, scanPersistedContractTree(rows))
 }
 
 func (this *ContractRepository) GetContractByNameAndVersion(
@@ -651,18 +669,19 @@ func (this *ContractRepository) GetContractByNameAndVersion(
 		panic(fmt.Errorf("error loading contract tree by name and version: %w", err))
 	}
 
-	return this.withSchemas(ctx, scanPersistedContractTree(rows))
+	return this.withSchemas(ctx, this.pool, scanPersistedContractTree(rows))
 }
 
 func (this *ContractRepository) withSchemas(
 	ctx context.Context,
+	q querier,
 	contract *model.PersistedContract,
 ) (*model.PersistedContract, bool) {
 	if contract == nil {
 		return nil, false
 	}
 
-	contract.Schemas = this.loadSchemasAt(ctx, schemaCatalogs{}, contract.ID)
+	contract.Schemas = this.loadSchemasAt(ctx, q, schemaCatalogs{}, contract.ID)
 
 	for hash, resource := range contract.Resources {
 		resource.Schemas = contract.Schemas
@@ -802,7 +821,7 @@ func (this *ContractRepository) loadProviderResource(
 		return model.PersistedResource{}, ErrProviderResourceNotFound
 	}
 
-	provider.Schemas = this.loadSchemasAt(ctx, catalogs, provider.ContractID)
+	provider.Schemas = this.loadSchemasAt(ctx, this.pool, catalogs, provider.ContractID)
 
 	return provider, nil
 }
@@ -885,7 +904,7 @@ func (this *ContractRepository) loadConsumerResources(
 	rows.Close()
 
 	for index := range consumers {
-		consumers[index].Schemas = this.loadSchemasAt(ctx, catalogs, consumers[index].ContractID)
+		consumers[index].Schemas = this.loadSchemasAt(ctx, this.pool, catalogs, consumers[index].ContractID)
 	}
 
 	return consumers
