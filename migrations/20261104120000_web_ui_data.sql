@@ -30,3 +30,25 @@ SELECT DISTINCT ON (participant_id)
   participant_id, version, contract_id, created_at
 FROM contract_versions
 ORDER BY participant_id, id DESC;
+
+ALTER TABLE compatibility_checks
+  ADD COLUMN report           jsonb NULL,
+  ADD COLUMN environment_name text  NULL;
+
+ALTER TABLE compatibility_check_results
+  ADD COLUMN role text NULL CHECK (role IN ('provider','consumer','both'));
+
+ALTER TABLE sessions
+  ADD COLUMN message text NULL;
+
+CREATE INDEX ON compatibility_checks (participant_id, created_at DESC);
+
+CREATE INDEX ON resources (consumed_provider) WHERE direction = 'consumes';
+
+CREATE INDEX ON deployments (environment_id, deployed_at DESC);
+
+CREATE INDEX ON compatibility_checks (environment_id, created_at DESC);
+
+CREATE INDEX ON compatibility_checks (participant_id, environment_id, created_at DESC);
+CREATE INDEX ON compatibility_checks (created_at DESC);
+CREATE INDEX ON deployments (deployed_at DESC);

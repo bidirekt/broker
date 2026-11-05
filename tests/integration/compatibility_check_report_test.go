@@ -13,7 +13,7 @@ import (
 
 const (
 	checkReportBackfillDatabase       = "store_check_reports_backfill"
-	checkReportMigration              = "20261104130000_store_check_reports.sql"
+	checkReportMigration              = "20261104120000_web_ui_data.sql"
 	checkReportBackfillMigrationTable = "public.schema_migrations"
 )
 

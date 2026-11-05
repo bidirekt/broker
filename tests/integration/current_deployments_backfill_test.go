@@ -13,7 +13,7 @@ import (
 
 const (
 	backfillDatabase       = "current_deployments_backfill"
-	backfillMigration      = "20261104120000_current_deployments.sql"
+	backfillMigration      = "20261104120000_web_ui_data.sql"
 	backfillMigrationTable = "public.schema_migrations"
 )
 
