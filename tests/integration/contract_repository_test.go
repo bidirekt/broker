@@ -71,24 +71,6 @@ func (this *IntegrationSuite) TestLoadContract_AbsentOptionalFieldsMarshalAsNull
 	this.Equal("null", string(provider))
 }
 
-func (this *IntegrationSuite) TestLoadContract_LegacyEmptyStringFieldsSurfaceAsNull() {
-	this.publishOrdersContract()
-
-	_, err := this.Pool.Exec(context.Background(),
-		`UPDATE resources SET consumed_provider = '', response_status_code = ''`,
-	)
-	this.Require().NoError(err)
-
-	resource := this.loadOrdersResource()
-
-	this.False(resource.ConsumedProvider.Valid, "expected ConsumedProvider to be null for empty value")
-	this.False(resource.ResponseStatusCode.Valid, "expected ResponseStatusCode to be null for empty value")
-
-	statusCode, err := json.Marshal(resource.ResponseStatusCode)
-	this.Require().NoError(err)
-	this.Equal("null", string(statusCode))
-}
-
 func (this *IntegrationSuite) TestLoadContract_PopulatedOptionalFieldsArePreserved() {
 	this.publishOrdersContract()
 

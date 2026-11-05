@@ -2,11 +2,11 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 
 	"github.com/bidirekt/broker/internal/model"
+	"github.com/guregu/null"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -553,26 +553,6 @@ func (this *ContractRepository) insertResource(
 		return id
 	}
 
-	statusCode := sql.NullString{
-		String: resource.ResponseStatusCode.String,
-		Valid:  resource.ResponseStatusCode.Valid,
-	}
-
-	provider := sql.NullString{
-		String: resource.ConsumedProvider.String,
-		Valid:  resource.ConsumedProvider.Valid,
-	}
-
-	providerHash := sql.NullString{
-		String: resource.ProviderHash(),
-		Valid:  resource.ProviderHash() != "",
-	}
-
-	consumerHash := sql.NullString{
-		String: resource.ConsumerHash(),
-		Valid:  resource.ConsumerHash() != "",
-	}
-
 	var id int64
 	if err := tx.QueryRow(
 		ctx,
@@ -580,12 +560,12 @@ func (this *ContractRepository) insertResource(
 		participantID,
 		resource.Direction.String(),
 		resource.Interaction.String(),
-		provider,
+		resource.ConsumedProvider,
 		resource.Endpoint,
 		resource.Method,
-		statusCode,
-		providerHash,
-		consumerHash,
+		resource.ResponseStatusCode,
+		resource.ProviderHash(),
+		null.NewString(resource.ConsumerHash(), resource.IsConsumer()),
 	).Scan(&id); err != nil {
 		panic(fmt.Errorf("error inserting resource: %w", err))
 	}
@@ -630,7 +610,7 @@ func (this *ContractRepository) insertResourceBodies(
 		resourceID, _ := this.findResourceIDByHash(ctx, tx, hash, resource.Direction)
 
 		for _, body := range resource.Bodies {
-			schemaID := sql.NullInt64{Int64: schemaIDs[body.SchemaName.String], Valid: body.SchemaName.Valid}
+			schemaID := null.NewInt(schemaIDs[body.SchemaName.String], body.SchemaName.Valid)
 
 			if _, err := tx.Exec(ctx, insertResourceBodyQuery, resourceID, contract.ID, body.Source, schemaID); err != nil {
 				panic(fmt.Errorf("error inserting resource body: %w", err))
