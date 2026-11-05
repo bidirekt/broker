@@ -15,7 +15,8 @@ const (
 	editUserEmailAlreadyInUse = "email already in use"
 	editUserInvalidEmail      = "invalid email"
 	editUserInvalidPermission = "invalid permission"
-	editUserUserNotFound      = "user not found"
+	editUserUserNotFoundPage  = "<h1>user not found</h1>"
+	editUserErrorStatus       = "Status 404"
 )
 
 func (this *IntegrationSuite) editUserPost(userID, email, permission string) (status int, header http.Header, body string) {
@@ -120,12 +121,14 @@ func (this *IntegrationSuite) TestEditUser_AnswersUserNotFoundForAnUnknownOrNonN
 		getStatus, _, getBody := this.getPage("/users/"+id+"/edit", adminCookie)
 
 		this.Equal(http.StatusNotFound, getStatus, "GET "+id)
-		this.Contains(getBody, editUserUserNotFound, "GET "+id)
+		this.Contains(getBody, editUserUserNotFoundPage, "GET "+id)
+		this.Contains(getBody, editUserErrorStatus, "GET "+id)
 
 		postStatus, _, postBody := this.editUserPost(id, "anna@y.com", "write")
 
 		this.Equal(http.StatusNotFound, postStatus, "POST "+id)
-		this.Contains(postBody, editUserUserNotFound, "POST "+id)
+		this.Contains(postBody, editUserUserNotFoundPage, "POST "+id)
+		this.Contains(postBody, editUserErrorStatus, "POST "+id)
 	}
 
 	this.Equal("ana@x.com", this.editUserFind(userID).Email)

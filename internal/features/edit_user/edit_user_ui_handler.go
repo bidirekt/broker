@@ -96,9 +96,7 @@ func (this *EditUserUiHandler) respondForbidden(ctx fiber.Ctx) error {
 }
 
 func (this *EditUserUiHandler) respondUserNotFound(ctx fiber.Ctx) error {
-	return pages.Render(ctx, fiber.StatusNotFound, pageFiles, editUserTemplate, EditUserPage{
-		Message: UserNotFoundMessage,
-	})
+	return respond.Problem(ctx, fiber.StatusNotFound, UserNotFoundMessage)
 }
 
 func (this *EditUserUiHandler) respondWithMessage(ctx fiber.Ctx, status int, page EditUserPage, message string) error {

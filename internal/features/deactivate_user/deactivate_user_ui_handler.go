@@ -1,7 +1,6 @@
 package deactivate_user
 
 import (
-	"embed"
 	"strconv"
 
 	"github.com/bidirekt/broker/internal/components/access"
@@ -9,9 +8,6 @@ import (
 	"github.com/bidirekt/broker/internal/components/respond"
 	"github.com/gofiber/fiber/v3"
 )
-
-//go:embed deactivate_user.html
-var pageFiles embed.FS
 
 type DeactivateUserUiHandler struct {
 	useCase *DeactivateUserUseCase
@@ -48,5 +44,5 @@ func (this *DeactivateUserUiHandler) respondForbidden(ctx fiber.Ctx) error {
 }
 
 func (this *DeactivateUserUiHandler) respondUserNotFound(ctx fiber.Ctx) error {
-	return pages.Render(ctx, fiber.StatusNotFound, pageFiles, deactivateUserTemplate, DeactivateUserPage{Message: UserNotFoundMessage})
+	return respond.Problem(ctx, fiber.StatusNotFound, UserNotFoundMessage)
 }

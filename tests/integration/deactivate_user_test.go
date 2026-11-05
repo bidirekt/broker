@@ -19,7 +19,8 @@ const (
 	deactivateUserEmail        = "ana@x.com"
 	deactivateUserPassword     = "deactivate-user-correct-horse"
 	deactivateUserLinkToken    = "deactivate-user-pending-token"
-	deactivateUserNotFound     = "user not found"
+	deactivateUserNotFoundPage = "<h1>user not found</h1>"
+	deactivateUserErrorStatus  = "Status 404"
 	deactivateUserLinkNotValid = "this link is no longer valid, ask your admin for a new one"
 )
 
@@ -196,7 +197,8 @@ func (this *IntegrationSuite) TestDeactivateUser_AnswersUserNotFoundForAnUnknown
 		status, _, body := this.deactivateUser(id)
 
 		this.Equal(http.StatusNotFound, status, id)
-		this.Contains(body, deactivateUserNotFound, id)
+		this.Contains(body, deactivateUserNotFoundPage, id)
+		this.Contains(body, deactivateUserErrorStatus, id)
 	}
 
 	user, found := repository.NewUserRepository(this.Pool).FindByID(context.Background(), userID)

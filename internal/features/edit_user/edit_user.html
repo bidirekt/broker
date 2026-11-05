@@ -4,7 +4,6 @@
 <section class="narrow">
 <h1>Edit a user</h1>
 {{with .Page.Message}}<p role="alert">{{.}}</p>{{end}}
-{{if .Page.UserID}}
 <div class="panel">
 <form method="post" action="/users/{{.Page.UserID}}/edit">
   <label for="email">Email</label>
@@ -17,7 +16,6 @@
   <button type="submit">Save</button>
 </form>
 </div>
-{{end}}
 <p class="back"><a href="/users">Back to users</a></p>
 </section>
 {{end}}

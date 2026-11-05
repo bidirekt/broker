@@ -16,10 +16,11 @@ import (
 )
 
 const (
-	generateLinkPassword        = "generate-link-correct-horse"
-	generateLinkPreviousToken   = "generate-link-previous-token"
-	generateLinkUserNotFound    = "user not found"
-	generateLinkUserDeactivated = "deactivated users cannot get a link"
+	generateLinkPassword         = "generate-link-correct-horse"
+	generateLinkPreviousToken    = "generate-link-previous-token"
+	generateLinkUserNotFoundPage = "<h1>user not found</h1>"
+	generateLinkErrorStatus      = "Status 404"
+	generateLinkUserDeactivated  = "deactivated users cannot get a link"
 )
 
 var generateLinkInPage = regexp.MustCompile(`http://localhost:8080/set-password\?token=([A-Za-z0-9_-]{43})`)
@@ -127,7 +128,8 @@ func (this *IntegrationSuite) TestGenerateLink_AnswersUserNotFoundForAnUnknownOr
 		status, body := this.generateLinkFor(id)
 
 		this.Equal(http.StatusNotFound, status, id)
-		this.Contains(body, generateLinkUserNotFound, id)
+		this.Contains(body, generateLinkUserNotFoundPage, id)
+		this.Contains(body, generateLinkErrorStatus, id)
 	}
 
 	this.Equal(0, this.countRows("one_time_links"))

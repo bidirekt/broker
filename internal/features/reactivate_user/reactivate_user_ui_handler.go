@@ -1,7 +1,6 @@
 package reactivate_user
 
 import (
-	"embed"
 	"strconv"
 
 	"github.com/bidirekt/broker/internal/components/access"
@@ -9,9 +8,6 @@ import (
 	"github.com/bidirekt/broker/internal/components/respond"
 	"github.com/gofiber/fiber/v3"
 )
-
-//go:embed reactivate_user.html
-var pageFiles embed.FS
 
 type ReactivateUserUiHandler struct {
 	useCase *ReactivateUserUseCase
@@ -48,5 +44,5 @@ func (this *ReactivateUserUiHandler) respondForbidden(ctx fiber.Ctx) error {
 }
 
 func (this *ReactivateUserUiHandler) respondUserNotFound(ctx fiber.Ctx) error {
-	return pages.Render(ctx, fiber.StatusNotFound, pageFiles, reactivateUserTemplate, ReactivateUserPage{Message: UserNotFoundMessage})
+	return respond.Problem(ctx, fiber.StatusNotFound, UserNotFoundMessage)
 }

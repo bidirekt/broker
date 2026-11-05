@@ -16,10 +16,11 @@ import (
 )
 
 const (
-	reactivateUserEmail     = "ana@x.com"
-	reactivateUserPassword  = "reactivate-user-correct-horse"
-	reactivateUserLinkToken = "reactivate-user-pending-token"
-	reactivateUserNotFound  = "user not found"
+	reactivateUserEmail        = "ana@x.com"
+	reactivateUserPassword     = "reactivate-user-correct-horse"
+	reactivateUserLinkToken    = "reactivate-user-pending-token"
+	reactivateUserNotFoundPage = "<h1>user not found</h1>"
+	reactivateUserErrorStatus  = "Status 404"
 )
 
 func (this *IntegrationSuite) reactivateUserPost(userID int64, action string) (status int, header http.Header) {
@@ -226,7 +227,8 @@ func (this *IntegrationSuite) TestReactivateUser_AnswersUserNotFoundForAnUnknown
 		status, _, body := this.postForm("/users/"+id+"/reactivate", cookie, this.csrfTokenFrom(users), url.Values{})
 
 		this.Equal(http.StatusNotFound, status, id)
-		this.Contains(body, reactivateUserNotFound, id)
+		this.Contains(body, reactivateUserNotFoundPage, id)
+		this.Contains(body, reactivateUserErrorStatus, id)
 	}
 
 	this.Equal(model.UserDeactivated, this.reactivateUserState(userID))

@@ -29,7 +29,7 @@ func (this *GenerateLinkUiHandler) Handle(ctx fiber.Ctx) error {
 	rawUserID := ctx.Params(userIDParam)
 	userID, err := strconv.ParseInt(rawUserID, 10, 64)
 	if err != nil || strconv.FormatInt(userID, 10) != rawUserID {
-		return this.respondWithMessage(ctx, fiber.StatusNotFound, UserNotFoundMessage)
+		return this.respondUserNotFound(ctx)
 	}
 
 	output, err := this.useCase.Execute(ctx.Context(), GenerateLinkInput{UserID: userID})
@@ -39,7 +39,7 @@ func (this *GenerateLinkUiHandler) Handle(ctx fiber.Ctx) error {
 
 	switch output.Status {
 	case UserNotFound:
-		return this.respondWithMessage(ctx, fiber.StatusNotFound, UserNotFoundMessage)
+		return this.respondUserNotFound(ctx)
 	case UserDeactivated:
 		return this.respondWithMessage(ctx, fiber.StatusConflict, UserDeactivatedMessage)
 	case TargetIsTheAdmin:
@@ -55,6 +55,10 @@ func (this *GenerateLinkUiHandler) Handle(ctx fiber.Ctx) error {
 
 func (this *GenerateLinkUiHandler) respondForbidden(ctx fiber.Ctx) error {
 	return respond.Problem(ctx, fiber.StatusForbidden, access.NoAccessMessage)
+}
+
+func (this *GenerateLinkUiHandler) respondUserNotFound(ctx fiber.Ctx) error {
+	return respond.Problem(ctx, fiber.StatusNotFound, UserNotFoundMessage)
 }
 
 func (this *GenerateLinkUiHandler) respondWithMessage(ctx fiber.Ctx, status int, message string) error {

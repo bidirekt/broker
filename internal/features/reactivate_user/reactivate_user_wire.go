@@ -6,10 +6,4 @@ const (
 	userIDParam = "id"
 
 	usersPath = "/users"
-
-	reactivateUserTemplate = "reactivate_user.html"
 )
-
-type ReactivateUserPage struct {
-	Message string
-}
