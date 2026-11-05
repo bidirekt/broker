@@ -90,17 +90,17 @@ func TestFreshPropertyBreaksCarryTheRoleOfTheCheckedSide(t *testing.T) {
 	absent := model.Schema{"": {Type: "object"}}
 
 	cases := []struct {
-		reason      compatibility_checker.BreakingReason
+		reason      model.BreakingReason
 		interaction string
 		consumer    model.Schema
 		provider    model.Schema
 	}{
-		{compatibility_checker.ReasonPropertyMissingInProvider, "201", required, absent},
-		{compatibility_checker.ReasonPropertyOptionalInProviderRequiredInConsumer, "201", required, optional},
-		{compatibility_checker.ReasonPropertyTypeMismatch, "201", required, integer},
-		{compatibility_checker.ReasonPropertyMissingInConsumer, "request", absent, required},
-		{compatibility_checker.ReasonPropertyOptionalInConsumerRequiredInProvider, "request", optional, required},
-		{compatibility_checker.ReasonPropertyTypeMismatch, "request", integer, required},
+		{model.ReasonPropertyMissingInProvider, "201", required, absent},
+		{model.ReasonPropertyOptionalInProviderRequiredInConsumer, "201", required, optional},
+		{model.ReasonPropertyTypeMismatch, "201", required, integer},
+		{model.ReasonPropertyMissingInConsumer, "request", absent, required},
+		{model.ReasonPropertyOptionalInConsumerRequiredInProvider, "request", optional, required},
+		{model.ReasonPropertyTypeMismatch, "request", integer, required},
 	}
 
 	for _, tc := range cases {
@@ -114,7 +114,7 @@ func TestFreshPropertyBreaksCarryTheRoleOfTheCheckedSide(t *testing.T) {
 			leaves := report.Hierarchical[petstoreAPI].Endpoints["/pets"]["post"][tc.interaction]
 			require.Len(t, leaves, 1)
 			assert.Equal(t, tc.reason, leaves[0].Reason)
-			assert.Equal(t, compatibility_checker.RoleConsumer, leaves[0].Role)
+			assert.Equal(t, model.RoleConsumer, leaves[0].Role)
 		})
 
 		t.Run(string(tc.reason)+" in "+tc.interaction+" checked from the provider", func(t *testing.T) {
@@ -125,7 +125,7 @@ func TestFreshPropertyBreaksCarryTheRoleOfTheCheckedSide(t *testing.T) {
 			leaves := report.Hierarchical[petstoreWeb].Endpoints["/pets"]["post"][tc.interaction]
 			require.Len(t, leaves, 1)
 			assert.Equal(t, tc.reason, leaves[0].Reason)
-			assert.Equal(t, compatibility_checker.RoleProvider, leaves[0].Role)
+			assert.Equal(t, model.RoleProvider, leaves[0].Role)
 		})
 	}
 }
@@ -141,36 +141,36 @@ func TestFreshResourceBreaksCarryTheirFixedRole(t *testing.T) {
 	removed.Removed = true
 
 	cases := []struct {
-		reason       compatibility_checker.BreakingReason
+		reason       model.BreakingReason
 		checked      model.PersistedResource
 		counterparts model.ResourceCounterparts
 		counterpart  string
-		role         compatibility_checker.BreakRole
+		role         model.BreakRole
 	}{
 		{
-			reason:       compatibility_checker.ReasonProviderResourceNotFound,
+			reason:       model.ReasonProviderResourceNotFound,
 			checked:      consumer,
 			counterparts: model.ResourceCounterparts{},
 			counterpart:  petstoreAPI,
-			role:         compatibility_checker.RoleConsumer,
+			role:         model.RoleConsumer,
 		},
 		{
-			reason:  compatibility_checker.ReasonProviderResourceNotDeployedInEnvironment,
+			reason:  model.ReasonProviderResourceNotDeployedInEnvironment,
 			checked: consumer,
 			counterparts: model.ResourceCounterparts{
 				Providers: map[string]model.PersistedResource{postPetsHash: undeployed},
 			},
 			counterpart: petstoreAPI,
-			role:        compatibility_checker.RoleConsumer,
+			role:        model.RoleConsumer,
 		},
 		{
-			reason:  compatibility_checker.ReasonProviderResourceRemovedButStillConsumed,
+			reason:  model.ReasonProviderResourceRemovedButStillConsumed,
 			checked: removed,
 			counterparts: model.ResourceCounterparts{
 				Consumers: map[string][]model.PersistedResource{postPetsHash: {consumer}},
 			},
 			counterpart: petstoreWeb,
-			role:        compatibility_checker.RoleProvider,
+			role:        model.RoleProvider,
 		},
 	}
 
@@ -188,16 +188,16 @@ func TestFreshResourceBreaksCarryTheirFixedRole(t *testing.T) {
 
 func TestCachedPropertyBreaksCarryTheRoleOfTheCurrentCheck(t *testing.T) {
 	cases := []struct {
-		reason      compatibility_checker.BreakingReason
+		reason      model.BreakingReason
 		interaction string
 		types       map[string]string
 	}{
-		{compatibility_checker.ReasonPropertyMissingInProvider, "201", map[string]string{"propertyType": "string"}},
-		{compatibility_checker.ReasonPropertyOptionalInProviderRequiredInConsumer, "201", map[string]string{"propertyType": "string"}},
-		{compatibility_checker.ReasonPropertyTypeMismatch, "201", map[string]string{"consumerPropertyType": "string", "providerPropertyType": "integer"}},
-		{compatibility_checker.ReasonPropertyMissingInConsumer, "request", map[string]string{"propertyType": "string"}},
-		{compatibility_checker.ReasonPropertyOptionalInConsumerRequiredInProvider, "request", map[string]string{"propertyType": "string"}},
-		{compatibility_checker.ReasonPropertyTypeMismatch, "request", map[string]string{"consumerPropertyType": "integer", "providerPropertyType": "string"}},
+		{model.ReasonPropertyMissingInProvider, "201", map[string]string{"propertyType": "string"}},
+		{model.ReasonPropertyOptionalInProviderRequiredInConsumer, "201", map[string]string{"propertyType": "string"}},
+		{model.ReasonPropertyTypeMismatch, "201", map[string]string{"consumerPropertyType": "string", "providerPropertyType": "integer"}},
+		{model.ReasonPropertyMissingInConsumer, "request", map[string]string{"propertyType": "string"}},
+		{model.ReasonPropertyOptionalInConsumerRequiredInProvider, "request", map[string]string{"propertyType": "string"}},
+		{model.ReasonPropertyTypeMismatch, "request", map[string]string{"consumerPropertyType": "integer", "providerPropertyType": "string"}},
 	}
 
 	for _, tc := range cases {
@@ -208,7 +208,7 @@ func TestCachedPropertyBreaksCarryTheRoleOfTheCurrentCheck(t *testing.T) {
 			Endpoint:    "/pets",
 			Method:      "post",
 			Interaction: tc.interaction,
-			Reason:      string(tc.reason),
+			Reason:      tc.reason,
 			Details:     details,
 		}
 
@@ -221,7 +221,7 @@ func TestCachedPropertyBreaksCarryTheRoleOfTheCurrentCheck(t *testing.T) {
 
 			assert.Equal(t, []compatibility_checker.ContractBreakingChange{{
 				Reason:  tc.reason,
-				Role:    compatibility_checker.RoleConsumer,
+				Role:    model.RoleConsumer,
 				Details: details,
 			}}, report.Hierarchical[petstoreAPI].Endpoints["/pets"]["post"][tc.interaction])
 		})
@@ -235,7 +235,7 @@ func TestCachedPropertyBreaksCarryTheRoleOfTheCurrentCheck(t *testing.T) {
 
 			assert.Equal(t, []compatibility_checker.ContractBreakingChange{{
 				Reason:  tc.reason,
-				Role:    compatibility_checker.RoleProvider,
+				Role:    model.RoleProvider,
 				Details: details,
 			}}, report.Hierarchical[petstoreWeb].Endpoints["/pets"]["post"][tc.interaction])
 		})
@@ -269,7 +269,7 @@ func TestCachedBreaksOfAnInteractionAreSortedByProperty(t *testing.T) {
 			Endpoint:    "/pets",
 			Method:      "post",
 			Interaction: "201",
-			Reason:      string(compatibility_checker.ReasonPropertyMissingInProvider),
+			Reason:      model.ReasonPropertyMissingInProvider,
 			Details:     map[string]string{"property": property, "consumerName": petstoreWeb, "providerName": petstoreAPI},
 		})
 	}
@@ -304,7 +304,7 @@ func TestReportIsDeployableOnlyWhenEveryResultIs(t *testing.T) {
 			Endpoint:    "/pets",
 			Method:      "post",
 			Interaction: "201",
-			Reason:      string(compatibility_checker.ReasonPropertyMissingInProvider),
+			Reason:      model.ReasonPropertyMissingInProvider,
 			Details:     map[string]string{"property": "$.name", "consumerName": petstoreMobile, "providerName": petstoreAPI},
 		})
 

@@ -7,35 +7,11 @@ import (
 	"github.com/bidirekt/broker/internal/model"
 )
 
-type BreakingReason string
-
-const (
-	ReasonProviderResourceNotFound                           BreakingReason = "provider_resource_not_found"
-	ReasonProviderResourceInteractionNotFound                BreakingReason = "provider_resource_interaction_not_found"
-	ReasonPropertyMissingInProvider                          BreakingReason = "property_missing_in_provider"
-	ReasonPropertyMissingInConsumer                          BreakingReason = "property_missing_in_consumer"
-	ReasonPropertyTypeMismatch                               BreakingReason = "property_type_mismatch"
-	ReasonPropertyOptionalInProviderRequiredInConsumer       BreakingReason = "property_optional_in_provider_required_in_consumer"
-	ReasonPropertyOptionalInConsumerRequiredInProvider       BreakingReason = "property_optional_in_consumer_required_in_provider"
-	ReasonPropertyNullableInProviderNotNullableInConsumer    BreakingReason = "property_nullable_in_provider_not_nullable_in_consumer"
-	ReasonPropertyNullableInConsumerNotNullableInProvider    BreakingReason = "property_nullable_in_consumer_not_nullable_in_provider"
-	ReasonProviderResourceNotDeployedInEnvironment           BreakingReason = "provider_resource_not_deployed_in_environment"
-	ReasonProviderResourceRemovedButStillConsumed            BreakingReason = "provider_resource_removed_but_still_consumed"
-	ReasonProviderResourceInteractionRemovedButStillConsumed BreakingReason = "provider_resource_interaction_removed_but_still_consumed"
-)
-
-type BreakRole string
-
-const (
-	RoleConsumer BreakRole = "consumer"
-	RoleProvider BreakRole = "provider"
-)
-
 type ContractBreakingChange struct {
 	CheckedResource     *model.PersistedResource `json:"-"`
 	CounterpartResource *model.PersistedResource `json:"-"`
-	Reason              BreakingReason           `json:"reason"`
-	Role                BreakRole                `json:"role"`
+	Reason              model.BreakingReason     `json:"reason"`
+	Role                model.BreakRole          `json:"role"`
 	Details             map[string]string        `json:"details,omitempty"`
 }
 
@@ -52,14 +28,8 @@ func (this *ContractBreakingChange) InteractionKey() string {
 	}
 }
 
-// IsPropertyBreak reports whether the break comes from a property diff, as opposed to the
-// environment checks that depend on deployments and never become a stored verdict.
 func (this *ContractBreakingChange) IsPropertyBreak() bool {
-	return this.Reason != ReasonProviderResourceNotFound &&
-		this.Reason != ReasonProviderResourceInteractionNotFound &&
-		this.Reason != ReasonProviderResourceNotDeployedInEnvironment &&
-		this.Reason != ReasonProviderResourceRemovedButStillConsumed &&
-		this.Reason != ReasonProviderResourceInteractionRemovedButStillConsumed
+	return this.Reason.IsPropertyBreak()
 }
 
 func (this *ContractBreakingChange) ConsumerResource() *model.PersistedResource {
@@ -81,7 +51,7 @@ func (this *ContractBreakingChange) ProviderName() string {
 func NewContractBreakingChange(
 	checkedResource *model.PersistedResource,
 	counterpartResource *model.PersistedResource,
-	reason BreakingReason,
+	reason model.BreakingReason,
 ) ContractBreakingChange {
 	return ContractBreakingChange{
 		CheckedResource:     checkedResource,
@@ -93,7 +63,7 @@ func NewContractBreakingChange(
 func NewProviderResourceNotFound(checkedResource *model.PersistedResource) ContractBreakingChange {
 	return ContractBreakingChange{
 		CheckedResource: checkedResource,
-		Reason:          ReasonProviderResourceNotFound,
+		Reason:          model.ReasonProviderResourceNotFound,
 	}
 }
 
@@ -111,7 +81,7 @@ func NewProviderResourceInteractionNotFound(
 
 	return ContractBreakingChange{
 		CheckedResource: consumerResource,
-		Reason:          ReasonProviderResourceInteractionNotFound,
+		Reason:          model.ReasonProviderResourceInteractionNotFound,
 		Details:         details,
 	}
 }
@@ -123,7 +93,7 @@ func NewProviderResourceRemovedButStillConsumed(
 	return ContractBreakingChange{
 		CheckedResource:     removedResource,
 		CounterpartResource: consumerResource,
-		Reason:              ReasonProviderResourceRemovedButStillConsumed,
+		Reason:              model.ReasonProviderResourceRemovedButStillConsumed,
 	}
 }
 
@@ -143,7 +113,7 @@ func NewProviderResourceInteractionRemovedButStillConsumed(
 	return ContractBreakingChange{
 		CheckedResource:     removedResource,
 		CounterpartResource: consumerResource,
-		Reason:              ReasonProviderResourceInteractionRemovedButStillConsumed,
+		Reason:              model.ReasonProviderResourceInteractionRemovedButStillConsumed,
 		Details:             details,
 	}
 }
@@ -152,7 +122,7 @@ func NewProviderResourceInteractionRemovedButStillConsumed(
 func NewPropertyBreakChange(
 	checkedResource *model.PersistedResource,
 	counterpartResource *model.PersistedResource,
-	reason BreakingReason,
+	reason model.BreakingReason,
 	propertyPath string,
 	consumerNode, providerNode schemagraph.Node,
 ) ContractBreakingChange {
@@ -175,7 +145,7 @@ func NewPropertyBreakChange(
 		details["providerField"] = providerNode.Field()
 	}
 
-	if reason == ReasonPropertyTypeMismatch {
+	if reason == model.ReasonPropertyTypeMismatch {
 		details["consumerPropertyType"] = typeToken(consumerNode)
 		details["providerPropertyType"] = typeToken(providerNode)
 	} else {
@@ -232,7 +202,7 @@ func NewProviderResourceNotDeployed(
 
 	return ContractBreakingChange{
 		CheckedResource: consumerResource,
-		Reason:          ReasonProviderResourceNotDeployedInEnvironment,
+		Reason:          model.ReasonProviderResourceNotDeployedInEnvironment,
 		Details:         details,
 	}
 }

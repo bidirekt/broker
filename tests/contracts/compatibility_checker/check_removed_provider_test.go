@@ -65,7 +65,7 @@ func TestRemovedProviderBreaksOncePerConsumer(t *testing.T) {
 	assert.Len(t, web.Breaks, 1)
 	assert.Equal(
 		t,
-		compatibility_checker.ReasonProviderResourceRemovedButStillConsumed,
+		model.ReasonProviderResourceRemovedButStillConsumed,
 		web.Breaks[0].Reason,
 	)
 	assert.Nil(t, web.Breaks[0].Details)
@@ -183,7 +183,7 @@ func TestRemovedProvider_StatusChangeOnSurvivingMethod_BreaksAsInteractionRemove
 	assert.Len(t, web.Breaks, 1)
 	assert.Equal(
 		t,
-		compatibility_checker.ReasonProviderResourceInteractionRemovedButStillConsumed,
+		model.ReasonProviderResourceInteractionRemovedButStillConsumed,
 		web.Breaks[0].Reason,
 	)
 	assert.Equal(t, map[string]string{"providerStatuses": "204, 2XX, 404"}, web.Breaks[0].Details)
@@ -215,7 +215,7 @@ func TestRemovedProvider_RequestDroppedOnSurvivingMethod_BreaksAsInteractionRemo
 	assert.Len(t, results[0].Breaks, 1)
 	assert.Equal(
 		t,
-		compatibility_checker.ReasonProviderResourceInteractionRemovedButStillConsumed,
+		model.ReasonProviderResourceInteractionRemovedButStillConsumed,
 		results[0].Breaks[0].Reason,
 	)
 	assert.Nil(t, results[0].Breaks[0].Details)
@@ -240,7 +240,7 @@ func TestRemovedProvider_ResponseDroppedWhereOnlyARequestRemains_BreaksAsInterac
 	assert.Len(t, results[0].Breaks, 1)
 	assert.Equal(
 		t,
-		compatibility_checker.ReasonProviderResourceInteractionRemovedButStillConsumed,
+		model.ReasonProviderResourceInteractionRemovedButStillConsumed,
 		results[0].Breaks[0].Reason,
 	)
 	assert.Nil(t, results[0].Breaks[0].Details)
@@ -269,7 +269,7 @@ func TestRemovedProvider_MethodGoneWhileEndpointRemains_KeepsTheRemovedReason(t 
 	assert.Len(t, results[0].Breaks, 1)
 	assert.Equal(
 		t,
-		compatibility_checker.ReasonProviderResourceRemovedButStillConsumed,
+		model.ReasonProviderResourceRemovedButStillConsumed,
 		results[0].Breaks[0].Reason,
 	)
 	assert.Nil(t, results[0].Breaks[0].Details)

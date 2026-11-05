@@ -7,9 +7,9 @@ import (
 
 type readingRules struct {
 	readerIsConsumer bool
-	missing          BreakingReason
-	optional         BreakingReason
-	nullable         BreakingReason
+	missing          model.BreakingReason
+	optional         model.BreakingReason
+	nullable         model.BreakingReason
 }
 
 // Optional and nullable belong to the fields a node is reached through, so each pair of them is compared once;
@@ -68,7 +68,7 @@ func (this *bodyComparison) compareRead(reader, producer schemagraph.Node, path 
 	if !acceptsType(reader.Type(), producer.Type()) {
 		if !this.comparedShapes[shapes] {
 			this.comparedShapes[shapes] = true
-			this.breakAt(ReasonPropertyTypeMismatch, path, reader, producer)
+			this.breakAt(model.ReasonPropertyTypeMismatch, path, reader, producer)
 		}
 
 		return
@@ -93,7 +93,7 @@ func (this *bodyComparison) compareRead(reader, producer schemagraph.Node, path 
 	}
 }
 
-func (this *bodyComparison) breakAt(reason BreakingReason, path string, reader, producer schemagraph.Node) {
+func (this *bodyComparison) breakAt(reason model.BreakingReason, path string, reader, producer schemagraph.Node) {
 	consumer, provider := producer, reader
 	if this.rules.readerIsConsumer {
 		consumer, provider = reader, producer

@@ -139,7 +139,7 @@ func (this *CanIDeployUseCase) recordCheck(
 						Endpoint:    breakChange.CheckedResource.Endpoint,
 						Method:      breakChange.CheckedResource.Method,
 						Interaction: breakChange.InteractionKey(),
-						Reason:      string(breakChange.Reason),
+						Reason:      breakChange.Reason,
 						Details:     breakChange.Details,
 					})
 				}

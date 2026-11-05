@@ -26,7 +26,7 @@ func (this pricesWithoutVerdict) GetVerdict(context.Context, int64, int64) (*mod
 }
 
 type pricesBreak struct {
-	reason   compatibility_checker.BreakingReason
+	reason   model.BreakingReason
 	property string
 }
 
@@ -122,7 +122,7 @@ func assertPricesBreaks(t *testing.T, interaction, consumerType, providerType st
 	})
 }
 
-var amountTypeMismatch = []pricesBreak{{compatibility_checker.ReasonPropertyTypeMismatch, "$.amount"}}
+var amountTypeMismatch = []pricesBreak{{model.ReasonPropertyTypeMismatch, "$.amount"}}
 
 var numberReaderCases = []struct {
 	producer string
