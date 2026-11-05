@@ -139,7 +139,7 @@ const (
 		ORDER BY r.id
 	`
 
-	getContractByNameAndVersion = `
+	contractVersionTreeQuery = `
 		SELECT
 			c.id,
 			cv.version,
@@ -179,7 +179,16 @@ const (
 			LEFT JOIN schemas s ON s.id = rb.schema_id
 			WHERE rb.resource_id = r.id AND rb.contract_id = c.id
 		) bodies ON true
+	`
+
+	getContractByNameAndVersion = contractVersionTreeQuery + `
 		WHERE pa.name = $1
+		  AND cv.version = $2
+		ORDER BY r.id
+	`
+
+	getContractByIDAndVersion = contractVersionTreeQuery + `
+		WHERE cv.contract_id = $1
 		  AND cv.version = $2
 		ORDER BY r.id
 	`
@@ -200,33 +209,19 @@ const (
 			r.created_at,
 			bodies.sources,
 			bodies.schema_names,
-			dep.version,
-			anchor.contract_id
+			cd.version,
+			cd.contract_id
 		FROM
 			resources r
 		JOIN
 			participants pa ON pa.id = r.participant_id
-		JOIN LATERAL (
-			SELECT version
-			FROM deployments
-			WHERE participant_id = r.participant_id
-			  AND environment_id = $3
-			ORDER BY deployed_at DESC
-			LIMIT 1
-		) dep ON true
-		JOIN LATERAL (
-			SELECT COALESCE(
-				(SELECT cv.contract_id FROM contract_versions cv
-				  WHERE cv.participant_id = r.participant_id
-				    AND cv.version = dep.version),
-				(SELECT MAX(id) FROM contracts WHERE participant_id = r.participant_id)
-			) AS contract_id
-		) anchor ON true
+		JOIN
+			current_deployments cd ON cd.participant_id = r.participant_id AND cd.environment_id = $3
 		JOIN LATERAL (
 			SELECT change_type
 			FROM resource_versions
 			WHERE resource_id = r.id
-			  AND contract_id <= anchor.contract_id
+			  AND contract_id <= cd.contract_id
 			ORDER BY contract_id DESC
 			LIMIT 1
 		) rv ON true
@@ -236,7 +231,7 @@ const (
 				array_agg(s.name ORDER BY rb.source COLLATE "C", rb.id) AS schema_names
 			FROM resource_bodies rb
 			LEFT JOIN schemas s ON s.id = rb.schema_id
-			WHERE rb.resource_id = r.id AND rb.contract_id = anchor.contract_id
+			WHERE rb.resource_id = r.id AND rb.contract_id = cd.contract_id
 		) bodies ON true
 		WHERE
 			r.direction = $1
@@ -271,17 +266,9 @@ const (
 			participants pa ON pa.id = r.participant_id
 		JOIN LATERAL (
 			SELECT COALESCE(
-				(SELECT cv.contract_id FROM contract_versions cv
-				  WHERE cv.participant_id = r.participant_id
-				    AND cv.version = (
-					SELECT version
-					FROM deployments
-					WHERE participant_id = r.participant_id
-					  AND environment_id = $3
-					ORDER BY deployed_at DESC
-					LIMIT 1
-				 )),
-				(SELECT MAX(id) FROM contracts WHERE participant_id = r.participant_id)
+				(SELECT contract_id FROM current_deployments
+				  WHERE participant_id = r.participant_id AND environment_id = $3),
+				(SELECT contract_id FROM latest_contract_versions WHERE participant_id = r.participant_id)
 			) AS contract_id
 		) anchor ON true
 		JOIN LATERAL (
@@ -300,12 +287,8 @@ const (
 			LEFT JOIN schemas s ON s.id = rb.schema_id
 			WHERE rb.resource_id = r.id AND rb.contract_id = anchor.contract_id
 		) bodies ON true
-		LEFT JOIN LATERAL (
-			SELECT DISTINCT ON (environment_id) environment_id, version
-			FROM deployments
-			WHERE participant_id = r.participant_id
-			ORDER BY environment_id, deployed_at DESC
-		) dep ON true
+		LEFT JOIN
+			current_deployments dep ON dep.participant_id = r.participant_id
 		LEFT JOIN
 			environments e ON e.id = dep.environment_id
 		WHERE
@@ -323,23 +306,15 @@ const (
 				FILTER (WHERE r.response_status_code IS NOT NULL)
 		FROM
 			participants pa
-		JOIN LATERAL (
-			SELECT version
-			FROM deployments
-			WHERE participant_id = pa.id
-			  AND environment_id = $5
-			ORDER BY deployed_at DESC
-			LIMIT 1
-		) dep ON true
 		JOIN
-			contract_versions cv ON cv.participant_id = pa.id AND cv.version = dep.version
+			current_deployments cd ON cd.participant_id = pa.id AND cd.environment_id = $5
 		JOIN
 			resources r ON r.participant_id = pa.id
 		JOIN LATERAL (
 			SELECT change_type
 			FROM resource_versions
 			WHERE resource_id = r.id
-			  AND contract_id <= cv.contract_id
+			  AND contract_id <= cd.contract_id
 			ORDER BY contract_id DESC
 			LIMIT 1
 		) rv ON true
@@ -646,6 +621,24 @@ func (this *ContractRepository) GetContractByNameAndVersion(
 	}
 
 	return this.withSchemas(ctx, this.pool, scanPersistedContractTree(rows))
+}
+
+func (this *ContractRepository) GetContractByIDAndVersion(
+	ctx context.Context,
+	contractID int64,
+	version string,
+) *model.PersistedContract {
+	rows, err := this.pool.Query(ctx, getContractByIDAndVersion, contractID, version)
+	if err != nil {
+		panic(fmt.Errorf("error loading contract tree by id and version: %w", err))
+	}
+
+	contract, found := this.withSchemas(ctx, this.pool, scanPersistedContractTree(rows))
+	if !found {
+		panic(fmt.Errorf("contract %d has no version %q", contractID, version))
+	}
+
+	return contract
 }
 
 func (this *ContractRepository) withSchemas(
