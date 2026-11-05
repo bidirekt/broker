@@ -69,10 +69,6 @@ const (
 		ORDER BY e.name COLLATE "C"
 	`
 
-	findEnvironmentByIDQuery = `
-		SELECT id, name FROM environments WHERE id = $1
-	`
-
 	countParticipantDeploymentsQuery = `
 		SELECT COUNT(*)
 		FROM deployments

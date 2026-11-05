@@ -12,6 +12,7 @@ type RelationsHeader struct {
 }
 
 type RelationsDeployment struct {
+	EnvironmentID   int64
 	EnvironmentName string
 	Version         string
 }
@@ -24,6 +25,7 @@ type ConsumedProvider struct {
 }
 
 type EnvironmentConsumers struct {
+	EnvironmentID   int64
 	EnvironmentName string
 	Consumers       []DeployedConsumer
 }

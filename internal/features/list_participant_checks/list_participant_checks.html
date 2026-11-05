@@ -9,7 +9,7 @@
     <h1><span class="name">{{$name}}</span></h1>
     <div class="badges">
       <span>Latest {{if .Header.LatestVersion.Valid}}<span class="ver">{{.Header.LatestVersion.String}}</span>{{else}}<span class="muted">never published</span>{{end}}</span>
-      {{range .Header.Deployed}}<span class="badge env">{{.Environment.Name}} <span class="v">{{.Version}}</span></span>{{else}}{{if .Header.LatestVersion.Valid}}<span class="badge quiet">not deployed</span>{{end}}{{end}}
+      {{range .Header.Deployed}}<a class="badge env" href="/environments/{{.Environment.ID}}">{{.Environment.Name}} <span class="v">{{.Version}}</span></a>{{else}}{{if .Header.LatestVersion.Valid}}<span class="badge quiet">not deployed</span>{{end}}{{end}}
     </div>
   </div>
   {{if $.CanWrite}}<div class="acts">{{if .Header.LatestVersion.Valid}}<a class="btn" aria-disabled="true">Rename</a>{{else}}<a class="btn" href="/participants/{{$name}}/rename">Rename</a>{{end}}</div>{{end}}
@@ -39,7 +39,7 @@
       <tr>
         <td data-l="Check"><a class="mono" href="/checks/{{.Check.ID}}">#{{.Check.ID}}</a></td>
         <td data-l="Version"><span class="ver">{{.Check.Version}}</span></td>
-        <td data-l="Environment"><span class="name">{{.Check.EnvironmentName}}</span></td>
+        <td data-l="Environment"><a class="name" href="/environments/{{.Check.EnvironmentID}}">{{.Check.EnvironmentName}}</a></td>
         <td data-l="Answer">{{if .Check.Deployable}}<span class="badge yes">{{template "icon_check" 12}}yes</span>{{else}}<span class="badge no">{{template "icon_x" 12}}no{{if .Report.Stored}} · {{template "breaks" .Report.Breaks}}{{end}}</span>{{end}}</td>
         <td data-l="Compared with">
           <div class="badges">

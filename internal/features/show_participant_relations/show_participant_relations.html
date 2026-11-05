@@ -10,7 +10,7 @@
     <div class="sub badges">
       {{if .Header.LatestVersion.Valid}}
       <span>Latest <span class="ver">{{.Header.LatestVersion.String}}</span></span>
-      {{range .Header.Deployed}}<span class="badge env">{{.EnvironmentName}} <span class="v">{{.Version}}</span></span>{{else}}<span class="badge quiet">not deployed</span>{{end}}
+      {{range .Header.Deployed}}<a class="badge env" href="/environments/{{.EnvironmentID}}">{{.EnvironmentName}} <span class="v">{{.Version}}</span></a>{{else}}<span class="badge quiet">not deployed</span>{{end}}
       {{else}}
       <span class="badge quiet">never published</span>
       {{end}}
@@ -31,7 +31,7 @@
     {{if .Consumes}}
     <ul class="list">
       {{range .Consumes}}
-      <li>{{if .Registered}}<a class="name" href="/participants/{{.Name}}">{{.Name}}</a>{{else}}<span class="name">{{.Name}}</span>{{end}}<span class="badges">{{if not .Registered}}<span class="badge quiet">not a participant</span>{{else if not .Published}}<span class="badge quiet">never published</span>{{else}}{{range .Deployed}}<span class="badge env">{{.EnvironmentName}} <span class="v">{{.Version}}</span></span>{{else}}<span class="badge quiet">not deployed</span>{{end}}{{end}}</span></li>
+      <li>{{if .Registered}}<a class="name" href="/participants/{{.Name}}">{{.Name}}</a>{{else}}<span class="name">{{.Name}}</span>{{end}}<span class="badges">{{if not .Registered}}<span class="badge quiet">not a participant</span>{{else if not .Published}}<span class="badge quiet">never published</span>{{else}}{{range .Deployed}}<a class="badge env" href="/environments/{{.EnvironmentID}}">{{.EnvironmentName}} <span class="v">{{.Version}}</span></a>{{else}}<span class="badge quiet">not deployed</span>{{end}}{{end}}</span></li>
       {{end}}
     </ul>
     {{else if .Header.LatestVersion.Valid}}
@@ -47,7 +47,7 @@
     <div class="sheet-head"><h2 class="h2">Consumed by <span class="muted">· its consumers, where deployed</span></h2></div>
     {{if .ConsumedBy}}
     {{range .ConsumedBy}}
-    <p class="pad"><span class="badge env">{{.EnvironmentName}}</span></p>
+    <p class="pad"><a class="badge env" href="/environments/{{.EnvironmentID}}">{{.EnvironmentName}}</a></p>
     <ul class="list">
       {{range .Consumers}}
       <li><a class="name" href="/participants/{{.Name}}">{{.Name}}</a><span class="ver">{{.Version}}</span></li>

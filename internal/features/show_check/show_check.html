@@ -13,7 +13,7 @@
         <div><dt>Check</dt><dd>#{{.Check.ID}}</dd></div>
         <div><dt>Participant</dt><dd><a class="name" href="{{.ParticipantURL}}">{{.Check.ParticipantName}}</a></dd></div>
         <div><dt>Version</dt><dd>{{if .VersionURL}}<a class="ver" href="{{.VersionURL}}">{{.Check.Version}}</a>{{else}}<span class="ver">{{.Check.Version}}</span>{{end}}</dd></div>
-        <div><dt>Environment</dt><dd><span class="name">{{.Check.EnvironmentName}}</span></dd></div>
+        <div><dt>Environment</dt><dd><a class="name" href="/environments/{{.Check.EnvironmentID}}">{{.Check.EnvironmentName}}</a></dd></div>
         <div><dt>Checked</dt><dd>{{detailTime .Check.CreatedAt}}</dd></div>
       </dl>
     </div>

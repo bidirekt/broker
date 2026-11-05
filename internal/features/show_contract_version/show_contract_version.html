@@ -15,7 +15,7 @@
     {{if .CurrentDeployments}}
     <ul class="list">
       {{range .CurrentDeployments}}
-      <li><span class="badge env">{{.Environment.Name}}</span><span class="muted">since {{detailTime .DeployedAt}}</span></li>
+      <li><a class="badge env" href="/environments/{{.Environment.ID}}">{{.Environment.Name}}</a><span class="muted">since {{detailTime .DeployedAt}}</span></li>
       {{end}}
     </ul>
     {{else}}
@@ -27,7 +27,7 @@
     {{if .LatestChecks}}
     <ul class="list">
       {{range .LatestChecks}}
-      <li><span class="badge env">{{.Check.EnvironmentName}}</span>{{template "answer" .}}<a href="/checks/{{.Check.ID}}">check #{{.Check.ID}}</a><span class="muted">{{detailTime .Check.CreatedAt}}</span></li>
+      <li><a class="badge env" href="/environments/{{.Check.EnvironmentID}}">{{.Check.EnvironmentName}}</a>{{template "answer" .}}<a href="/checks/{{.Check.ID}}">check #{{.Check.ID}}</a><span class="muted">{{detailTime .Check.CreatedAt}}</span></li>
       {{end}}
     </ul>
     {{else}}
@@ -60,7 +60,7 @@
     <tbody>
       {{range .Deployments}}
       <tr>
-        <td data-l="Environment"><span class="badges"><span class="badge env">{{.Environment.Name}}</span>{{if .Rollback}}<span class="badge rb">{{template "icon_rollback" 12}}rollback</span>{{end}}</span></td>
+        <td data-l="Environment"><span class="badges"><a class="badge env" href="/environments/{{.Environment.ID}}">{{.Environment.Name}}</a>{{if .Rollback}}<span class="badge rb">{{template "icon_rollback" 12}}rollback</span>{{end}}</span></td>
         <td data-l="Deployed">{{detailTime .DeployedAt}}</td>
       </tr>
       {{end}}
@@ -87,7 +87,7 @@
       {{range .Checks}}
       <tr>
         <td data-l="Check"><a href="/checks/{{.Check.ID}}">#{{.Check.ID}}</a></td>
-        <td data-l="Environment"><span class="badge env">{{.Check.EnvironmentName}}</span></td>
+        <td data-l="Environment"><a class="badge env" href="/environments/{{.Check.EnvironmentID}}">{{.Check.EnvironmentName}}</a></td>
         <td data-l="Answer">{{template "answer" .}}</td>
         <td data-l="Compared with">{{if .Report.Counterparts}}<span class="badges">{{$stored := .Report.Stored}}{{range .Report.Counterparts}}<span class="badge cpb{{if and $stored .Breaks}} no{{end}}">{{.Name}} {{if .Version}}<span class="v">{{.Version}}</span>{{else}}<span class="v">no version</span>{{end}}{{if and $stored .Breaks}} · {{.Breaks}} {{if eq .Breaks 1}}break{{else}}breaks{{end}}{{end}}</span>{{end}}</span>{{else}}<span class="muted">nothing shares an endpoint</span>{{end}}</td>
         <td data-l="Asked">{{detailTime .Check.CreatedAt}}</td>

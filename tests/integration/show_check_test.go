@@ -229,7 +229,14 @@ func (this *IntegrationSuite) TestShowCheck_ShowsAConsumerSideNoWithItsBreaksRea
 	this.Less(strings.Index(body, `<p class="group-label">Endpoints</p>`), strings.Index(body, `<p class="group-label">Fields</p>`))
 }
 
-func (this *IntegrationSuite) TestShowCheck_SummaryCarriesNoLinkAndEnvironmentNamesAreText() {
+func (this *IntegrationSuite) environmentPathForShowCheck(name string) string {
+	var id int64
+	this.Require().NoError(this.Pool.QueryRow(context.Background(), `SELECT id FROM environments WHERE name = $1`, name).Scan(&id))
+
+	return "/environments/" + strconv.FormatInt(id, 10)
+}
+
+func (this *IntegrationSuite) TestShowCheck_LinksTheCheckEnvironmentButNeitherTheSummaryNorTheDeployedEnvironments() {
 	checkPath := this.consumerSideCheckForShowCheck()
 
 	_, _, body := this.getPage(checkPath, this.signInAsAdmin())
@@ -244,7 +251,9 @@ func (this *IntegrationSuite) TestShowCheck_SummaryCarriesNoLinkAndEnvironmentNa
 	this.Contains(summaries[2][1], `<span class="who-cp">petstore_api</span><span class="ver">1.4.0</span><span class="badge env">production</span>`)
 	this.Contains(summaries[2][1], `no · 2 breaks`)
 	this.Contains(summaries[3][1], `no · 1 break</span>`)
-	this.NotContains(body, `href="/environments`)
+	this.Contains(body, `<div><dt>Environment</dt><dd><a class="name" href="`+this.environmentPathForShowCheck("production")+`">production</a></dd></div>`)
+	this.Contains(body, `not deployed in production (deployed in: staging)`)
+	this.NotContains(body, `href="`+this.environmentPathForShowCheck("staging")+`"`)
 }
 
 func (this *IntegrationSuite) TestShowCheck_LinksTheCheckedParticipantAndItsVersion() {
@@ -358,6 +367,7 @@ func (this *IntegrationSuite) TestShowCheck_KeepsTheEnvironmentNameOfTheCheck() 
 	_, _, body := this.getPage(checkPath, this.signInAsAdmin())
 
 	this.Contains(body, `cannot be deployed to <span class="name">production</span>`)
+	this.Contains(body, `<a class="name" href="`+this.environmentPathForShowCheck("live")+`">production</a>`)
 	this.NotContains(body, `live`)
 }
 

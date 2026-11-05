@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/bidirekt/broker/internal/model"
@@ -51,6 +52,13 @@ func (this *IntegrationSuite) insertParticipantsForListParticipantPages(count in
 	this.Require().NoError(err)
 }
 
+func (this *IntegrationSuite) environmentPathForListParticipantPages(name string) string {
+	var id int64
+	this.Require().NoError(this.Pool.QueryRow(context.Background(), `SELECT id FROM environments WHERE name = $1`, name).Scan(&id))
+
+	return "/environments/" + strconv.FormatInt(id, 10)
+}
+
 func (this *IntegrationSuite) TestListParticipantPages_ShowsLatestVersionAndWhereEachIsDeployed() {
 	for _, environment := range []string{"staging", "production"} {
 		this.mustPostForListParticipantPages("/api/environments", `{"environment":"`+environment+`"}`)
@@ -63,6 +71,8 @@ func (this *IntegrationSuite) TestListParticipantPages_ShowsLatestVersionAndWher
 	this.publishForListParticipantPages("petstore_web", "2.3.0")
 	this.deployForListParticipantPages("petstore_web", "2.3.0", "staging")
 	this.publishForListParticipantPages("petstore_reviews", "1.0.0")
+	production := this.environmentPathForListParticipantPages("production")
+	staging := this.environmentPathForListParticipantPages("staging")
 
 	status, header, body := this.getPage("/participants", this.signInAsAdmin())
 
@@ -83,7 +93,7 @@ func (this *IntegrationSuite) TestListParticipantPages_ShowsLatestVersionAndWher
 	this.Contains(rows[1], `<a class="name" href="/participants/petstore_api">petstore_api</a>`)
 	this.Contains(rows[1], `<span class="ver">1.5.0</span>`)
 	this.Contains(rows[1], `just now</time>`)
-	this.Contains(rows[1], `<div class="badges"><span class="badge env">production <span class="v">1.4.0</span></span><span class="badge env">staging <span class="v">1.5.0</span></span></div>`)
+	this.Contains(rows[1], `<div class="badges"><a class="badge env" href="`+production+`">production <span class="v">1.4.0</span></a><a class="badge env" href="`+staging+`">staging <span class="v">1.5.0</span></a></div>`)
 
 	this.Contains(rows[2], `<a class="name" href="/participants/petstore_reviews">petstore_reviews</a>`)
 	this.Contains(rows[2], `<span class="ver">1.0.0</span>`)
@@ -91,7 +101,7 @@ func (this *IntegrationSuite) TestListParticipantPages_ShowsLatestVersionAndWher
 	this.NotContains(rows[2], `never published`)
 
 	this.Contains(rows[3], `<a class="name" href="/participants/petstore_web">petstore_web</a>`)
-	this.Contains(rows[3], `<span class="badge env">staging <span class="v">2.3.0</span></span>`)
+	this.Contains(rows[3], `<a class="badge env" href="`+staging+`">staging <span class="v">2.3.0</span></a>`)
 	this.NotContains(rows[3], `production`)
 
 	this.Contains(body, `showing 1–4 of 4`)

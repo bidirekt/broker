@@ -3,6 +3,7 @@ package integration_test
 import (
 	"context"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/bidirekt/broker/internal/model"
@@ -131,6 +132,13 @@ func (this *IntegrationSuite) petstoreForRelations() {
 	this.publishForRelations("petstore_web", "2.3.0", relationsWebV2Contract)
 }
 
+func (this *IntegrationSuite) environmentPathForRelations(name string) string {
+	var id int64
+	this.Require().NoError(this.Pool.QueryRow(context.Background(), `SELECT id FROM environments WHERE name = $1`, name).Scan(&id))
+
+	return "/environments/" + strconv.FormatInt(id, 10)
+}
+
 func (this *IntegrationSuite) TestShowParticipantRelations_ShowsTheHeaderTabsAndFooter() {
 	this.petstoreForRelations()
 
@@ -141,8 +149,8 @@ func (this *IntegrationSuite) TestShowParticipantRelations_ShowsTheHeaderTabsAnd
 	this.Equal("no-store", header.Get("Cache-Control"))
 	this.Contains(body, `<h1 class="mono">petstore_web</h1>`)
 	this.Contains(body, `<span>Latest <span class="ver">2.3.0</span></span>`)
-	this.Contains(body, `<span class="badge env">production <span class="v">2.2.0</span></span>`)
-	this.NotContains(body, `<span class="badge env">staging <span class="v">2.`)
+	this.Contains(body, `<a class="badge env" href="`+this.environmentPathForRelations("production")+`">production <span class="v">2.2.0</span></a>`)
+	this.NotContains(body, `">staging <span class="v">2.`)
 	this.Contains(body, `<a href="/participants/petstore_web">Versions <span class="count">2</span></a>`)
 	this.Contains(body, `<a href="/participants/petstore_web/deployments">Deployments <span class="count">1</span></a>`)
 	this.Contains(body, `<a href="/participants/petstore_web/checks">Checks <span class="count">0</span></a>`)
@@ -152,14 +160,16 @@ func (this *IntegrationSuite) TestShowParticipantRelations_ShowsTheHeaderTabsAnd
 
 func (this *IntegrationSuite) TestShowParticipantRelations_ConsumesListsTheLatestVersionProvidersWithWhereTheyAreDeployed() {
 	this.petstoreForRelations()
+	production := this.environmentPathForRelations("production")
+	staging := this.environmentPathForRelations("staging")
 
 	_, _, body := this.getPage("/participants/petstore_web/relations", this.signInAsAdmin())
 
 	this.Contains(body, `<span class="muted">from the latest version, 2.3.0</span>`)
 	ghost := `<li><span class="name">ghost</span><span class="badges"><span class="badge quiet">not a participant</span></span></li>`
 	admin := `<li><a class="name" href="/participants/petstore_admin">petstore_admin</a><span class="badges"><span class="badge quiet">never published</span></span></li>`
-	api := `<li><a class="name" href="/participants/petstore_api">petstore_api</a><span class="badges"><span class="badge env">production <span class="v">1.4.0</span></span><span class="badge env">staging <span class="v">1.5.0</span></span></span></li>`
-	reviews := `<li><a class="name" href="/participants/petstore_reviews">petstore_reviews</a><span class="badges"><span class="badge env">production <span class="v">1.0.0</span></span><span class="badge env">staging <span class="v">1.1.0</span></span></span></li>`
+	api := `<li><a class="name" href="/participants/petstore_api">petstore_api</a><span class="badges"><a class="badge env" href="` + production + `">production <span class="v">1.4.0</span></a><a class="badge env" href="` + staging + `">staging <span class="v">1.5.0</span></a></span></li>`
+	reviews := `<li><a class="name" href="/participants/petstore_reviews">petstore_reviews</a><span class="badges"><a class="badge env" href="` + production + `">production <span class="v">1.0.0</span></a><a class="badge env" href="` + staging + `">staging <span class="v">1.1.0</span></a></span></li>`
 	for _, row := range []string{ghost, admin, api, reviews} {
 		this.Equal(1, strings.Count(body, row), row)
 	}
@@ -176,16 +186,15 @@ func (this *IntegrationSuite) TestShowParticipantRelations_ConsumedByListsPerEnv
 	_, _, body := this.getPage("/participants/petstore_api/relations", this.signInAsAdmin())
 
 	this.Contains(body, `<span class="name">petstore_api</span> consumes nothing in its latest version.`)
-	production := `<p class="pad"><span class="badge env">production</span></p>`
+	production := `<p class="pad"><a class="badge env" href="` + this.environmentPathForRelations("production") + `">production</a></p>`
 	reviews := `<li><a class="name" href="/participants/petstore_reviews">petstore_reviews</a><span class="ver">1.0.0</span></li>`
 	web := `<li><a class="name" href="/participants/petstore_web">petstore_web</a><span class="ver">2.2.0</span></li>`
 	this.Contains(body, production)
 	this.Less(strings.Index(body, production), strings.Index(body, reviews))
 	this.Less(strings.Index(body, reviews), strings.Index(body, web))
-	this.NotContains(body, `<p class="pad"><span class="badge env">staging</span></p>`)
+	this.NotContains(body, `">staging</a></p>`)
 	this.NotContains(body, `petstore_web</a><span class="ver">2.3.0</span>`)
 	this.Contains(body, `Relations <span class="count">2</span>`)
-	this.NotContains(body, `href="/environments`)
 }
 
 func (this *IntegrationSuite) TestShowParticipantRelations_NeverPublishedParticipantStillShowsConsumedBy() {
@@ -199,9 +208,9 @@ func (this *IntegrationSuite) TestShowParticipantRelations_NeverPublishedPartici
 	this.NotContains(body, `from the latest version`)
 	this.Contains(body, `<span class="name">petstore_admin</span> has never published a contract, so it consumes nothing yet.`)
 	this.Contains(body, `<code class="cmd">bidirekt publish</code>`)
-	this.Contains(body, `<p class="pad"><span class="badge env">staging</span></p>`)
+	this.Contains(body, `<p class="pad"><a class="badge env" href="`+this.environmentPathForRelations("staging")+`">staging</a></p>`)
 	this.Contains(body, `<li><a class="name" href="/participants/petstore_reviews">petstore_reviews</a><span class="ver">1.1.0</span></li>`)
-	this.NotContains(body, `<p class="pad"><span class="badge env">production</span></p>`)
+	this.NotContains(body, `">production</a></p>`)
 	this.NotContains(body, `petstore_web</a><span class="ver">`)
 	this.Contains(body, `Relations <span class="count">1</span>`)
 	this.Contains(body, `Versions <span class="count">0</span>`)

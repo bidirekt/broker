@@ -132,6 +132,13 @@ func (this *IntegrationSuite) TestShowContractVersion_ShowsTheFilesExactlyAsPubl
 	this.NotContains(body, `class="s"`)
 }
 
+func (this *IntegrationSuite) environmentPathForContractVersion(name string) string {
+	var id int64
+	this.Require().NoError(this.Pool.QueryRow(context.Background(), `SELECT id FROM environments WHERE name = $1`, name).Scan(&id))
+
+	return "/environments/" + strconv.FormatInt(id, 10)
+}
+
 func (this *IntegrationSuite) TestShowContractVersion_ShowsDeployedNowAndTheDeploymentHistoryNewestFirst() {
 	this.publishForContractVersion()
 	this.mustPostForContractVersion("/api/contracts", this.publishBody("version_web", "3.0.0",
@@ -142,18 +149,20 @@ func (this *IntegrationSuite) TestShowContractVersion_ShowsDeployedNowAndTheDepl
 	this.deployForContractVersion("version_web", "release/2.0", "production")
 	this.deployForContractVersion("version_web", "3.0.0", "production")
 	this.deployForContractVersion("version_web", "release/2.0", "production")
+	production := `<a class="badge env" href="` + this.environmentPathForContractVersion("production") + `">production</a>`
+	staging := `<a class="badge env" href="` + this.environmentPathForContractVersion("staging") + `">staging</a>`
 
 	_, _, body := this.getPage(contractVersionPath, this.signInAsAdmin())
 
-	this.Regexp(`(?s)<h2 class="h2">Deployed now</h2>.*?<li><span class="badge env">production</span><span class="muted">since <time datetime="[^"]+">[^<]+ UTC · just now</time></span></li>\s*<li><span class="badge env">staging</span>`, body)
+	this.Regexp(`(?s)<h2 class="h2">Deployed now</h2>.*?<li>`+production+`<span class="muted">since <time datetime="[^"]+">[^<]+ UTC · just now</time></span></li>\s*<li>`+staging, body)
 
 	history := body[strings.Index(body, `Deployment history`):strings.Index(body, `All checks`)]
 	this.Equal(3, strings.Count(history, `<tr>`)-1)
 	this.Equal(1, strings.Count(history, `rollback</span>`))
 	rows := strings.Split(history, `<tr>`)[2:]
-	this.Contains(rows[0], `<span class="badge env">production</span><span class="badge rb">`)
-	this.Contains(rows[1], `<span class="badge env">production</span></span>`)
-	this.Contains(rows[2], `<span class="badge env">staging</span></span>`)
+	this.Contains(rows[0], production+`<span class="badge rb">`)
+	this.Contains(rows[1], production+`</span>`)
+	this.Contains(rows[2], staging+`</span>`)
 	this.Contains(rows[0], ` UTC · just now</time>`)
 }
 
@@ -185,14 +194,16 @@ func (this *IntegrationSuite) TestShowContractVersion_ShowsTheLatestCheckPerEnvi
 	stagingBreaks := this.breaksOnCheckPageForContractVersion(latestStaging, cookie)
 	production := strconv.FormatInt(latestProduction, 10)
 	staging := strconv.FormatInt(latestStaging, 10)
+	productionBadge := `<a class="badge env" href="` + this.environmentPathForContractVersion("production") + `">production</a>`
+	stagingBadge := `<a class="badge env" href="` + this.environmentPathForContractVersion("staging") + `">staging</a>`
 
 	status, _, body := this.getPage(contractVersionPath, cookie)
 	this.Require().Equal(http.StatusOK, status, body)
 
 	latest := body[strings.Index(body, `Latest check per environment`):strings.Index(body, `<h2 class="h2">Contract</h2>`)]
 	this.Equal(2, strings.Count(latest, `<li>`))
-	this.Regexp(`<li><span class="badge env">production</span><span class="badge no">.*?no · `+productionBreaks+`</span><a href="/checks/`+production+`">check #`+production+`</a><span class="muted"><time datetime="[^"]+">[^<]+ UTC · just now</time></span></li>`, latest)
-	this.Regexp(`<li><span class="badge env">staging</span><span class="badge no">.*?no · `+stagingBreaks+`</span><a href="/checks/`+staging+`">check #`+staging+`</a>`, latest)
+	this.Regexp(`<li>`+productionBadge+`<span class="badge no">.*?no · `+productionBreaks+`</span><a href="/checks/`+production+`">check #`+production+`</a><span class="muted"><time datetime="[^"]+">[^<]+ UTC · just now</time></span></li>`, latest)
+	this.Regexp(`<li>`+stagingBadge+`<span class="badge no">.*?no · `+stagingBreaks+`</span><a href="/checks/`+staging+`">check #`+staging+`</a>`, latest)
 	this.Less(strings.Index(latest, `production`), strings.Index(latest, `staging`))
 
 	all := body[strings.Index(body, `All checks`):]
@@ -201,7 +212,8 @@ func (this *IntegrationSuite) TestShowContractVersion_ShowsTheLatestCheckPerEnvi
 	this.Contains(all, `<span class="badge cpb no">version_api <span class="v">1.0.0</span> · `+productionBreaks+`</span>`)
 	this.Contains(all, `<span class="badge cpb no">version_api <span class="v">no version</span> · `+stagingBreaks+`</span>`)
 	this.Contains(all, `<td data-l="Answer"><span class="badge no">`)
-	this.NotContains(body, `href="/environments`)
+	this.Contains(all, `<td data-l="Environment">`+productionBadge+`</td>`)
+	this.Contains(all, `<td data-l="Environment">`+stagingBadge+`</td>`)
 }
 
 func (this *IntegrationSuite) TestShowContractVersion_CheckWithoutAStoredReportShowsNoCount() {

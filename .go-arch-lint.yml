@@ -37,6 +37,8 @@ components:
   feature_list_participant_deployments: { in: internal/features/list_participant_deployments }
   feature_list_participant_checks: { in: internal/features/list_participant_checks }
   feature_show_participant_relations: { in: internal/features/show_participant_relations }
+  feature_list_environment_pages: { in: internal/features/list_environment_pages }
+  feature_show_environment: { in: internal/features/show_environment }
   components:                 { in: internal/components }
   components_config:        { in: internal/components/config }
   components_passwords:     { in: internal/components/passwords }
@@ -106,13 +108,15 @@ deps:
       - feature_list_participant_deployments
       - feature_list_participant_checks
       - feature_show_participant_relations
+      - feature_list_environment_pages
+      - feature_show_environment
     canUse: [fiber]
 
   feature_can_i_deploy:
     mayDependOn: [contracts, components, components_access, repository, model, validations]
     canUse: [fiber, guregu_null]
   feature_create_environment:
-    mayDependOn: [components, components_access, repository, model, validations]
+    mayDependOn: [components, components_access, components_pages, components_respond, components_sessions, repository, model, validations]
     canUse: [fiber]
   feature_create_participant:
     mayDependOn: [components, components_access, components_pages, components_respond, components_sessions, repository, model, validations]
@@ -154,7 +158,7 @@ deps:
     mayDependOn: [components, components_access, repository, model, validations]
     canUse: [fiber]
   feature_rename_environment:
-    mayDependOn: [components, components_access, repository, model, validations]
+    mayDependOn: [components, components_access, components_pages, components_respond, components_sessions, repository, model, validations]
     canUse: [fiber]
   feature_rename_participant:
     mayDependOn: [components, components_access, components_pages, components_respond, components_sessions, repository, model, validations]
@@ -193,6 +197,13 @@ deps:
     mayDependOn: [components, components_access, components_breakreport, components_pages, components_respond, repository, model]
     canUse: [fiber]
   feature_show_participant_relations:
+    mayDependOn: [components, components_access, components_pages, components_respond, repository, model]
+    canUse: [fiber, guregu_null]
+  feature_show_environment:
+    mayDependOn: [components, components_access, components_breakreport, components_pages, components_respond, repository, model]
+    canUse: [fiber]
+
+  feature_list_environment_pages:
     mayDependOn: [components, components_access, components_pages, components_respond, repository, model]
     canUse: [fiber, guregu_null]
 

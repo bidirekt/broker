@@ -25,7 +25,7 @@ func (this *IntegrationSuite) TestLayout_SignedInPageIsDarkWithTheTopBar() {
 	this.Contains(body, `<span class="email">`+suiteAdminEmail+`</span>`)
 	this.Contains(body, `<button type="submit" class="linkbtn">Sign out</button>`)
 	this.Contains(body, `<a href="/participants">Participants</a>`)
-	this.NotContains(body, `href="/environments"`)
+	this.Contains(body, `<a href="/environments">Environments</a>`)
 	this.NotContains(body, `href="/compatibility"`)
 	this.assertLayoutIsSelfContained(body)
 }

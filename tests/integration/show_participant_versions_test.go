@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"strings"
@@ -104,8 +105,17 @@ func (this *IntegrationSuite) seedForShowParticipantVersions() {
 	this.mustPostForShowParticipantVersions("/api/can-i-deploy", `{"participant":"petstore_web","version":"2.3.0","environment":"production"}`)
 }
 
+func (this *IntegrationSuite) environmentPathForShowParticipantVersions(name string) string {
+	var id int64
+	this.Require().NoError(this.Pool.QueryRow(context.Background(), `SELECT id FROM environments WHERE name = $1`, name).Scan(&id))
+
+	return "/environments/" + strconv.FormatInt(id, 10)
+}
+
 func (this *IntegrationSuite) TestShowParticipantVersions_ShowsTheHeaderWithLatestVersionDeployedNowAndTabCounts() {
 	this.seedForShowParticipantVersions()
+	production := this.environmentPathForShowParticipantVersions("production")
+	staging := this.environmentPathForShowParticipantVersions("staging")
 
 	status, header, body := this.getPage("/participants/petstore_web", this.signInAsAdmin())
 
@@ -114,7 +124,7 @@ func (this *IntegrationSuite) TestShowParticipantVersions_ShowsTheHeaderWithLate
 	this.Equal("no-store", header.Get("Cache-Control"))
 	this.Contains(body, `<nav class="crumbs" aria-label="Breadcrumbs"><a href="/participants">participants</a><span aria-hidden="true">/</span><span aria-current="page">petstore_web</span></nav>`)
 	this.Contains(body, `<h1 class="mono">petstore_web</h1>`)
-	this.Contains(body, `<span>Latest <span class="ver">2.3.0</span></span><span class="badge env">production <span class="v">2.2.0</span></span><span class="badge env">staging <span class="v">2.3.0</span></span>`)
+	this.Contains(body, `<span>Latest <span class="ver">2.3.0</span></span><a class="badge env" href="`+production+`">production <span class="v">2.2.0</span></a><a class="badge env" href="`+staging+`">staging <span class="v">2.3.0</span></a>`)
 	this.Contains(body, `<a href="/participants/petstore_web" aria-current="page">Versions <span class="count">3</span></a>`)
 	this.Contains(body, `<a href="/participants/petstore_web/deployments">Deployments <span class="count">3</span></a>`)
 	this.Contains(body, `<a href="/participants/petstore_web/checks">Checks <span class="count">1</span></a>`)
@@ -141,6 +151,8 @@ func (this *IntegrationSuite) TestShowParticipantVersions_RelationsCountsOnlyDep
 
 func (this *IntegrationSuite) TestShowParticipantVersions_ListsVersionsNewestFirstWithPublishTimeAndWhereDeployedNow() {
 	this.seedForShowParticipantVersions()
+	production := this.environmentPathForShowParticipantVersions("production")
+	staging := this.environmentPathForShowParticipantVersions("staging")
 
 	_, _, body := this.getPage("/participants/petstore_web", this.signInAsAdmin())
 
@@ -157,8 +169,8 @@ func (this *IntegrationSuite) TestShowParticipantVersions_ListsVersionsNewestFir
 	}
 	this.Equal(3, strings.Count(body, `<td data-l="Published"><time datetime="`))
 	this.Contains(body, `just now</time></td>`)
-	this.Contains(body, `<td data-l="Deployed now"><span class="badges"><span class="badge env">staging</span></span></td>`)
-	this.Contains(body, `<td data-l="Deployed now"><span class="badges"><span class="badge env">production</span></span></td>`)
+	this.Contains(body, `<td data-l="Deployed now"><span class="badges"><a class="badge env" href="`+staging+`">staging</a></span></td>`)
+	this.Contains(body, `<td data-l="Deployed now"><span class="badges"><a class="badge env" href="`+production+`">production</a></span></td>`)
 	this.Contains(body, `<td data-l="Deployed now"><span class="muted">not deployed</span></td>`)
 	this.Contains(body, `showing 1–3 of 3`)
 }

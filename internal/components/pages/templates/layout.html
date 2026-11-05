@@ -14,6 +14,7 @@
       <a class="brand" href="/">{{template "mark"}}Bidirekt</a>
       <nav class="nav" aria-label="Main">
         <a href="/participants"{{if eq .Section "participants"}} aria-current="page"{{end}}>Participants</a>
+        <a href="/environments"{{if eq .Section "environments"}} aria-current="page"{{end}}>Environments</a>
         {{if .ManagesUsers}}
         <a href="/users"{{if eq .Section "users"}} aria-current="page"{{end}}>Users</a>
         {{end}}

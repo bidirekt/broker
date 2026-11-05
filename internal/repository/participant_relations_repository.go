@@ -28,7 +28,7 @@ const (
 
 	listRelationsDeploymentsQuery = `
 		SELECT
-			e.name, cd.version
+			e.id, e.name, cd.version
 		FROM
 			current_deployments cd
 			JOIN environments e ON e.id = cd.environment_id
@@ -43,6 +43,7 @@ const (
 			consumed.provider,
 			p.id IS NOT NULL,
 			EXISTS (SELECT 1 FROM contract_versions WHERE participant_id = p.id),
+			e.id,
 			e.name,
 			cd.version
 		FROM (
@@ -72,7 +73,7 @@ const (
 
 	listConsumersByEnvironmentQuery = `
 		SELECT
-			e.name, p.name, cd.version
+			e.id, e.name, p.name, cd.version
 		FROM
 			current_deployments cd
 			JOIN environments e ON e.id = cd.environment_id
@@ -125,7 +126,7 @@ func (this *ParticipantRepository) FindRelationsHeader(ctx context.Context, name
 
 	header.Deployed, err = pgx.CollectRows(rows, func(row pgx.CollectableRow) (model.RelationsDeployment, error) {
 		var deployment model.RelationsDeployment
-		err := row.Scan(&deployment.EnvironmentName, &deployment.Version)
+		err := row.Scan(&deployment.EnvironmentID, &deployment.EnvironmentName, &deployment.Version)
 		return deployment, err
 	})
 	if err != nil {
@@ -145,17 +146,18 @@ func (this *ParticipantRepository) ListConsumedProviders(ctx context.Context, pa
 	var providers []model.ConsumedProvider
 	for rows.Next() {
 		var provider model.ConsumedProvider
+		var environmentID null.Int
 		var environmentName, version null.String
-		if err := rows.Scan(&provider.Name, &provider.Registered, &provider.Published, &environmentName, &version); err != nil {
+		if err := rows.Scan(&provider.Name, &provider.Registered, &provider.Published, &environmentID, &environmentName, &version); err != nil {
 			panic(fmt.Errorf("error scanning consumed providers: %w", err))
 		}
 
 		if len(providers) == 0 || providers[len(providers)-1].Name != provider.Name {
 			providers = append(providers, provider)
 		}
-		if environmentName.Valid {
+		if environmentID.Valid {
 			last := &providers[len(providers)-1]
-			last.Deployed = append(last.Deployed, model.RelationsDeployment{EnvironmentName: environmentName.String, Version: version.String})
+			last.Deployed = append(last.Deployed, model.RelationsDeployment{EnvironmentID: environmentID.Int64, EnvironmentName: environmentName.String, Version: version.String})
 		}
 	}
 	if err := rows.Err(); err != nil {
@@ -174,14 +176,14 @@ func (this *ParticipantRepository) ListConsumersByEnvironment(ctx context.Contex
 
 	var environments []model.EnvironmentConsumers
 	for rows.Next() {
-		var environmentName string
+		var environment model.Environment
 		var consumer model.DeployedConsumer
-		if err := rows.Scan(&environmentName, &consumer.Name, &consumer.Version); err != nil {
+		if err := rows.Scan(&environment.ID, &environment.Name, &consumer.Name, &consumer.Version); err != nil {
 			panic(fmt.Errorf("error scanning consumers by environment: %w", err))
 		}
 
-		if len(environments) == 0 || environments[len(environments)-1].EnvironmentName != environmentName {
-			environments = append(environments, model.EnvironmentConsumers{EnvironmentName: environmentName})
+		if len(environments) == 0 || environments[len(environments)-1].EnvironmentID != environment.ID {
+			environments = append(environments, model.EnvironmentConsumers{EnvironmentID: environment.ID, EnvironmentName: environment.Name})
 		}
 		last := &environments[len(environments)-1]
 		last.Consumers = append(last.Consumers, consumer)

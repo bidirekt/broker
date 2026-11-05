@@ -78,7 +78,7 @@ consumes:
 
 var (
 	participantDeploymentsRow     = regexp.MustCompile(`(?s)<tr>\s*<td data-l="Environment">(.*?)</tr>`)
-	participantDeploymentsEnvCell = regexp.MustCompile(`<td data-l="Environment"><span class="badge env">([^<]+)</span>`)
+	participantDeploymentsEnvCell = regexp.MustCompile(`<td data-l="Environment"><a class="badge env" href="/environments/\d+">([^<]+)</a>`)
 	participantDeploymentsVerCell = regexp.MustCompile(`<a class="ver" href="[^"]+">([^<]+)</a>`)
 )
 
@@ -144,6 +144,8 @@ func (this *IntegrationSuite) deploymentRowsForParticipantDeployments(body strin
 
 func (this *IntegrationSuite) TestListParticipantDeployments_ShowsTheHeaderAndTheHistoryNewestFirst() {
 	this.historyForParticipantDeployments()
+	productionID := this.environmentIDForParticipantDeployments("production")
+	stagingID := this.environmentIDForParticipantDeployments("staging")
 
 	status, header, body := this.getPage(participantDeploymentsPath, this.signInAsAdmin())
 
@@ -153,7 +155,7 @@ func (this *IntegrationSuite) TestListParticipantDeployments_ShowsTheHeaderAndTh
 
 	this.Contains(body, `<h1 class="name">petstore_api</h1>`)
 	this.Contains(body, `Latest <a class="ver" href="/participants/petstore_api/versions/1.4.0">1.4.0</a>`)
-	this.Regexp(`(?s)<span class="badge env">production <span class="v">1.3.0</span></span>.*<span class="badge env">staging <span class="v">1.4.0</span></span>`, body)
+	this.Regexp(`(?s)<a class="badge env" href="/environments/`+productionID+`">production <span class="v">1.3.0</span></a>.*<a class="badge env" href="/environments/`+stagingID+`">staging <span class="v">1.4.0</span></a>`, body)
 
 	this.Contains(body, `<a href="/participants/petstore_api">Versions <span class="count">2</span></a>`)
 	this.Contains(body, `<a href="/participants/petstore_api/deployments" aria-current="page">Deployments <span class="count">4</span></a>`)
@@ -163,6 +165,8 @@ func (this *IntegrationSuite) TestListParticipantDeployments_ShowsTheHeaderAndTh
 	environments, versions, rows := this.deploymentRowsForParticipantDeployments(body)
 	this.Equal([]string{"staging", "production", "production", "production"}, environments)
 	this.Equal([]string{"1.4.0", "1.3.0", "1.4.0", "1.3.0"}, versions)
+	this.Contains(rows[0], `<a class="badge env" href="/environments/`+stagingID+`">staging</a>`)
+	this.Contains(rows[1], `<a class="badge env" href="/environments/`+productionID+`">production</a>`)
 	this.Contains(rows[1], `<span class="badge rb">`)
 	for _, row := range []string{rows[0], rows[2], rows[3]} {
 		this.NotContains(row, `<span class="badge rb">`)
@@ -274,7 +278,7 @@ func (this *IntegrationSuite) TestListParticipantDeployments_PublishedButNeverDe
 	status, _, body = this.getPage(participantDeploymentsPath+"?environment="+productionID, cookie)
 
 	this.Equal(http.StatusOK, status)
-	this.Contains(body, "No deployments in production")
+	this.Contains(body, `No deployments in <a class="name" href="/environments/`+productionID+`">production</a>`)
 	this.Contains(body, `<code class="cmd">bidirekt record-deployment</code>`)
 }
 

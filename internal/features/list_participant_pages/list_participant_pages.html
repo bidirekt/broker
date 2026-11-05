@@ -26,7 +26,7 @@
         {{if .LatestVersion.Valid}}
         <td data-l="Latest version"><span class="ver">{{.LatestVersion.String}}</span></td>
         <td data-l="Published">{{listTime .PublishedAt.Time}}</td>
-        <td data-l="Deployed">{{if .Deployments}}<div class="badges">{{range .Deployments}}<span class="badge env">{{.EnvironmentName}} <span class="v">{{.Version}}</span></span>{{end}}</div>{{else}}<span class="muted">not deployed</span>{{end}}</td>
+        <td data-l="Deployed">{{if .Deployments}}<div class="badges">{{range .Deployments}}<a class="badge env" href="/environments/{{.EnvironmentID}}">{{.EnvironmentName}} <span class="v">{{.Version}}</span></a>{{end}}</div>{{else}}<span class="muted">not deployed</span>{{end}}</td>
         {{else}}
         <td data-l="Latest version"><span class="muted">never published</span></td>
         <td data-l="Published"><span class="muted">never published</span></td>

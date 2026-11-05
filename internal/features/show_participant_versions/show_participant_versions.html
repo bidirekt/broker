@@ -8,7 +8,7 @@
   <div>
     <h1 class="mono">{{$participant}}</h1>
     {{if .Header.LatestVersion.Valid}}
-    <div class="sub badges"><span>Latest <span class="ver">{{.Header.LatestVersion.String}}</span></span>{{range .Header.DeployedNow}}<span class="badge env">{{.Environment.Name}} <span class="v">{{.Version}}</span></span>{{else}}<span class="badge quiet">not deployed</span>{{end}}</div>
+    <div class="sub badges"><span>Latest <span class="ver">{{.Header.LatestVersion.String}}</span></span>{{range .Header.DeployedNow}}<a class="badge env" href="/environments/{{.Environment.ID}}">{{.Environment.Name}} <span class="v">{{.Version}}</span></a>{{else}}<span class="badge quiet">not deployed</span>{{end}}</div>
     {{else}}
     <p class="sub">never published</p>
     {{end}}
@@ -37,7 +37,7 @@
       <tr>
         <td data-l="Version">{{if .URL}}<a class="ver" href="{{.URL}}">{{.Version}}</a>{{else}}<span class="ver">{{.Version}}</span>{{end}}</td>
         <td data-l="Published">{{listTime .PublishedAt}}</td>
-        <td data-l="Deployed now">{{if .DeployedIn}}<span class="badges">{{range .DeployedIn}}<span class="badge env">{{.Name}}</span>{{end}}</span>{{else}}<span class="muted">not deployed</span>{{end}}</td>
+        <td data-l="Deployed now">{{if .DeployedIn}}<span class="badges">{{range .DeployedIn}}<a class="badge env" href="/environments/{{.ID}}">{{.Name}}</a>{{end}}</span>{{else}}<span class="muted">not deployed</span>{{end}}</td>
       </tr>
       {{end}}
     </tbody>
