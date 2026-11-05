@@ -63,6 +63,14 @@ const (
 			users
 		ORDER BY
 			email COLLATE "C"
+		LIMIT $1 OFFSET $2
+	`
+
+	countUsersQuery = `
+		SELECT
+			count(*)
+		FROM
+			users
 	`
 
 	updateUserEmailAndPermissionQuery = `
@@ -238,18 +246,29 @@ func (this *UserRepository) AdminExists(ctx context.Context) bool {
 	return exists
 }
 
-func (this *UserRepository) List(ctx context.Context) []*model.User {
-	rows, err := this.pool.Query(ctx, listUsersQuery)
+func (this *UserRepository) List(ctx context.Context, limit, offset int) (users []*model.User, total int) {
+	tx, err := this.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	if err != nil {
+		panic(fmt.Errorf("error starting transaction: %w", err))
+	}
+
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if err := tx.QueryRow(ctx, countUsersQuery).Scan(&total); err != nil {
+		panic(fmt.Errorf("error counting users: %w", err))
+	}
+
+	rows, err := tx.Query(ctx, listUsersQuery, limit, offset)
 	if err != nil {
 		panic(fmt.Errorf("error listing users: %w", err))
 	}
 
-	users, err := pgx.AppendRows(make([]*model.User, 0), rows, scanUser)
+	users, err = pgx.AppendRows(make([]*model.User, 0), rows, scanUser)
 	if err != nil {
 		panic(fmt.Errorf("error listing users: %w", err))
 	}
 
-	return users
+	return users, total
 }
 
 func (this *UserRepository) UpdateEmailAndPermission(

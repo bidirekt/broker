@@ -20,7 +20,8 @@ const (
 	deactivateUserPassword     = "deactivate-user-correct-horse"
 	deactivateUserLinkToken    = "deactivate-user-pending-token"
 	deactivateUserNotFoundPage = "<h1>user not found</h1>"
-	deactivateUserErrorStatus  = "Status 404"
+	deactivateUserErrorStatus  = `<div class="code-n">404</div>`
+	deactivateUserNotice       = `<div class="flash" role="status">`
 	deactivateUserLinkNotValid = "this link is no longer valid, ask your admin for a new one"
 )
 
@@ -90,7 +91,7 @@ func (this *IntegrationSuite) deactivateUserCountRows(table string, userID int64
 
 func (this *IntegrationSuite) deactivateUserSeedLink(userID int64) {
 	tokenHash := sha256.Sum256([]byte(deactivateUserLinkToken))
-	_, found, deactivated := repository.NewOneTimeLinkRepository(this.Pool).ReplaceOpen(context.Background(), &model.OneTimeLink{
+	_, found, deactivated, _ := repository.NewOneTimeLinkRepository(this.Pool).ReplaceOpen(context.Background(), &model.OneTimeLink{
 		TokenHash: tokenHash[:],
 		UserID:    userID,
 		ExpiresAt: time.Now().Add(time.Hour),
@@ -216,7 +217,72 @@ func (this *IntegrationSuite) TestDeactivateUser_ButtonIsShownForEveryUserNotDea
 	status, _, body := this.getPage("/users", this.signInAsAdmin())
 
 	this.Require().Equal(http.StatusOK, status)
-	this.Contains(body, fmt.Sprintf(`<form method="post" action="/users/%d/deactivate"><button type="submit">Deactivate</button></form>`, invitedID))
-	this.Contains(body, fmt.Sprintf(`<form method="post" action="/users/%d/deactivate"><button type="submit">Deactivate</button></form>`, activeID))
+	this.Contains(body, fmt.Sprintf(`<form method="post" action="/users/%d/deactivate"><input type="hidden" name="page" value="1"><button type="submit" class="btn sm danger">Deactivate</button></form>`, invitedID))
+	this.Contains(body, fmt.Sprintf(`<form method="post" action="/users/%d/deactivate"><input type="hidden" name="page" value="1"><button type="submit" class="btn sm danger">Deactivate</button></form>`, activeID))
 	this.NotContains(body, fmt.Sprintf(`action="/users/%d/deactivate"`, deactivatedID))
+}
+
+func (this *IntegrationSuite) deactivateUserPostAs(cookie string, userID int64, form url.Values) (status int, header http.Header) {
+	_, _, users := this.getPage("/users", cookie)
+	status, header, _ = this.postForm(fmt.Sprintf("/users/%d/deactivate", userID), cookie, this.csrfTokenFrom(users), form)
+
+	return status, header
+}
+
+func (this *IntegrationSuite) TestDeactivateUser_ConfirmsWithASessionMessageOnTheUsersPage() {
+	userID := this.createActiveUser("Ana@X.com", model.PermissionWrite, deactivateUserPassword)
+	this.setUserState(userID, model.UserActive)
+	cookie := this.signInAsAdmin()
+
+	status, _ := this.deactivateUserPostAs(cookie, userID, url.Values{})
+	this.Require().Equal(http.StatusSeeOther, status)
+
+	_, _, users := this.getPage("/users", cookie)
+	this.Contains(users, deactivateUserNotice)
+	this.Contains(users, "<span>user deactivated: Ana@X.com</span>")
+
+	_, _, reloaded := this.getPage("/users", cookie)
+	this.NotContains(reloaded, deactivateUserNotice)
+}
+
+func (this *IntegrationSuite) TestDeactivateUser_SetsNoMessageWhenTheStateDidNotChange() {
+	for _, state := range []model.UserState{
+		model.UserDeactivated,
+	} {
+		userID := this.createActiveUser(string(state)+"@x.com", model.PermissionWrite, deactivateUserPassword)
+		this.setUserState(userID, state)
+		cookie := this.signInAsAdmin()
+
+		status, _ := this.deactivateUserPostAs(cookie, userID, url.Values{})
+		this.Require().Equal(http.StatusSeeOther, status, state)
+
+		_, _, users := this.getPage("/users", cookie)
+		this.NotContains(users, deactivateUserNotice, state)
+	}
+}
+
+func (this *IntegrationSuite) TestDeactivateUser_ReturnsToThePageItCameFrom() {
+	userID := this.createActiveUser("ana@x.com", model.PermissionWrite, deactivateUserPassword)
+	this.setUserState(userID, model.UserActive)
+
+	status, header := this.deactivateUserPostAs(this.signInAsAdmin(), userID, url.Values{"page": {"3"}})
+
+	this.Equal(http.StatusSeeOther, status)
+	this.Equal("/users?page=3", header.Get("Location"))
+}
+
+func (this *IntegrationSuite) TestDeactivateUser_AnswersNotFoundForANonCanonicalPageAndChangesNothing() {
+	userID := this.createActiveUser("ana@x.com", model.PermissionWrite, deactivateUserPassword)
+	this.setUserState(userID, model.UserActive)
+	cookie := this.signInAsAdmin()
+
+	for _, page := range []string{"0", "01", "+1", "", "abc"} {
+		status, _ := this.deactivateUserPostAs(cookie, userID, url.Values{"page": {page}})
+
+		this.Equal(http.StatusNotFound, status, page)
+	}
+
+	user, found := repository.NewUserRepository(this.Pool).FindByID(context.Background(), userID)
+	this.Require().True(found)
+	this.Equal(model.UserActive, user.State())
 }

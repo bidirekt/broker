@@ -16,15 +16,25 @@ const (
 	editUserInvalidEmail      = "invalid email"
 	editUserInvalidPermission = "invalid permission"
 	editUserUserNotFoundPage  = "<h1>user not found</h1>"
-	editUserErrorStatus       = "Status 404"
+	editUserErrorStatus       = `<div class="code-n">404</div>`
+	editUserNotFoundPage      = "<h1>Not Found</h1>"
+	editUserReadDescription   = "Sees every data screen and their own profile; runs can-i-deploy and validate."
+	editUserWriteDescription  = "Everything read does, plus publishing contracts, recording deployments, and creating and renaming participants and environments."
 )
 
 func (this *IntegrationSuite) editUserPost(userID, email, permission string) (status int, header http.Header, body string) {
+	return this.editUserPostForm(userID, url.Values{"email": {email}, "permission": {permission}})
+}
+
+func (this *IntegrationSuite) editUserPostForm(userID string, form url.Values) (status int, header http.Header, body string) {
 	cookie := this.signInAsAdmin()
 	_, _, users := this.getPage("/users", cookie)
 
-	return this.postForm("/users/"+userID+"/edit", cookie, this.csrfTokenFrom(users),
-		url.Values{"email": {email}, "permission": {permission}})
+	return this.postForm("/users/"+userID+"/edit", cookie, this.csrfTokenFrom(users), form)
+}
+
+func editUserFieldError(field string) string {
+	return `<p class="err" id="` + field + `-err"><svg`
 }
 
 func (this *IntegrationSuite) editUserFind(userID int64) *model.User {
@@ -40,9 +50,51 @@ func (this *IntegrationSuite) TestEditUser_FormIsPrefilledWithTheEmailAndPermiss
 	status, _, body := this.getPage(fmt.Sprintf("/users/%d/edit", userID), this.signInAsAdmin())
 
 	this.Equal(http.StatusOK, status)
+	this.Contains(body, "<h1>Edit ana@x.com</h1>")
 	this.Contains(body, `value="ana@x.com"`)
-	this.Contains(body, `<option value="write" selected>`)
-	this.Contains(body, fmt.Sprintf(`action="/users/%d/edit"`, userID))
+	this.Contains(body, `<input type="radio" name="permission" value="read" required>`)
+	this.Contains(body, `<input type="radio" name="permission" value="write" required checked>`)
+	this.Contains(body, editUserReadDescription)
+	this.Contains(body, editUserWriteDescription)
+	this.Contains(body, fmt.Sprintf(`<form class="sheet formcard" method="post" action="/users/%d/edit">`, userID))
+	this.Contains(body, `<button type="submit" class="btn primary">Save</button><a class="btn" href="/users">Cancel</a>`)
+	this.NotContains(body, `name="page"`)
+	this.NotContains(body, `aria-invalid`)
+}
+
+func (this *IntegrationSuite) TestEditUser_ShowsALineWithTheUserState() {
+	activeID := this.createActiveUser("ana@x.com", model.PermissionRead, editUserPassword)
+	invitedID := this.createActiveUser("bob@x.com", model.PermissionRead, editUserPassword)
+	this.setUserState(invitedID, model.UserInvited)
+	deactivatedID := this.createActiveUser("zoe@x.com", model.PermissionRead, editUserPassword)
+	this.setUserState(deactivatedID, model.UserDeactivated)
+	cookie := this.signInAsAdmin()
+
+	for userID, line := range map[int64]string{
+		activeID:      "Active since they set their password.",
+		invitedID:     "Invited, has not set a password yet.",
+		deactivatedID: "Deactivated.",
+	} {
+		status, _, body := this.getPage(fmt.Sprintf("/users/%d/edit", userID), cookie)
+
+		this.Equal(http.StatusOK, status, line)
+		this.Contains(body, `<p class="sub">`+line+`</p>`, line)
+	}
+}
+
+func (this *IntegrationSuite) TestEditUser_ARefusedFormKeepsTheStoredEmailInTheHeadingAndTheState() {
+	this.createActiveUser("ana@x.com", model.PermissionRead, editUserPassword)
+	bobID := this.createActiveUser("bob@x.com", model.PermissionRead, editUserPassword)
+	this.setUserState(bobID, model.UserInvited)
+
+	for _, email := range []string{"ana@x.com", "bob.x.com"} {
+		_, _, body := this.editUserPost(fmt.Sprint(bobID), email, "write")
+
+		this.Contains(body, "<h1>Edit bob@x.com</h1>", email)
+		this.Contains(body, `<span aria-current="page">bob@x.com</span>`, email)
+		this.Contains(body, `<p class="sub">Invited, has not set a password yet.</p>`, email)
+		this.Contains(body, `value="`+email+`"`, email)
+	}
 }
 
 func (this *IntegrationSuite) TestEditUser_ChangesEmailAndPermissionKeepingTheSessions() {
@@ -55,8 +107,7 @@ func (this *IntegrationSuite) TestEditUser_ChangesEmailAndPermissionKeepingTheSe
 	this.Equal("/users", header.Get("Location"))
 
 	_, _, users := this.getPage("/users", this.signInAsAdmin())
-	this.Contains(users, "<td>anna@y.com</td>")
-	this.Contains(users, "<td>write</td>")
+	this.Contains(users, "<td data-l=\"Email\"><span class=\"mono\">anna@y.com</span></td>\n        <td data-l=\"Permission\"><span class=\"badge perm\">write</span></td>")
 	this.NotContains(users, "ana@x.com")
 
 	profileStatus, _, _ := this.getPage("/profile", userCookie)
@@ -81,7 +132,10 @@ func (this *IntegrationSuite) TestEditUser_RefusesAnEmailUsedByAnotherUserInAnyC
 	status, _, body := this.editUserPost(fmt.Sprint(bobID), "ANA@x.com", "write")
 
 	this.Equal(http.StatusConflict, status)
-	this.Contains(body, editUserEmailAlreadyInUse)
+	this.Contains(body, `aria-invalid="true" aria-describedby="email-err">`)
+	this.Contains(body, editUserFieldError("email"))
+	this.Contains(body, `</svg><span>`+editUserEmailAlreadyInUse+`</span></p>`)
+	this.Contains(body, `value="write" required checked>`)
 	bob := this.editUserFind(bobID)
 	this.Equal("bob@x.com", bob.Email)
 	this.Equal(model.PermissionRead, bob.Permission)
@@ -93,19 +147,25 @@ func (this *IntegrationSuite) TestEditUser_RefusesAnInvalidEmailOrPermission() {
 	cases := []struct {
 		email      string
 		permission string
+		field      string
 		message    string
 	}{
-		{"ana.x.com", "write", editUserInvalidEmail},
-		{"ana @x.com", "write", editUserInvalidEmail},
-		{"anna@y.com", "admin", editUserInvalidPermission},
-		{"anna@y.com", "", editUserInvalidPermission},
+		{"ana.x.com", "write", "email", editUserInvalidEmail},
+		{"ana @x.com", "write", "email", editUserInvalidEmail},
+		{"anna@y.com", "admin", "permission", editUserInvalidPermission},
+		{"anna@y.com", "", "permission", editUserInvalidPermission},
 	}
 
 	for _, c := range cases {
 		status, _, body := this.editUserPost(fmt.Sprint(userID), c.email, c.permission)
 
 		this.Equal(http.StatusBadRequest, status, c.email+" "+c.permission)
-		this.Contains(body, c.message, c.email+" "+c.permission)
+		this.Contains(body, `aria-describedby="`+c.field+`-err">`, c.email+" "+c.permission)
+		this.Contains(body, editUserFieldError(c.field), c.email+" "+c.permission)
+		this.Contains(body, `</svg><span>`+c.message+`</span></p>`, c.email+" "+c.permission)
+		if c.field == "permission" {
+			this.NotContains(body, " checked", c.email+" "+c.permission)
+		}
 	}
 
 	user := this.editUserFind(userID)
@@ -139,5 +199,40 @@ func (this *IntegrationSuite) TestEditUser_ListOffersAnEditLinkPerUser() {
 
 	_, _, users := this.getPage("/users", this.signInAsAdmin())
 
-	this.Contains(users, fmt.Sprintf(`<a href="/users/%d/edit">Edit</a>`, userID))
+	this.Contains(users, fmt.Sprintf(`<a class="btn sm" href="/users/%d/edit?page=1">Edit</a>`, userID))
+}
+
+func (this *IntegrationSuite) TestEditUser_KeepsThePageItCameFromAndReturnsToIt() {
+	userID := this.createActiveUser("ana@x.com", model.PermissionRead, editUserPassword)
+
+	status, _, form := this.getPage(fmt.Sprintf("/users/%d/edit?page=2", userID), this.signInAsAdmin())
+
+	this.Require().Equal(http.StatusOK, status)
+	this.Contains(form, `<input type="hidden" name="page" value="2">`)
+	this.Contains(form, `<a class="btn" href="/users?page=2">Cancel</a>`)
+
+	status, _, refused := this.editUserPostForm(fmt.Sprint(userID), url.Values{"email": {"ana.x.com"}, "permission": {"read"}, "page": {"2"}})
+	this.Equal(http.StatusBadRequest, status)
+	this.Contains(refused, `<input type="hidden" name="page" value="2">`)
+
+	status, header, _ := this.editUserPostForm(fmt.Sprint(userID), url.Values{"email": {"anna@x.com"}, "permission": {"read"}, "page": {"2"}})
+	this.Equal(http.StatusSeeOther, status)
+	this.Equal("/users?page=2", header.Get("Location"))
+}
+
+func (this *IntegrationSuite) TestEditUser_AnswersNotFoundForANonCanonicalPage() {
+	userID := this.createActiveUser("ana@x.com", model.PermissionRead, editUserPassword)
+	cookie := this.signInAsAdmin()
+
+	for _, page := range []string{"0", "01", "+1", "", "abc"} {
+		status, _, body := this.getPage(fmt.Sprintf("/users/%d/edit?page=%s", userID, url.QueryEscape(page)), cookie)
+		this.Equal(http.StatusNotFound, status, "GET "+page)
+		this.Contains(body, editUserNotFoundPage, "GET "+page)
+
+		status, _, body = this.editUserPostForm(fmt.Sprint(userID), url.Values{"email": {"anna@x.com"}, "permission": {"write"}, "page": {page}})
+		this.Equal(http.StatusNotFound, status, "POST "+page)
+		this.Contains(body, editUserNotFoundPage, "POST "+page)
+	}
+
+	this.Equal("ana@x.com", this.editUserFind(userID).Email)
 }

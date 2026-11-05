@@ -89,7 +89,11 @@ func (this *IntegrationSuite) TestInputDoor_RefusesTextThatIsNotUTF8OrCarriesNUL
 
 			this.Equal(http.StatusBadRequest, status)
 			this.Equal("text/html; charset=utf-8", header.Get("Content-Type"))
+			this.Contains(body, `<div class="code-n">400</div>`)
 			this.Contains(body, "<h1>"+inputDoorInvalidInput+"</h1>")
+			this.Contains(body, `href="/">Go to overview</a>`)
+			this.Contains(body, `data-theme="light"`)
+			this.NotContains(body, `action="/sign-out"`)
 			this.Equal(rowsBefore, this.countRows(page.table))
 		})
 	}
@@ -144,6 +148,22 @@ func (this *IntegrationSuite) TestInputDoor_RefusesTextThatIsNotUTF8OrCarriesNUL
 			this.Equal(rowsBefore, this.countRows(api.table))
 		})
 	}
+}
+
+func (this *IntegrationSuite) TestInputDoor_RefusedPagePostOffersOnlyTheOverview() {
+	status, _, body := this.postForm("/sign-in", "", "", url.Values{"email": {"a\x00@x.io"}, "password": {inputDoorPassword}})
+
+	this.Equal(http.StatusBadRequest, status)
+	this.Contains(body, `<a class="btn primary" href="/">Go to overview</a>`)
+	this.NotContains(body, "Try again")
+}
+
+func (this *IntegrationSuite) TestInputDoor_RefusedPageGetOffersToTryAgain() {
+	status, _, body := this.getPage("/set-password?token=%FF%00", "")
+
+	this.Equal(http.StatusBadRequest, status)
+	this.Contains(body, `<a class="btn primary" href="">Try again</a>`)
+	this.Contains(body, `<a class="btn" href="/">Go to overview</a>`)
 }
 
 func (this *IntegrationSuite) TestInputDoor_RefusesAJSONNULEscapeSentAsAForm() {

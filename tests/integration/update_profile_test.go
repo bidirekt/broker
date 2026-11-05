@@ -21,6 +21,11 @@ const (
 	profileAdminEmail           = "admin@example.com"
 	profileAdminSecret          = "suite-admin-correct-horse"
 	profileLinkInvalid          = "this link is no longer valid, ask your admin for a new one"
+	profileNotice               = `<div class="flash" role="status">`
+	profileAskTheAdmin          = "Forgot the current one? Ask your broker's admin for a reset link."
+	profileReadDescription      = "Sees every data screen and their own profile; runs can-i-deploy and validate."
+	profileWriteDescription     = "Everything read does, plus publishing contracts, recording deployments, and creating and renaming participants and environments."
+	profileAdminDescription     = "Everything write can do, plus managing users. The only admin of this broker."
 )
 
 var profileResetLinkInPage = regexp.MustCompile(`http://localhost:8080/set-password\?token=([A-Za-z0-9_-]{43})`)
@@ -44,12 +49,52 @@ func (this *IntegrationSuite) TestUpdateProfile_PageAsksCurrentAndNewPassword() 
 	this.createActiveUser(profileUserEmail, model.PermissionRead, profileCurrentPassword)
 	cookie := this.signInAsUser(profileUserEmail, profileCurrentPassword)
 
-	status, _, body := this.getPage("/profile", cookie)
+	status, header, body := this.getPage("/profile", cookie)
 	this.Equal(http.StatusOK, status)
-	this.Contains(body, `<form method="post" action="/profile">`)
+	this.Equal("text/html; charset=utf-8", header.Get("Content-Type"))
+	this.Equal("no-store", header.Get("Cache-Control"))
+	this.Contains(body, `<form class="sheet formcard" method="post" action="/profile">`)
 	this.Contains(body, `name="current_password"`)
 	this.Contains(body, `name="new_password"`)
 	this.Contains(body, `action="/sign-out"`)
+	this.NotContains(body, `aria-invalid`)
+	this.NotContains(body, `role="alert"`)
+}
+
+func (this *IntegrationSuite) TestUpdateProfile_IdentityCardShowsEmailPermissionAndItsDescription() {
+	this.createActiveUser(profileUserEmail, model.PermissionRead, profileCurrentPassword)
+	readCookie := this.signInAsUser(profileUserEmail, profileCurrentPassword)
+	_, _, body := this.getPage("/profile", readCookie)
+	this.Contains(body, `<div class="mono">`+profileUserEmail+`</div>`)
+	this.Contains(body, `<span class="badge perm">read</span>`)
+	this.Contains(body, profileReadDescription)
+	this.Contains(body, profileAskTheAdmin)
+
+	writerEmail := "bia@x.com"
+	this.createActiveUser(writerEmail, model.PermissionWrite, profileCurrentPassword)
+	writeCookie := this.signInAsUser(writerEmail, profileCurrentPassword)
+	_, _, body = this.getPage("/profile", writeCookie)
+	this.Contains(body, `<span class="badge perm">write</span>`)
+	this.Contains(body, profileWriteDescription)
+	this.Contains(body, profileAskTheAdmin)
+}
+
+func (this *IntegrationSuite) TestUpdateProfile_AdminIsNeverToldToAskTheAdmin() {
+	cookie := this.signInAsAdmin()
+
+	status, _, body := this.getPage("/profile", cookie)
+	this.Equal(http.StatusOK, status)
+	this.Contains(body, `<div class="mono">`+profileAdminEmail+`</div>`)
+	this.Contains(body, `<span class="badge perm">admin</span>`)
+	this.Contains(body, profileAdminDescription)
+	this.NotContains(body, "Ask your broker's admin")
+
+	status, _, body = this.postForm("/profile", cookie, this.csrfTokenFrom(body), url.Values{
+		"current_password": {"not-the-current-password"},
+		"new_password":     {profileNewPassword},
+	})
+	this.Equal(http.StatusBadRequest, status)
+	this.NotContains(body, "Ask your broker's admin")
 }
 
 func (this *IntegrationSuite) TestUpdateProfile_WrongCurrentPassword_Answers400AndKeepsThePassword() {
@@ -63,7 +108,11 @@ func (this *IntegrationSuite) TestUpdateProfile_WrongCurrentPassword_Answers400A
 		"new_password":     {profileNewPassword},
 	})
 	this.Equal(http.StatusBadRequest, status)
+	this.Contains(body, `name="current_password" type="password" autocomplete="current-password" required autofocus aria-invalid="true" aria-describedby="current_password-err">`)
+	this.Contains(body, `<p class="err" id="current_password-err">`)
 	this.Contains(body, profileCurrentPasswordWrong)
+	this.Contains(body, `<div class="mono">`+profileUserEmail+`</div>`)
+	this.NotContains(body, `role="alert"`)
 	this.Equal(passwordHashBefore, this.profilePasswordHash(userID))
 }
 
@@ -92,7 +141,10 @@ func (this *IntegrationSuite) TestUpdateProfile_ShortNewPassword_Answers400AndKe
 		"new_password":     {"fourteen-chars"},
 	})
 	this.Equal(http.StatusBadRequest, status)
+	this.Contains(body, `name="new_password" type="password" autocomplete="new-password" required aria-invalid="true" aria-describedby="new_password-err">`)
+	this.Contains(body, `<p class="err" id="new_password-err">`)
 	this.Contains(body, profilePasswordInvalid)
+	this.NotContains(body, `aria-describedby="current_password-err"`)
 	this.Equal(passwordHashBefore, this.profilePasswordHash(userID))
 }
 
@@ -102,20 +154,22 @@ func (this *IntegrationSuite) TestUpdateProfile_Success_EndsOtherSessionsAndKeep
 	cookie := this.signInAsUser(profileUserEmail, profileCurrentPassword)
 	csrfToken := this.openProfile(cookie)
 
-	status, _, body := this.postForm("/profile", cookie, csrfToken, url.Values{
+	status, header, _ := this.postForm("/profile", cookie, csrfToken, url.Values{
 		"current_password": {profileCurrentPassword},
 		"new_password":     {profileNewPassword},
 	})
-	this.Equal(http.StatusOK, status)
-	this.Contains(body, profilePasswordChanged)
+	this.Equal(http.StatusSeeOther, status)
+	this.Equal("/profile", header.Get("Location"))
 	this.True(passwords.Verify(profileNewPassword, this.profilePasswordHash(userID)))
 
-	status, header, _ := this.getPage("/profile", otherCookie)
+	status, header, _ = this.getPage("/profile", otherCookie)
 	this.Equal(http.StatusSeeOther, status)
 	this.Equal("/sign-in", header.Get("Location"))
 
-	status, _, _ = this.getPage("/profile", cookie)
+	status, _, body := this.getPage("/profile", cookie)
 	this.Equal(http.StatusOK, status)
+	this.Contains(body, profileNotice)
+	this.Contains(body, "<span>"+profilePasswordChanged+"</span>")
 	this.Equal(1, this.countRows("sessions"))
 
 	status, _, _ = this.postForm("/sign-in", "", "", url.Values{
@@ -142,7 +196,7 @@ func (this *IntegrationSuite) TestUpdateProfile_Success_EndsTheOpenResetLink() {
 		"current_password": {profileCurrentPassword},
 		"new_password":     {profileNewPassword},
 	})
-	this.Require().Equal(http.StatusOK, status)
+	this.Require().Equal(http.StatusSeeOther, status)
 
 	status, _, body := this.getPage("/set-password?token="+match[1], "")
 	this.Equal(http.StatusGone, status)
@@ -153,12 +207,15 @@ func (this *IntegrationSuite) TestUpdateProfile_AdminChangesItsPasswordAndSignsI
 	cookie := this.signInAsAdmin()
 	csrfToken := this.openProfile(cookie)
 
-	status, _, body := this.postForm("/profile", cookie, csrfToken, url.Values{
+	status, header, _ := this.postForm("/profile", cookie, csrfToken, url.Values{
 		"current_password": {profileAdminSecret},
 		"new_password":     {profileNewPassword},
 	})
-	this.Require().Equal(http.StatusOK, status)
-	this.Contains(body, profilePasswordChanged)
+	this.Require().Equal(http.StatusSeeOther, status)
+	this.Equal("/profile", header.Get("Location"))
+
+	_, _, body := this.getPage("/profile", cookie)
+	this.Contains(body, "<span>"+profilePasswordChanged+"</span>")
 
 	this.NotEmpty(this.signInAsUser(profileAdminEmail, profileNewPassword))
 }

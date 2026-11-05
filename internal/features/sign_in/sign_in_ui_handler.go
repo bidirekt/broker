@@ -61,6 +61,13 @@ func (this *SignInUiHandler) Email(ctx fiber.Ctx) string {
 	return ctx.FormValue(emailFormField)
 }
 
+func (this *SignInUiHandler) RespondTooManyAttempts(ctx fiber.Ctx) error {
+	return pages.Render(ctx, fiber.StatusTooManyRequests, pageFiles, signInTemplate, SignInPage{
+		Email:   this.Email(ctx),
+		Message: TooManySignInAttemptsMessage,
+	})
+}
+
 func (this *SignInUiHandler) respondForbidden(ctx fiber.Ctx) error {
 	return respond.Problem(ctx, fiber.StatusForbidden, access.ForbiddenMessage)
 }

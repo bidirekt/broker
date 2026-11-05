@@ -25,7 +25,9 @@ type SetPasswordInput struct {
 }
 
 type SetPasswordOutput struct {
-	Status SetPasswordStatus
+	Status    SetPasswordStatus
+	Email     string
+	ExpiresAt time.Time
 }
 
 type FindLinkOutput struct {
@@ -56,12 +58,13 @@ func (this *SetPasswordUseCase) FindLink(ctx context.Context, token string) Find
 }
 
 func (this *SetPasswordUseCase) Execute(ctx context.Context, input SetPasswordInput) (SetPasswordOutput, error) {
-	if validations.Password(input.Password) != nil {
-		return SetPasswordOutput{Status: PasswordInvalid}, nil
+	link := this.FindLink(ctx, input.Token)
+	if link.Status != LinkFound {
+		return SetPasswordOutput{Status: LinkInvalid}, nil
 	}
 
-	if this.FindLink(ctx, input.Token).Status != LinkFound {
-		return SetPasswordOutput{Status: LinkInvalid}, nil
+	if validations.Password(input.Password) != nil {
+		return SetPasswordOutput{Status: PasswordInvalid, Email: link.Email, ExpiresAt: link.ExpiresAt}, nil
 	}
 
 	passwordHash, err := passwords.Hash(input.Password)

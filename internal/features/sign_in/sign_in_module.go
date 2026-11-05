@@ -10,7 +10,7 @@ func Register(kernel *components.Components) {
 	useCase := NewSignInUseCase(userRepository)
 	uiHandler := NewSignInUiHandler(useCase, kernel.SessionKeeper)
 	apiHandler := NewSignInApiHandler(useCase, kernel.Settings)
-	limiter := newSignInLimiter()
+	limiter := newSignInLimiter(uiHandler.RespondTooManyAttempts)
 	kernel.Server.Get("/sign-in", uiHandler.ShowForm)
 	kernel.Server.Post("/sign-in", uiHandler.RequireSameOrigin, limiter.PerIP, limiter.PerAccount(uiHandler.Email), uiHandler.SignIn)
 	kernel.Server.Get(homePath, uiHandler.RedirectHome)

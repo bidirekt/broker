@@ -111,10 +111,12 @@ func (this *IntegrationSuite) TestSignInRateLimit_EleventhFailureForOneAccountIs
 		this.Require().Equal(http.StatusUnauthorized, status)
 	}
 
-	status, body := this.rateLimitPageSignIn(app, clientIP, rateLimitAnaEmail, rateLimitPassword)
+	status, body := this.rateLimitPageSignIn(app, clientIP, "ANA@x.com", rateLimitPassword)
 	this.Equal(http.StatusTooManyRequests, status)
-	this.Contains(body, rateLimitTooManyMessage)
-	this.Contains(body, "<html")
+	this.Contains(body, `<div class="alert" role="alert">`)
+	this.Contains(body, "<span>"+rateLimitTooManyMessage+"</span>")
+	this.Contains(body, `<form class="sheet formcard" method="post" action="/sign-in">`)
+	this.Contains(body, `value="ANA@x.com"`)
 
 	status, body = this.rateLimitApiSignIn(app, clientIP, rateLimitAnaEmail, rateLimitPassword)
 	this.Equal(http.StatusTooManyRequests, status)

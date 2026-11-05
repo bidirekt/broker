@@ -1,18 +1,39 @@
 {{define "title"}}Profile{{end}}
 
 {{define "content"}}
-<section class="narrow">
-<h1>Profile</h1>
-{{with .Page.Problem}}<p role="alert">{{.}}</p>{{end}}
-{{with .Page.Confirmation}}<p role="status">{{.}}</p>{{end}}
-<div class="panel">
-<form method="post" action="/profile">
-  <label for="current_password">Current password</label>
-  <input id="current_password" name="current_password" type="password" autocomplete="current-password" required autofocus>
-  <label for="new_password">New password</label>
-  <input id="new_password" name="new_password" type="password" autocomplete="new-password" required>
-  <button type="submit">Change password</button>
-</form>
-</div>
+<div class="head"><h1>Profile</h1></div>
+{{if and .Page.Message (not .Page.Field)}}<div class="alert" role="alert">{{template "icon_error" 14}}<span>{{.Page.Message}}</span></div>{{end}}
+<section class="sheet pad ident" aria-label="Your account">
+  <span class="av">{{template "icon_user" 18}}</span>
+  <div>
+    <div class="mono">{{.Page.Email}}</div>
+    <div><span class="badge perm">{{.Page.Permission}}</span> <span class="muted">{{.Page.PermissionDescription}}</span></div>
+  </div>
 </section>
+<div class="formgrid">
+  <form class="sheet formcard" method="post" action="/profile">
+    <div class="sheet-head"><h2 class="h2">Change your password</h2></div>
+    <div class="form">
+      <div class="field">
+        <label for="current_password">Current password</label>
+        <input class="input" id="current_password" name="current_password" type="password" autocomplete="current-password" required autofocus{{if eq .Page.Field "current_password"}} aria-invalid="true" aria-describedby="current_password-err"{{end}}>
+        {{if eq .Page.Field "current_password"}}<p class="err" id="current_password-err">{{template "icon_error" 14}}<span>{{.Page.Message}}</span></p>{{end}}
+      </div>
+      <div class="field">
+        <label for="new_password">New password</label>
+        <input class="input" id="new_password" name="new_password" type="password" autocomplete="new-password" required{{if eq .Page.Field "new_password"}} aria-invalid="true" aria-describedby="new_password-err"{{end}}>
+        {{if eq .Page.Field "new_password"}}<p class="err" id="new_password-err">{{template "icon_error" 14}}<span>{{.Page.Message}}</span></p>{{end}}
+        <p class="hint">15 to 128 characters. A long passphrase works well.</p>
+      </div>
+    </div>
+    <div class="form-foot"><button type="submit" class="btn primary">Change password</button></div>
+  </form>
+  <aside class="sheet aside" aria-label="About passwords">
+    <h2>About passwords</h2>
+    <ul>
+      <li>15 to 128 characters.</li>
+      {{if not .ManagesUsers}}<li>Forgot the current one? Ask your broker's admin for a reset link.</li>{{end}}
+    </ul>
+  </aside>
+</div>
 {{end}}

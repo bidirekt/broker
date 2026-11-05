@@ -4,15 +4,17 @@ import (
 	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/components/pages"
 	"github.com/bidirekt/broker/internal/components/respond"
+	"github.com/bidirekt/broker/internal/components/sessions"
 	"github.com/gofiber/fiber/v3"
 )
 
 type DeactivateUserUiHandler struct {
-	useCase *DeactivateUserUseCase
+	useCase       *DeactivateUserUseCase
+	sessionKeeper *sessions.Keeper
 }
 
-func NewDeactivateUserUiHandler(useCase *DeactivateUserUseCase) *DeactivateUserUiHandler {
-	return &DeactivateUserUiHandler{useCase: useCase}
+func NewDeactivateUserUiHandler(useCase *DeactivateUserUseCase, sessionKeeper *sessions.Keeper) *DeactivateUserUiHandler {
+	return &DeactivateUserUiHandler{useCase: useCase, sessionKeeper: sessionKeeper}
 }
 
 func (this *DeactivateUserUiHandler) Handle(ctx fiber.Ctx) error {
@@ -25,15 +27,22 @@ func (this *DeactivateUserUiHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondUserNotFound(ctx)
 	}
 
+	returnPage, ok := pages.ReturnPage(ctx, pageParam)
+	if !ok {
+		return respond.NotFound(ctx)
+	}
+
 	output := this.useCase.Execute(ctx.Context(), DeactivateUserInput{UserID: userID})
 	switch output.Status {
 	case UserNotFound:
 		return this.respondUserNotFound(ctx)
 	case TargetIsTheAdmin:
 		return this.respondForbidden(ctx)
+	case UserDeactivated:
+		this.sessionKeeper.SetMessage(ctx, UserDeactivatedMessage+output.User.Email)
 	}
 
-	return pages.Redirect(ctx, usersPath)
+	return pages.Redirect(ctx, usersPathFor(returnPage))
 }
 
 func (this *DeactivateUserUiHandler) respondForbidden(ctx fiber.Ctx) error {

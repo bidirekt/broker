@@ -1,0 +1,51 @@
+package integration_test
+
+import (
+	"net/http"
+	"regexp"
+	"strings"
+)
+
+var (
+	layoutInlineStyle  = regexp.MustCompile(`<style|\sstyle=`)
+	layoutInlineScript = regexp.MustCompile(`<script[^>]*>[^<]`)
+	layoutExternalLink = regexp.MustCompile(`(?:src|href)="(?:https?:)?//`)
+)
+
+func (this *IntegrationSuite) TestLayout_SignedInPageIsDarkWithTheTopBar() {
+	cookie := this.signInAsAdmin()
+
+	status, _, body := this.getPage("/users", cookie)
+
+	this.Equal(http.StatusOK, status)
+	this.Contains(body, `<html lang="en" data-theme="dark">`)
+	this.Contains(body, `<body class="bk" hx-boost="true" hx-headers='{"X-CSRF-Token": "`)
+	this.Contains(body, `<link rel="stylesheet" href="/assets/bundle.css">`)
+	this.Contains(body, `<a class="brand" href="/">`)
+	this.Contains(body, `<span class="email">`+suiteAdminEmail+`</span>`)
+	this.Contains(body, `<button type="submit" class="linkbtn">Sign out</button>`)
+	this.NotContains(body, `href="/participants"`)
+	this.NotContains(body, `href="/environments"`)
+	this.NotContains(body, `href="/compatibility"`)
+	this.assertLayoutIsSelfContained(body)
+}
+
+func (this *IntegrationSuite) TestLayout_SignedOutPageIsLightWithOnlyTheBrand() {
+	status, _, body := this.getPage("/sign-in", "")
+
+	this.Equal(http.StatusOK, status)
+	this.Contains(body, `<html lang="en" data-theme="light">`)
+	this.Contains(body, `<body class="bk" hx-boost="true">`)
+	this.Contains(body, `<link rel="stylesheet" href="/assets/bundle.css">`)
+	this.Contains(body, `<a class="brand" href="/">`)
+	this.NotContains(body, `class="nav"`)
+	this.NotContains(body, `class="email"`)
+	this.assertLayoutIsSelfContained(body)
+}
+
+func (this *IntegrationSuite) assertLayoutIsSelfContained(body string) {
+	this.NotRegexp(layoutInlineStyle, body)
+	this.NotRegexp(layoutInlineScript, body)
+	this.Equal(strings.Count(body, "<script"), strings.Count(body, `<script src="/assets/`))
+	this.NotRegexp(layoutExternalLink, body)
+}

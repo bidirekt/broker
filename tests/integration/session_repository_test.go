@@ -99,7 +99,7 @@ func (this *IntegrationSuite) TestSessionRepository_CreateAfterAResetLinkSetAnot
 	users := repository.NewUserRepository(this.Pool)
 	repo := repository.NewSessionRepository(this.Pool)
 	userID := this.sessionRepositoryCreateActiveUser()
-	_, found, deactivated := repository.NewOneTimeLinkRepository(this.Pool).ReplaceOpen(ctx,
+	_, found, deactivated, _ := repository.NewOneTimeLinkRepository(this.Pool).ReplaceOpen(ctx,
 		&model.OneTimeLink{TokenHash: []byte("ana-reset"), UserID: userID, ExpiresAt: time.Now().Add(24 * time.Hour)},
 	)
 	this.Require().True(found)
@@ -218,4 +218,56 @@ func (this *IntegrationSuite) TestSessionRepository_DeleteExpired_RemovesIdleAnd
 	this.Equal(1, this.countRows("sessions"))
 	_, ok := repo.FindByIDHash(ctx, []byte("fresh-session"))
 	this.True(ok)
+}
+
+func (this *IntegrationSuite) TestSessionRepository_MarkSeenTakingMessage_ReturnsTheMessageOnceAndBumpsLastSeenAt() {
+	ctx := context.Background()
+	repo := repository.NewSessionRepository(this.Pool)
+	userID := this.sessionRepositoryCreateActiveUser()
+
+	this.Require().True(repo.Create(ctx, sessionRepositoryUserSession("ana-session", userID), sessionRepositoryPasswordHash))
+	repo.SetMessage(ctx, []byte("ana-session"), "participant created")
+	_, err := this.Pool.Exec(ctx, `UPDATE sessions SET last_seen_at = now() - interval '1 hour'`)
+	this.Require().NoError(err)
+
+	this.Equal("participant created", repo.MarkSeenTakingMessage(ctx, []byte("ana-session")))
+
+	found, ok := repo.FindByIDHash(ctx, []byte("ana-session"))
+	this.Require().True(ok)
+	this.WithinDuration(time.Now(), found.LastSeenAt, time.Minute)
+
+	this.Empty(repo.MarkSeenTakingMessage(ctx, []byte("ana-session")))
+}
+
+func (this *IntegrationSuite) TestSessionRepository_MarkSeenTakingMessage_TakesOnlyThatSessionsMessage() {
+	ctx := context.Background()
+	repo := repository.NewSessionRepository(this.Pool)
+	userID := this.sessionRepositoryCreateActiveUser()
+
+	this.Require().True(repo.Create(ctx, sessionRepositoryUserSession("ana-laptop", userID), sessionRepositoryPasswordHash))
+	this.Require().True(repo.Create(ctx, sessionRepositoryUserSession("ana-phone", userID), sessionRepositoryPasswordHash))
+	repo.SetMessage(ctx, []byte("ana-laptop"), "participant created")
+	repo.SetMessage(ctx, []byte("ana-phone"), "environment created")
+
+	this.Equal("participant created", repo.MarkSeenTakingMessage(ctx, []byte("ana-laptop")))
+	this.Equal("environment created", repo.MarkSeenTakingMessage(ctx, []byte("ana-phone")))
+}
+
+func (this *IntegrationSuite) TestSessionRepository_MarkSeenTakingMessageOfAnUnknownSession_ReturnsNone() {
+	repo := repository.NewSessionRepository(this.Pool)
+
+	this.Empty(repo.MarkSeenTakingMessage(context.Background(), []byte("no-such-session")))
+}
+
+func (this *IntegrationSuite) TestSessionRepository_MarkSeen_KeepsTheMessage() {
+	ctx := context.Background()
+	repo := repository.NewSessionRepository(this.Pool)
+	userID := this.sessionRepositoryCreateActiveUser()
+
+	this.Require().True(repo.Create(ctx, sessionRepositoryUserSession("ana-session", userID), sessionRepositoryPasswordHash))
+	repo.SetMessage(ctx, []byte("ana-session"), "participant created")
+
+	repo.MarkSeen(ctx, []byte("ana-session"))
+
+	this.Equal("participant created", repo.MarkSeenTakingMessage(ctx, []byte("ana-session")))
 }

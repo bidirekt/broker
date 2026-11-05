@@ -28,6 +28,7 @@ type EditUserInput struct {
 
 type EditUserOutput struct {
 	Status EditUserStatus
+	User   *model.User
 }
 
 type FindUserOutput struct {
@@ -57,27 +58,28 @@ func (this *EditUserUseCase) FindUser(ctx context.Context, userID int64) FindUse
 }
 
 func (this *EditUserUseCase) Execute(ctx context.Context, input EditUserInput) EditUserOutput {
-	if target := this.FindUser(ctx, input.UserID); target.Status != UserFound {
+	target := this.FindUser(ctx, input.UserID)
+	if target.Status != UserFound {
 		return EditUserOutput{Status: target.Status}
 	}
 
 	if validations.Email(input.Email) != nil {
-		return EditUserOutput{Status: EmailInvalid}
+		return EditUserOutput{Status: EmailInvalid, User: target.User}
 	}
 
 	permission := model.Permission(input.Permission)
 	if !permission.IsGrantable() {
-		return EditUserOutput{Status: PermissionInvalid}
+		return EditUserOutput{Status: PermissionInvalid, User: target.User}
 	}
 
 	updated, conflict := this.userRepository.UpdateEmailAndPermission(ctx, input.UserID, input.Email, permission)
 	if conflict {
-		return EditUserOutput{Status: EmailAlreadyInUse}
+		return EditUserOutput{Status: EmailAlreadyInUse, User: target.User}
 	}
 
 	if !updated {
 		return EditUserOutput{Status: UserNotFound}
 	}
 
-	return EditUserOutput{Status: UserEdited}
+	return EditUserOutput{Status: UserEdited, User: target.User}
 }

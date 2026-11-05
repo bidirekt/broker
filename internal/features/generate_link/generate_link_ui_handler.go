@@ -39,15 +39,17 @@ func (this *GenerateLinkUiHandler) Handle(ctx fiber.Ctx) error {
 	case UserNotFound:
 		return this.respondUserNotFound(ctx)
 	case UserDeactivated:
-		return this.respondWithMessage(ctx, fiber.StatusConflict, UserDeactivatedMessage)
+		return this.respondWithMessage(ctx, fiber.StatusConflict, output.Email, UserDeactivatedMessage)
 	case TargetIsTheAdmin:
 		return this.respondForbidden(ctx)
 	}
 
 	return pages.Render(ctx, fiber.StatusOK, pageFiles, generateLinkTemplate, GenerateLinkPage{
-		Email:   output.Email,
-		Purpose: output.Purpose,
-		Link:    output.Link,
+		Email:            output.Email,
+		Purpose:          output.Purpose,
+		Link:             output.Link,
+		ExpiresAt:        output.ExpiresAt,
+		ReplacedOpenLink: output.ReplacedOpenLink,
 	})
 }
 
@@ -59,6 +61,6 @@ func (this *GenerateLinkUiHandler) respondUserNotFound(ctx fiber.Ctx) error {
 	return respond.Problem(ctx, fiber.StatusNotFound, UserNotFoundMessage)
 }
 
-func (this *GenerateLinkUiHandler) respondWithMessage(ctx fiber.Ctx, status int, message string) error {
-	return pages.Render(ctx, status, pageFiles, generateLinkTemplate, GenerateLinkPage{Message: message})
+func (this *GenerateLinkUiHandler) respondWithMessage(ctx fiber.Ctx, status int, email string, message string) error {
+	return pages.Render(ctx, status, pageFiles, generateLinkTemplate, GenerateLinkPage{Email: email, Message: message})
 }

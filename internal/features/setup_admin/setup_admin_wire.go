@@ -15,5 +15,6 @@ const (
 
 type SetupPage struct {
 	Email   string
+	Field   string
 	Message string
 }

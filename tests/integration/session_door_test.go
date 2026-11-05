@@ -194,7 +194,7 @@ func (this *IntegrationSuite) TestSessionDoor_PostWithCSRFHeaderAndOrigin_Passes
 }
 
 func (this *IntegrationSuite) TestSessionDoor_LeavesApiHealthAndAssetsOpen() {
-	for _, path := range []string{"/api/participants", "/health", "/assets/app.css"} {
+	for _, path := range []string{"/api/participants", "/health", "/assets/bundle.css"} {
 		status, header, _ := this.sendThroughDoor(doorRequest{
 			method:  "GET",
 			path:    path,

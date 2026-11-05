@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/bidirekt/broker/internal/model"
+	"github.com/guregu/null"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -38,6 +39,26 @@ const (
 		UPDATE sessions
 		SET
 			last_seen_at = now()
+		WHERE
+			id_hash = $1
+	`
+
+	// a CTE read only in RETURNING would return NULL; RETURNING OLD needs Postgres 18 and the compose runs 17
+	markSessionSeenTakingMessageQuery = `
+		UPDATE sessions s
+		SET
+			last_seen_at = now(), message = NULL
+		FROM
+			(SELECT id_hash, message FROM sessions WHERE id_hash = $1 FOR UPDATE) prior
+		WHERE
+			s.id_hash = prior.id_hash
+		RETURNING prior.message
+	`
+
+	setSessionMessageQuery = `
+		UPDATE sessions
+		SET
+			message = $2
 		WHERE
 			id_hash = $1
 	`
@@ -105,6 +126,26 @@ func (this *SessionRepository) FindByIDHash(ctx context.Context, idHash []byte) 
 func (this *SessionRepository) MarkSeen(ctx context.Context, idHash []byte) {
 	if _, err := this.pool.Exec(ctx, markSessionSeenQuery, idHash); err != nil {
 		panic(fmt.Errorf("error marking session seen: %w", err))
+	}
+}
+
+func (this *SessionRepository) MarkSeenTakingMessage(ctx context.Context, idHash []byte) (message string) {
+	var taken null.String
+	err := this.pool.QueryRow(ctx, markSessionSeenTakingMessageQuery, idHash).Scan(&taken)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ""
+	}
+
+	if err != nil {
+		panic(fmt.Errorf("error marking session seen taking its message: %w", err))
+	}
+
+	return taken.String
+}
+
+func (this *SessionRepository) SetMessage(ctx context.Context, idHash []byte, message string) {
+	if _, err := this.pool.Exec(ctx, setSessionMessageQuery, idHash, message); err != nil {
+		panic(fmt.Errorf("error setting session message: %w", err))
 	}
 }
 

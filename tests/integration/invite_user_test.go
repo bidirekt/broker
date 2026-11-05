@@ -16,7 +16,19 @@ const (
 	inviteUserEmailInvalid      = "invalid email"
 	inviteUserPermissionInvalid = "invalid permission"
 	inviteUserEmailInUse        = "email already in use"
+	inviteUserReadDescription   = "Sees every data screen and their own profile; runs can-i-deploy and validate."
+	inviteUserWriteDescription  = "Everything read does, plus publishing contracts, recording deployments, and creating and renaming participants and environments."
+	inviteUserEmailError        = `aria-invalid="true" aria-describedby="email-err">`
+	inviteUserPermissionError   = `role="radiogroup" aria-labelledby="permission-label" aria-invalid="true" aria-describedby="permission-err">`
 )
+
+func inviteUserFieldError(field string) string {
+	return `<p class="err" id="` + field + `-err"><svg`
+}
+
+func inviteUserFieldMessage(message string) string {
+	return `</svg><span>` + message + `</span></p>`
+}
 
 var inviteUserLinkInPage = regexp.MustCompile(`http://localhost:8080/set-password\?token=([A-Za-z0-9_-]{43})`)
 
@@ -32,14 +44,18 @@ func (this *IntegrationSuite) inviteUser(email, permission string) (status int, 
 	return status, body
 }
 
-func (this *IntegrationSuite) TestInviteUser_FormAsksForEmailAndPermission() {
+func (this *IntegrationSuite) TestInviteUser_FormAsksForEmailAndPermissionWithReadChecked() {
 	status, _, body := this.getPage("/users/invite", this.signInAsAdmin())
 
 	this.Require().Equal(http.StatusOK, status)
-	this.Contains(body, `<form method="post" action="/users/invite">`)
-	this.Contains(body, `name="email"`)
-	this.Contains(body, `<option value="read"`)
-	this.Contains(body, `<option value="write"`)
+	this.Contains(body, `<form class="sheet formcard" method="post" action="/users/invite">`)
+	this.Contains(body, `name="email" type="text" inputmode="email"`)
+	this.Contains(body, `<input type="radio" name="permission" value="read" required checked>`)
+	this.Contains(body, `<input type="radio" name="permission" value="write" required>`)
+	this.Contains(body, inviteUserReadDescription)
+	this.Contains(body, inviteUserWriteDescription)
+	this.Contains(body, `<button type="submit" class="btn primary">Invite</button>`)
+	this.NotContains(body, `aria-invalid`)
 }
 
 func (this *IntegrationSuite) TestInviteUser_HtmxFormAnswersWithoutHXPushUrl() {
@@ -49,7 +65,7 @@ func (this *IntegrationSuite) TestInviteUser_HtmxFormAnswersWithoutHXPushUrl() {
 	status, header, body := this.sendPageRequest(req, this.signInAsAdmin())
 
 	this.Require().Equal(http.StatusOK, status)
-	this.Contains(body, `<form method="post" action="/users/invite">`)
+	this.Contains(body, `method="post" action="/users/invite">`)
 	this.Empty(header.Get("HX-Push-Url"))
 }
 
@@ -57,8 +73,10 @@ func (this *IntegrationSuite) TestInviteUser_CreatesAnInvitedUserAndShowsTheLink
 	status, body := this.inviteUser(inviteUserEmail, "read")
 
 	this.Require().Equal(http.StatusOK, status)
+	this.Contains(body, "<h1>User invited</h1>")
 	match := inviteUserLinkInPage.FindStringSubmatch(body)
 	this.Require().Len(match, 2, "page shows no invite link")
+	this.Contains(body, `<input class="copy" type="text" readonly value="`+match[0]+`" aria-label="Invite link">`)
 
 	tokenHash := sha256.Sum256([]byte(match[1]))
 	var purpose, email string
@@ -73,10 +91,11 @@ func (this *IntegrationSuite) TestInviteUser_CreatesAnInvitedUserAndShowsTheLink
 	this.Equal("invite", purpose)
 	this.Equal(inviteUserEmail, email)
 	this.WithinDuration(time.Now().Add(24*time.Hour), expiresAt, time.Minute)
+	this.Contains(body, `Send this invite link to `+inviteUserEmail+`. It works once, until <time datetime="`+expiresAt.UTC().Format(time.RFC3339Nano)+`">`+expiresAt.UTC().Format("2006-01-02 15:04")+` UTC</time>, and is not shown again.`)
 	this.Equal(1, this.countRows("one_time_links"))
 
 	_, _, list := this.getPage("/users", this.signInAsAdmin())
-	this.Contains(list, "<td>ana@x.com</td>\n      <td>read</td>\n      <td>invited</td>")
+	this.Contains(list, "<tr data-state=\"invited\">\n        <td data-l=\"Email\"><span class=\"mono\">ana@x.com</span></td>\n        <td data-l=\"Permission\"><span class=\"badge perm\">read</span></td>")
 	this.NotContains(list, match[1])
 }
 
@@ -110,7 +129,11 @@ func (this *IntegrationSuite) TestInviteUser_RejectsAnEmailInUseInAnotherCase() 
 	status, body := this.inviteUser("ANA@X.com", "read")
 
 	this.Equal(http.StatusConflict, status)
-	this.Contains(body, inviteUserEmailInUse)
+	this.Contains(body, inviteUserEmailError)
+	this.Contains(body, inviteUserFieldError("email"))
+	this.Contains(body, inviteUserFieldMessage(inviteUserEmailInUse))
+	this.Contains(body, `value="ANA@X.com"`)
+	this.Contains(body, `value="read" required checked>`)
 	this.Equal(2, this.countRows("users"))
 	this.Equal(1, this.countRows("one_time_links"))
 }
@@ -122,7 +145,9 @@ func (this *IntegrationSuite) TestInviteUser_RejectsAMalformedEmail() {
 		status, body := this.inviteUser(email, "read")
 
 		this.Equal(http.StatusBadRequest, status, email)
-		this.Contains(body, inviteUserEmailInvalid, email)
+		this.Contains(body, inviteUserEmailError, email)
+		this.Contains(body, inviteUserFieldMessage(inviteUserEmailInvalid), email)
+		this.NotContains(body, `aria-describedby="permission-err"`, email)
 	}
 
 	this.Equal(1, this.countRows("users"))
@@ -135,7 +160,11 @@ func (this *IntegrationSuite) TestInviteUser_RejectsATamperedPermission() {
 		status, body := this.inviteUser(inviteUserEmail, permission)
 
 		this.Equal(http.StatusBadRequest, status, permission)
-		this.Contains(body, inviteUserPermissionInvalid, permission)
+		this.Contains(body, inviteUserPermissionError, permission)
+		this.Contains(body, inviteUserFieldError("permission"), permission)
+		this.Contains(body, inviteUserFieldMessage(inviteUserPermissionInvalid), permission)
+		this.NotContains(body, " checked", permission)
+		this.Contains(body, `value="`+inviteUserEmail+`"`, permission)
 	}
 
 	this.Equal(1, this.countRows("users"))

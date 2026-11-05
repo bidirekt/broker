@@ -20,7 +20,8 @@ const (
 	reactivateUserPassword     = "reactivate-user-correct-horse"
 	reactivateUserLinkToken    = "reactivate-user-pending-token"
 	reactivateUserNotFoundPage = "<h1>user not found</h1>"
-	reactivateUserErrorStatus  = "Status 404"
+	reactivateUserErrorStatus  = `<div class="code-n">404</div>`
+	reactivateUserNotice       = `<div class="flash" role="status">`
 )
 
 func (this *IntegrationSuite) reactivateUserPost(userID int64, action string) (status int, header http.Header) {
@@ -99,7 +100,7 @@ func (this *IntegrationSuite) reactivateUserCountRows(table string, userID int64
 func (this *IntegrationSuite) reactivateUserDeactivateRacing(userID int64, race func(adminCookie, csrfToken string) (status int)) (raceStatus int) {
 	ctx := context.Background()
 	tokenHash := sha256.Sum256([]byte(reactivateUserLinkToken))
-	_, found, deactivated := repository.NewOneTimeLinkRepository(this.Pool).ReplaceOpen(ctx, &model.OneTimeLink{
+	_, found, deactivated, _ := repository.NewOneTimeLinkRepository(this.Pool).ReplaceOpen(ctx, &model.OneTimeLink{
 		TokenHash: tokenHash[:],
 		UserID:    userID,
 		ExpiresAt: time.Now().Add(time.Hour),
@@ -150,7 +151,7 @@ func (this *IntegrationSuite) TestReactivateUser_AnInvitedUserComesBackInvitedWi
 	userID := this.createActiveUser(reactivateUserEmail, model.PermissionRead, reactivateUserPassword)
 	this.setUserState(userID, model.UserInvited)
 	tokenHash := sha256.Sum256([]byte(reactivateUserLinkToken))
-	_, found, deactivated := repository.NewOneTimeLinkRepository(this.Pool).ReplaceOpen(context.Background(), &model.OneTimeLink{
+	_, found, deactivated, _ := repository.NewOneTimeLinkRepository(this.Pool).ReplaceOpen(context.Background(), &model.OneTimeLink{
 		TokenHash: tokenHash[:],
 		UserID:    userID,
 		ExpiresAt: time.Now().Add(time.Hour),
@@ -244,7 +245,73 @@ func (this *IntegrationSuite) TestReactivateUser_ButtonIsShownOnlyForADeactivate
 	status, _, body := this.getPage("/users", this.signInAsAdmin())
 
 	this.Require().Equal(http.StatusOK, status)
-	this.Contains(body, fmt.Sprintf(`<form method="post" action="/users/%d/reactivate"><button type="submit">Reactivate</button></form>`, deactivatedID))
+	this.Contains(body, fmt.Sprintf(`<form method="post" action="/users/%d/reactivate"><input type="hidden" name="page" value="1"><button type="submit" class="btn sm">Reactivate</button></form>`, deactivatedID))
 	this.NotContains(body, fmt.Sprintf(`action="/users/%d/reactivate"`, invitedID))
 	this.NotContains(body, fmt.Sprintf(`action="/users/%d/reactivate"`, activeID))
+}
+
+func (this *IntegrationSuite) reactivateUserPostAs(cookie string, userID int64, form url.Values) (status int, header http.Header) {
+	_, _, users := this.getPage("/users", cookie)
+	status, header, _ = this.postForm(fmt.Sprintf("/users/%d/reactivate", userID), cookie, this.csrfTokenFrom(users), form)
+
+	return status, header
+}
+
+func (this *IntegrationSuite) TestReactivateUser_ConfirmsWithASessionMessageOnTheUsersPage() {
+	userID := this.createActiveUser("Ana@X.com", model.PermissionWrite, reactivateUserPassword)
+	this.setUserState(userID, model.UserDeactivated)
+	cookie := this.signInAsAdmin()
+
+	status, _ := this.reactivateUserPostAs(cookie, userID, url.Values{})
+	this.Require().Equal(http.StatusSeeOther, status)
+
+	_, _, users := this.getPage("/users", cookie)
+	this.Contains(users, reactivateUserNotice)
+	this.Contains(users, "<span>user reactivated: Ana@X.com</span>")
+
+	_, _, reloaded := this.getPage("/users", cookie)
+	this.NotContains(reloaded, reactivateUserNotice)
+}
+
+func (this *IntegrationSuite) TestReactivateUser_SetsNoMessageWhenTheStateDidNotChange() {
+	for _, state := range []model.UserState{
+		model.UserActive,
+		model.UserInvited,
+	} {
+		userID := this.createActiveUser(string(state)+"@x.com", model.PermissionWrite, reactivateUserPassword)
+		this.setUserState(userID, state)
+		cookie := this.signInAsAdmin()
+
+		status, _ := this.reactivateUserPostAs(cookie, userID, url.Values{})
+		this.Require().Equal(http.StatusSeeOther, status, state)
+
+		_, _, users := this.getPage("/users", cookie)
+		this.NotContains(users, reactivateUserNotice, state)
+	}
+}
+
+func (this *IntegrationSuite) TestReactivateUser_ReturnsToThePageItCameFrom() {
+	userID := this.createActiveUser("ana@x.com", model.PermissionWrite, reactivateUserPassword)
+	this.setUserState(userID, model.UserDeactivated)
+
+	status, header := this.reactivateUserPostAs(this.signInAsAdmin(), userID, url.Values{"page": {"3"}})
+
+	this.Equal(http.StatusSeeOther, status)
+	this.Equal("/users?page=3", header.Get("Location"))
+}
+
+func (this *IntegrationSuite) TestReactivateUser_AnswersNotFoundForANonCanonicalPageAndChangesNothing() {
+	userID := this.createActiveUser("ana@x.com", model.PermissionWrite, reactivateUserPassword)
+	this.setUserState(userID, model.UserDeactivated)
+	cookie := this.signInAsAdmin()
+
+	for _, page := range []string{"0", "01", "+1", "", "abc"} {
+		status, _ := this.reactivateUserPostAs(cookie, userID, url.Values{"page": {page}})
+
+		this.Equal(http.StatusNotFound, status, page)
+	}
+
+	user, found := repository.NewUserRepository(this.Pool).FindByID(context.Background(), userID)
+	this.Require().True(found)
+	this.Equal(model.UserDeactivated, user.State())
 }
