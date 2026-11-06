@@ -47,9 +47,11 @@ func (this *IntegrationSuite) editUserFind(userID int64) *model.User {
 func (this *IntegrationSuite) TestEditUser_FormIsPrefilledWithTheEmailAndPermission() {
 	userID := this.createActiveUser("ana@x.com", model.PermissionWrite, editUserPassword)
 
-	status, _, body := this.getPage(fmt.Sprintf("/users/%d/edit", userID), this.signInAsAdmin())
+	status, header, body := this.getPage(fmt.Sprintf("/users/%d/edit", userID), this.signInAsAdmin())
 
 	this.Equal(http.StatusOK, status)
+	this.Equal("text/html; charset=utf-8", header.Get("Content-Type"))
+	this.Equal("no-store", header.Get("Cache-Control"))
 	this.Contains(body, "<h1>Edit ana@x.com</h1>")
 	this.Contains(body, `value="ana@x.com" required autofocus>`)
 	this.Contains(body, `<input type="radio" name="permission" value="read" required>`)

@@ -188,21 +188,9 @@ func typeTokenOf(node schemagraph.Node, rendering map[string]bool) string {
 	return node.Type()
 }
 
-func NewProviderResourceNotDeployed(
-	consumerResource *model.PersistedResource,
-	deployedEnvironments []string,
-) ContractBreakingChange {
-	var details map[string]string
-
-	if len(deployedEnvironments) > 0 {
-		details = map[string]string{
-			"deployedEnvironments": strings.Join(deployedEnvironments, ", "),
-		}
-	}
-
+func NewProviderResourceNotDeployed(consumerResource *model.PersistedResource) ContractBreakingChange {
 	return ContractBreakingChange{
 		CheckedResource: consumerResource,
 		Reason:          model.ReasonProviderResourceNotDeployedInEnvironment,
-		Details:         details,
 	}
 }

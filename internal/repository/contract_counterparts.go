@@ -13,15 +13,14 @@ func (this *ContractRepository) LoadCounterparts(
 	environmentID int64,
 ) model.ResourceCounterparts {
 	counterparts := model.ResourceCounterparts{
-		Providers:          make(map[string]model.PersistedResource),
-		Consumers:          make(map[string][]model.PersistedResource),
-		ProviderStatuses:   make(map[string][]string),
-		UnmatchedProviders: make(map[string]model.RegisteredProvider),
+		Providers:           make(map[string]model.PersistedResource),
+		Consumers:           make(map[string][]model.PersistedResource),
+		ProviderStatuses:    make(map[string][]string),
+		RegisteredProviders: make(map[string]model.RegisteredProvider),
 	}
 
 	providersQueried := make(map[string]bool)
 	providerNamesQueried := make(map[string]bool)
-	registeredProviders := make(map[string]model.RegisteredProvider)
 	catalogs := schemaCatalogs{}
 
 	for _, resource := range contract.Resources {
@@ -32,23 +31,24 @@ func (this *ContractRepository) LoadCounterparts(
 			}
 
 			providersQueried[resource.ProviderHash] = true
+			providerName := resource.ConsumedProvider.String
+
+			if !providerNamesQueried[providerName] {
+				providerNamesQueried[providerName] = true
+
+				if registered, isParticipant := this.loadRegisteredProvider(ctx, providerName, environmentID); isParticipant {
+					counterparts.RegisteredProviders[providerName] = registered
+				}
+			}
+
+			if !counterparts.RegisteredProviders[providerName].DeployedVersion.Valid {
+				continue
+			}
 
 			if provider, found := this.loadProviderResource(ctx, catalogs, resource.ProviderHash, environmentID); found {
 				counterparts.Providers[resource.ProviderHash] = provider
 
 				continue
-			}
-
-			if !providerNamesQueried[resource.ConsumedProvider.String] {
-				providerNamesQueried[resource.ConsumedProvider.String] = true
-
-				if registered, isParticipant := this.loadRegisteredProvider(ctx, resource.ConsumedProvider.String, environmentID); isParticipant {
-					registeredProviders[resource.ConsumedProvider.String] = registered
-				}
-			}
-
-			if registered, isParticipant := registeredProviders[resource.ConsumedProvider.String]; isParticipant {
-				counterparts.UnmatchedProviders[resource.ProviderHash] = registered
 			}
 
 			if statuses, declaresMethod := this.loadDeployedProviderStatuses(ctx, resource, environmentID); declaresMethod {
@@ -59,7 +59,7 @@ func (this *ContractRepository) LoadCounterparts(
 				continue
 			}
 
-			counterparts.Consumers[resource.ProviderHash] = this.loadConsumerResources(ctx, catalogs, resource.ProviderHash, environmentID)
+			counterparts.Consumers[resource.ProviderHash] = this.loadDeployedResources(ctx, catalogs, model.Consumes, resource.ProviderHash, environmentID)
 		}
 	}
 

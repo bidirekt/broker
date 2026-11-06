@@ -193,7 +193,7 @@ const (
 		ORDER BY r.id
 	`
 
-	consumersByProviderHashAndEnvironmentQuery = `
+	deployedResourcesByProviderHashAndEnvironmentQuery = `
 		SELECT
 			pa.id,
 			pa.name,
@@ -233,64 +233,6 @@ const (
 			LEFT JOIN schemas s ON s.id = rb.schema_id
 			WHERE rb.resource_id = r.id AND rb.contract_id = cd.contract_id
 		) bodies ON true
-		WHERE
-			r.direction = $1
-		AND
-			r.provider_hash = $2
-		AND
-			rv.change_type = 'added'
-	`
-
-	loadProviderResourceWithDeploymentsQuery = `
-		SELECT
-			pa.id,
-			pa.name,
-			r.id,
-			r.direction,
-			r.interaction,
-			r.consumed_provider,
-			r.endpoint,
-			r.method,
-			r.response_status_code,
-			r.provider_hash,
-			r.consumer_hash,
-			r.created_at,
-			bodies.sources,
-			bodies.schema_names,
-			e.name,
-			dep.version,
-			anchor.contract_id
-		FROM
-			resources r
-		JOIN
-			participants pa ON pa.id = r.participant_id
-		JOIN LATERAL (
-			SELECT COALESCE(
-				(SELECT contract_id FROM current_deployments
-				  WHERE participant_id = r.participant_id AND environment_id = $3),
-				(SELECT contract_id FROM latest_contract_versions WHERE participant_id = r.participant_id)
-			) AS contract_id
-		) anchor ON true
-		JOIN LATERAL (
-			SELECT change_type
-			FROM resource_versions
-			WHERE resource_id = r.id
-			  AND contract_id <= anchor.contract_id
-			ORDER BY contract_id DESC
-			LIMIT 1
-		) rv ON true
-		JOIN LATERAL (
-			SELECT
-				array_agg(rb.source ORDER BY rb.source COLLATE "C", rb.id) AS sources,
-				array_agg(s.name ORDER BY rb.source COLLATE "C", rb.id) AS schema_names
-			FROM resource_bodies rb
-			LEFT JOIN schemas s ON s.id = rb.schema_id
-			WHERE rb.resource_id = r.id AND rb.contract_id = anchor.contract_id
-		) bodies ON true
-		LEFT JOIN
-			current_deployments dep ON dep.participant_id = r.participant_id
-		LEFT JOIN
-			environments e ON e.id = dep.environment_id
 		WHERE
 			r.direction = $1
 		AND
@@ -732,7 +674,7 @@ func (this *ContractRepository) GetConsumersResourcesByProviderHashAndEnvironmen
 	providerHash string,
 	environmentID int64,
 ) []model.PersistedResource {
-	return this.loadConsumerResources(ctx, schemaCatalogs{}, providerHash, environmentID)
+	return this.loadDeployedResources(ctx, schemaCatalogs{}, model.Consumes, providerHash, environmentID)
 }
 
 func (this *ContractRepository) loadProviderResource(
@@ -741,70 +683,12 @@ func (this *ContractRepository) loadProviderResource(
 	providerHash string,
 	environmentID int64,
 ) (model.PersistedResource, bool) {
-	rows, err := this.pool.Query(
-		ctx,
-		loadProviderResourceWithDeploymentsQuery,
-		string(model.Provides),
-		providerHash,
-		environmentID,
-	)
-	if err != nil {
-		panic(fmt.Errorf("error loading provider resource of consumer: %w", err))
-	}
-
-	defer rows.Close()
-
-	var found bool
-	var provider model.PersistedResource
-
-	for rows.Next() {
-		var row tableRow
-
-		if err := rows.Scan(
-			&row.ParticipantID,
-			&row.ParticipantName,
-			&row.ResourceID,
-			&row.ResourceDirection,
-			&row.ResourceInteraction,
-			&row.ResourceConsumedProvider,
-			&row.ResourceEndpoint,
-			&row.ResourceMethod,
-			&row.ResourceResponseStatusCode,
-			&row.ResourceProviderHash,
-			&row.ResourceConsumerHash,
-			&row.ResourceCreatedAt,
-			&row.BodySources,
-			&row.BodySchemaNames,
-			&row.DeploymentEnvironment,
-			&row.DeploymentVersion,
-			&row.ContractID,
-		); err != nil {
-			panic(fmt.Errorf("error scanning provider resource of consumer: %w", err))
-		}
-
-		if !found {
-			provider = row.toResourceModel()
-			found = true
-		}
-
-		if row.DeploymentEnvironment.Valid {
-			provider.DeployedVersions[row.DeploymentEnvironment.String] = row.DeploymentVersion.String
-		}
-	}
-
-	if err := rows.Err(); err != nil {
-		panic(fmt.Errorf("error reading provider resource of consumer: %w", err))
-	}
-
-	rows.Close()
-
-	if !found {
+	providers := this.loadDeployedResources(ctx, catalogs, model.Provides, providerHash, environmentID)
+	if len(providers) == 0 {
 		return model.PersistedResource{}, false
 	}
 
-	provider.Schemas = this.loadSchemasAt(ctx, this.pool, catalogs, provider.ContractID)
-
-	return provider, true
+	return providers[0], true
 }
 
 func (this *ContractRepository) loadRegisteredProvider(
@@ -849,26 +733,27 @@ func (this *ContractRepository) loadDeployedProviderStatuses(
 	return statuses, declaresMethod
 }
 
-func (this *ContractRepository) loadConsumerResources(
+func (this *ContractRepository) loadDeployedResources(
 	ctx context.Context,
 	catalogs schemaCatalogs,
+	direction model.Direction,
 	providerHash string,
 	environmentID int64,
 ) []model.PersistedResource {
 	rows, err := this.pool.Query(
 		ctx,
-		consumersByProviderHashAndEnvironmentQuery,
-		string(model.Consumes),
+		deployedResourcesByProviderHashAndEnvironmentQuery,
+		string(direction),
 		providerHash,
 		environmentID,
 	)
 	if err != nil {
-		panic(fmt.Errorf("error finding consumers of provider: %w", err))
+		panic(fmt.Errorf("error loading deployed resources by provider hash: %w", err))
 	}
 
 	defer rows.Close()
 
-	consumers := make([]model.PersistedResource, 0)
+	resources := make([]model.PersistedResource, 0)
 
 	for rows.Next() {
 		var row tableRow
@@ -891,21 +776,21 @@ func (this *ContractRepository) loadConsumerResources(
 			&row.ResourceVersion,
 			&row.ContractID,
 		); err != nil {
-			panic(fmt.Errorf("error scanning consumer: %w", err))
+			panic(fmt.Errorf("error scanning deployed resource: %w", err))
 		}
 
-		consumers = append(consumers, row.toResourceModel())
+		resources = append(resources, row.toResourceModel())
 	}
 
 	if err := rows.Err(); err != nil {
-		panic(fmt.Errorf("error reading consumers of provider: %w", err))
+		panic(fmt.Errorf("error reading deployed resources by provider hash: %w", err))
 	}
 
 	rows.Close()
 
-	for index := range consumers {
-		consumers[index].Schemas = this.loadSchemasAt(ctx, this.pool, catalogs, consumers[index].ContractID)
+	for index := range resources {
+		resources[index].Schemas = this.loadSchemasAt(ctx, this.pool, catalogs, resources[index].ContractID)
 	}
 
-	return consumers
+	return resources
 }

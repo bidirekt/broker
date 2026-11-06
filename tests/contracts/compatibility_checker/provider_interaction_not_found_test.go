@@ -57,7 +57,10 @@ func newsletterReportCheckedFrom(
 		context.Background(),
 		contract,
 		model.NewEnvironment("production"),
-		model.ResourceCounterparts{ProviderStatuses: providerStatuses},
+		model.ResourceCounterparts{
+			ProviderStatuses:    providerStatuses,
+			RegisteredProviders: map[string]model.RegisteredProvider{newsletterProviderName: {ParticipantID: 2, DeployedVersion: null.StringFrom("1.0.0")}},
+		},
 	)
 }
 
@@ -103,7 +106,7 @@ func TestConsumerResourceMissingFromTheDeployedProvider(t *testing.T) {
 
 			assert.False(t, report.Deployable())
 			assert.JSONEq(t,
-				`{"deployable":false,"participantVersion":null,"endpoints":{"/newsletter/unsubscribe":{"post":{"`+tc.interaction+`":[`+tc.leaf+`]}}}}`,
+				`{"deployable":false,"participantVersion":"1.0.0","endpoints":{"/newsletter/unsubscribe":{"post":{"`+tc.interaction+`":[`+tc.leaf+`]}}}}`,
 				string(result),
 			)
 		})

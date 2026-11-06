@@ -74,7 +74,7 @@ func avatarsResources(
 		ResponseStatusCode: status,
 		Bodies:             []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Profile")}},
 		Schemas:            model.Schemas{"Profile": providerSchema},
-		DeployedVersions:   map[string]string{avatarsEnvironment: "1.0.0"},
+		ParticipantVersion: null.StringFrom("1.0.0"),
 	}
 
 	return consumer, provider
@@ -145,7 +145,8 @@ func assertAvatarsBreaks(
 
 	t.Run("checked from the consumer", func(t *testing.T) {
 		assert.Equal(t, expected(model.RoleConsumer), avatarsBreaksCheckedFrom(consumer, model.ResourceCounterparts{
-			Providers: map[string]model.PersistedResource{avatarsProviderHash: provider},
+			Providers:           map[string]model.PersistedResource{avatarsProviderHash: provider},
+			RegisteredProviders: map[string]model.RegisteredProvider{avatarsProviderName: {DeployedVersion: null.StringFrom("1.0.0")}},
 		}, avatarsProviderName, interaction))
 	})
 

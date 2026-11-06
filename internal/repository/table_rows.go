@@ -36,10 +36,6 @@ type tableRow struct {
 	// Bodies, aligned by index
 	BodySources     []string
 	BodySchemaNames []null.String
-
-	// Deploy & Environment
-	DeploymentEnvironment null.String
-	DeploymentVersion     null.String
 }
 
 func (this *tableRow) toPersistedContractModel() *model.PersistedContract {
@@ -60,7 +56,6 @@ func (this *tableRow) toResourceModel() model.PersistedResource {
 		Endpoint:           this.ResourceEndpoint,
 		Method:             this.ResourceMethod,
 		Bodies:             this.toResourceBodies(),
-		DeployedVersions:   make(map[string]string),
 		ParticipantName:    this.ParticipantName,
 		ParticipantID:      this.ParticipantID,
 		ContractID:         this.ContractID,

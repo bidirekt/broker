@@ -269,27 +269,19 @@ func TestBreakMarshalsOnlyReasonRoleAndDetails(t *testing.T) {
 	assert.ElementsMatch(t, []string{"reason", "role", "details"}, keys)
 }
 
-func TestProviderNotDeployedDetails(t *testing.T) {
+func TestProviderNotDeployedHasNoDetails(t *testing.T) {
 	consumer := &model.PersistedResource{
 		Direction:        model.Consumes,
 		ConsumedProvider: null.StringFrom("accounts"),
 		ParticipantName:  "front",
 	}
 
-	deployed := compatibility_checker.NewProviderResourceNotDeployed(
-		consumer, []string{"staging", "prod"},
-	)
-	nowhere := compatibility_checker.NewProviderResourceNotDeployed(
-		consumer, nil,
-	)
+	notDeployed := compatibility_checker.NewProviderResourceNotDeployed(consumer)
 
-	assert.Equal(t, model.ReasonProviderResourceNotDeployedInEnvironment, deployed.Reason)
-	assert.Equal(t, map[string]string{"deployedEnvironments": "staging, prod"}, deployed.Details)
-	assert.Equal(t, "front", deployed.ConsumerName())
-	assert.Equal(t, "accounts", deployed.ProviderName())
-
-	assert.Equal(t, model.ReasonProviderResourceNotDeployedInEnvironment, nowhere.Reason)
-	assert.Nil(t, nowhere.Details)
+	assert.Equal(t, model.ReasonProviderResourceNotDeployedInEnvironment, notDeployed.Reason)
+	assert.Nil(t, notDeployed.Details)
+	assert.Equal(t, "front", notDeployed.ConsumerName())
+	assert.Equal(t, "accounts", notDeployed.ProviderName())
 }
 
 func TestReportAppendMergesResultsPerCounterpart(t *testing.T) {

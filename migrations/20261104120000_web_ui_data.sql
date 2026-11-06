@@ -26,10 +26,15 @@ FROM (
 CREATE INDEX ON contract_versions (participant_id, id DESC);
 
 CREATE VIEW latest_contract_versions AS
-SELECT DISTINCT ON (participant_id)
-  participant_id, version, contract_id, created_at
-FROM contract_versions
-ORDER BY participant_id, id DESC;
+SELECT p.id AS participant_id, cv.version, cv.contract_id, cv.created_at
+FROM participants p
+CROSS JOIN LATERAL (
+  SELECT version, contract_id, created_at
+  FROM contract_versions
+  WHERE participant_id = p.id
+  ORDER BY id DESC
+  LIMIT 1
+) cv;
 
 ALTER TABLE compatibility_checks
   ADD COLUMN report           jsonb NULL,

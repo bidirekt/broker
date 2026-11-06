@@ -165,8 +165,10 @@ func (this *IntegrationSuite) TestSetPassword_ExpiredLinkShowsTheInvalidLinkPage
 	_, err := this.Pool.Exec(context.Background(), `UPDATE one_time_links SET expires_at = now() - interval '1 minute'`)
 	this.Require().NoError(err)
 
-	status, _, body := this.getPage("/set-password?token="+token, "")
+	status, header, body := this.getPage("/set-password?token="+token, "")
 	this.Equal(http.StatusGone, status)
+	this.Equal("text/html; charset=utf-8", header.Get("Content-Type"))
+	this.Equal("no-store", header.Get("Cache-Control"))
 	this.Contains(body, setPasswordLinkInvalid)
 	this.NotContains(body, token)
 
@@ -246,8 +248,10 @@ func (this *IntegrationSuite) TestSetPassword_FormShowsTheEmailAndTheLinkExpiry(
 	_, err := this.Pool.Exec(context.Background(), `UPDATE one_time_links SET expires_at = $1`, setPasswordFixedExpiry)
 	this.Require().NoError(err)
 
-	status, _, page := this.getPage("/set-password?token="+token, "")
+	status, header, page := this.getPage("/set-password?token="+token, "")
 	this.Require().Equal(http.StatusOK, status)
+	this.Equal("text/html; charset=utf-8", header.Get("Content-Type"))
+	this.Equal("no-store", header.Get("Cache-Control"))
 	this.Contains(page, setPasswordForLine)
 	this.Contains(page, setPasswordExpiryLine)
 

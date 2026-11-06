@@ -218,8 +218,8 @@ func (this *IntegrationSuite) TestShowContractVersion_ShowsTheLatestCheckPerEnvi
 	all := body[strings.Index(body, `All checks`):]
 	this.Len(contractVersionCheckRow.FindAllString(all, -1), 3)
 	this.Less(strings.Index(all, `#`+staging+`</a>`), strings.Index(all, `#`+production+`</a>`))
-	this.Contains(all, `<span class="badge cpb no">version_api <span class="v">1.0.0</span> · `+productionBreaks+`</span>`)
-	this.Contains(all, `<span class="badge cpb no">version_api <span class="v">no version</span> · `+stagingBreaks+`</span>`)
+	this.Contains(all, `<span><span class="role">PROVIDER</span><span class="badge cpb no">version_api <span class="v">1.0.0</span> · `+productionBreaks+`</span></span>`)
+	this.Contains(all, `<span><span class="role">PROVIDER</span><span class="badge cpb no">version_api <span class="v">no version</span> · `+stagingBreaks+`</span></span>`)
 	this.Contains(all, `<td data-l="Answer"><span class="badge no">`)
 	this.Contains(all, `<td data-l="Environment">`+productionBadge+`</td>`)
 	this.Contains(all, `<td data-l="Environment">`+stagingBadge+`</td>`)
@@ -235,7 +235,96 @@ func (this *IntegrationSuite) TestShowContractVersion_CheckWithoutAStoredReportS
 
 	this.Contains(body, `<span class="badge no">`)
 	this.NotContains(body, `no · `)
+	this.NotContains(body, `class="role"`)
 	this.Contains(body, `<span class="badge cpb">version_api <span class="v">1.0.0</span></span>`)
+}
+
+func (this *IntegrationSuite) TestShowContractVersion_CounterpartWithNoVersionAndNoBreaksIsQuiet() {
+	this.publishForContractVersion()
+	this.checkForContractVersion("version_web", "release/2.0", "staging")
+	_, err := this.Pool.Exec(context.Background(), `UPDATE compatibility_checks SET report = NULL`)
+	this.Require().NoError(err)
+
+	_, _, body := this.getPage(contractVersionPath, this.signInAsAdmin())
+
+	this.Contains(body, `<span><span class="badge cpb quiet">version_api <span class="v">no version</span></span></span>`)
+}
+
+const contractVersionFourProvidersContract = `consumes:
+  version_api:
+    rest:
+      /pets:
+        get:
+          responses:
+            200: Pet
+  version_auth:
+    rest:
+      /pets:
+        get:
+          responses:
+            200: Pet
+  version_ghost:
+    rest:
+      /ghosts:
+        get:
+          responses:
+            200: ~
+  version_zombie:
+    rest:
+      /zombies:
+        get:
+          responses:
+            200: ~
+schemas:
+  Pet:
+    type: object
+    properties:
+      id: { type: string }
+`
+
+func (this *IntegrationSuite) TestShowContractVersion_ComparedWithShowsThreeCounterpartsBreakingFirstThenMore() {
+	this.publishForContractVersion()
+	this.mustPostForContractVersion("/api/participants", `{"participant":"version_auth"}`)
+	this.mustPostForContractVersion("/api/contracts", this.publishBody("version_auth", "1.0.0",
+		contractFragment{"contract.yaml", contractVersionProviderContract}))
+	this.deployForContractVersion("version_auth", "1.0.0", "production")
+	this.mustPostForContractVersion("/api/contracts", this.publishBody("version_web", "4.0.0",
+		contractFragment{"contract.yaml", contractVersionFourProvidersContract}))
+	checkID := strconv.FormatInt(this.checkForContractVersion("version_web", "4.0.0", "production"), 10)
+
+	status, _, body := this.getPage("/participants/version_web/versions/4.0.0", this.signInAsAdmin())
+
+	this.Require().Equal(http.StatusOK, status, body)
+	all := body[strings.Index(body, `All checks`):]
+	this.Equal(3, strings.Count(all, `class="badge cpb`))
+	this.Contains(all, `<span><span class="role">PROVIDER</span><span class="badge cpb no">version_ghost <span class="v">no version</span> · 1 break</span></span>`+
+		`<span><span class="role">PROVIDER</span><span class="badge cpb no">version_zombie <span class="v">no version</span> · 1 break</span></span>`+
+		`<span><span class="role">PROVIDER</span><span class="badge cpb">version_api <span class="v">1.0.0</span></span></span>`)
+	this.NotContains(all, `version_auth`)
+	this.Contains(all, `<a class="badge more" href="/checks/`+checkID+`">+1 more</a>`)
+}
+
+const contractVersionProviderPath = "/participants/version_api/versions/1.0.0"
+
+func (this *IntegrationSuite) TestShowContractVersion_StoredCheckWithNoCounterpartsSaysNothingDeployedSharesAnEndpoint() {
+	this.publishForContractVersion()
+	this.checkForContractVersion("version_api", "1.0.0", "production")
+
+	_, _, body := this.getPage(contractVersionProviderPath, this.signInAsAdmin())
+
+	this.Contains(body, `<span class="muted">nothing deployed shares an endpoint</span>`)
+}
+
+func (this *IntegrationSuite) TestShowContractVersion_CheckWithoutAStoredReportOrCounterpartsLeavesComparedWithEmpty() {
+	this.publishForContractVersion()
+	this.checkForContractVersion("version_api", "1.0.0", "production")
+	_, err := this.Pool.Exec(context.Background(), `UPDATE compatibility_checks SET report = NULL`)
+	this.Require().NoError(err)
+
+	_, _, body := this.getPage(contractVersionProviderPath, this.signInAsAdmin())
+
+	this.Regexp(`<td data-l="Compared with">\s*<div class="badges">\s*</div>\s*</td>`, body)
+	this.NotContains(body, `nothing deployed shares an endpoint`)
 }
 
 func (this *IntegrationSuite) TestShowContractVersion_PaginatesTheChecks() {

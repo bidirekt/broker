@@ -6,8 +6,9 @@ import (
 )
 
 type anchorBreak struct {
-	Reason string `json:"reason"`
-	Role   string `json:"role"`
+	Reason  string            `json:"reason"`
+	Role    string            `json:"role"`
+	Details map[string]string `json:"details"`
 }
 
 type anchorResult struct {
@@ -156,13 +157,15 @@ func (this *IntegrationSuite) TestCanIDeploy_UndeployedProviderWhoseLatestVersio
 	this.False(got.Deployable)
 	api := got.Results["api"]
 	this.False(api.Deployable)
+	this.Nil(api.ParticipantVersion)
 	breaks := api.Endpoints["/pets"]["get"]["200"]
 	this.Require().Len(breaks, 1)
 	this.Equal("provider_resource_not_deployed_in_environment", breaks[0].Reason)
 	this.Equal("consumer", breaks[0].Role)
+	this.Nil(breaks[0].Details)
 }
 
-func (this *IntegrationSuite) TestCanIDeploy_UndeployedProviderWhoseLatestVersionDropsTheResource_IsNotFound() {
+func (this *IntegrationSuite) TestCanIDeploy_UndeployedProviderWhoseLatestVersionDropsTheResource_IsNotDeployed() {
 	mustPost := func(path, body string) {
 		status, _ := this.post(path, body)
 		this.Require().Equalf(http.StatusOK, status, "POST %s", path)
@@ -186,8 +189,10 @@ func (this *IntegrationSuite) TestCanIDeploy_UndeployedProviderWhoseLatestVersio
 	this.False(got.Deployable)
 	api := got.Results["api"]
 	this.False(api.Deployable)
+	this.Nil(api.ParticipantVersion)
 	breaks := api.Endpoints["/pets"]["get"]["200"]
 	this.Require().Len(breaks, 1)
-	this.Equal("provider_resource_not_found", breaks[0].Reason)
+	this.Equal("provider_resource_not_deployed_in_environment", breaks[0].Reason)
 	this.Equal("consumer", breaks[0].Role)
+	this.Nil(breaks[0].Details)
 }

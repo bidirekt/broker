@@ -35,7 +35,7 @@ const consumerSideReport = `{
     "participantVersion": null,
     "endpoints": {
       "/reviews": {"get": {"200": [
-        {"reason": "provider_resource_not_deployed_in_environment", "role": "consumer", "details": {"deployedEnvironments": "staging, qa"}}
+        {"reason": "provider_resource_not_deployed_in_environment", "role": "consumer"}
       ]}}
     }
   },
@@ -158,12 +158,12 @@ func TestEndpointBreakCarriesItsInteractionSentenceReasonAndFixes(t *testing.T) 
 	}, broken.Fixes)
 }
 
-func TestNotDeployedBreakHasOnlyTheCounterpartFixAndListsWhereItIsDeployed(t *testing.T) {
+func TestNotDeployedBreakHasOnlyTheCounterpartFix(t *testing.T) {
 	reviews := counterpartNamed(t, fromStoredCheck(t, consumerSideCheck()), "petstore_reviews")
 
 	broken := reviews.Endpoints[0].Breaks[0]
 	assert.Equal(t, "petstore_web calls GET /reviews, but petstore_reviews is not deployed in production", broken.Sentence.String())
-	assert.Equal(t, "not deployed in production (deployed in: staging, qa)", broken.ReasonLine)
+	assert.Equal(t, "not deployed in production", broken.ReasonLine)
 	assert.Equal(t, []breakreport.Fix{{Participant: "petstore_reviews", Action: "deploy it to production first"}}, broken.Fixes)
 }
 
@@ -257,27 +257,36 @@ func TestDistinctFieldBreaksCountSeparately(t *testing.T) {
 	assert.Equal(t, "provide it", report.Counterparts[0].Fields[0].Fixes[1].Action)
 }
 
-func TestNotFoundReasonDependsOnTheStoredVersionAndRegistration(t *testing.T) {
-	notFound := `{"petstore_api": {"deployable": false, "participantVersion": null, "endpoints": {
-		"/pets": {"get": {"200": [{"reason": "provider_resource_not_found", "role": "consumer"}]}}
+func TestNotFoundReasonNamesTheDeployedVersion(t *testing.T) {
+	report := fromStoredCheck(t, breakreport.StoredCheck{
+		Participant: checkedParticipant,
+		Environment: checkEnvironment,
+		Report: []byte(`{"petstore_api": {"deployable": false, "participantVersion": "1.4.0", "endpoints": {
+			"/pets": {"get": {"200": [{"reason": "provider_resource_not_found", "role": "consumer"}]}}
+		}}}`),
+		Counterparts: []breakreport.StoredCounterpart{{Name: "petstore_api", Role: model.CounterpartProvider, Version: "1.4.0", Registered: true}},
+	})
+
+	assert.Equal(t, "petstore_api 1.4.0, deployed in production, doesn't provide this endpoint",
+		report.Counterparts[0].Endpoints[0].Breaks[0].ReasonLine)
+}
+
+func TestNotDeployedReasonIsTheSameWhetherTheCounterpartIsAParticipantOrNot(t *testing.T) {
+	notDeployed := `{"petstore_api": {"deployable": false, "participantVersion": null, "endpoints": {
+		"/pets": {"get": {"200": [{"reason": "provider_resource_not_deployed_in_environment", "role": "consumer"}]}}
 	}}}`
-	reasonFor := func(counterpart breakreport.StoredCounterpart) string {
-		counterpart.Name = "petstore_api"
+	reasonFor := func(registered bool) string {
 		report := fromStoredCheck(t, breakreport.StoredCheck{
 			Participant:  checkedParticipant,
 			Environment:  checkEnvironment,
-			Report:       []byte(notFound),
-			Counterparts: []breakreport.StoredCounterpart{counterpart},
+			Report:       []byte(notDeployed),
+			Counterparts: []breakreport.StoredCounterpart{{Name: "petstore_api", Role: model.CounterpartProvider, Registered: registered}},
 		})
 		return report.Counterparts[0].Endpoints[0].Breaks[0].ReasonLine
 	}
 
-	assert.Equal(t, "petstore_api 1.4.0, deployed in production, doesn't provide this endpoint",
-		reasonFor(breakreport.StoredCounterpart{Version: "1.4.0", Registered: true}))
-	assert.Equal(t, "petstore_api is not deployed in production, and no version it published provides this endpoint",
-		reasonFor(breakreport.StoredCounterpart{Registered: true}))
-	assert.Equal(t, "petstore_api is not a participant of this broker",
-		reasonFor(breakreport.StoredCounterpart{}))
+	assert.Equal(t, "not deployed in production", reasonFor(true))
+	assert.Equal(t, "not deployed in production", reasonFor(false))
 }
 
 func TestUnknownBreakFallsBackToItsReasonAndDetails(t *testing.T) {

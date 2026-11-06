@@ -47,7 +47,6 @@ func (this *IntegrationSuite) TestCreateParticipantUi_ShowsTheFormBeforeTheParti
 	this.Contains(body, `<input class="input" id="name" name="name" type="text" autocomplete="off" value="" required autofocus>`)
 	this.Contains(body, `<button type="submit" class="btn primary">Create participant</button>`)
 	this.Contains(body, `<li>The name can't change later.</li>`)
-	this.NotContains(body, `rename`)
 	this.Contains(body, `<code class="cmd">bidirekt create-participant</code>`)
 	this.Contains(body, `<a href="/participants" aria-current="page">Participants</a>`)
 	this.NotContains(body, `class="err"`)

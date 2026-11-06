@@ -47,7 +47,7 @@ func (this *CompatibilityChecker) Check(
 
 		switch resource.Direction {
 		case model.Consumes:
-			this.checkConsumer(ctx, resource, environment, counterparts, pairs, report)
+			this.checkConsumer(ctx, resource, counterparts, pairs, report)
 		case model.Provides:
 			this.checkProvider(ctx, resource, counterparts, pairs, report)
 		}

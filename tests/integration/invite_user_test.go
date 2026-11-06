@@ -45,9 +45,11 @@ func (this *IntegrationSuite) inviteUser(email, permission string) (status int, 
 }
 
 func (this *IntegrationSuite) TestInviteUser_FormAsksForEmailAndPermissionWithReadChecked() {
-	status, _, body := this.getPage("/users/invite", this.signInAsAdmin())
+	status, header, body := this.getPage("/users/invite", this.signInAsAdmin())
 
 	this.Require().Equal(http.StatusOK, status)
+	this.Equal("text/html; charset=utf-8", header.Get("Content-Type"))
+	this.Equal("no-store", header.Get("Cache-Control"))
 	this.Contains(body, `<form class="sheet formcard" method="post" action="/users/invite">`)
 	this.Contains(body, `name="email" type="text" inputmode="email" autocomplete="off" value="" required autofocus>`)
 	this.Contains(body, `<input type="radio" name="permission" value="read" required checked>`)
@@ -117,6 +119,7 @@ func (this *IntegrationSuite) TestInviteUser_HtmxInviteShowsTheLinkWithoutPushin
 	this.Require().Equal(http.StatusOK, status)
 	this.Regexp(inviteUserLinkInPage, body)
 	this.Equal("false", header.Get("HX-Push-Url"))
+	this.Equal("text/html; charset=utf-8", header.Get("Content-Type"))
 	this.Equal("no-store", header.Get("Cache-Control"))
 }
 
