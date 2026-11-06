@@ -56,9 +56,7 @@ func toCounterpartRow(counterpart breakreport.Counterpart) CounterpartRow {
 	}
 
 	row.ParticipantURL = participantURL(counterpart.Name)
-	if counterpart.Version != "" {
-		row.VersionURL = versionURL(counterpart.Name, counterpart.Version)
-	}
+	row.VersionURL = versionURL(counterpart.Name, counterpart.Version)
 
 	return row
 }
@@ -68,7 +66,7 @@ func participantURL(participantName string) string {
 }
 
 func versionURL(participantName, version string) string {
-	if version == "." || version == ".." {
+	if version == "" || version == "." || version == ".." {
 		return ""
 	}
 
