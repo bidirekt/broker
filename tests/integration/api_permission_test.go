@@ -54,7 +54,6 @@ func (this *IntegrationSuite) apiPermissionWriteRoutes() []apiPermissionRoute {
 		{http.MethodPost, "/api/contracts", this.publishBody("orders", "v2", contractFragment{apiPermissionProviderSource, apiPermissionProviderYAML})},
 		{http.MethodPost, "/api/deployments", `{"participant":"orders","version":"v1","environment":"production"}`},
 		{http.MethodPost, "/api/participants", `{"participant":"billing"}`},
-		{http.MethodPost, "/api/participants/rename", `{"oldName":"orders","newName":"sales"}`},
 		{http.MethodPost, "/api/environments", `{"environment":"staging"}`},
 		{http.MethodPost, "/api/environments/rename", `{"oldName":"production","newName":"prod"}`},
 	}

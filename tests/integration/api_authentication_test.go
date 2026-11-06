@@ -30,7 +30,6 @@ var apiAuthenticationRoutes = []apiAuthenticationRoute{
 	{http.MethodPost, "/api/contracts"},
 	{http.MethodPost, "/api/deployments"},
 	{http.MethodPost, "/api/participants"},
-	{http.MethodPost, "/api/participants/rename"},
 	{http.MethodPost, "/api/environments"},
 	{http.MethodPost, "/api/environments/rename"},
 }
@@ -179,4 +178,16 @@ func (this *IntegrationSuite) TestApiAuthentication_SignInWithATrailingSlashIssu
 	this.Equal(http.StatusUnauthorized, status)
 	this.Equal("Bearer", header.Get("WWW-Authenticate"))
 	this.JSONEq(apiAuthenticationUnauthenticated, body)
+}
+
+func (this *IntegrationSuite) TestApiAuthentication_TheParticipantRenameRouteIsNotFound() {
+	status, response := this.post("/api/participants", `{"participant":"pets"}`)
+	this.Require().Equal(http.StatusOK, status, response)
+
+	status, _, _ = this.postWithToken("/api/participants/rename", this.writerToken, `{"oldName":"pets","newName":"orders"}`)
+
+	this.Equal(http.StatusNotFound, status)
+	_, _, participants := this.getWithToken("/api/participants", this.writerToken)
+	this.Contains(participants, `"pets"`)
+	this.NotContains(participants, `"orders"`)
 }

@@ -37,16 +37,3 @@ func (this *IntegrationSuite) TestParticipantRepository_CreateWithAnExistingName
 	this.Equal(1, this.countRows("participants"))
 	this.Empty(queryErrors)
 }
-
-func (this *IntegrationSuite) TestParticipantRepository_RenameToATakenName_ReportsFoundAndConflict() {
-	ctx := context.Background()
-	repo := repository.NewParticipantRepository(this.Pool)
-	this.Require().True(repo.Create(ctx, model.NewParticipant("billing_service")))
-	this.Require().True(repo.Create(ctx, model.NewParticipant("ledger_service")))
-
-	found, conflict, published := repo.Rename(ctx, "billing_service", "ledger_service")
-
-	this.True(found)
-	this.True(conflict)
-	this.False(published)
-}
