@@ -42,7 +42,7 @@ func (this *ShowParticipantVersionsUiHandler) Handle(ctx fiber.Ctx) error {
 		return respond.NotFound(ctx)
 	}
 
-	pager, ok := pages.NewPager(ctx, pageParam, page, output.Header.VersionCount)
+	pager, ok := pages.NewPager(ctx, pageParam, page, output.Total)
 	if !ok {
 		return respond.NotFound(ctx)
 	}

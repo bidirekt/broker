@@ -74,6 +74,15 @@ const (
 			e.name COLLATE "C"
 	`
 
+	countParticipantChecksQuery = `
+		SELECT
+			COUNT(*)
+		FROM
+			compatibility_checks
+		WHERE
+			participant_id = $1
+	`
+
 	listParticipantChecksQuery = `
 		SELECT
 			c.id, c.participant_id, p.name, c.contract_id, c.version, c.environment_id,
@@ -156,13 +165,28 @@ func (this *ParticipantChecksRepository) FindHeader(ctx context.Context, name st
 	return header, true
 }
 
-func (this *ParticipantChecksRepository) ListChecks(ctx context.Context, participantID int64, limit, offset int) []model.CompatibilityCheck {
-	rows, err := this.pool.Query(ctx, listParticipantChecksQuery, participantID, limit, offset)
+func (this *ParticipantChecksRepository) ListChecks(
+	ctx context.Context,
+	participantID int64,
+	limit, offset int,
+) (checks []model.CompatibilityCheck, total int) {
+	tx, err := this.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	if err != nil {
+		panic(fmt.Errorf("error starting transaction: %w", err))
+	}
+
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if err := tx.QueryRow(ctx, countParticipantChecksQuery, participantID).Scan(&total); err != nil {
+		panic(fmt.Errorf("error counting participant checks: %w", err))
+	}
+
+	rows, err := tx.Query(ctx, listParticipantChecksQuery, participantID, limit, offset)
 	if err != nil {
 		panic(fmt.Errorf("error listing participant checks: %w", err))
 	}
 
-	checks, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (model.CompatibilityCheck, error) {
+	checks, err = pgx.AppendRows(make([]model.CompatibilityCheck, 0), rows, func(row pgx.CollectableRow) (model.CompatibilityCheck, error) {
 		var check model.CompatibilityCheck
 		err := row.Scan(
 			&check.ID,
@@ -182,7 +206,7 @@ func (this *ParticipantChecksRepository) ListChecks(ctx context.Context, partici
 		panic(fmt.Errorf("error scanning participant checks: %w", err))
 	}
 
-	return checks
+	return checks, total
 }
 
 func (this *ParticipantChecksRepository) ListResultsByCheck(ctx context.Context, checkIDs []int64) map[int64][]model.CompatibilityCheckResult {

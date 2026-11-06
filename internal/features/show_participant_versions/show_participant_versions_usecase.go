@@ -24,6 +24,7 @@ type ShowParticipantVersionsOutput struct {
 	Status   ShowParticipantVersionsStatus
 	Header   *model.ParticipantVersionsHeader
 	Versions []model.PublishedVersion
+	Total    int
 }
 
 type ShowParticipantVersionsUseCase struct {
@@ -40,7 +41,7 @@ func (this *ShowParticipantVersionsUseCase) Execute(ctx context.Context, input S
 		return ShowParticipantVersionsOutput{Status: ParticipantVersionsParticipantNotFound}
 	}
 
-	versions := this.participantVersionsRepository.ListPublishedVersions(ctx, header.Participant.ID, pages.PageSize, pages.Offset(input.Page))
+	versions, total := this.participantVersionsRepository.ListPublishedVersions(ctx, header.Participant.ID, pages.PageSize, pages.Offset(input.Page))
 
-	return ShowParticipantVersionsOutput{Status: ParticipantVersionsFound, Header: header, Versions: versions}
+	return ShowParticipantVersionsOutput{Status: ParticipantVersionsFound, Header: header, Versions: versions, Total: total}
 }

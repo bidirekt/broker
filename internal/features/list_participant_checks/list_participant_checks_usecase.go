@@ -25,6 +25,7 @@ type ListParticipantChecksOutput struct {
 	Status ListParticipantChecksStatus
 	Header *repository.ParticipantChecksHeader
 	Checks []ListedCheck
+	Total  int
 }
 
 type ListedCheck struct {
@@ -46,7 +47,7 @@ func (this *ListParticipantChecksUseCase) Execute(ctx context.Context, input Lis
 		return ListParticipantChecksOutput{Status: ParticipantNotFound}
 	}
 
-	checks := this.participantChecksRepository.ListChecks(ctx, header.Participant.ID, pages.PageSize, pages.Offset(input.Page))
+	checks, total := this.participantChecksRepository.ListChecks(ctx, header.Participant.ID, pages.PageSize, pages.Offset(input.Page))
 	checkIDs := make([]int64, 0, len(checks))
 	for _, check := range checks {
 		checkIDs = append(checkIDs, check.ID)
@@ -58,7 +59,7 @@ func (this *ListParticipantChecksUseCase) Execute(ctx context.Context, input Lis
 		listed = append(listed, ListedCheck{Check: check, Report: toReport(check, resultsByCheck[check.ID])})
 	}
 
-	return ListParticipantChecksOutput{Status: ParticipantChecksListed, Header: header, Checks: listed}
+	return ListParticipantChecksOutput{Status: ParticipantChecksListed, Header: header, Checks: listed, Total: total}
 }
 
 func toReport(check model.CompatibilityCheck, results []model.CompatibilityCheckResult) breakreport.Report {

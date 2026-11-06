@@ -42,7 +42,7 @@ func (this *ListParticipantChecksUiHandler) Handle(ctx fiber.Ctx) error {
 		return respond.NotFound(ctx)
 	}
 
-	pager, ok := pages.NewPager(ctx, pageParam, page, output.Header.Checks)
+	pager, ok := pages.NewPager(ctx, pageParam, page, output.Total)
 	if !ok {
 		return respond.NotFound(ctx)
 	}
