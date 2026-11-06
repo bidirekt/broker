@@ -63,7 +63,7 @@
 {{else}}
 <section class="sheet">
   <div class="empty">
-    <div class="ic">{{template "deployments_icon" 20}}</div>
+    <div class="ic">{{template "icon_package" 20}}</div>
     <h2 class="h2">No deployments yet</h2>
     <p>Record the first deployment to <span class="name">{{$name}}</span> from your pipeline.</p>
     <code class="cmd">bidirekt record-deployment</code>
@@ -73,7 +73,7 @@
 <section class="sheet">
   <div class="sheet-head"><h2 class="h2">Checks</h2><span class="muted">can-i-deploy answers asked against {{$name}}</span></div>
   {{if .Checks}}
-  <table class="t stack">
+  <div class="scroll"><table class="t stack">
     <thead>
       <tr>
         <th scope="col">Check</th>
@@ -100,7 +100,7 @@
       </tr>
       {{end}}
     </tbody>
-  </table>
+  </table></div>
   {{template "pager" .ChecksPager}}
   {{else}}
   <div class="empty">
@@ -121,5 +121,3 @@
 {{define "role"}}{{if eq . "both"}}<span class="role">PROVIDER · CONSUMER</span>{{else if eq . "provider"}}<span class="role">PROVIDER</span>{{else if eq . "consumer"}}<span class="role">CONSUMER</span>{{end}}{{end}}
 
 {{define "breaks"}}{{.}} {{if eq . 1}}break{{else}}breaks{{end}}{{end}}
-
-{{define "deployments_icon"}}<svg viewBox="0 0 16 16" width="{{.}}" height="{{.}}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 1.8l5.5 3.1v6.2L8 14.2l-5.5-3.1V4.9z"/><path d="M2.5 4.9L8 8l5.5-3.1M8 8v6.2"/></svg>{{end}}

@@ -5,6 +5,22 @@ import (
 	"net/http"
 )
 
+type anchorBreak struct {
+	Reason string `json:"reason"`
+	Role   string `json:"role"`
+}
+
+type anchorResult struct {
+	Deployable         bool                                           `json:"deployable"`
+	ParticipantVersion *string                                        `json:"participantVersion"`
+	Endpoints          map[string]map[string]map[string][]anchorBreak `json:"endpoints"`
+}
+
+type anchorResponse struct {
+	Deployable bool                    `json:"deployable"`
+	Results    map[string]anchorResult `json:"results"`
+}
+
 const anchorProviderV1Contract = `
 {
   "provides": { "rest": { "/things": { "get": { "responses": { "200": "Thing" } } } } },
@@ -53,7 +69,7 @@ func (this *IntegrationSuite) TestCanIDeploy_AnchorsToAnAliasedDeployedProvider(
 	status, body := this.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
 	this.Equal(http.StatusOK, status)
 
-	var got canIDeployResponse
+	var got anchorResponse
 	this.Require().NoError(json.Unmarshal([]byte(body), &got))
 
 	this.True(got.Deployable)
@@ -85,7 +101,7 @@ func (this *IntegrationSuite) TestCanIDeploy_AnchorsToAnAliasedDeployedConsumer(
 	status, body := this.post("/api/can-i-deploy", `{"participant":"api","version":"v1","environment":"production"}`)
 	this.Equal(http.StatusOK, status)
 
-	var got canIDeployResponse
+	var got anchorResponse
 	this.Require().NoError(json.Unmarshal([]byte(body), &got))
 
 	this.True(got.Deployable)
@@ -134,7 +150,7 @@ func (this *IntegrationSuite) TestCanIDeploy_UndeployedProviderWhoseLatestVersio
 	status, body := this.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
 	this.Equal(http.StatusOK, status)
 
-	var got canIDeployResponse
+	var got anchorResponse
 	this.Require().NoError(json.Unmarshal([]byte(body), &got))
 
 	this.False(got.Deployable)
@@ -164,7 +180,7 @@ func (this *IntegrationSuite) TestCanIDeploy_UndeployedProviderWhoseLatestVersio
 	status, body := this.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
 	this.Equal(http.StatusOK, status)
 
-	var got canIDeployResponse
+	var got anchorResponse
 	this.Require().NoError(json.Unmarshal([]byte(body), &got))
 
 	this.False(got.Deployable)

@@ -2,7 +2,7 @@
 
 {{define "content"}}
 {{with .Page}}
-<nav class="crumbs" aria-label="Breadcrumbs"><span>participants</span><span aria-hidden="true">/</span><span>{{.ContractVersion.ParticipantName}}</span><span aria-hidden="true">/</span><span aria-current="page">{{.ContractVersion.Version}}</span></nav>
+<nav class="crumbs" aria-label="Breadcrumbs"><a href="/participants">participants</a><span aria-hidden="true">/</span><a href="{{.ParticipantURL}}">{{.ContractVersion.ParticipantName}}</a><span aria-hidden="true">/</span><span aria-current="page">{{.ContractVersion.Version}}</span></nav>
 <div class="head">
   <div>
     <h1><span class="name">{{.ContractVersion.ParticipantName}}</span> <span class="ver">{{.ContractVersion.Version}}</span></h1>
@@ -66,6 +66,7 @@
       {{end}}
     </tbody>
   </table>
+  {{template "pager" .DeploymentsPager}}
   {{else}}
   <p class="pad muted">not deployed</p>
   {{end}}

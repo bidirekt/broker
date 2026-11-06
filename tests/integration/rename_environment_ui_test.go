@@ -20,6 +20,7 @@ const (
 	renameEnvironmentUiNotFound        = "<h1>Not Found</h1>"
 	renameEnvironmentUiNameFieldError  = `<p class="err" id="name-err"><svg`
 	renameEnvironmentUiNameInvalidMark = `aria-invalid="true" aria-describedby="name-err"`
+	renameEnvironmentUiWarnIcon        = `<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 1.8l6.5 11.7h-13z"/><path d="M8 6.5v3M8 11.6v.01"/></svg>`
 )
 
 func (this *IntegrationSuite) renameEnvironmentUiCreate(name string) (id int64) {
@@ -78,7 +79,7 @@ func (this *IntegrationSuite) TestRenameEnvironmentUi_FormIsPrefilledWithTheCurr
 	this.Contains(body, "<h1>Rename production</h1>")
 	this.Contains(body, `<form class="sheet formcard" method="post" action="`+productionPath+`/rename">`)
 	this.Contains(body, `name="name" type="text" autocomplete="off" value="production" required autofocus>`)
-	this.Contains(body, `<div class="warn" role="note"><span><b>Pipelines use this name.</b> Until they are updated, any pipeline still using <span class="mono">production</span> gets <code>environment not found</code>. Deployments and checks stay attached to the environment.</span></div>`)
+	this.Contains(body, `<div class="warn" role="note">`+renameEnvironmentUiWarnIcon+`<span><b>Pipelines use this name.</b> Until they are updated, any pipeline still using <span class="mono">production</span> gets <code>environment not found</code>. Deployments and checks stay attached to the environment.</span></div>`)
 	this.Contains(body, `<button type="submit" class="btn primary">Rename</button><a class="btn" href="`+productionPath+`">Cancel</a>`)
 	this.NotContains(body, `aria-invalid`)
 }

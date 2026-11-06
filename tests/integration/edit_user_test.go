@@ -51,7 +51,7 @@ func (this *IntegrationSuite) TestEditUser_FormIsPrefilledWithTheEmailAndPermiss
 
 	this.Equal(http.StatusOK, status)
 	this.Contains(body, "<h1>Edit ana@x.com</h1>")
-	this.Contains(body, `value="ana@x.com"`)
+	this.Contains(body, `value="ana@x.com" required autofocus>`)
 	this.Contains(body, `<input type="radio" name="permission" value="read" required>`)
 	this.Contains(body, `<input type="radio" name="permission" value="write" required checked>`)
 	this.Contains(body, editUserReadDescription)
@@ -165,6 +165,8 @@ func (this *IntegrationSuite) TestEditUser_RefusesAnInvalidEmailOrPermission() {
 		this.Contains(body, `</svg><span>`+c.message+`</span></p>`, c.email+" "+c.permission)
 		if c.field == "permission" {
 			this.NotContains(body, " checked", c.email+" "+c.permission)
+			this.Contains(body, `<input type="radio" name="permission" value="read" required autofocus>`, c.email+" "+c.permission)
+			this.Contains(body, `value="`+c.email+`" required>`, c.email+" "+c.permission)
 		}
 	}
 

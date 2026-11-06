@@ -29,7 +29,7 @@
 {{if eq .Header.VersionCount 0}}
 <section class="sheet">
   <div class="empty">
-    <div class="ic">{{template "deployments_icon" 20}}</div>
+    <div class="ic">{{template "icon_package" 20}}</div>
     <h2 class="h2">No deployments yet</h2>
     <p>Publish this participant's contract from CI, then record each deployment.</p>
     <code class="cmd">bidirekt publish</code>
@@ -66,7 +66,7 @@
   {{template "pager" .Pager}}
   {{else}}
   <div class="empty">
-    <div class="ic">{{template "deployments_icon" 20}}</div>
+    <div class="ic">{{template "icon_package" 20}}</div>
     {{if .Environment}}
     <h2 class="h2">No deployments in <a class="name" href="/environments/{{.Environment.ID}}">{{.Environment.Name}}</a></h2>
     <p>Record a deployment from CI each time this participant is deployed to {{.Environment.Name}}.</p>
@@ -81,5 +81,3 @@
 {{end}}
 {{end}}
 {{end}}
-
-{{define "deployments_icon"}}<svg viewBox="0 0 16 16" width="{{.}}" height="{{.}}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 1.8l5.5 3.1v6.2L8 14.2l-5.5-3.1V4.9z"/><path d="M2.5 4.9L8 8l5.5-3.1M8 8v6.2"/></svg>{{end}}

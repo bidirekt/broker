@@ -167,7 +167,7 @@ func (this *IntegrationSuite) TestShowParticipantVersions_ListsVersionsNewestFir
 		this.Require().Greater(at, previous, row)
 		previous = at
 	}
-	this.Equal(3, strings.Count(body, `<td data-l="Published"><time datetime="`))
+	this.Equal(3, strings.Count(body, `<td data-l="Published"><time class="time" datetime="`))
 	this.Contains(body, `just now</time></td>`)
 	this.Contains(body, `<td data-l="Deployed now"><span class="badges"><a class="badge env" href="`+staging+`">staging</a></span></td>`)
 	this.Contains(body, `<td data-l="Deployed now"><span class="badges"><a class="badge env" href="`+production+`">production</a></span></td>`)

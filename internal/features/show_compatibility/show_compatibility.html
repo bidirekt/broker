@@ -11,7 +11,7 @@
 {{if not .Participants}}
 <section class="sheet">
   <div class="empty">
-    <div class="ic">{{template "matrix_icon" 20}}</div>
+    <div class="ic">{{template "icon_matrix" 20}}</div>
     <h2 class="h2">No participants yet</h2>
     <p>Create a participant and publish its contract, and its versions show up here.</p>
     <code class="cmd">bidirekt create-participant</code>
@@ -34,7 +34,7 @@
 {{if not .Rows}}
 <section class="sheet">
   <div class="empty">
-    <div class="ic">{{template "matrix_icon" 20}}</div>
+    <div class="ic">{{template "icon_matrix" 20}}</div>
     <h2 class="h2">Nothing to compare</h2>
     <p><a class="name" href="{{.ParticipantURL}}">{{$participant}}</a> was never published, so it has no versions yet.</p>
     <code class="cmd">bidirekt publish</code>
@@ -43,7 +43,7 @@
 {{else if not .Environments}}
 <section class="sheet">
   <div class="empty">
-    <div class="ic">{{template "matrix_icon" 20}}</div>
+    <div class="ic">{{template "icon_matrix" 20}}</div>
     <h2 class="h2">No environments yet</h2>
     <p>Create one for each place you deploy to, and every version of <span class="name">{{$participant}}</span> gets a column per environment.</p>
     <code class="cmd">bidirekt create-environment</code>
@@ -55,7 +55,7 @@
     <h2 class="h2"><a class="name" href="{{.ParticipantURL}}">{{$participant}}</a> <span class="muted">· {{.Pager.Total}} {{if eq .Pager.Total 1}}version{{else}}versions{{end}}</span></h2>
     <p class="legend"><span>{{template "icon_check" 12}}can deploy</span><span>{{template "icon_x" 12}}cannot deploy</span><span>{{template "icon_deactivated" 12}}not checked yet</span></p>
   </div>
-  <table class="rt{{if .Stacked}} stacked{{end}}">
+  <div class="scroll"><table class="rt{{if .Stacked}} stacked{{end}}">
     <thead>
       <tr>
         <th scope="col">Version of <span class="name">{{$participant}}</span></th>
@@ -74,7 +74,7 @@
         <td class="rc {{if .Check.Deployable}}ok{{else}}bad{{end}}" data-env="{{$environment}}">
           <div class="rc-head">
             {{if .Check.Deployable}}<a class="res ok" href="/checks/{{.Check.ID}}">{{template "icon_check" 12}}can deploy</a>{{else}}<a class="res bad" href="/checks/{{.Check.ID}}">{{template "icon_x" 12}}cannot deploy{{if .Report.Stored}} · {{template "breaks" .Report.Breaks}}{{end}}</a>{{end}}
-            {{if $deployed}}<span class="badge env">deployed version</span>{{end}}
+            {{if $deployed}}<span class="badge deployed">deployed version</span>{{end}}
             <span class="rc-sub">check <a href="/checks/{{.Check.ID}}">#{{.Check.ID}}</a> · {{listTime .Check.CreatedAt}}</span>
           </div>
           {{if .Counterparts}}
@@ -108,7 +108,7 @@
         <td class="rc none" data-env="{{$environment}}">
           <div class="rc-head">
             <span class="res none">{{template "icon_deactivated" 12}}not checked yet</span>
-            {{if $deployed}}<span class="badge env">deployed version</span>{{end}}
+            {{if $deployed}}<span class="badge deployed">deployed version</span>{{end}}
           </div>
           <p class="rc-sub">no can-i-deploy for {{$version}} in {{$environment}} yet</p>
         </td>
@@ -117,7 +117,7 @@
       </tr>
       {{end}}
     </tbody>
-  </table>
+  </table></div>
   {{template "pager" .Pager}}
 </section>
 {{end}}
@@ -128,5 +128,3 @@
 {{define "role"}}{{if eq . "both"}}provider · consumer{{else}}{{.}}{{end}}{{end}}
 
 {{define "breaks"}}{{.}} {{if eq . 1}}break{{else}}breaks{{end}}{{end}}
-
-{{define "matrix_icon"}}<svg viewBox="0 0 16 16" width="{{.}}" height="{{.}}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="2.5" y="2.5" width="11" height="11" rx="1.5"/><path d="M2.5 6.5h11M2.5 10h11M6.5 6.5v7"/></svg>{{end}}

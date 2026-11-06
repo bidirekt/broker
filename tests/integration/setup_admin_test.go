@@ -105,7 +105,7 @@ func (this *IntegrationSuite) TestSetupAdmin_PageAsksForTheAdminsEmailAndPasswor
 	this.Equal("text/html; charset=utf-8", header.Get("Content-Type"))
 	this.Contains(body, "<h1>Create the admin</h1>")
 	this.Contains(body, `<form class="sheet formcard" method="post" action="/setup">`)
-	this.Contains(body, `<input class="input" id="email" name="email" type="text" inputmode="email"`)
+	this.Contains(body, `<input class="input" id="email" name="email" type="text" inputmode="email" autocomplete="email" value="" required autofocus>`)
 	this.Contains(body, `<input class="input" id="password" name="password" type="password"`)
 	this.NotContains(body, `aria-invalid`)
 	this.NotContains(body, `class="nav"`)
@@ -203,11 +203,11 @@ func (this *IntegrationSuite) TestSetupAdmin_RefusesAnInvalidEmailOrAFourteenCha
 
 	status, _, body = this.setupAdminPost(app, setupAdminEmail, "fourteen-chars")
 	this.Equal(http.StatusBadRequest, status)
-	this.Contains(body, `autocomplete="new-password" required aria-invalid="true" aria-describedby="password-err">`)
+	this.Contains(body, `autocomplete="new-password" required autofocus aria-invalid="true" aria-describedby="password-err">`)
 	this.Contains(body, `<p class="err" id="password-err">`)
 	this.Contains(body, `<span>`+setupAdminPasswordShort+`</span></p>`)
 	this.NotContains(body, `email-err`)
-	this.Contains(body, `value="`+setupAdminEmail+`"`)
+	this.Contains(body, `value="`+setupAdminEmail+`" required>`)
 
 	this.Equal(0, this.setupAdminCount())
 }

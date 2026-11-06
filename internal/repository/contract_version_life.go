@@ -32,6 +32,15 @@ const (
 			e.name COLLATE "C"
 	`
 
+	countDeploymentsOfVersionQuery = `
+		SELECT
+			count(*)
+		FROM
+			deployments
+		WHERE
+			participant_id = $1 AND version = $2
+	`
+
 	listDeploymentsOfVersionQuery = `
 		SELECT
 			d.id, e.id, e.name, d.rollback, d.deployed_at
@@ -42,6 +51,7 @@ const (
 			d.participant_id = $1 AND d.version = $2
 		ORDER BY
 			d.deployed_at DESC, d.id DESC
+		LIMIT $3 OFFSET $4
 	`
 
 	listLatestChecksOfVersionQuery = `
@@ -139,13 +149,29 @@ func (this *DeploymentRepository) ListCurrentDeploymentsOfVersion(ctx context.Co
 	return deployments
 }
 
-func (this *DeploymentRepository) ListDeploymentsOfVersion(ctx context.Context, participantID int64, version string) []model.Deployment {
-	rows, err := this.pool.Query(ctx, listDeploymentsOfVersionQuery, participantID, version)
+func (this *DeploymentRepository) ListDeploymentsOfVersion(
+	ctx context.Context,
+	participantID int64,
+	version string,
+	limit, offset int,
+) (deployments []model.Deployment, total int) {
+	tx, err := this.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	if err != nil {
+		panic(fmt.Errorf("error starting transaction: %w", err))
+	}
+
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if err := tx.QueryRow(ctx, countDeploymentsOfVersionQuery, participantID, version).Scan(&total); err != nil {
+		panic(fmt.Errorf("error counting deployments of version: %w", err))
+	}
+
+	rows, err := tx.Query(ctx, listDeploymentsOfVersionQuery, participantID, version, limit, offset)
 	if err != nil {
 		panic(fmt.Errorf("error listing deployments of version: %w", err))
 	}
 
-	deployments, err := pgx.AppendRows(make([]model.Deployment, 0), rows, func(row pgx.CollectableRow) (model.Deployment, error) {
+	deployments, err = pgx.AppendRows(make([]model.Deployment, 0), rows, func(row pgx.CollectableRow) (model.Deployment, error) {
 		deployment := model.Deployment{Version: version, Environment: &model.Environment{}}
 		err := row.Scan(&deployment.ID, &deployment.Environment.ID, &deployment.Environment.Name, &deployment.Rollback, &deployment.DeployedAt)
 
@@ -155,7 +181,7 @@ func (this *DeploymentRepository) ListDeploymentsOfVersion(ctx context.Context, 
 		panic(fmt.Errorf("error scanning deployments of version: %w", err))
 	}
 
-	return deployments
+	return deployments, total
 }
 
 func (this *CompatibilityRepository) ListLatestChecksOfVersion(ctx context.Context, participantID int64, version string) []model.CompatibilityCheck {

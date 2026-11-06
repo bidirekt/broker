@@ -18,11 +18,12 @@ const (
 	renameParticipantUiHasPublished    = "participant has published contracts, create a new participant and switch every consumer&#39;s consumes to it"
 	renameParticipantUiNoAccess        = "<h1>you don&#39;t have access</h1>"
 	renameParticipantUiNotFound        = "<h1>Not Found</h1>"
-	renameParticipantUiDisabledSubmit  = `<button type="submit" class="btn primary" aria-disabled="true">Rename</button>`
+	renameParticipantUiDisabledSubmit  = `<button type="submit" class="btn primary" aria-disabled="true" disabled>Rename</button>`
 	renameParticipantUiEnabledSubmit   = `<button type="submit" class="btn primary">Rename</button>`
 	renameParticipantUiNameFieldError  = `<p class="err" id="name-err"><svg`
 	renameParticipantUiNameInvalidMark = `aria-invalid="true" aria-describedby="name-err"`
-	renameParticipantUiWholeFormAlert  = `<div class="alert" role="alert">`
+	renameParticipantUiMessageIcon     = `<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 1.8l6.5 11.7h-13z"/><path d="M8 6.5v3M8 11.6v.01"/></svg>`
+	renameParticipantUiWholeFormAlert  = `<div class="alert" role="alert">` + renameParticipantUiMessageIcon
 	renameParticipantUiDisabledRename  = `<a class="btn" aria-disabled="true">Rename</a>`
 	renameParticipantUiDisabledNote    = `<p class="disabled-note">participant has published contracts, create a new participant and switch every consumer's consumes to it</p>`
 )
@@ -85,10 +86,11 @@ func (this *IntegrationSuite) TestRenameParticipantUi_FormIsPrefilledWithTheCurr
 	this.Require().Equal(http.StatusOK, status, body)
 	this.Equal("text/html; charset=utf-8", header.Get("Content-Type"))
 	this.Equal("no-store", header.Get("Cache-Control"))
+	this.Contains(body, `<nav class="crumbs" aria-label="Breadcrumbs"><a href="/participants">participants</a><span aria-hidden="true">/</span><a href="/participants/petstore_admin">petstore_admin</a><span aria-hidden="true">/</span><span aria-current="page">rename</span></nav>`)
 	this.Contains(body, "<h1>Rename petstore_admin</h1>")
 	this.Contains(body, `<form class="sheet formcard" method="post" action="/participants/petstore_admin/rename">`)
 	this.Contains(body, `name="name" type="text" autocomplete="off" value="petstore_admin" required autofocus>`)
-	this.Contains(body, `<div class="warn" role="note"><span>Another participant's <code>consumes</code> and the CI that use <span class="mono">petstore_admin</span> stop finding it under the old name.</span></div>`)
+	this.Contains(body, `<div class="warn" role="note">`+renameParticipantUiMessageIcon+`<span>Another participant's <code>consumes</code> and the CI that use <span class="mono">petstore_admin</span> stop finding it under the old name.</span></div>`)
 	this.Contains(body, renameParticipantUiEnabledSubmit+`<a class="btn" href="/participants/petstore_admin">Cancel</a>`)
 	this.NotContains(body, renameParticipantUiWholeFormAlert)
 	this.NotContains(body, `aria-invalid`)

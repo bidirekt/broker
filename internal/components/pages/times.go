@@ -62,5 +62,5 @@ func timeFuncs(now func() time.Time) template.FuncMap {
 }
 
 func timeElement(at time.Time, text string) template.HTML {
-	return template.HTML(`<time datetime="` + MachineTime(at) + `">` + text + `</time>`)
+	return template.HTML(`<time class="time" datetime="` + MachineTime(at) + `" title="` + at.UTC().Format(minuteLayout) + `">` + text + `</time>`)
 }

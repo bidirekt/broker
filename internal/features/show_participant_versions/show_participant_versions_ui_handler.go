@@ -7,6 +7,7 @@ import (
 	"github.com/bidirekt/broker/internal/components/pages"
 	"github.com/bidirekt/broker/internal/components/respond"
 	"github.com/bidirekt/broker/internal/model"
+	"github.com/bidirekt/broker/internal/validations"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -26,12 +27,17 @@ func (this *ShowParticipantVersionsUiHandler) Handle(ctx fiber.Ctx) error {
 		return respond.Problem(ctx, fiber.StatusForbidden, access.NoAccessMessage)
 	}
 
+	name := ctx.Params(participantNameParam)
+	if validations.ParticipantName(name) != nil {
+		return respond.NotFound(ctx)
+	}
+
 	page, ok := pages.RequestedPage(ctx, pageParam)
 	if !ok {
 		return respond.NotFound(ctx)
 	}
 
-	output := this.useCase.Execute(ctx.Context(), ShowParticipantVersionsInput{Name: ctx.Params(participantNameParam), Page: page})
+	output := this.useCase.Execute(ctx.Context(), ShowParticipantVersionsInput{Name: name, Page: page})
 	if output.Status == ParticipantVersionsParticipantNotFound {
 		return respond.NotFound(ctx)
 	}

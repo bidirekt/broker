@@ -7,6 +7,7 @@ import (
 	"github.com/bidirekt/broker/internal/components/pages"
 	"github.com/bidirekt/broker/internal/components/respond"
 	"github.com/bidirekt/broker/internal/model"
+	"github.com/bidirekt/broker/internal/validations"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -26,7 +27,17 @@ func (this *ShowContractVersionUiHandler) Handle(ctx fiber.Ctx) error {
 		return respond.Problem(ctx, fiber.StatusForbidden, access.NoAccessMessage)
 	}
 
+	participantName := ctx.Params(participantNameParam)
+	if validations.ParticipantName(participantName) != nil {
+		return respond.NotFound(ctx)
+	}
+
 	version, ok := pages.ParsePathSegment(ctx.Params(versionParam))
+	if !ok {
+		return respond.NotFound(ctx)
+	}
+
+	deploymentsPage, ok := pages.RequestedPage(ctx, deploymentsPageParam)
 	if !ok {
 		return respond.NotFound(ctx)
 	}
@@ -37,11 +48,17 @@ func (this *ShowContractVersionUiHandler) Handle(ctx fiber.Ctx) error {
 	}
 
 	output := this.useCase.Execute(ctx.Context(), ShowContractVersionInput{
-		ParticipantName: ctx.Params(participantNameParam),
+		ParticipantName: participantName,
 		Version:         version,
+		DeploymentsPage: deploymentsPage,
 		ChecksPage:      checksPage,
 	})
 	if output.Status == ContractVersionNotFound {
+		return respond.NotFound(ctx)
+	}
+
+	deploymentsPager, ok := pages.NewPager(ctx, deploymentsPageParam, deploymentsPage, output.DeploymentsTotal)
+	if !ok {
 		return respond.NotFound(ctx)
 	}
 
@@ -50,5 +67,5 @@ func (this *ShowContractVersionUiHandler) Handle(ctx fiber.Ctx) error {
 		return respond.NotFound(ctx)
 	}
 
-	return pages.Render(ctx, fiber.StatusOK, pageFiles, showContractVersionTemplate, newShowContractVersionPage(output, checksPager))
+	return pages.Render(ctx, fiber.StatusOK, pageFiles, showContractVersionTemplate, newShowContractVersionPage(output, deploymentsPager, checksPager))
 }

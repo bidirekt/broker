@@ -1,5 +1,7 @@
 package rename_participant
 
+import "net/url"
+
 const (
 	ParticipantRenamedMessage               string = "participant renamed"
 	ParticipantInvalidInputMessage          string = "participant invalid input"
@@ -15,20 +17,25 @@ const (
 )
 
 type RenameParticipantPage struct {
-	Name    string
-	NewName string
-	Alert   string
-	Field   string
-	Message string
+	Name           string
+	ParticipantURL string
+	NewName        string
+	Alert          string
+	Field          string
+	Message        string
 }
 
 func newRenameParticipantPage(name, newName string, published bool) RenameParticipantPage {
-	page := RenameParticipantPage{Name: name, NewName: newName}
+	page := RenameParticipantPage{Name: name, ParticipantURL: participantURL(name), NewName: newName}
 	if published {
 		page.Alert = ParticipantHasPublishedContractsMessage
 	}
 
 	return page
+}
+
+func participantURL(participantName string) string {
+	return "/participants/" + url.PathEscape(participantName)
 }
 
 type RenameParticipantRequestBody struct {

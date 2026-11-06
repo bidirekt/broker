@@ -21,7 +21,8 @@ const (
 	generateLinkUserNotFoundPage = "<h1>user not found</h1>"
 	generateLinkErrorStatus      = `<div class="code-n">404</div>`
 	generateLinkUserDeactivated  = "deactivated users cannot get a link"
-	generateLinkPreviousWarning  = `<div class="warn" role="note"><span>The previous link no longer works.</span></div>`
+	generateLinkWarnIcon         = `<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 1.8l6.5 11.7h-13z"/><path d="M8 6.5v3M8 11.6v.01"/></svg>`
+	generateLinkPreviousWarning  = `<div class="warn" role="note">` + generateLinkWarnIcon + `<span>The previous link no longer works.</span></div>`
 )
 
 var generateLinkInPage = regexp.MustCompile(`http://localhost:8080/set-password\?token=([A-Za-z0-9_-]{43})`)
@@ -68,7 +69,7 @@ func (this *IntegrationSuite) generateLinkAssertReplaced(userID int64, previousH
 	this.WithinDuration(time.Now().Add(24*time.Hour), link.ExpiresAt, time.Minute)
 	this.Contains(body, `<h1>New `+string(purpose)+` link</h1>`)
 	this.Contains(body, `<p class="sub">for `+user.Email+`</p>`)
-	this.Contains(body, `Send this `+string(purpose)+` link to `+user.Email+`. It works once, until <time datetime="`+link.ExpiresAt.UTC().Format(time.RFC3339Nano)+`">`+link.ExpiresAt.UTC().Format("2006-01-02 15:04")+` UTC</time>, and is not shown again.`)
+	this.Contains(body, `Send this `+string(purpose)+` link to `+user.Email+`. It works once, until <time class="time" datetime="`+link.ExpiresAt.UTC().Format(time.RFC3339Nano)+`" title="`+link.ExpiresAt.UTC().Format("2006-01-02 15:04")+` UTC">`+link.ExpiresAt.UTC().Format("2006-01-02 15:04")+` UTC</time>, and is not shown again.`)
 	this.Contains(body, `<input class="copy" type="text" readonly value="`+match[0]+`"`)
 	this.Contains(body, generateLinkPreviousWarning)
 	this.Equal(1, this.countRows("one_time_links"))

@@ -8,6 +8,7 @@ import (
 	"github.com/bidirekt/broker/internal/components/respond"
 	"github.com/bidirekt/broker/internal/components/sessions"
 	"github.com/bidirekt/broker/internal/model"
+	"github.com/bidirekt/broker/internal/validations"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -29,6 +30,10 @@ func (this *RenameParticipantUiHandler) ShowForm(ctx fiber.Ctx) error {
 	}
 
 	name := ctx.Params(participantNameParam)
+	if validations.ParticipantName(name) != nil {
+		return respond.NotFound(ctx)
+	}
+
 	target := this.useCase.FindTarget(ctx.Context(), name)
 	if target.Status == ParticipantNotFound {
 		return respond.NotFound(ctx)
@@ -45,6 +50,10 @@ func (this *RenameParticipantUiHandler) RenameParticipant(ctx fiber.Ctx) error {
 	}
 
 	name := ctx.Params(participantNameParam)
+	if validations.ParticipantName(name) != nil {
+		return respond.NotFound(ctx)
+	}
+
 	target := this.useCase.FindTarget(ctx.Context(), name)
 	if target.Status == ParticipantNotFound {
 		return respond.NotFound(ctx)

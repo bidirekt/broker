@@ -35,7 +35,7 @@
   {{template "pager" .Page.Pager}}
   {{else}}
   <div class="empty">
-    <div class="ic">{{template "environments_icon" 20}}</div>
+    <div class="ic">{{template "icon_environments" 20}}</div>
     <h2 class="h2">No environments yet</h2>
     <p>Create one for each place you deploy to, like <code>staging</code> and <code>production</code>, {{if .CanWrite}}here, or {{end}}from CI:</p>
     <code class="cmd">bidirekt create-environment</code>
@@ -43,5 +43,3 @@
   {{end}}
 </section>
 {{end}}
-
-{{define "environments_icon"}}<svg viewBox="0 0 16 16" width="{{.}}" height="{{.}}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 2l6 3-6 3-6-3z"/><path d="M2 8l6 3 6-3"/><path d="M2 11l6 3 6-3"/></svg>{{end}}

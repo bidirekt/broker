@@ -20,30 +20,33 @@ const (
 	`
 
 	listOverviewSaidNoChecksQuery = `
-		WITH latest AS (
-			SELECT DISTINCT ON (participant_id, environment_id)
-				id, participant_id, contract_id, version, environment_id, environment_name, deployable, report, created_at
-			FROM
-				compatibility_checks
-			ORDER BY
-				participant_id, environment_id, created_at DESC, id DESC
-		)
 		SELECT
-			c.id, c.participant_id, p.name, c.contract_id, c.version, c.environment_id,
+			c.id, p.id, p.name, c.contract_id, c.version, e.id,
 			COALESCE(c.environment_name, e.name), c.deployable, c.report, c.created_at,
 			EXISTS (
 				SELECT 1
 				FROM deployments d
-				WHERE d.participant_id = c.participant_id
-					AND d.environment_id = c.environment_id
+				WHERE d.participant_id = p.id
+					AND d.environment_id = e.id
 					AND d.version = c.version
 					AND d.deployed_at > c.created_at
 			),
 			COUNT(*) OVER ()
 		FROM
-			latest c
-			JOIN participants p ON p.id = c.participant_id
-			JOIN environments e ON e.id = c.environment_id
+			participants p
+			CROSS JOIN environments e
+			CROSS JOIN LATERAL (
+				SELECT
+					id, contract_id, version, environment_name, deployable, report, created_at
+				FROM
+					compatibility_checks
+				WHERE
+					participant_id = p.id
+					AND environment_id = e.id
+				ORDER BY
+					created_at DESC, id DESC
+				LIMIT 1
+			) c
 		WHERE
 			NOT c.deployable
 		ORDER BY

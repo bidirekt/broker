@@ -1,7 +1,7 @@
 {{define "title"}}Rename {{.Page.Name}}{{end}}
 
 {{define "content"}}
-<nav class="crumbs" aria-label="Breadcrumbs"><a href="/participants">participants</a><span aria-hidden="true">/</span><a href="/participants/{{.Page.Name}}">{{.Page.Name}}</a><span aria-hidden="true">/</span><span aria-current="page">rename</span></nav>
+<nav class="crumbs" aria-label="Breadcrumbs"><a href="/participants">participants</a><span aria-hidden="true">/</span><a href="{{.Page.ParticipantURL}}">{{.Page.Name}}</a><span aria-hidden="true">/</span><span aria-current="page">rename</span></nav>
 <div class="head">
   <div>
     <h1>Rename {{.Page.Name}}</h1>
@@ -11,8 +11,8 @@
 <div class="formgrid">
   <form class="sheet formcard" method="post" action="/participants/{{.Page.Name}}/rename">
     <div class="form">
-      {{with .Page.Alert}}<div class="alert" role="alert">{{template "icon_error" 14}}<span>{{.}}</span></div>{{end}}
-      <div class="warn" role="note"><span>Another participant's <code>consumes</code> and the CI that use <span class="mono">{{.Page.Name}}</span> stop finding it under the old name.</span></div>
+      {{with .Page.Alert}}<div class="alert" role="alert">{{template "icon_error" 16}}<span>{{.}}</span></div>{{end}}
+      <div class="warn" role="note">{{template "icon_error" 16}}<span>Another participant's <code>consumes</code> and the CI that use <span class="mono">{{.Page.Name}}</span> stop finding it under the old name.</span></div>
       <div class="field">
         <label for="name">New name</label>
         <input class="input mono" id="name" name="name" type="text" autocomplete="off" value="{{.Page.NewName}}" required autofocus{{if eq .Page.Field "name"}} aria-invalid="true" aria-describedby="name-err"{{end}}>
@@ -20,7 +20,7 @@
         <p class="hint">Lowercase letters, digits and underscores, like <code>petstore_web</code>.</p>
       </div>
     </div>
-    <div class="form-foot"><button type="submit" class="btn primary"{{if .Page.Alert}} aria-disabled="true"{{end}}>Rename</button><a class="btn" href="/participants/{{.Page.Name}}">Cancel</a></div>
+    <div class="form-foot"><button type="submit" class="btn primary"{{if .Page.Alert}} aria-disabled="true" disabled{{end}}>Rename</button><a class="btn" href="/participants/{{.Page.Name}}">Cancel</a></div>
   </form>
   <aside class="sheet aside" aria-label="About renaming">
     <h2>About renaming</h2>

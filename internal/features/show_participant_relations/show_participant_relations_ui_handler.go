@@ -7,6 +7,7 @@ import (
 	"github.com/bidirekt/broker/internal/components/pages"
 	"github.com/bidirekt/broker/internal/components/respond"
 	"github.com/bidirekt/broker/internal/model"
+	"github.com/bidirekt/broker/internal/validations"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -26,7 +27,12 @@ func (this *ShowParticipantRelationsUiHandler) Handle(ctx fiber.Ctx) error {
 		return respond.Problem(ctx, fiber.StatusForbidden, access.NoAccessMessage)
 	}
 
-	output := this.useCase.Execute(ctx.Context(), ShowParticipantRelationsInput{Name: ctx.Params(participantNameParam)})
+	name := ctx.Params(participantNameParam)
+	if validations.ParticipantName(name) != nil {
+		return respond.NotFound(ctx)
+	}
+
+	output := this.useCase.Execute(ctx.Context(), ShowParticipantRelationsInput{Name: name})
 	if output.Status == ParticipantNotFound {
 		return respond.NotFound(ctx)
 	}

@@ -39,12 +39,12 @@
   {{end}}
 </section>
 {{else if .Breaking}}
-<p class="legend"><span>Fix in the participant under check</span><span>Or fix in the counterpart</span><span><span class="role">PROVIDER</span> it consumes from</span><span><span class="role">CONSUMER</span> consumes it</span></p>
+<p class="legend"><span><span class="sw"></span>Fix in the participant under check</span><span><span class="sw o"></span>Or fix in the counterpart</span><span><span class="role">PROVIDER</span> it consumes from</span><span><span class="role">CONSUMER</span> consumes it</span></p>
 {{$check := .Check}}
 {{range .Breaking}}
 {{$counterpart := .Name}}
 <details class="cp" open>
-  <summary>{{template "role" .Role}}<span class="who-cp">{{.Name}}</span>{{if .Version}}<span class="ver">{{.Version}}</span><span class="badge env">{{$check.EnvironmentName}}</span>{{else}}<span class="muted">no version</span>{{end}}<span class="badge no nb">{{template "icon_x" 12}}no · {{.Breaks}} {{if eq .Breaks 1}}break{{else}}breaks{{end}}</span></summary>
+  <summary><span class="chev">{{template "icon_chevron" 14}}</span>{{template "role" .Role}}<span class="who-cp">{{.Name}}</span>{{if .Version}}<span class="ver">{{.Version}}</span><span class="badge env">{{$check.EnvironmentName}}</span>{{else}}<span class="muted">no version</span>{{end}}<span class="badge no nb">{{template "icon_x" 12}}no · {{.Breaks}} {{if eq .Breaks 1}}break{{else}}breaks{{end}}</span></summary>
   {{if .ParticipantURL}}<div class="cp-links"><a href="{{.ParticipantURL}}">{{.Name}}</a>{{if .VersionURL}}<span aria-hidden="true">·</span><a href="{{.VersionURL}}">version {{.Version}}</a>{{end}}</div>{{end}}
   {{if .Endpoints}}
   <p class="group-label">Endpoints</p>

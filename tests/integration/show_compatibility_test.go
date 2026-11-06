@@ -134,7 +134,7 @@ func (this *IntegrationSuite) TestShowCompatibility_ShowsTheVersionsByEnvironmen
 	this.Contains(body, production)
 	this.Contains(body, staging)
 	this.Less(strings.Index(body, production), strings.Index(body, staging))
-	this.Contains(body, `<table class="rt">`)
+	this.Contains(body, `<div class="scroll"><table class="rt">`)
 
 	newest := `<a class="ver" href="/participants/petstore_api/versions/1.5.0">1.5.0</a>`
 	oldest := `<a class="ver" href="/participants/petstore_api/versions/1.4.0">1.4.0</a>`
@@ -145,7 +145,7 @@ func (this *IntegrationSuite) TestShowCompatibility_ShowsTheVersionsByEnvironmen
 
 	this.Contains(body, `<a class="res bad" href="/checks/`+breakingID+`">`)
 	this.Contains(body, `cannot deploy · 1 break</a>`)
-	this.Contains(body, `<span class="rc-sub">check <a href="/checks/`+breakingID+`">#`+breakingID+`</a> · <time datetime="`)
+	this.Contains(body, `<span class="rc-sub">check <a href="/checks/`+breakingID+`">#`+breakingID+`</a> · <time class="time" datetime="`)
 	this.Contains(body, `<td><a class="name" href="/participants/petstore_web">petstore_web</a></td>
                 <td class="rl">consumer</td>
                 <td class="ver">2.3.0</td>
@@ -155,7 +155,8 @@ func (this *IntegrationSuite) TestShowCompatibility_ShowsTheVersionsByEnvironmen
                 <td class="st-cell"><span class="st ok">`)
 
 	this.Contains(body, `<a class="res ok" href="/checks/`+staleID+`">`)
-	this.Equal(1, strings.Count(body, `<span class="badge env">deployed version</span>`))
+	this.Equal(1, strings.Count(body, `<span class="badge deployed">deployed version</span>`))
+	this.NotContains(body, `<span class="badge env">deployed version</span>`)
 	this.Contains(body, `<span>Since this check, 2 deployments to production: petstore_reviews, petstore_web. Ask again before deploying.</span>`)
 	this.Equal(1, strings.Count(body, `class="rc-stale"`))
 
@@ -288,7 +289,7 @@ func (this *IntegrationSuite) TestShowCompatibility_MoreThanTwoEnvironmentsStack
 
 	_, _, body := this.getPage("/compatibility", this.signInAsAdmin())
 
-	this.Contains(body, `<table class="rt stacked">`)
+	this.Contains(body, `<div class="scroll"><table class="rt stacked">`)
 	this.Equal(3, strings.Count(body, `<td class="rc none"`))
 }
 

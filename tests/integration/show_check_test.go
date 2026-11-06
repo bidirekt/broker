@@ -136,6 +136,11 @@ consumes:
             200: ~
 `
 
+const (
+	showCheckChevron = `<span class="chev"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 3.5l4.5 4.5-4.5 4.5"/></svg></span>`
+	showCheckLegend  = `<p class="legend"><span><span class="sw"></span>Fix in the participant under check</span><span><span class="sw o"></span>Or fix in the counterpart</span><span><span class="role">PROVIDER</span> it consumes from</span><span><span class="role">CONSUMER</span> consumes it</span></p>`
+)
+
 var showCheckSummary = regexp.MustCompile(`(?s)<summary>(.*?)</summary>`)
 
 func (this *IntegrationSuite) mustPostForShowCheck(path, body string) {
@@ -210,6 +215,8 @@ func (this *IntegrationSuite) TestShowCheck_ShowsAConsumerSideNoWithItsBreaksRea
 	this.Contains(body, `<div><b>4 of 4</b><span>counterparts break</span></div>`)
 	this.Contains(body, `<div><b>2</b><span>places in the contracts</span></div>`)
 	this.Equal(4, strings.Count(body, `<details class="cp" open>`))
+	this.Equal(4, strings.Count(body, `<summary>`+showCheckChevron+`<span class="role">`))
+	this.Contains(body, showCheckLegend)
 
 	this.Contains(body, `<p class="ix-name">response 200</p>`)
 	this.Contains(body, `<b class="name">petstore_web</b> reads response 200, but <b class="name">petstore_api</b> answers only 204`)

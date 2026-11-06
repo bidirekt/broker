@@ -39,6 +39,7 @@ const (
 			(token_hash, user_id, purpose, expires_at)
 		VALUES
 			($1, $2, $3, $4)
+		RETURNING expires_at
 	`
 
 	findUsableLinkQuery = `
@@ -71,7 +72,7 @@ func NewOneTimeLinkRepository(pool *pgxpool.Pool) *OneTimeLinkRepository {
 	return &OneTimeLinkRepository{pool: pool}
 }
 
-// ReplaceOpen sets link.Purpose: invite for a user without a password, reset otherwise.
+// ReplaceOpen sets link.Purpose (invite for a user without a password, reset otherwise) and link.ExpiresAt to the stored value.
 func (this *OneTimeLinkRepository) ReplaceOpen(ctx context.Context, link *model.OneTimeLink) (email string, found, deactivated, replacedUsable bool) {
 	tx, err := this.pool.Begin(ctx)
 	if err != nil {
@@ -106,7 +107,7 @@ func (this *OneTimeLinkRepository) ReplaceOpen(ctx context.Context, link *model.
 		panic(fmt.Errorf("error deleting open link: %w", err))
 	}
 
-	if _, err := tx.Exec(ctx, insertLinkQuery, link.TokenHash, link.UserID, link.Purpose, link.ExpiresAt); err != nil {
+	if err := tx.QueryRow(ctx, insertLinkQuery, link.TokenHash, link.UserID, link.Purpose, link.ExpiresAt).Scan(&link.ExpiresAt); err != nil {
 		panic(fmt.Errorf("error inserting link: %w", err))
 	}
 

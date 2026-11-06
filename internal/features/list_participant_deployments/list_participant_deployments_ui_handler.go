@@ -7,6 +7,7 @@ import (
 	"github.com/bidirekt/broker/internal/components/pages"
 	"github.com/bidirekt/broker/internal/components/respond"
 	"github.com/bidirekt/broker/internal/model"
+	"github.com/bidirekt/broker/internal/validations"
 	"github.com/gofiber/fiber/v3"
 	"github.com/guregu/null"
 )
@@ -27,6 +28,11 @@ func (this *ListParticipantDeploymentsUiHandler) Handle(ctx fiber.Ctx) error {
 		return respond.Problem(ctx, fiber.StatusForbidden, access.NoAccessMessage)
 	}
 
+	participantName := ctx.Params(participantNameParam)
+	if validations.ParticipantName(participantName) != nil {
+		return respond.NotFound(ctx)
+	}
+
 	environmentID, ok := requestedEnvironmentID(ctx)
 	if !ok {
 		return respond.NotFound(ctx)
@@ -38,7 +44,7 @@ func (this *ListParticipantDeploymentsUiHandler) Handle(ctx fiber.Ctx) error {
 	}
 
 	output := this.useCase.Execute(ctx.Context(), ListParticipantDeploymentsInput{
-		ParticipantName: ctx.Params(participantNameParam),
+		ParticipantName: participantName,
 		EnvironmentID:   environmentID,
 		Page:            page,
 	})

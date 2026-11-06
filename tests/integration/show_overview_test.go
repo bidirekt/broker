@@ -144,6 +144,7 @@ func (this *IntegrationSuite) TestShowOverview_ShowsTheNumbersTheLastNoChecksWha
 	this.NotContains(saidNo, `badge more`)
 
 	deployed := this.sectionOfShowOverview(body, "Deployed now", "Recent activity")
+	this.Contains(deployed, `<div class="scroll"><table class="t stack dep">`)
 	this.Contains(deployed, `<th scope="col">Participant</th>
         <th scope="col"><a class="badge env" href="/environments/`+production+`">production</a></th><th scope="col"><a class="badge env" href="/environments/`+qa+`">qa</a></th><th scope="col"><a class="badge env" href="/environments/`+staging+`">staging</a></th>`)
 	webRow := `<td data-l="Participant"><a class="name" href="/participants/petstore_web">petstore_web</a></td>
@@ -313,7 +314,7 @@ func (this *IntegrationSuite) TestShowOverview_SignedOutIsRedirectedToSignIn() {
 
 func (this *IntegrationSuite) TestShowOverview_IndexesExist() {
 	indexes := []struct{ table, definition string }{
-		{"compatibility_checks", "%USING btree (participant_id, environment_id, created_at DESC)"},
+		{"compatibility_checks", "%USING btree (participant_id, environment_id, created_at DESC, id DESC)"},
 		{"compatibility_checks", "%USING btree (created_at DESC)"},
 		{"deployments", "%USING btree (deployed_at DESC)"},
 	}

@@ -23,7 +23,7 @@ const (
 	setPasswordPasswordInvalid = "the password must have 15 to 128 characters"
 	setPasswordFixedExpiry     = "2099-01-02 03:04:00+00"
 	setPasswordForLine         = `<p>For ` + setPasswordUserEmail + `</p>`
-	setPasswordExpiryLine      = `<p>This link works once, until <time datetime="2099-01-02T03:04:00Z">2099-01-02 03:04 UTC</time></p>`
+	setPasswordExpiryLine      = `<p>This link works once, until <time class="time" datetime="2099-01-02T03:04:00Z" title="2099-01-02 03:04 UTC">2099-01-02 03:04 UTC</time></p>`
 )
 
 var setPasswordInviteLinkInPage = regexp.MustCompile(`http://localhost:8080(/set-password\?token=([A-Za-z0-9_-]{43}))`)

@@ -49,7 +49,7 @@ func (this *IntegrationSuite) TestInviteUser_FormAsksForEmailAndPermissionWithRe
 
 	this.Require().Equal(http.StatusOK, status)
 	this.Contains(body, `<form class="sheet formcard" method="post" action="/users/invite">`)
-	this.Contains(body, `name="email" type="text" inputmode="email"`)
+	this.Contains(body, `name="email" type="text" inputmode="email" autocomplete="off" value="" required autofocus>`)
 	this.Contains(body, `<input type="radio" name="permission" value="read" required checked>`)
 	this.Contains(body, `<input type="radio" name="permission" value="write" required>`)
 	this.Contains(body, inviteUserReadDescription)
@@ -91,7 +91,7 @@ func (this *IntegrationSuite) TestInviteUser_CreatesAnInvitedUserAndShowsTheLink
 	this.Equal("invite", purpose)
 	this.Equal(inviteUserEmail, email)
 	this.WithinDuration(time.Now().Add(24*time.Hour), expiresAt, time.Minute)
-	this.Contains(body, `Send this invite link to `+inviteUserEmail+`. It works once, until <time datetime="`+expiresAt.UTC().Format(time.RFC3339Nano)+`">`+expiresAt.UTC().Format("2006-01-02 15:04")+` UTC</time>, and is not shown again.`)
+	this.Contains(body, `Send this invite link to `+inviteUserEmail+`. It works once, until <time class="time" datetime="`+expiresAt.UTC().Format(time.RFC3339Nano)+`" title="`+expiresAt.UTC().Format("2006-01-02 15:04")+` UTC">`+expiresAt.UTC().Format("2006-01-02 15:04")+` UTC</time>, and is not shown again.`)
 	this.Equal(1, this.countRows("one_time_links"))
 
 	_, _, list := this.getPage("/users", this.signInAsAdmin())
@@ -164,7 +164,8 @@ func (this *IntegrationSuite) TestInviteUser_RejectsATamperedPermission() {
 		this.Contains(body, inviteUserFieldError("permission"), permission)
 		this.Contains(body, inviteUserFieldMessage(inviteUserPermissionInvalid), permission)
 		this.NotContains(body, " checked", permission)
-		this.Contains(body, `value="`+inviteUserEmail+`"`, permission)
+		this.Contains(body, `<input type="radio" name="permission" value="read" required autofocus>`, permission)
+		this.Contains(body, `value="`+inviteUserEmail+`" required>`, permission)
 	}
 
 	this.Equal(1, this.countRows("users"))

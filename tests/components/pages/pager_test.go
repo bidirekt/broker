@@ -2,7 +2,9 @@ package pages_test
 
 import (
 	"io"
+	"math"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -54,6 +56,33 @@ func TestRequestedPageRejectsANonCanonicalValue(t *testing.T) {
 
 		assert.False(t, outcome.ok, "raw %q", raw)
 	}
+}
+
+func requestedPageFor(t *testing.T, target string) (page int64, ok bool) {
+	t.Helper()
+
+	app := fiber.New()
+	app.Get("/things", func(ctx fiber.Ctx) error {
+		page, ok = pages.RequestedPage(ctx, pagerParam)
+		return ctx.SendStatus(fiber.StatusNoContent)
+	})
+
+	_, err := app.Test(httptest.NewRequest(fiber.MethodGet, target, nil))
+	require.NoError(t, err)
+
+	return page, ok
+}
+
+func TestRequestedPageRefusesAPageWhoseOffsetWouldOverflow(t *testing.T) {
+	largest := int64(math.MaxInt64 / pages.PageSize)
+
+	page, ok := requestedPageFor(t, "/things?"+pagerParam+"="+strconv.FormatInt(largest, 10))
+	require.True(t, ok)
+	assert.Equal(t, largest, page)
+	assert.Positive(t, pages.Offset(page))
+
+	_, ok = requestedPageFor(t, "/things?"+pagerParam+"="+strconv.FormatInt(largest+1, 10))
+	assert.False(t, ok)
 }
 
 func TestPagerShowsTwentyFiveItemsAPage(t *testing.T) {

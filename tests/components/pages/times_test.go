@@ -78,7 +78,7 @@ func TestRenderedPagesFormatTimesAsTimeElements(t *testing.T) {
 	body, err := io.ReadAll(response.Body)
 	require.NoError(t, err)
 
-	datetime := `<time datetime="` + pages.MachineTime(at) + `">`
-	assert.Contains(t, string(body), datetime+`2 hours ago</time>|`+datetime+pages.DetailTime(at, time.Now())+`</time>|`)
-	assert.Contains(t, string(body), `<time datetime="2026-11-05T15:30:00Z">2026-11-05 15:30 UTC</time>`)
+	open := `<time class="time" datetime="` + pages.MachineTime(at) + `" title="` + pages.ExpiryTime(at) + `">`
+	assert.Contains(t, string(body), open+`2 hours ago</time>|`+open+pages.DetailTime(at, time.Now())+`</time>|`)
+	assert.Contains(t, string(body), `<time class="time" datetime="2026-11-05T15:30:00Z" title="2026-11-05 15:30 UTC">2026-11-05 15:30 UTC</time>`)
 }

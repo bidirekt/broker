@@ -179,6 +179,7 @@ func (this *IntegrationSuite) TestListParticipantChecks_ShowsTheHeaderAndThePart
 	this.Equal("text/html; charset=utf-8", header.Get("Content-Type"))
 	this.Equal("no-store", header.Get("Cache-Control"))
 
+	this.Contains(body, `<nav class="crumbs" aria-label="Breadcrumbs"><a href="/participants">participants</a><span aria-hidden="true">/</span><span aria-current="page">petstore_web</span></nav>`)
 	this.Contains(body, `<h1><span class="name">petstore_web</span></h1>`)
 	this.Contains(body, `<span>Latest <span class="ver">2.3.0</span></span>`)
 	this.Contains(body, `<a class="badge env" href="`+production+`">production <span class="v">2.2.0</span></a>`)

@@ -1,6 +1,7 @@
 package pages
 
 import (
+	"math"
 	"net/url"
 	"strconv"
 
@@ -24,7 +25,9 @@ func RequestedPage(ctx fiber.Ctx, param string) (page int64, ok bool) {
 		return 1, true
 	}
 
-	return ParsePositiveInteger(string(query.Peek(param)))
+	page, ok = ParsePositiveInteger(string(query.Peek(param)))
+
+	return page, ok && page <= math.MaxInt64/PageSize
 }
 
 func Offset(page int64) int {

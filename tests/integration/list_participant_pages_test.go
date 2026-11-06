@@ -158,6 +158,14 @@ func (this *IntegrationSuite) TestListParticipantPages_InvalidOrPastTheLastPageI
 	}
 }
 
+func (this *IntegrationSuite) TestListParticipantPages_PageWhoseOffsetWouldOverflowIsNotFound() {
+	status, header, body := this.getPage("/participants?page=400000000000000000", this.signInAsAdmin())
+
+	this.Equal(http.StatusNotFound, status)
+	this.Equal("text/html; charset=utf-8", header.Get("Content-Type"))
+	this.Contains(body, "Not Found")
+}
+
 func (this *IntegrationSuite) TestListParticipantPages_EmptyListHasOnlyTheFirstPage() {
 	status, _, _ := this.getPage("/participants?page=2", this.signInAsAdmin())
 

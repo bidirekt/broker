@@ -11,7 +11,7 @@
 <div class="formgrid">
   <form class="sheet formcard" method="post" action="/environments/{{.Page.ID}}/rename">
     <div class="form">
-      <div class="warn" role="note"><span><b>Pipelines use this name.</b> Until they are updated, any pipeline still using <span class="mono">{{.Page.Name}}</span> gets <code>environment not found</code>. Deployments and checks stay attached to the environment.</span></div>
+      <div class="warn" role="note">{{template "icon_error" 16}}<span><b>Pipelines use this name.</b> Until they are updated, any pipeline still using <span class="mono">{{.Page.Name}}</span> gets <code>environment not found</code>. Deployments and checks stay attached to the environment.</span></div>
       <div class="field">
         <label for="name">New name</label>
         <input class="input mono" id="name" name="name" type="text" autocomplete="off" value="{{.Page.NewName}}" required autofocus{{if eq .Page.Field "name"}} aria-invalid="true" aria-describedby="name-err"{{end}}>

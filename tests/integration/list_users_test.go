@@ -135,6 +135,13 @@ func (this *IntegrationSuite) TestListUsers_AnswersNotFoundForAPagePastTheLastOr
 	}
 }
 
+func (this *IntegrationSuite) TestListUsers_AnswersNotFoundForAPageWhoseOffsetWouldOverflow() {
+	status, _, body := this.getPage("/users?page=400000000000000000", this.signInAsAdmin())
+
+	this.Equal(http.StatusNotFound, status)
+	this.Contains(body, "<h1>Not Found</h1>")
+}
+
 func (this *IntegrationSuite) TestListUsers_RowActionsCarryThePageTheyCameFrom() {
 	this.listUsersCreateInvited(30)
 	activeID := this.createActiveUser("zz-active@x.com", model.PermissionRead, listUsersPassword)

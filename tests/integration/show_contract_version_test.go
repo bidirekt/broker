@@ -107,8 +107,8 @@ func (this *IntegrationSuite) TestShowContractVersion_ShowsTheFilesExactlyAsPubl
 	this.Equal("text/html; charset=utf-8", header.Get("Content-Type"))
 	this.Equal("no-store", header.Get("Cache-Control"))
 	this.Contains(body, `<h1><span class="name">version_web</span> <span class="ver">release/2.0</span></h1>`)
-	this.Contains(body, `<p class="sub">Published <time datetime="`)
-	this.Regexp(`<p class="sub">Published <time datetime="[^"]+Z">\d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC · just now</time></p>`, body)
+	this.Contains(body, `<p class="sub">Published <time class="time" datetime="`)
+	this.Regexp(`<p class="sub">Published <time class="time" datetime="[^"]+Z" title="\d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC">\d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC · just now</time></p>`, body)
 	this.Contains(body, `Exactly as published · 2 files`)
 
 	this.Contains(body, `<span class="path">`+contractVersionConsumesSource+`</span><span class="muted">13 lines · select the text to copy</span>`)
@@ -130,6 +130,15 @@ func (this *IntegrationSuite) TestShowContractVersion_ShowsTheFilesExactlyAsPubl
 	this.Contains(body, `<span class="l">`+"\n"+`</span>`)
 	this.NotContains(body, `class="k"`)
 	this.NotContains(body, `class="s"`)
+}
+
+func (this *IntegrationSuite) TestShowContractVersion_BreadcrumbsLinkToTheParticipantsAndTheParticipant() {
+	this.publishForContractVersion()
+
+	status, _, body := this.getPage(contractVersionPath, this.signInAsAdmin())
+
+	this.Require().Equal(http.StatusOK, status, body)
+	this.Contains(body, `<nav class="crumbs" aria-label="Breadcrumbs"><a href="/participants">participants</a><span aria-hidden="true">/</span><a href="/participants/version_web">version_web</a><span aria-hidden="true">/</span><span aria-current="page">release/2.0</span></nav>`)
 }
 
 func (this *IntegrationSuite) environmentPathForContractVersion(name string) string {
@@ -154,7 +163,7 @@ func (this *IntegrationSuite) TestShowContractVersion_ShowsDeployedNowAndTheDepl
 
 	_, _, body := this.getPage(contractVersionPath, this.signInAsAdmin())
 
-	this.Regexp(`(?s)<h2 class="h2">Deployed now</h2>.*?<li>`+production+`<span class="muted">since <time datetime="[^"]+">[^<]+ UTC · just now</time></span></li>\s*<li>`+staging, body)
+	this.Regexp(`(?s)<h2 class="h2">Deployed now</h2>.*?<li>`+production+`<span class="muted">since <time class="time" datetime="[^"]+" title="[^"]+ UTC">[^<]+ UTC · just now</time></span></li>\s*<li>`+staging, body)
 
 	history := body[strings.Index(body, `Deployment history`):strings.Index(body, `All checks`)]
 	this.Equal(3, strings.Count(history, `<tr>`)-1)
@@ -202,7 +211,7 @@ func (this *IntegrationSuite) TestShowContractVersion_ShowsTheLatestCheckPerEnvi
 
 	latest := body[strings.Index(body, `Latest check per environment`):strings.Index(body, `<h2 class="h2">Contract</h2>`)]
 	this.Equal(2, strings.Count(latest, `<li>`))
-	this.Regexp(`<li>`+productionBadge+`<span class="badge no">.*?no · `+productionBreaks+`</span><a href="/checks/`+production+`">check #`+production+`</a><span class="muted"><time datetime="[^"]+">[^<]+ UTC · just now</time></span></li>`, latest)
+	this.Regexp(`<li>`+productionBadge+`<span class="badge no">.*?no · `+productionBreaks+`</span><a href="/checks/`+production+`">check #`+production+`</a><span class="muted"><time class="time" datetime="[^"]+" title="[^"]+ UTC">[^<]+ UTC · just now</time></span></li>`, latest)
 	this.Regexp(`<li>`+stagingBadge+`<span class="badge no">.*?no · `+stagingBreaks+`</span><a href="/checks/`+staging+`">check #`+staging+`</a>`, latest)
 	this.Less(strings.Index(latest, `production`), strings.Index(latest, `staging`))
 
@@ -252,6 +261,72 @@ func (this *IntegrationSuite) TestShowContractVersion_PaginatesTheChecks() {
 		status, _, _ := this.getPage(contractVersionPath+query, cookie)
 		this.Equal(http.StatusNotFound, status, query)
 	}
+}
+
+const contractVersionDeploymentRow = `<td data-l="Deployed">`
+
+func (this *IntegrationSuite) insertDeploymentsForContractVersion(count int) {
+	_, err := this.Pool.Exec(context.Background(), `
+		INSERT INTO deployments (participant_id, version, environment_id, rollback, deployed_at)
+		SELECT p.id, 'release/2.0', e.id, false, '2026-01-01T00:00:00Z'::timestamptz + n * interval '1 minute'
+		FROM participants p CROSS JOIN environments e CROSS JOIN generate_series(1, $1) n
+		WHERE p.name = 'version_web' AND e.name = 'production'`, count)
+	this.Require().NoError(err)
+}
+
+func (this *IntegrationSuite) insertChecksForContractVersion(count int) {
+	_, err := this.Pool.Exec(context.Background(), `
+		INSERT INTO compatibility_checks (participant_id, contract_id, version, environment_id, deployable, created_at)
+		SELECT cv.participant_id, cv.contract_id, cv.version, e.id, true, '2026-01-01T00:00:00Z'::timestamptz + n * interval '1 minute'
+		FROM contract_versions cv JOIN participants p ON p.id = cv.participant_id CROSS JOIN environments e CROSS JOIN generate_series(1, $1) n
+		WHERE p.name = 'version_web' AND cv.version = 'release/2.0' AND e.name = 'production'`, count)
+	this.Require().NoError(err)
+}
+
+func (this *IntegrationSuite) TestShowContractVersion_PaginatesTheDeploymentHistory() {
+	this.publishForContractVersion()
+	this.insertDeploymentsForContractVersion(26)
+	cookie := this.signInAsAdmin()
+
+	status, _, first := this.getPage(contractVersionPath, cookie)
+	this.Require().Equal(http.StatusOK, status, first)
+	this.Equal(25, strings.Count(first, contractVersionDeploymentRow))
+	this.Contains(first, `showing 1–25 of 26`)
+	this.Contains(first, `<a href="`+contractVersionPath+`?deployments_page=2" rel="next">Next</a>`)
+	this.Contains(first, `datetime="2026-01-01T00:26:00Z"`)
+	this.NotContains(first, `datetime="2026-01-01T00:01:00Z"`)
+
+	status, _, second := this.getPage(contractVersionPath+"?deployments_page=2", cookie)
+	this.Require().Equal(http.StatusOK, status, second)
+	this.Equal(1, strings.Count(second, contractVersionDeploymentRow))
+	this.Contains(second, `showing 26–26 of 26`)
+	this.Contains(second, `datetime="2026-01-01T00:01:00Z"`)
+	this.Contains(second, `<a href="`+contractVersionPath+`?deployments_page=1" rel="prev">Previous</a>`)
+
+	for _, query := range []string{"?deployments_page=3", "?deployments_page=0", "?deployments_page=01", "?deployments_page=+1", "?deployments_page=", "?deployments_page=x"} {
+		status, _, _ := this.getPage(contractVersionPath+query, cookie)
+		this.Equal(http.StatusNotFound, status, query)
+	}
+}
+
+func (this *IntegrationSuite) TestShowContractVersion_PaginatesDeploymentsAndChecksIndependently() {
+	this.publishForContractVersion()
+	this.insertDeploymentsForContractVersion(26)
+	this.insertChecksForContractVersion(26)
+	cookie := this.signInAsAdmin()
+
+	status, _, deploymentsSecond := this.getPage(contractVersionPath+"?deployments_page=2", cookie)
+	this.Require().Equal(http.StatusOK, status, deploymentsSecond)
+	this.Equal(1, strings.Count(deploymentsSecond, contractVersionDeploymentRow))
+	this.Len(contractVersionCheckRow.FindAllString(deploymentsSecond, -1), 25)
+	this.Contains(deploymentsSecond, `<a href="`+contractVersionPath+`?checks_page=2&amp;deployments_page=2" rel="next">Next</a>`)
+
+	status, _, bothSecond := this.getPage(contractVersionPath+"?checks_page=2&deployments_page=2", cookie)
+	this.Require().Equal(http.StatusOK, status, bothSecond)
+	this.Equal(1, strings.Count(bothSecond, contractVersionDeploymentRow))
+	this.Len(contractVersionCheckRow.FindAllString(bothSecond, -1), 1)
+	this.Contains(bothSecond, `<a href="`+contractVersionPath+`?checks_page=2&amp;deployments_page=1" rel="prev">Previous</a>`)
+	this.Contains(bothSecond, `<a href="`+contractVersionPath+`?checks_page=1&amp;deployments_page=2" rel="prev">Previous</a>`)
 }
 
 func (this *IntegrationSuite) TestShowContractVersion_UnknownOrUnreadableVersionIsNotFound() {

@@ -186,7 +186,7 @@ func (this *UserRepository) CreateInvited(ctx context.Context, user *model.User,
 	}
 
 	link.UserID = user.ID
-	if _, err := tx.Exec(ctx, insertLinkQuery, link.TokenHash, link.UserID, link.Purpose, link.ExpiresAt); err != nil {
+	if err := tx.QueryRow(ctx, insertLinkQuery, link.TokenHash, link.UserID, link.Purpose, link.ExpiresAt).Scan(&link.ExpiresAt); err != nil {
 		panic(fmt.Errorf("error inserting invite link: %w", err))
 	}
 

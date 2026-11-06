@@ -3,7 +3,7 @@
 {{define "content"}}
 {{with .Page}}
 {{$name := .Header.Participant.Name}}
-<nav class="crumbs" aria-label="Breadcrumbs"><span>participants</span><span aria-hidden="true">/</span><span aria-current="page">{{$name}}</span></nav>
+<nav class="crumbs" aria-label="Breadcrumbs"><a href="/participants">participants</a><span aria-hidden="true">/</span><span aria-current="page">{{$name}}</span></nav>
 <div class="head">
   <div>
     <h1><span class="name">{{$name}}</span></h1>

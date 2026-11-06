@@ -21,6 +21,7 @@ const (
 type ShowContractVersionInput struct {
 	ParticipantName string
 	Version         string
+	DeploymentsPage int64
 	ChecksPage      int64
 }
 
@@ -41,6 +42,7 @@ type ShowContractVersionOutput struct {
 	CurrentDeployments []model.Deployment
 	LatestChecks       []ReportedCheck
 	Deployments        []model.Deployment
+	DeploymentsTotal   int
 	Checks             []ReportedCheck
 	ChecksTotal        int
 }
@@ -75,6 +77,9 @@ func (this *ShowContractVersionUseCase) Execute(ctx context.Context, input ShowC
 	}
 
 	latestChecks := this.compatibilityRepository.ListLatestChecksOfVersion(ctx, contractVersion.ParticipantID, contractVersion.Version)
+	deployments, deploymentsTotal := this.deploymentRepository.ListDeploymentsOfVersion(
+		ctx, contractVersion.ParticipantID, contractVersion.Version, pages.PageSize, pages.Offset(input.DeploymentsPage),
+	)
 	checks, checksTotal := this.compatibilityRepository.ListChecksOfVersion(
 		ctx, contractVersion.ParticipantID, contractVersion.Version, pages.PageSize, pages.Offset(input.ChecksPage),
 	)
@@ -86,7 +91,8 @@ func (this *ShowContractVersionUseCase) Execute(ctx context.Context, input ShowC
 		Files:              files,
 		CurrentDeployments: this.deploymentRepository.ListCurrentDeploymentsOfVersion(ctx, contractVersion.ParticipantID, contractVersion.Version),
 		LatestChecks:       toReportedChecks(latestChecks, results),
-		Deployments:        this.deploymentRepository.ListDeploymentsOfVersion(ctx, contractVersion.ParticipantID, contractVersion.Version),
+		Deployments:        deployments,
+		DeploymentsTotal:   deploymentsTotal,
 		Checks:             toReportedChecks(checks, results),
 		ChecksTotal:        checksTotal,
 	}
