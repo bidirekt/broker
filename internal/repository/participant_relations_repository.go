@@ -124,9 +124,9 @@ func (this *ParticipantRepository) FindRelationsHeader(ctx context.Context, name
 		panic(fmt.Errorf("error listing relations deployments: %w", err))
 	}
 
-	header.Deployed, err = pgx.CollectRows(rows, func(row pgx.CollectableRow) (model.RelationsDeployment, error) {
-		var deployment model.RelationsDeployment
-		err := row.Scan(&deployment.EnvironmentID, &deployment.EnvironmentName, &deployment.Version)
+	header.Deployed, err = pgx.CollectRows(rows, func(row pgx.CollectableRow) (model.Deployment, error) {
+		deployment := model.Deployment{Environment: &model.Environment{}}
+		err := row.Scan(&deployment.Environment.ID, &deployment.Environment.Name, &deployment.Version)
 		return deployment, err
 	})
 	if err != nil {
@@ -157,7 +157,7 @@ func (this *ParticipantRepository) ListConsumedProviders(ctx context.Context, pa
 		}
 		if environmentID.Valid {
 			last := &providers[len(providers)-1]
-			last.Deployed = append(last.Deployed, model.RelationsDeployment{EnvironmentID: environmentID.Int64, EnvironmentName: environmentName.String, Version: version.String})
+			last.Deployed = append(last.Deployed, model.Deployment{Version: version.String, Environment: &model.Environment{ID: environmentID.Int64, Name: environmentName.String}})
 		}
 	}
 	if err := rows.Err(); err != nil {

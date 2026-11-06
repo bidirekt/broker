@@ -9,16 +9,11 @@ import (
 type ParticipantVersionsHeader struct {
 	Participant     Participant
 	LatestVersion   null.String
-	DeployedNow     []EnvironmentVersion
+	DeployedNow     []Deployment
 	VersionCount    int
 	DeploymentCount int
 	CheckCount      int
 	RelationCount   int
-}
-
-type EnvironmentVersion struct {
-	Environment Environment
-	Version     string
 }
 
 type PublishedVersion struct {

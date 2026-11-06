@@ -87,14 +87,18 @@ func (this *ParticipantListingRepository) List(ctx context.Context, limit, offse
 		panic(fmt.Errorf("error listing participant deployments: %w", err))
 	}
 
-	var participantID int64
-	var deployment model.ParticipantListingDeployment
-	_, err = pgx.ForEachRow(rows, []any{&participantID, &deployment.EnvironmentID, &deployment.EnvironmentName, &deployment.Version}, func() error {
-		byID[participantID].Deployments = append(byID[participantID].Deployments, deployment)
-		return nil
+	deployments, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (model.Deployment, error) {
+		deployment := model.Deployment{Participant: &model.Participant{}, Environment: &model.Environment{}}
+		err := row.Scan(&deployment.Participant.ID, &deployment.Environment.ID, &deployment.Environment.Name, &deployment.Version)
+		return deployment, err
 	})
 	if err != nil {
 		panic(fmt.Errorf("error listing participant deployments: %w", err))
+	}
+
+	for _, deployment := range deployments {
+		participant := byID[deployment.Participant.ID]
+		participant.Deployments = append(participant.Deployments, deployment)
 	}
 
 	return participants, total

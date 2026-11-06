@@ -135,14 +135,14 @@ func (this *ParticipantVersionsRepository) FindHeader(ctx context.Context, name 
 	return header, true
 }
 
-func (this *ParticipantVersionsRepository) listDeployedNow(ctx context.Context, participantID int64) []model.EnvironmentVersion {
+func (this *ParticipantVersionsRepository) listDeployedNow(ctx context.Context, participantID int64) []model.Deployment {
 	rows, err := this.pool.Query(ctx, listParticipantDeployedNowQuery, participantID)
 	if err != nil {
 		panic(fmt.Errorf("error listing participant deployed now: %w", err))
 	}
 
-	deployed, err := pgx.AppendRows(make([]model.EnvironmentVersion, 0), rows, func(row pgx.CollectableRow) (model.EnvironmentVersion, error) {
-		var deployment model.EnvironmentVersion
+	deployed, err := pgx.AppendRows(make([]model.Deployment, 0), rows, func(row pgx.CollectableRow) (model.Deployment, error) {
+		deployment := model.Deployment{Environment: &model.Environment{}}
 		err := row.Scan(&deployment.Environment.ID, &deployment.Environment.Name, &deployment.Version)
 		return deployment, err
 	})
