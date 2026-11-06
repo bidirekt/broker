@@ -27,13 +27,12 @@ type ConsumedProviderRow struct {
 }
 
 type EnvironmentConsumersRow struct {
-	EnvironmentID   int64
-	EnvironmentName string
-	Consumers       []DeployedConsumerRow
+	Environment model.Environment
+	Consumers   []DeployedConsumerRow
 }
 
 type DeployedConsumerRow struct {
-	model.DeployedConsumer
+	model.Deployment
 	URL string
 }
 
@@ -52,12 +51,11 @@ func newShowParticipantRelationsPage(output ShowParticipantRelationsOutput) Show
 	}
 	for _, environment := range output.ConsumedBy {
 		row := EnvironmentConsumersRow{
-			EnvironmentID:   environment.EnvironmentID,
-			EnvironmentName: environment.EnvironmentName,
-			Consumers:       make([]DeployedConsumerRow, 0, len(environment.Consumers)),
+			Environment: environment.Environment,
+			Consumers:   make([]DeployedConsumerRow, 0, len(environment.Consumers)),
 		}
 		for _, consumer := range environment.Consumers {
-			row.Consumers = append(row.Consumers, DeployedConsumerRow{DeployedConsumer: consumer, URL: participantURL(consumer.Name)})
+			row.Consumers = append(row.Consumers, DeployedConsumerRow{Deployment: consumer, URL: participantURL(consumer.Participant.Name)})
 		}
 		page.ConsumedBy = append(page.ConsumedBy, row)
 	}

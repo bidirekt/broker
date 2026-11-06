@@ -59,7 +59,7 @@ func countDistinctNames(consumes []model.ConsumedProvider, consumedBy []model.En
 	}
 	for _, environment := range consumedBy {
 		for _, consumer := range environment.Consumers {
-			names[consumer.Name] = struct{}{}
+			names[consumer.Participant.Name] = struct{}{}
 		}
 	}
 

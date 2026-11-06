@@ -46,10 +46,10 @@
     <div class="sheet-head"><h2 class="h2">Consumed by <span class="muted">· its consumers, where deployed</span></h2></div>
     {{if .ConsumedBy}}
     {{range .ConsumedBy}}
-    <p class="pad"><a class="badge env" href="/environments/{{.EnvironmentID}}">{{.EnvironmentName}}</a></p>
+    <p class="pad"><a class="badge env" href="/environments/{{.Environment.ID}}">{{.Environment.Name}}</a></p>
     <ul class="list">
       {{range .Consumers}}
-      <li><a class="name" href="{{.URL}}">{{.Name}}</a><span class="ver">{{.Version}}</span></li>
+      <li><a class="name" href="{{.URL}}">{{.Participant.Name}}</a><span class="ver">{{.Version}}</span></li>
       {{end}}
     </ul>
     {{end}}
