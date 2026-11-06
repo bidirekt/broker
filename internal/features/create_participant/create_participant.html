@@ -1,0 +1,33 @@
+{{define "title"}}Create participant{{end}}
+
+{{define "content"}}
+<nav class="crumbs" aria-label="Breadcrumbs"><a href="/participants">participants</a><span aria-hidden="true">/</span><span aria-current="page">create</span></nav>
+<div class="head">
+  <div>
+    <h1>Create participant</h1>
+    <p class="sub">Register a service. Publishing its contract happens from CI.</p>
+  </div>
+</div>
+<div class="formgrid">
+  <form class="sheet formcard" method="post" action="/participants/new-participant">
+    <div class="form">
+      <div class="field">
+        <label for="name">Name</label>
+        <input class="input" id="name" name="name" type="text" autocomplete="off" value="{{.Page.Name}}" required autofocus{{if eq .Page.Field "name"}} aria-invalid="true" aria-describedby="name-err"{{end}}>
+        {{if eq .Page.Field "name"}}<p class="err" id="name-err">{{template "icon_error" 14}}<span>{{.Page.Message}}</span></p>{{end}}
+        <p class="hint">Lowercase letters, digits and underscores, like <span class="mono">petstore_web</span>.</p>
+      </div>
+    </div>
+    <div class="form-foot"><button type="submit" class="btn primary">Create participant</button><a class="btn" href="/participants">Cancel</a></div>
+  </form>
+  <aside class="sheet aside" aria-label="About participants">
+    <h2>About participants</h2>
+    <ul>
+      <li>A participant is a service that publishes a contract.</li>
+      <li>Contracts and pipelines refer to it by this exact name, so pick it once.</li>
+      <li>The name can't change later.</li>
+    </ul>
+    <code class="cmd">bidirekt create-participant</code>
+  </aside>
+</div>
+{{end}}

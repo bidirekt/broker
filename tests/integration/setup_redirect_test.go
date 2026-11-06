@@ -66,7 +66,7 @@ func (this *IntegrationSuite) TestSetupRedirect_LeavesHealthAssetsAndApiToTheirO
 	status, _, _ := this.setupRedirectSend(app, httptest.NewRequest("GET", "/health", nil))
 	this.Equal(http.StatusOK, status)
 
-	status, header, _ := this.setupRedirectSend(app, httptest.NewRequest("GET", "/assets/app.css", nil))
+	status, header, _ := this.setupRedirectSend(app, httptest.NewRequest("GET", "/assets/bundle.css", nil))
 	this.Equal(http.StatusOK, status)
 	this.Contains(header.Get("Content-Type"), "text/css")
 

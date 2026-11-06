@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"io/fs"
 	"strings"
+	"time"
 
 	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/gofiber/fiber/v3"
@@ -19,12 +20,15 @@ const (
 //go:embed templates
 var templateFiles embed.FS
 
-var layouts = template.Must(template.ParseFS(templateFiles, "templates/layout*.html"))
+var layouts = template.Must(template.New("").Funcs(timeFuncs(time.Now)).ParseFS(templateFiles, "templates/layout*.html", "templates/partial_*.html"))
 
 type layoutData struct {
 	CSRFToken    string
+	Email        string
 	ManagesUsers bool
+	CanWrite     bool
 	Section      string
+	Notice       string
 	Page         any
 }
 
@@ -68,13 +72,19 @@ func layoutFor(ctx fiber.Ctx, page any) (layout string, data layoutData) {
 
 	return signedInLayout, layoutData{
 		CSRFToken:    session.CSRFToken,
+		Email:        principal.Email,
 		ManagesUsers: principal.ManagesUsers(),
+		CanWrite:     principal.CanWrite(),
 		Section:      sectionOf(ctx.Path()),
+		Notice:       session.Message,
 		Page:         page,
 	}
 }
 
 func sectionOf(path string) string {
 	section, _, _ := strings.Cut(strings.TrimPrefix(path, "/"), "/")
+	if section == "checks" {
+		return "participants"
+	}
 	return section
 }

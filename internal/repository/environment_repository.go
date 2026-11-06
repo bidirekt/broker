@@ -11,6 +11,10 @@ import (
 )
 
 const (
+	findEnvironmentByIDQuery = `
+		SELECT id, name FROM environments WHERE id = $1
+	`
+
 	findEnvironmentByNameQuery = `
 		SELECT
 			id, name
@@ -37,6 +41,26 @@ const (
 		ORDER BY
 			name COLLATE "C"
 	`
+
+	renameEnvironmentByNameQuery = `
+		UPDATE
+			environments
+		SET
+			name = $2
+		WHERE
+			name = $1
+		RETURNING id
+	`
+
+	renameEnvironmentByIDQuery = `
+		UPDATE
+			environments
+		SET
+			name = $2
+		WHERE
+			id = $1
+		RETURNING id
+	`
 )
 
 type EnvironmentRepository struct {
@@ -55,6 +79,18 @@ func (this *EnvironmentRepository) FindByName(ctx context.Context, name string) 
 	}
 	if err != nil {
 		panic(fmt.Errorf("error finding environment by name: %w", err))
+	}
+	return e, true
+}
+
+func (this *EnvironmentRepository) FindByID(ctx context.Context, id int64) (*model.Environment, bool) {
+	e := &model.Environment{}
+	err := this.pool.QueryRow(ctx, findEnvironmentByIDQuery, id).Scan(&e.ID, &e.Name)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, false
+	}
+	if err != nil {
+		panic(fmt.Errorf("error finding environment by id: %w", err))
 	}
 	return e, true
 }
@@ -84,4 +120,30 @@ func (this *EnvironmentRepository) ListNames(ctx context.Context) []string {
 	}
 
 	return names
+}
+
+func (this *EnvironmentRepository) RenameByName(ctx context.Context, oldName, newName string) (found, conflict bool) {
+	return this.rename(ctx, renameEnvironmentByNameQuery, oldName, newName)
+}
+
+func (this *EnvironmentRepository) RenameByID(ctx context.Context, id int64, newName string) (found, conflict bool) {
+	return this.rename(ctx, renameEnvironmentByIDQuery, id, newName)
+}
+
+func (this *EnvironmentRepository) rename(ctx context.Context, query string, key any, newName string) (found, conflict bool) {
+	var id int64
+	err := this.pool.QueryRow(ctx, query, key, newName).Scan(&id)
+	if isUniqueViolation(err) {
+		return true, true
+	}
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, false
+	}
+
+	if err != nil {
+		panic(fmt.Errorf("error renaming environment: %w", err))
+	}
+
+	return true, false
 }

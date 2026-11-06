@@ -5,6 +5,7 @@ import (
 
 	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/components/pages"
+	"github.com/bidirekt/broker/internal/components/sessions"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -12,15 +13,16 @@ import (
 var pageFiles embed.FS
 
 type UpdateProfileUiHandler struct {
-	useCase *UpdateProfileUseCase
+	useCase       *UpdateProfileUseCase
+	sessionKeeper *sessions.Keeper
 }
 
-func NewUpdateProfileUiHandler(useCase *UpdateProfileUseCase) *UpdateProfileUiHandler {
-	return &UpdateProfileUiHandler{useCase: useCase}
+func NewUpdateProfileUiHandler(useCase *UpdateProfileUseCase, sessionKeeper *sessions.Keeper) *UpdateProfileUiHandler {
+	return &UpdateProfileUiHandler{useCase: useCase, sessionKeeper: sessionKeeper}
 }
 
 func (this *UpdateProfileUiHandler) ShowForm(ctx fiber.Ctx) error {
-	return pages.Render(ctx, fiber.StatusOK, pageFiles, updateProfileTemplate, UpdateProfilePage{})
+	return this.render(ctx, fiber.StatusOK, "", "")
 }
 
 func (this *UpdateProfileUiHandler) UpdateProfile(ctx fiber.Ctx) error {
@@ -38,18 +40,26 @@ func (this *UpdateProfileUiHandler) UpdateProfile(ctx fiber.Ctx) error {
 
 	switch output.Status {
 	case CurrentPasswordWrong:
-		return this.respondProblem(ctx, CurrentPasswordWrongMessage)
+		return this.render(ctx, fiber.StatusBadRequest, currentPasswordFormField, CurrentPasswordWrongMessage)
 	case PasswordInvalid:
-		return this.respondProblem(ctx, PasswordInvalidMessage)
+		return this.render(ctx, fiber.StatusBadRequest, newPasswordFormField, PasswordInvalidMessage)
 	}
 
-	return pages.Render(ctx, fiber.StatusOK, pageFiles, updateProfileTemplate, UpdateProfilePage{
-		Confirmation: PasswordChangedMessage,
-	})
+	this.sessionKeeper.SetMessage(ctx, PasswordChangedMessage)
+	return pages.Redirect(ctx, profilePath)
 }
 
-func (this *UpdateProfileUiHandler) respondProblem(ctx fiber.Ctx, message string) error {
-	return pages.Render(ctx, fiber.StatusBadRequest, pageFiles, updateProfileTemplate, UpdateProfilePage{
-		Problem: message,
+func (this *UpdateProfileUiHandler) RespondTooManyAttempts(ctx fiber.Ctx) error {
+	return this.render(ctx, fiber.StatusTooManyRequests, "", TooManyProfileAttemptsMessage)
+}
+
+func (this *UpdateProfileUiHandler) render(ctx fiber.Ctx, status int, field, message string) error {
+	principal, _ := access.PrincipalFrom(ctx)
+	return pages.Render(ctx, status, pageFiles, updateProfileTemplate, UpdateProfilePage{
+		Email:                 principal.Email,
+		Permission:            principal.Permission,
+		PermissionDescription: permissionDescriptions[principal.Permission],
+		Field:                 field,
+		Message:               message,
 	})
 }

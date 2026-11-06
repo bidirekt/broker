@@ -5,6 +5,8 @@ import (
 	"net/http"
 )
 
+const petsServiceParticipantBody = `{"participant":"pets_service"}`
+
 const contractBody = `{
   "provides": {
     "rest": {
@@ -218,7 +220,7 @@ const invoicesSchemasYAML = `schemas:
 `
 
 func (this *IntegrationSuite) TestHappyPath_PublishContract() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1", contractFragment{"api.yaml", contractBody}))
@@ -239,7 +241,7 @@ func (this *IntegrationSuite) TestHappyPath_PublishContract() {
 }
 
 func (this *IntegrationSuite) TestPublish_SameVersionSameContent_Returns200NoNewRow() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, _ = this.post("/api/contracts", this.publishBody("pets_service", "1", contractFragment{"api.yaml", contractBody}))
@@ -253,7 +255,7 @@ func (this *IntegrationSuite) TestPublish_SameVersionSameContent_Returns200NoNew
 }
 
 func (this *IntegrationSuite) TestPublish_SameVersionDifferentContent_Returns409() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, _ = this.post("/api/contracts", this.publishBody("pets_service", "1", contractFragment{"api.yaml", contractBody}))
@@ -267,7 +269,7 @@ func (this *IntegrationSuite) TestPublish_SameVersionDifferentContent_Returns409
 }
 
 func (this *IntegrationSuite) TestPublishContract_MissingContracts() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, body := this.post("/api/contracts", `{"participant":"pets_service","version":"a1b2c3d"}`)
@@ -276,7 +278,7 @@ func (this *IntegrationSuite) TestPublishContract_MissingContracts() {
 }
 
 func (this *IntegrationSuite) TestPublishContract_EmptyContracts() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, body := this.post("/api/contracts", `{"participant":"pets_service","version":"a1b2c3d","contracts":[]}`)
@@ -285,7 +287,7 @@ func (this *IntegrationSuite) TestPublishContract_EmptyContracts() {
 }
 
 func (this *IntegrationSuite) TestPublishContract_BlankParticipant() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	for _, participant := range []string{"", "   "} {
@@ -296,7 +298,7 @@ func (this *IntegrationSuite) TestPublishContract_BlankParticipant() {
 }
 
 func (this *IntegrationSuite) TestPublishContract_PaddedParticipantOrVersion() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	cases := map[string]string{
@@ -316,7 +318,7 @@ func (this *IntegrationSuite) TestPublishContract_PaddedParticipantOrVersion() {
 }
 
 func (this *IntegrationSuite) TestPublishContract_BlankSource() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1", contractFragment{"  ", contractBody}))
@@ -325,7 +327,7 @@ func (this *IntegrationSuite) TestPublishContract_BlankSource() {
 }
 
 func (this *IntegrationSuite) TestPublishContract_UnsupportedExtension() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1", contractFragment{"notes.txt", contractBody}))
@@ -336,7 +338,7 @@ func (this *IntegrationSuite) TestPublishContract_UnsupportedExtension() {
 }
 
 func (this *IntegrationSuite) TestPublishContract_MalformedYAML() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1", contractFragment{"broken.yaml", "provides: {"}))
@@ -347,7 +349,7 @@ func (this *IntegrationSuite) TestPublishContract_MalformedYAML() {
 }
 
 func (this *IntegrationSuite) TestPublishContract_JSONExtensionRejected() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1", contractFragment{"broken.json", contractBody}))
@@ -358,7 +360,7 @@ func (this *IntegrationSuite) TestPublishContract_JSONExtensionRejected() {
 }
 
 func (this *IntegrationSuite) TestPublishContract_CommitHashVersion() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "a1b2c3d4e5f6", contractFragment{"api.yaml", contractBody}))
@@ -374,7 +376,7 @@ func (this *IntegrationSuite) TestPublishContract_CommitHashVersion() {
 }
 
 func (this *IntegrationSuite) TestPublishContract_ParamEndpoint_RejectedNothingStored() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1", contractFragment{"api.yaml", contractBodyParamEndpoint}))
@@ -400,7 +402,7 @@ func (this *IntegrationSuite) TestPublishContract_ColonParamEndpoint_RejectedNot
 }
 
 func (this *IntegrationSuite) TestPublishContract_EndpointWithNUL_RejectedNothingStored() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1", contractFragment{"api.yaml", contractBodyNULEndpoint}))
@@ -413,7 +415,7 @@ func (this *IntegrationSuite) TestPublishContract_EndpointWithNUL_RejectedNothin
 }
 
 func (this *IntegrationSuite) TestPublishContract_BadServiceName_RejectedNothingStored() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1", contractFragment{"api.yaml", contractBodyBadServiceName}))
@@ -461,7 +463,7 @@ func (this *IntegrationSuite) TestPublishContract_UnknownParticipant() {
 }
 
 func (this *IntegrationSuite) TestPublishContract_RefCrossesFragments() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1",
@@ -489,7 +491,7 @@ func (this *IntegrationSuite) TestPublishContract_RefCrossesFragments() {
 }
 
 func (this *IntegrationSuite) TestPublishContract_EmptyFragmentContributesNothing() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, _ = this.post("/api/contracts", this.publishBody("pets_service", "1",
@@ -503,7 +505,7 @@ func (this *IntegrationSuite) TestPublishContract_EmptyFragmentContributesNothin
 }
 
 func (this *IntegrationSuite) TestPublishContract_DifferentMethodsSamePath_Merge() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1",
@@ -518,7 +520,7 @@ func (this *IntegrationSuite) TestPublishContract_DifferentMethodsSamePath_Merge
 }
 
 func (this *IntegrationSuite) TestPublishContract_RequestInOneFragmentStatusInAnother_Merge() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1",
@@ -533,7 +535,7 @@ func (this *IntegrationSuite) TestPublishContract_RequestInOneFragmentStatusInAn
 }
 
 func (this *IntegrationSuite) TestPublishContract_DuplicateResponseResource_Rejected() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1",
@@ -551,7 +553,7 @@ func (this *IntegrationSuite) TestPublishContract_DuplicateResponseResource_Reje
 }
 
 func (this *IntegrationSuite) TestPublishContract_DuplicateRequestResource_Rejected() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1",
@@ -585,7 +587,7 @@ func (this *IntegrationSuite) TestPublishContract_IdenticalConsumedResourceInTwo
 }
 
 func (this *IntegrationSuite) TestPublishContract_TrailingSlashCountsAsDuplicate() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1",
@@ -602,7 +604,7 @@ func (this *IntegrationSuite) TestPublishContract_TrailingSlashCountsAsDuplicate
 }
 
 func (this *IntegrationSuite) TestPublishContract_DuplicateSchema_Rejected() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1",
@@ -619,7 +621,7 @@ func (this *IntegrationSuite) TestPublishContract_DuplicateSchema_Rejected() {
 }
 
 func (this *IntegrationSuite) TestPublishContract_SameContentSplitInFragments_AliasesTheSnapshot() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, _ = this.post("/api/contracts", this.publishBody("pets_service", "v42", contractFragment{"api.yaml", contractBody}))
@@ -761,7 +763,7 @@ schemas:
 `
 
 func (this *IntegrationSuite) TestPublishContract_InvalidSchemaType_Rejected() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1",
@@ -949,7 +951,7 @@ func (this *IntegrationSuite) TestPublishContract_OptionalOnItems_Rejected() {
 }
 
 func (this *IntegrationSuite) TestPublishContract_StatusCodeOutOfRange_Rejected() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1",
@@ -965,7 +967,7 @@ func (this *IntegrationSuite) TestPublishContract_StatusCodeOutOfRange_Rejected(
 }
 
 func (this *IntegrationSuite) TestPublishContract_ArrayWithoutItems_RejectedBrokerStaysUp() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1",
@@ -983,7 +985,7 @@ func (this *IntegrationSuite) TestPublishContract_ArrayWithoutItems_RejectedBrok
 }
 
 func (this *IntegrationSuite) TestPublishContract_BothProvidedSpellingsInOneFile_Rejected() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1",
@@ -999,7 +1001,7 @@ func (this *IntegrationSuite) TestPublishContract_BothProvidedSpellingsInOneFile
 }
 
 func (this *IntegrationSuite) TestPublishContract_ShapeViolation_ReportedBeforeContextualRules() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1",
@@ -1095,7 +1097,7 @@ const parentEndpointOutOfRangeYAML = `provides:
 `
 
 func (this *IntegrationSuite) TestPublishContract_UnknownMethod_Rejected() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1",
@@ -1110,7 +1112,7 @@ func (this *IntegrationSuite) TestPublishContract_UnknownMethod_Rejected() {
 }
 
 func (this *IntegrationSuite) TestPublishContract_MessageBlock_Rejected() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1",
@@ -1125,7 +1127,7 @@ func (this *IntegrationSuite) TestPublishContract_MessageBlock_Rejected() {
 }
 
 func (this *IntegrationSuite) TestPublishContract_ScalarMethod_Rejected() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1",
@@ -1140,7 +1142,7 @@ func (this *IntegrationSuite) TestPublishContract_ScalarMethod_Rejected() {
 }
 
 func (this *IntegrationSuite) TestPublishContract_AnchorsAndAliases_Rejected() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1",
@@ -1153,7 +1155,7 @@ func (this *IntegrationSuite) TestPublishContract_AnchorsAndAliases_Rejected() {
 }
 
 func (this *IntegrationSuite) TestPublishContract_MultipleDocuments_Rejected() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1",
@@ -1166,7 +1168,7 @@ func (this *IntegrationSuite) TestPublishContract_MultipleDocuments_Rejected() {
 }
 
 func (this *IntegrationSuite) TestPublishContract_ShapeViolations_KeepDocumentOrderPerSource() {
-	status, _ := this.post("/api/participants", petsParticipantBody)
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1",

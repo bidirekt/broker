@@ -6,6 +6,7 @@ import (
 	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/components/pages"
 	"github.com/bidirekt/broker/internal/components/respond"
+	"github.com/bidirekt/broker/internal/model"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -25,7 +26,7 @@ func (this *InviteUserUiHandler) ShowForm(ctx fiber.Ctx) error {
 		return this.respondForbidden(ctx)
 	}
 
-	return pages.Render(ctx, fiber.StatusOK, pageFiles, inviteUserTemplate, InviteUserPage{})
+	return pages.Render(ctx, fiber.StatusOK, pageFiles, inviteUserTemplate, InviteUserPage{Permission: string(model.PermissionRead)})
 }
 
 func (this *InviteUserUiHandler) Invite(ctx fiber.Ctx) error {
@@ -48,14 +49,16 @@ func (this *InviteUserUiHandler) Invite(ctx fiber.Ctx) error {
 
 	switch output.Status {
 	case EmailInvalid:
-		return this.respondWithMessage(ctx, fiber.StatusBadRequest, page, EmailInvalidMessage)
+		return this.respondProblem(ctx, fiber.StatusBadRequest, page, emailFormField, EmailInvalidMessage)
 	case PermissionInvalid:
-		return this.respondWithMessage(ctx, fiber.StatusBadRequest, page, PermissionInvalidMessage)
+		page.Permission = ""
+		return this.respondProblem(ctx, fiber.StatusBadRequest, page, permissionFormField, PermissionInvalidMessage)
 	case EmailAlreadyInUse:
-		return this.respondWithMessage(ctx, fiber.StatusConflict, page, EmailAlreadyInUseMessage)
+		return this.respondProblem(ctx, fiber.StatusConflict, page, emailFormField, EmailAlreadyInUseMessage)
 	}
 
 	page.Link = output.Link
+	page.ExpiresAt = output.ExpiresAt
 	return pages.Render(ctx, fiber.StatusOK, pageFiles, inviteUserTemplate, page)
 }
 
@@ -63,7 +66,8 @@ func (this *InviteUserUiHandler) respondForbidden(ctx fiber.Ctx) error {
 	return respond.Problem(ctx, fiber.StatusForbidden, access.NoAccessMessage)
 }
 
-func (this *InviteUserUiHandler) respondWithMessage(ctx fiber.Ctx, status int, page InviteUserPage, message string) error {
+func (this *InviteUserUiHandler) respondProblem(ctx fiber.Ctx, status int, page InviteUserPage, field string, message string) error {
+	page.Field = field
 	page.Message = message
 	return pages.Render(ctx, status, pageFiles, inviteUserTemplate, page)
 }

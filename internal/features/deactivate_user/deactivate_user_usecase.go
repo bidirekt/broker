@@ -22,6 +22,7 @@ type DeactivateUserInput struct {
 
 type DeactivateUserOutput struct {
 	Status DeactivateUserStatus
+	User   *model.User
 }
 
 type DeactivateUserUseCase struct {
@@ -43,8 +44,8 @@ func (this *DeactivateUserUseCase) Execute(ctx context.Context, input Deactivate
 	}
 
 	if !this.userRepository.Deactivate(ctx, input.UserID) {
-		return DeactivateUserOutput{Status: UserAlreadyDeactivated}
+		return DeactivateUserOutput{Status: UserAlreadyDeactivated, User: user}
 	}
 
-	return DeactivateUserOutput{Status: UserDeactivated}
+	return DeactivateUserOutput{Status: UserDeactivated, User: user}
 }

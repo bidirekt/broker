@@ -26,7 +26,7 @@ func (this pricesWithoutVerdict) GetVerdict(context.Context, int64, int64) (*mod
 }
 
 type pricesBreak struct {
-	reason   compatibility_checker.BreakingReason
+	reason   model.BreakingReason
 	property string
 }
 
@@ -72,7 +72,7 @@ func pricesResources(interaction, consumerType, providerType string) (consumer, 
 		ResponseStatusCode: status,
 		Bodies:             providerBodies,
 		Schemas:            providerSchemas,
-		DeployedVersions:   map[string]string{pricesEnvironment: "1.0.0"},
+		ParticipantVersion: null.StringFrom("1.0.0"),
 	}
 
 	return consumer, provider
@@ -111,7 +111,8 @@ func assertPricesBreaks(t *testing.T, interaction, consumerType, providerType st
 
 	t.Run("checked from the consumer", func(t *testing.T) {
 		assert.Equal(t, expected, pricesBreaksCheckedFrom(consumer, model.ResourceCounterparts{
-			Providers: map[string]model.PersistedResource{pricesProviderHash: provider},
+			Providers:           map[string]model.PersistedResource{pricesProviderHash: provider},
+			RegisteredProviders: map[string]model.RegisteredProvider{pricesProviderName: {DeployedVersion: null.StringFrom("1.0.0")}},
 		}, pricesProviderName, interaction))
 	})
 
@@ -122,7 +123,7 @@ func assertPricesBreaks(t *testing.T, interaction, consumerType, providerType st
 	})
 }
 
-var amountTypeMismatch = []pricesBreak{{compatibility_checker.ReasonPropertyTypeMismatch, "$.amount"}}
+var amountTypeMismatch = []pricesBreak{{model.ReasonPropertyTypeMismatch, "$.amount"}}
 
 var numberReaderCases = []struct {
 	producer string

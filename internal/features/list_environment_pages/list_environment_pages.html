@@ -1,0 +1,45 @@
+{{define "title"}}Environments{{end}}
+
+{{define "content"}}
+<div class="head">
+  <div>
+    <h1>Environments</h1>
+    <p class="sub">Where pipelines deploy, and what can-i-deploy compares against.</p>
+  </div>
+  {{if .CanWrite}}<div class="acts"><a class="btn primary" href="/environments/new-environment">Create environment</a></div>{{end}}
+</div>
+<section class="sheet">
+  {{if .Page.Environments}}
+  <table class="t stack dep">
+    <thead>
+      <tr>
+        <th scope="col">Environment</th>
+        <th scope="col">Participants deployed</th>
+        <th scope="col">Last deployment</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Page.Environments}}
+      <tr>
+        <td data-l="Environment"><a class="name" href="/environments/{{.ID}}">{{.Name}}</a></td>
+        <td data-l="Participants deployed">{{.DeployedParticipantCount}}</td>
+        {{with .LastDeployment}}
+        <td data-l="Last deployment"><div class="v2"><span><a class="name" href="{{.ParticipantURL}}">{{.Participant}}</a> {{if .VersionURL}}<a class="ver" href="{{.VersionURL}}">{{.Version}}</a>{{else}}<span class="ver">{{.Version}}</span>{{end}}</span><span class="time">{{listTime .DeployedAt}}</span></div></td>
+        {{else}}
+        <td data-l="Last deployment"><span class="muted">not deployed</span></td>
+        {{end}}
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  {{template "pager" .Page.Pager}}
+  {{else}}
+  <div class="empty">
+    <div class="ic">{{template "icon_environments" 20}}</div>
+    <h2 class="h2">No environments yet</h2>
+    <p>Create one for each place you deploy to, like <code>staging</code> and <code>production</code>, {{if .CanWrite}}here, or {{end}}from CI:</p>
+    <code class="cmd">bidirekt create-environment</code>
+  </div>
+  {{end}}
+</section>
+{{end}}

@@ -24,11 +24,16 @@ func NewSetPasswordUiHandler(useCase *SetPasswordUseCase, sessionKeeper *session
 
 func (this *SetPasswordUiHandler) ShowForm(ctx fiber.Ctx) error {
 	token := ctx.Query(tokenField)
-	if !this.useCase.IsLinkUsable(ctx.Context(), token) {
+	link := this.useCase.FindLink(ctx.Context(), token)
+	if link.Status != LinkFound {
 		return this.respondLinkInvalid(ctx)
 	}
 
-	return pages.Render(ctx, fiber.StatusOK, pageFiles, setPasswordTemplate, SetPasswordPage{Token: token})
+	return pages.Render(ctx, fiber.StatusOK, pageFiles, setPasswordTemplate, SetPasswordPage{
+		Token:     token,
+		Email:     link.Email,
+		ExpiresAt: link.ExpiresAt,
+	})
 }
 
 func (this *SetPasswordUiHandler) SetPassword(ctx fiber.Ctx) error {
@@ -48,8 +53,11 @@ func (this *SetPasswordUiHandler) SetPassword(ctx fiber.Ctx) error {
 	switch output.Status {
 	case PasswordInvalid:
 		return pages.Render(ctx, fiber.StatusBadRequest, pageFiles, setPasswordTemplate, SetPasswordPage{
-			Token:   token,
-			Message: PasswordInvalidMessage,
+			Token:     token,
+			Email:     output.Email,
+			ExpiresAt: output.ExpiresAt,
+			Field:     passwordFormField,
+			Message:   PasswordInvalidMessage,
 		})
 	case LinkInvalid:
 		return this.respondLinkInvalid(ctx)
