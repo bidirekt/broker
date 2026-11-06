@@ -27,6 +27,19 @@ type persistedCheckResult struct {
 	Deployable               bool
 }
 
+type persistenceCanIDeployBreak struct {
+	Reason string `json:"reason"`
+}
+
+type persistenceCanIDeployResult struct {
+	Endpoints map[string]map[string]map[string][]persistenceCanIDeployBreak `json:"endpoints"`
+}
+
+type persistenceCanIDeployResponse struct {
+	Deployable bool                                   `json:"deployable"`
+	Results    map[string]persistenceCanIDeployResult `json:"results"`
+}
+
 const persistenceStandaloneContract = `
 {
   "provides": { "rest": { "/widgets": { "get": { "responses": { "200": "Widget" } } } } },
@@ -121,7 +134,7 @@ func (this *IntegrationSuite) TestCompatibilityPersistence_BootstrapCheckRecords
 		`{"participant":"widgets","version":"v1","environment":"production"}`)
 	this.Require().Equal(http.StatusOK, status)
 
-	var got canIDeployResponse
+	var got persistenceCanIDeployResponse
 	this.Require().NoError(json.Unmarshal([]byte(body), &got))
 	this.True(got.Deployable)
 	this.Empty(got.Results)
@@ -155,7 +168,7 @@ func (this *IntegrationSuite) TestCompatibilityPersistence_NotFoundCounterpartKe
 		`{"participant":"front","version":"v1","environment":"production"}`)
 	this.Require().Equal(http.StatusOK, status)
 
-	var got canIDeployResponse
+	var got persistenceCanIDeployResponse
 	this.Require().NoError(json.Unmarshal([]byte(body), &got))
 	this.False(got.Deployable)
 	this.Equal("provider_resource_not_found",
@@ -187,7 +200,7 @@ func (this *IntegrationSuite) TestCompatibilityPersistence_NotDeployedCounterpar
 		`{"participant":"front","version":"v1","environment":"production"}`)
 	this.Require().Equal(http.StatusOK, status)
 
-	var got canIDeployResponse
+	var got persistenceCanIDeployResponse
 	this.Require().NoError(json.Unmarshal([]byte(body), &got))
 	this.False(got.Deployable)
 	this.Equal("provider_resource_not_deployed_in_environment",
@@ -222,7 +235,7 @@ func (this *IntegrationSuite) TestCompatibilityPersistence_CompatiblePairIsStore
 		`{"participant":"front","version":"v1","environment":"production"}`)
 	this.Require().Equal(http.StatusOK, status)
 
-	var got canIDeployResponse
+	var got persistenceCanIDeployResponse
 	this.Require().NoError(json.Unmarshal([]byte(body), &got))
 	this.True(got.Deployable)
 
@@ -268,7 +281,7 @@ func (this *IntegrationSuite) TestCompatibilityPersistence_IncompatiblePairStore
 		`{"participant":"front","version":"v1","environment":"production"}`)
 	this.Require().Equal(http.StatusOK, status)
 
-	var got canIDeployResponse
+	var got persistenceCanIDeployResponse
 	this.Require().NoError(json.Unmarshal([]byte(body), &got))
 	this.False(got.Deployable)
 

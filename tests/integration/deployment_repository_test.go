@@ -9,6 +9,29 @@ import (
 
 const stagingEnvBody = `{"environment":"staging"}`
 
+const deploymentRepositoryApiV1Contract = `
+{
+  "provides": {
+    "rest": {
+      "/things": {
+        "get": {
+          "responses": {
+            "200": "Thing"
+          }
+        }
+      }
+    }
+  },
+  "schemas": {
+    "Thing": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" }
+      }
+    }
+  }
+}`
+
 const deploymentRepositoryApiV2Contract = `provides:
   rest:
     /things:
@@ -53,6 +76,17 @@ func (this *IntegrationSuite) insertDeploymentAt(participantID int64, version st
 	this.Require().NoError(err)
 }
 
+func (this *IntegrationSuite) seedDeploymentRepositoryApiV1AndProduction() {
+	status, _ := this.post("/api/participants", `{"participant":"api"}`)
+	this.Require().Equal(http.StatusOK, status)
+
+	status, _ = this.post("/api/contracts", this.publishBody("api", "v1", contractFragment{"api.yaml", deploymentRepositoryApiV1Contract}))
+	this.Require().Equal(http.StatusOK, status)
+
+	status, _ = this.post("/api/environments", `{"environment":"production"}`)
+	this.Require().Equal(http.StatusOK, status)
+}
+
 func (this *IntegrationSuite) publishDeploymentRepositoryApiV2() {
 	status, _ := this.post("/api/contracts", this.publishBody("api", "v2", contractFragment{"api.yaml", deploymentRepositoryApiV2Contract}))
 	this.Require().Equal(http.StatusOK, status)
@@ -68,12 +102,30 @@ func (this *IntegrationSuite) contractIDOfVersion(participantID int64, version s
 	return contractID
 }
 
+func (this *IntegrationSuite) participantIDForDeploymentRepository(name string) int64 {
+	var id int64
+	err := this.Pool.QueryRow(context.Background(),
+		`SELECT id FROM participants WHERE name = $1`, name,
+	).Scan(&id)
+	this.Require().NoError(err)
+	return id
+}
+
+func (this *IntegrationSuite) environmentIDForDeploymentRepository(name string) int64 {
+	var id int64
+	err := this.Pool.QueryRow(context.Background(),
+		`SELECT id FROM environments WHERE name = $1`, name,
+	).Scan(&id)
+	this.Require().NoError(err)
+	return id
+}
+
 func (this *IntegrationSuite) TestCurrentDeploymentInEnv_RollbackPicksLatestRowEvenIfOlderVersion() {
-	this.seedApiParticipantContractAndProductionEnv()
+	this.seedDeploymentRepositoryApiV1AndProduction()
 	this.publishDeploymentRepositoryApiV2()
 
-	participantID := this.lookupParticipantID("api")
-	productionID := this.lookupEnvironmentID("production")
+	participantID := this.participantIDForDeploymentRepository("api")
+	productionID := this.environmentIDForDeploymentRepository("production")
 
 	this.insertDeploymentAt(participantID, "v1", productionID, "2026-05-01T00:00:00Z")
 	this.insertDeploymentAt(participantID, "v2", productionID, "2026-05-10T00:00:00Z")
@@ -87,10 +139,10 @@ func (this *IntegrationSuite) TestCurrentDeploymentInEnv_RollbackPicksLatestRowE
 }
 
 func (this *IntegrationSuite) TestCurrentDeploymentInEnv_NoRowsReturnsNotFound() {
-	this.seedApiParticipantContractAndProductionEnv()
+	this.seedDeploymentRepositoryApiV1AndProduction()
 
-	participantID := this.lookupParticipantID("api")
-	productionID := this.lookupEnvironmentID("production")
+	participantID := this.participantIDForDeploymentRepository("api")
+	productionID := this.environmentIDForDeploymentRepository("production")
 
 	repo := repository.NewDeploymentRepository(this.Pool)
 	version, contractID, ok := repo.CurrentDeploymentInEnv(context.Background(), participantID, productionID)
@@ -100,16 +152,16 @@ func (this *IntegrationSuite) TestCurrentDeploymentInEnv_NoRowsReturnsNotFound()
 }
 
 func (this *IntegrationSuite) TestCurrentDeploymentInEnv_ScopedPerEnvironment() {
-	this.seedApiParticipantContractAndProductionEnv()
+	this.seedDeploymentRepositoryApiV1AndProduction()
 
 	this.publishDeploymentRepositoryApiV2()
 
 	status, _ := this.post("/api/environments", stagingEnvBody)
 	this.Require().Equal(http.StatusOK, status)
 
-	participantID := this.lookupParticipantID("api")
-	productionID := this.lookupEnvironmentID("production")
-	stagingID := this.lookupEnvironmentID("staging")
+	participantID := this.participantIDForDeploymentRepository("api")
+	productionID := this.environmentIDForDeploymentRepository("production")
+	stagingID := this.environmentIDForDeploymentRepository("staging")
 
 	this.insertDeploymentAt(participantID, "v1", productionID, "2026-05-01T00:00:00Z")
 	this.insertDeploymentAt(participantID, "v2", stagingID, "2026-05-02T00:00:00Z")
