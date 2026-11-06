@@ -124,8 +124,14 @@ func (this *IntegrationSuite) canIDeployForRecursiveSchema(participant, version 
 }
 
 func (this *IntegrationSuite) validateForRecursiveSchema(participant, content string) recursiveSchemaResponse {
-	return this.checkForRecursiveSchema("/api/contracts/validate",
-		this.validateBody(participant, "production", validateFile{Source: "contract.yaml", Content: content}))
+	body, err := json.Marshal(struct {
+		Participant string             `json:"participant"`
+		Environment string             `json:"environment"`
+		Contracts   []contractFragment `json:"contracts"`
+	}{participant, "production", []contractFragment{{"contract.yaml", content}}})
+	this.Require().NoError(err)
+
+	return this.checkForRecursiveSchema("/api/contracts/validate", string(body))
 }
 
 func (this *IntegrationSuite) setupRecursiveSchemaPair() {

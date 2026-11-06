@@ -8,12 +8,13 @@ const (
 	passwordFormField = "password"
 
 	signInPath = "/sign-in"
-	usersPath  = "/users"
+	homePath   = "/"
 
 	setupTemplate = "setup.html"
 )
 
 type SetupPage struct {
 	Email   string
+	Field   string
 	Message string
 }

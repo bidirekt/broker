@@ -1,0 +1,33 @@
+{{define "title"}}Create environment{{end}}
+
+{{define "content"}}
+<nav class="crumbs" aria-label="Breadcrumbs"><a href="/environments">environments</a><span aria-hidden="true">/</span><span aria-current="page">create</span></nav>
+<div class="head">
+  <div>
+    <h1>Create environment</h1>
+    <p class="sub">A place your pipelines deploy to.</p>
+  </div>
+</div>
+<div class="formgrid">
+  <form class="sheet formcard" method="post" action="/environments/new-environment">
+    <div class="form">
+      <div class="field">
+        <label for="name">Name</label>
+        <input class="input" id="name" name="name" type="text" autocomplete="off" value="{{.Page.Name}}" required autofocus{{if eq .Page.Field "name"}} aria-invalid="true" aria-describedby="name-err"{{end}}>
+        {{if eq .Page.Field "name"}}<p class="err" id="name-err">{{template "icon_error" 14}}<span>{{.Page.Message}}</span></p>{{end}}
+        <p class="hint">Shown exactly as written.</p>
+      </div>
+    </div>
+    <div class="form-foot"><button type="submit" class="btn primary">Create environment</button><a class="btn" href="/environments">Cancel</a></div>
+  </form>
+  <aside class="sheet aside" aria-label="About environments">
+    <h2>About environments</h2>
+    <ul>
+      <li>A place your pipelines deploy to, like <span class="mono">staging</span> or <span class="mono">production</span>.</li>
+      <li>Pipelines pass this name to <span class="mono">record-deployment</span> and <span class="mono">can-i-deploy</span>.</li>
+      <li>Spaces around the name are not accepted.</li>
+    </ul>
+    <code class="cmd">bidirekt create-environment</code>
+  </aside>
+</div>
+{{end}}

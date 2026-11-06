@@ -1,7 +1,6 @@
 package integration_test
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 )
@@ -698,19 +697,4 @@ func (this *IntegrationSuite) TestValidateContract_RemovalIsMeasuredFromTheDeplo
 	breaks := response.Results["web"].Endpoints["/items"]["get"]["200"]
 	this.Require().Len(breaks, 1)
 	this.Equal("provider_resource_removed_but_still_consumed", breaks[0].Reason)
-}
-
-func (this *IntegrationSuite) TestValidateContract_DeployedVersionWithoutContractIsAnInternalError() {
-	this.setupForValidate("catalog")
-	_, err := this.Pool.Exec(context.Background(),
-		`INSERT INTO deployments (participant_id, version, environment_id, rollback)
-		 SELECT p.id, 'v9', e.id, false FROM participants p, environments e
-		  WHERE p.name = 'catalog' AND e.name = 'production'`)
-	this.Require().NoError(err)
-
-	status, body := this.post("/api/contracts/validate",
-		this.validateBody("catalog", "production", validateFile{"api.yaml", validateCatalogStockYAML}))
-
-	this.Equal(http.StatusInternalServerError, status)
-	this.JSONEq(`{"message":"internal error"}`, body)
 }

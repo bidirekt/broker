@@ -1,23 +1,41 @@
-{{define "title"}}Edit a user{{end}}
+{{define "title"}}Edit {{.Page.StoredEmail}}{{end}}
 
 {{define "content"}}
-<section class="narrow">
-<h1>Edit a user</h1>
-{{with .Page.Message}}<p role="alert">{{.}}</p>{{end}}
-{{if .Page.UserID}}
-<div class="panel">
-<form method="post" action="/users/{{.Page.UserID}}/edit">
-  <label for="email">Email</label>
-  <input id="email" name="email" type="text" inputmode="email" autocomplete="off" value="{{.Page.Email}}" required autofocus>
-  <label for="permission">Permission</label>
-  <select id="permission" name="permission" required>
-    <option value="read"{{if eq .Page.Permission "read"}} selected{{end}}>read</option>
-    <option value="write"{{if eq .Page.Permission "write"}} selected{{end}}>write</option>
-  </select>
-  <button type="submit">Save</button>
-</form>
+<nav class="crumbs" aria-label="Breadcrumbs"><a href="{{.Page.UsersPath}}">users</a><span aria-hidden="true">/</span><span aria-current="page">{{.Page.StoredEmail}}</span></nav>
+<div class="head">
+  <div>
+    <h1>Edit {{.Page.StoredEmail}}</h1>
+    <p class="sub">{{.Page.StateLine}}</p>
+  </div>
 </div>
-{{end}}
-<p class="back"><a href="/users">Back to users</a></p>
-</section>
+<div class="formgrid">
+  <form class="sheet formcard" method="post" action="/users/{{.Page.UserID}}/edit">
+    <div class="form">
+      {{with .Page.ReturnPage}}<input type="hidden" name="page" value="{{.}}">{{end}}
+      <div class="field">
+        <label for="email">Email</label>
+        <input class="input" id="email" name="email" type="text" inputmode="email" autocomplete="off" value="{{.Page.Email}}" required{{if not .Page.Field}} autofocus{{end}}{{if eq .Page.Field "email"}} autofocus aria-invalid="true" aria-describedby="email-err"{{end}}>
+        {{if eq .Page.Field "email"}}<p class="err" id="email-err">{{template "icon_error" 14}}<span>{{.Page.Message}}</span></p>{{end}}
+      </div>
+      <div class="field">
+        <span class="lbl" id="permission-label">Permission</span>
+        <div class="radios" role="radiogroup" aria-labelledby="permission-label"{{if eq .Page.Field "permission"}} aria-invalid="true" aria-describedby="permission-err"{{end}}>
+          <label class="radio"><input type="radio" name="permission" value="read" required{{if eq .Page.Permission "read"}} checked{{end}}{{if eq .Page.Field "permission"}} autofocus{{end}}><span><span class="mono">read</span><small>Sees every data screen and their own profile; runs can-i-deploy and validate.</small></span></label>
+          <label class="radio"><input type="radio" name="permission" value="write" required{{if eq .Page.Permission "write"}} checked{{end}}><span><span class="mono">write</span><small>Everything read does, plus publishing contracts, recording deployments, and creating participants and environments, and renaming environments.</small></span></label>
+        </div>
+        {{if eq .Page.Field "permission"}}<p class="err" id="permission-err">{{template "icon_error" 14}}<span>{{.Page.Message}}</span></p>{{end}}
+        <p class="hint">Admin can't be granted: a broker has exactly one.</p>
+      </div>
+    </div>
+    <div class="form-foot"><button type="submit" class="btn primary">Save</button><a class="btn" href="{{.Page.UsersPath}}">Cancel</a></div>
+  </form>
+  <aside class="sheet aside" aria-label="About editing">
+    <h2>About editing</h2>
+    <ul>
+      <li>A permission change applies on their next request.</li>
+      <li>Admin can't be granted or removed: a broker has exactly one.</li>
+      <li>To stop access, use Deactivate on the Users page instead.</li>
+    </ul>
+  </aside>
+</div>
 {{end}}

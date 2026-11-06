@@ -6,7 +6,7 @@ type VerdictBreak struct {
 	Endpoint    string            `json:"endpoint"`
 	Method      string            `json:"method"`
 	Interaction string            `json:"interaction"`
-	Reason      string            `json:"reason"`
+	Reason      BreakingReason    `json:"reason"`
 	Details     map[string]string `json:"details"`
 }
 

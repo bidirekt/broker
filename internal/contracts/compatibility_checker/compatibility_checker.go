@@ -94,7 +94,7 @@ func (this *pairState) hit() bool {
 
 // replay injects the stored breaks once per pair: a verdict already aggregates every resource
 // of the pair, so the remaining resources contribute nothing.
-func (this *pairState) replay(item *IncompatibleItem) {
+func (this *pairState) replay(item *CounterpartResult) {
 	if this.injected {
 		return
 	}

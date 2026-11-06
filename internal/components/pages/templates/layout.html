@@ -1,32 +1,39 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{template "title" .}} · Bidirekt</title>
-  <link rel="stylesheet" href="/assets/app.css">
+  <link rel="stylesheet" href="/assets/bundle.css">
   <script src="/assets/htmx.min.js"></script>
   <script src="/assets/app.js"></script>
 </head>
-<body hx-boost="true" hx-headers='{"X-CSRF-Token": "{{.CSRFToken}}"}'>
-  <header class="topbar">
-    <div class="frame topbar-inner">
-      <span class="brand">{{template "mark"}}Bidirekt</span>
+<body class="bk" hx-boost="true" hx-headers='{"X-CSRF-Token": "{{.CSRFToken}}"}'>
+  <header class="top">
+    <div class="top-in">
+      <a class="brand" href="/">{{template "mark"}}Bidirekt</a>
       <nav class="nav" aria-label="Main">
+        <a href="/participants"{{if eq .Section "participants"}} aria-current="page"{{end}}>Participants</a>
+        <a href="/environments"{{if eq .Section "environments"}} aria-current="page"{{end}}>Environments</a>
+        <a href="/compatibility"{{if eq .Section "compatibility"}} aria-current="page"{{end}}>Compatibility</a>
         {{if .ManagesUsers}}
         <a href="/users"{{if eq .Section "users"}} aria-current="page"{{end}}>Users</a>
         {{end}}
         <a href="/profile"{{if eq .Section "profile"}} aria-current="page"{{end}}>Profile</a>
       </nav>
-      <form class="sign-out" method="post" action="/sign-out">
-        <button type="submit">Sign out</button>
-      </form>
+      <div class="who">
+        <span class="email">{{.Email}}</span>
+        <form method="post" action="/sign-out">
+          <button type="submit" class="linkbtn">Sign out</button>
+        </form>
+      </div>
     </div>
   </header>
-  <main class="sheet">
-    <div class="frame">
-      {{template "content" .}}
-    </div>
+  <main class="main">
+    {{with .Notice}}
+    <div class="flash" role="status">{{template "icon_check" 16}}<span>{{.}}</span></div>
+    {{end}}
+    {{template "content" .}}
   </main>
 </body>
 </html>

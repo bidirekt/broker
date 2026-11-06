@@ -1,0 +1,118 @@
+{{define "title"}}Check #{{.Page.Check.ID}}{{end}}
+
+{{define "content"}}
+{{with .Page}}
+<nav class="crumbs" aria-label="Breadcrumbs"><a href="/participants">participants</a><span aria-hidden="true">/</span><a href="{{.ParticipantURL}}">{{.Check.ParticipantName}}</a><span aria-hidden="true">/</span>{{if .VersionURL}}<a href="{{.VersionURL}}">{{.Check.Version}}</a>{{else}}<span>{{.Check.Version}}</span>{{end}}<span aria-hidden="true">/</span><span aria-current="page">check #{{.Check.ID}}</span></nav>
+<section class="sheet">
+  <div class="verdict {{if .Check.Deployable}}yes{{else}}no{{end}}">
+    <div class="ic">{{if .Check.Deployable}}{{template "icon_check" 20}}{{else}}{{template "icon_x" 20}}{{end}}</div>
+    <div class="sec">
+      <p class="word">{{if .Check.Deployable}}yes · can be deployed{{else}}no · cannot be deployed{{end}}</p>
+      <h1><span class="name">{{.Check.ParticipantName}}</span> <span class="ver">{{.Check.Version}}</span> {{if .Check.Deployable}}can be deployed{{else}}cannot be deployed{{end}} to <span class="name">{{.Check.EnvironmentName}}</span></h1>
+      <dl class="kv">
+        <div><dt>Check</dt><dd>#{{.Check.ID}}</dd></div>
+        <div><dt>Participant</dt><dd><a class="name" href="{{.ParticipantURL}}">{{.Check.ParticipantName}}</a></dd></div>
+        <div><dt>Version</dt><dd>{{if .VersionURL}}<a class="ver" href="{{.VersionURL}}">{{.Check.Version}}</a>{{else}}<span class="ver">{{.Check.Version}}</span>{{end}}</dd></div>
+        <div><dt>Environment</dt><dd><a class="name" href="/environments/{{.Check.EnvironmentID}}">{{.Check.EnvironmentName}}</a></dd></div>
+        <div><dt>Checked</dt><dd>{{detailTime .Check.CreatedAt}}</dd></div>
+      </dl>
+    </div>
+  </div>
+  {{if and .Report.Stored .Breaking}}
+  <div class="stats">
+    <div><b>{{.Report.Breaks}}</b><span>{{if eq .Report.Breaks 1}}break{{else}}breaks{{end}}</span></div>
+    <div><b>{{.Report.CounterpartsBreaking}} of {{len .Report.Counterparts}}</b><span>{{if eq (len .Report.Counterparts) 1}}counterpart breaks{{else}}counterparts break{{end}}</span></div>
+    {{if .Report.Places}}<div><b>{{.Report.Places}}</b><span>{{if eq .Report.Places 1}}place{{else}}places{{end}} in the contracts</span></div>{{end}}
+  </div>
+  {{end}}
+</section>
+{{if not .Report.Stored}}
+<section class="sheet">
+  <div class="sheet-head"><h2 class="h2">compared with</h2></div>
+  <p class="pad muted">the details of this check were not stored</p>
+  {{if .Counterparts}}
+  <ul class="list">
+    {{range .Counterparts}}
+    <li>{{template "answer" .Deployable}}{{template "counterpart_name" .}}{{template "counterpart_version" .}}</li>
+    {{end}}
+  </ul>
+  {{end}}
+</section>
+{{else if .Breaking}}
+<p class="legend"><span><span class="sw"></span>Fix in the participant under check</span><span><span class="sw o"></span>Or fix in the counterpart</span><span><span class="role">PROVIDER</span> it consumes from</span><span><span class="role">CONSUMER</span> consumes it</span></p>
+{{$check := .Check}}
+{{range .Breaking}}
+{{$counterpart := .Name}}
+<details class="cp" open>
+  <summary><span class="chev">{{template "icon_chevron" 14}}</span>{{template "role" .Role}}<span class="who-cp">{{.Name}}</span>{{if .Version}}<span class="ver">{{.Version}}</span><span class="badge env">{{$check.EnvironmentName}}</span>{{else}}<span class="muted">no version</span>{{end}}<span class="badge no nb">{{template "icon_x" 12}}no · {{.Breaks}} {{if eq .Breaks 1}}break{{else}}breaks{{end}}</span></summary>
+  {{if .ParticipantURL}}<div class="cp-links"><a href="{{.ParticipantURL}}">{{.Name}}</a>{{if .VersionURL}}<span aria-hidden="true">·</span><a href="{{.VersionURL}}">version {{.Version}}</a>{{end}}</div>{{end}}
+  {{if .Endpoints}}
+  <p class="group-label">Endpoints</p>
+  {{range .Endpoints}}
+  <div class="ep">
+    <div class="ep-title"><span class="meth">{{.Method}}</span><span>{{.Path}}</span></div>
+    {{range .Breaks}}
+    <div class="ix">
+      {{with .Interaction}}<p class="ix-name">{{.}}</p>{{end}}
+      <p class="brk">{{template "icon_x" 14}}<span>{{template "phrase" .Sentence}}</span></p>
+      {{with .ReasonLine}}<p class="muted">{{.}}</p>{{end}}
+      {{template "fixes" .Fixes}}
+    </div>
+    {{end}}
+  </div>
+  {{end}}
+  {{end}}
+  {{if .Fields}}
+  <p class="group-label">Fields</p>
+  {{range .Fields}}
+  <div class="ep">
+    <div class="ep-title"><span class="prop">FIELD</span><span>{{.Field}}</span><span class="badge">{{len .Places}} {{if eq (len .Places) 1}}place{{else}}places{{end}}</span></div>
+    <p class="brk">{{template "icon_x" 14}}<span>{{template "phrase" .Sentence}}</span></p>
+    {{template "fixes" .Fixes}}
+    <ul class="places">
+      {{range .Places}}
+      <li><span class="meth">{{.Method}}</span><span>{{.Endpoint}}</span><span class="at">{{.Interaction}}</span><span>at {{.Property}}</span>{{with .CounterpartField}}<span class="cf">({{$counterpart}}: {{.}})</span>{{end}}</li>
+      {{end}}
+    </ul>
+  </div>
+  {{end}}
+  {{end}}
+</details>
+{{end}}
+{{if .Compatible}}
+<section class="sheet">
+  <ul class="list">
+    <li>{{template "icon_check" 14}}<span>Also compared with, and compatible:</span>{{range .Compatible}}<span>{{template "role" .Role}}{{template "counterpart_name" .}} {{template "counterpart_version" .}}</span>{{end}}</li>
+  </ul>
+</section>
+{{end}}
+{{else}}
+<section class="sheet">
+  <div class="sheet-head"><h2 class="h2">compared with</h2></div>
+  {{if .Counterparts}}
+  <ul class="list">
+    {{range .Counterparts}}
+    <li>{{template "answer" .Deployable}}{{template "counterpart_name" .}}{{template "counterpart_version" .}}{{template "role" .Role}}</li>
+    {{end}}
+  </ul>
+  {{else}}
+  <p class="pad muted">nothing deployed in <span class="name">{{.Check.EnvironmentName}}</span> shares an endpoint with <span class="name">{{.Check.ParticipantName}}</span></p>
+  {{end}}
+</section>
+{{end}}
+{{end}}
+{{end}}
+
+{{define "role"}}{{if eq . "both"}}<span class="role">PROVIDER · CONSUMER</span>{{else if eq . "provider"}}<span class="role">PROVIDER</span>{{else if eq . "consumer"}}<span class="role">CONSUMER</span>{{end}}{{end}}
+
+{{define "counterpart_name"}}{{if .ParticipantURL}}<a class="name" href="{{.ParticipantURL}}">{{.Name}}</a>{{else}}<span class="name">{{.Name}}</span>{{end}}{{end}}
+
+{{define "counterpart_version"}}{{if .VersionURL}}<a class="ver" href="{{.VersionURL}}">{{.Version}}</a>{{else}}{{template "version" .Version}}{{end}}{{end}}
+
+{{define "version"}}{{if .}}<span class="ver">{{.}}</span>{{else}}<span class="muted">no version</span>{{end}}{{end}}
+
+{{define "answer"}}{{if .}}<span class="badge yes">{{template "icon_check" 12}}yes</span>{{else}}<span class="badge no">{{template "icon_x" 12}}no</span>{{end}}{{end}}
+
+{{define "phrase"}}{{range .}}{{if .IsName}}<b class="name">{{.Text}}</b>{{else if .IsCode}}<code>{{.Text}}</code>{{else}}{{.Text}}{{end}}{{end}}{{end}}
+
+{{define "fixes"}}{{if .}}<div class="fixes">{{range $index, $fix := .}}<div class="fix {{if .Checked}}self{{else}}other{{end}}{{if eq (len $) 1}} only{{end}}"><span class="side">{{if eq $index 0}}Fix in{{else}}or fix in{{end}} <b>{{.Participant}}</b></span><span>{{.Action}}</span></div>{{end}}</div>{{end}}{{end}}

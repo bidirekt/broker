@@ -24,7 +24,7 @@ func (this petsWithoutVerdict) GetVerdict(context.Context, int64, int64) (*model
 }
 
 type petsBreak struct {
-	reason   compatibility_checker.BreakingReason
+	reason   model.BreakingReason
 	property string
 }
 
@@ -117,7 +117,7 @@ func TestMapValuesWithAnotherTypeBreakOnTheValues(t *testing.T) {
 	}
 
 	assertPetsBreaks(t, readByTheConsumer, petsMapProvidedByTheProvider(), []petsBreak{
-		{compatibility_checker.ReasonPropertyTypeMismatch, "$.pets{}"},
+		{model.ReasonPropertyTypeMismatch, "$.pets{}"},
 	})
 }
 
@@ -126,7 +126,7 @@ func TestNullableMapValuesBreakAgainstANonNullableReader(t *testing.T) {
 	providedByTheProvider["pets{}"] = model.Field{Type: "object", Nullable: true}
 
 	assertPetsBreaks(t, petsMapProvidedByTheProvider(), providedByTheProvider, []petsBreak{
-		{compatibility_checker.ReasonPropertyNullableInProviderNotNullableInConsumer, "$.pets{}"},
+		{model.ReasonPropertyNullableInProviderNotNullableInConsumer, "$.pets{}"},
 	})
 }
 
@@ -135,7 +135,7 @@ func TestMapValueChildMissingInTheProviderBreaksOnTheChild(t *testing.T) {
 	readByTheConsumer["pets{}.age"] = model.Field{Type: "integer"}
 
 	assertPetsBreaks(t, readByTheConsumer, petsMapProvidedByTheProvider(), []petsBreak{
-		{compatibility_checker.ReasonPropertyMissingInProvider, "$.pets{}.age"},
+		{model.ReasonPropertyMissingInProvider, "$.pets{}.age"},
 	})
 }
 
@@ -144,7 +144,7 @@ func TestMapValueMemberWithAnotherTypeBreaksOnTheMember(t *testing.T) {
 	readByTheConsumer["pets{}.name"] = model.Field{Type: "integer"}
 
 	assertPetsBreaks(t, readByTheConsumer, petsMapProvidedByTheProvider(), []petsBreak{
-		{compatibility_checker.ReasonPropertyTypeMismatch, "$.pets{}.name"},
+		{model.ReasonPropertyTypeMismatch, "$.pets{}.name"},
 	})
 }
 
@@ -156,7 +156,7 @@ func TestObjectReadAgainstAMapBreaksOnTheParent(t *testing.T) {
 	}
 
 	assertPetsBreaks(t, readByTheConsumer, petsMapProvidedByTheProvider(), []petsBreak{
-		{compatibility_checker.ReasonPropertyTypeMismatch, "$.pets"},
+		{model.ReasonPropertyTypeMismatch, "$.pets"},
 	})
 }
 
@@ -169,6 +169,6 @@ func TestMapReadAgainstAnObjectBreaksOnTheParent(t *testing.T) {
 	}
 
 	assertPetsBreaks(t, petsMapProvidedByTheProvider(), providedByTheProvider, []petsBreak{
-		{compatibility_checker.ReasonPropertyTypeMismatch, "$.pets"},
+		{model.ReasonPropertyTypeMismatch, "$.pets"},
 	})
 }

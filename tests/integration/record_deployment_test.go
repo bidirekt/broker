@@ -265,6 +265,81 @@ func (this *IntegrationSuite) TestRecordDeployment_RollbackWritesNewRow() {
 	this.Equal(row{version: "v1", rollback: true}, got[2])
 }
 
+type recordDeploymentCurrentRow struct {
+	version    string
+	contractID int64
+	deployedAt time.Time
+}
+
+func (this *IntegrationSuite) recordDeploymentCurrentRows() []recordDeploymentCurrentRow {
+	rows, err := this.Pool.Query(context.Background(),
+		`SELECT version, contract_id, deployed_at FROM current_deployments`,
+	)
+	this.Require().NoError(err)
+
+	current, err := pgx.AppendRows(make([]recordDeploymentCurrentRow, 0), rows, func(row pgx.CollectableRow) (recordDeploymentCurrentRow, error) {
+		var current recordDeploymentCurrentRow
+		err := row.Scan(&current.version, &current.contractID, &current.deployedAt)
+
+		return current, err
+	})
+	this.Require().NoError(err)
+
+	return current
+}
+
+func (this *IntegrationSuite) recordDeploymentLatestRow() (version string, deployedAt time.Time) {
+	this.Require().NoError(this.Pool.QueryRow(context.Background(),
+		`SELECT version, deployed_at FROM deployments ORDER BY deployed_at DESC LIMIT 1`,
+	).Scan(&version, &deployedAt))
+
+	return version, deployedAt
+}
+
+func (this *IntegrationSuite) recordDeploymentContractIDOf(version string) int64 {
+	var contractID int64
+	this.Require().NoError(this.Pool.QueryRow(context.Background(),
+		`SELECT contract_id FROM contract_versions WHERE version = $1`, version,
+	).Scan(&contractID))
+
+	return contractID
+}
+
+func (this *IntegrationSuite) TestRecordDeployment_CurrentDeploymentFollowsNewSameAndRolledBackVersions() {
+	status, _ := this.post("/api/participants", apiParticipantBody)
+	this.Require().Equal(http.StatusOK, status)
+
+	status, _ = this.post("/api/contracts", this.publishBody("api", "v1", contractFragment{"api.yaml", apiV1ContractBody}))
+	this.Require().Equal(http.StatusOK, status)
+
+	status, _ = this.post("/api/contracts", this.publishBody("api", "v2", contractFragment{"api.yaml", apiV2ContractBody}))
+	this.Require().Equal(http.StatusOK, status)
+
+	status, _ = this.post("/api/environments", productionEnvBodyForDeploy)
+	this.Require().Equal(http.StatusOK, status)
+
+	status, _ = this.post("/api/deployments", apiV1DeploymentBody)
+	this.Require().Equal(http.StatusOK, status)
+	_, v1DeployedAt := this.recordDeploymentLatestRow()
+	this.Equal([]recordDeploymentCurrentRow{{"v1", this.recordDeploymentContractIDOf("v1"), v1DeployedAt}}, this.recordDeploymentCurrentRows(), "first deployment")
+
+	status, _ = this.post("/api/deployments", apiV2DeploymentBody)
+	this.Require().Equal(http.StatusOK, status)
+	_, v2DeployedAt := this.recordDeploymentLatestRow()
+	this.Equal([]recordDeploymentCurrentRow{{"v2", this.recordDeploymentContractIDOf("v2"), v2DeployedAt}}, this.recordDeploymentCurrentRows(), "new version")
+
+	status, _ = this.post("/api/deployments", apiV2DeploymentBody)
+	this.Require().Equal(http.StatusOK, status)
+	this.Equal(2, this.countRows("deployments"), "same version")
+	this.Equal([]recordDeploymentCurrentRow{{"v2", this.recordDeploymentContractIDOf("v2"), v2DeployedAt}}, this.recordDeploymentCurrentRows(), "same version")
+
+	status, body := this.post("/api/deployments", apiV1DeploymentBody)
+	this.Require().Equal(http.StatusOK, status)
+	this.JSONEq(`{"message":"deployment rolled back"}`, body)
+	_, rollbackDeployedAt := this.recordDeploymentLatestRow()
+	this.Equal([]recordDeploymentCurrentRow{{"v1", this.recordDeploymentContractIDOf("v1"), rollbackDeployedAt}}, this.recordDeploymentCurrentRows(), "rollback")
+}
+
 func (this *IntegrationSuite) TestRecordDeployment_RollbackScopedPerEnvironment() {
 	this.seedApiParticipantContractAndProductionEnv()
 

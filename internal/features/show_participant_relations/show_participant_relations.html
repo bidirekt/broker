@@ -1,0 +1,63 @@
+{{define "title"}}{{.Page.Header.Participant.Name}} · Relations{{end}}
+
+{{define "content"}}
+{{with .Page}}
+{{$name := .Header.Participant.Name}}
+<nav class="crumbs" aria-label="Breadcrumbs"><a href="/participants">participants</a><span aria-hidden="true">/</span><span aria-current="page">{{$name}}</span></nav>
+<div class="head">
+  <div>
+    <h1 class="mono">{{$name}}</h1>
+    {{if .Header.LatestVersion.Valid}}
+    <div class="sub badges">
+      <span>Latest {{if .LatestURL}}<a class="ver" href="{{.LatestURL}}">{{.Header.LatestVersion.String}}</a>{{else}}<span class="ver">{{.Header.LatestVersion.String}}</span>{{end}}</span>
+      <span aria-hidden="true">·</span>
+      {{range .Header.Deployed}}<a class="badge env" href="/environments/{{.Environment.ID}}">{{.Environment.Name}} <span class="v">{{.Version}}</span></a>{{else}}<span class="badge quiet">not deployed</span>{{end}}
+    </div>
+    {{else}}
+    <p class="sub">never published</p>
+    {{end}}
+  </div>
+</div>
+<nav class="tabs" aria-label="Participant">
+  <a href="{{.ParticipantURL}}">Versions <span class="count">{{.Header.VersionCount}}</span></a>
+  <a href="{{.ParticipantURL}}/deployments">Deployments <span class="count">{{.Header.DeploymentCount}}</span></a>
+  <a href="{{.ParticipantURL}}/checks">Checks <span class="count">{{.Header.CheckCount}}</span></a>
+  <a href="{{.ParticipantURL}}/relations" aria-current="page">Relations <span class="count">{{.RelationsCount}}</span></a>
+</nav>
+<div class="grid2">
+  <section class="sheet">
+    <div class="sheet-head"><h2 class="h2">Consumes <span class="muted">· its providers</span></h2>{{if .Header.LatestVersion.Valid}}<span class="muted">from the latest version, {{.Header.LatestVersion.String}}</span>{{end}}</div>
+    {{if .Consumes}}
+    <ul class="list">
+      {{range .Consumes}}
+      <li>{{if .Registered}}<a class="name" href="{{.URL}}">{{.Name}}</a>{{else}}<span class="name">{{.Name}}</span>{{end}}<span class="badges">{{if not .Registered}}<span class="badge quiet">not a participant</span>{{else if not .Published}}<span class="badge quiet">never published</span>{{else}}{{range .Deployed}}<a class="badge env" href="/environments/{{.Environment.ID}}">{{.Environment.Name}} <span class="v">{{.Version}}</span></a>{{else}}<span class="badge quiet">not deployed</span>{{end}}{{end}}</span></li>
+      {{end}}
+    </ul>
+    {{else if .Header.LatestVersion.Valid}}
+    <p class="pad muted"><span class="name">{{$name}}</span> consumes nothing in its latest version.</p>
+    {{else}}
+    <div class="empty">
+      <p><span class="name">{{$name}}</span> has never published a contract, so it consumes nothing yet.</p>
+      <code class="cmd">bidirekt publish</code>
+    </div>
+    {{end}}
+  </section>
+  <section class="sheet">
+    <div class="sheet-head"><h2 class="h2">Consumed by <span class="muted">· its consumers, where deployed</span></h2></div>
+    {{if .ConsumedBy}}
+    {{range .ConsumedBy}}
+    <p class="pad"><a class="badge env" href="/environments/{{.EnvironmentID}}">{{.EnvironmentName}}</a></p>
+    <ul class="list">
+      {{range .Consumers}}
+      <li><a class="name" href="{{.URL}}">{{.Name}}</a><span class="ver">{{.Version}}</span></li>
+      {{end}}
+    </ul>
+    {{end}}
+    {{else}}
+    <p class="pad muted">No deployed participant consumes <span class="name">{{$name}}</span>, so its checks compare only with providers.</p>
+    {{end}}
+  </section>
+</div>
+<p class="muted">A can-i-deploy compares the version with the deployed counterparts that share an endpoint with it. A consumer counts only when it is deployed; a provider it consumes from that is not deployed is a break.</p>
+{{end}}
+{{end}}

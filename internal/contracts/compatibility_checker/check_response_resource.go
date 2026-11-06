@@ -7,9 +7,9 @@ import (
 
 var responseRules = readingRules{
 	readerIsConsumer: true,
-	missing:          ReasonPropertyMissingInProvider,
-	optional:         ReasonPropertyOptionalInProviderRequiredInConsumer,
-	nullable:         ReasonPropertyNullableInProviderNotNullableInConsumer,
+	missing:          model.ReasonPropertyMissingInProvider,
+	optional:         model.ReasonPropertyOptionalInProviderRequiredInConsumer,
+	nullable:         model.ReasonPropertyNullableInProviderNotNullableInConsumer,
 }
 
 func checkResponseResource(

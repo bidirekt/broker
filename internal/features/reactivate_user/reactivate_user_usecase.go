@@ -22,6 +22,7 @@ type ReactivateUserInput struct {
 
 type ReactivateUserOutput struct {
 	Status ReactivateUserStatus
+	User   *model.User
 }
 
 type ReactivateUserUseCase struct {
@@ -43,8 +44,8 @@ func (this *ReactivateUserUseCase) Execute(ctx context.Context, input Reactivate
 	}
 
 	if !this.userRepository.Reactivate(ctx, input.UserID) {
-		return ReactivateUserOutput{Status: UserAlreadyActive}
+		return ReactivateUserOutput{Status: UserAlreadyActive, User: user}
 	}
 
-	return ReactivateUserOutput{Status: UserReactivated}
+	return ReactivateUserOutput{Status: UserReactivated, User: user}
 }

@@ -1,17 +1,24 @@
 {{define "title"}}Sign in{{end}}
 
 {{define "content"}}
-<section class="narrow">
-<h1>Sign in</h1>
-{{with .Page.Message}}<p role="alert">{{.}}</p>{{end}}
-<div class="panel">
-<form method="post" action="/sign-in">
-  <label for="email">Email</label>
-  <input id="email" name="email" type="text" inputmode="email" autocomplete="username" value="{{.Page.Email}}" required autofocus>
-  <label for="password">Password</label>
-  <input id="password" name="password" type="password" autocomplete="current-password" required>
-  <button type="submit">Sign in</button>
-</form>
+<div class="auth-brand">
+  {{template "mark"}}
+  <h1>Sign in to Bidirekt</h1>
+  <p>Contract checks for every service in your company.</p>
 </div>
-</section>
+<form class="sheet formcard" method="post" action="/sign-in">
+  <div class="form">
+    {{with .Page.Message}}<div class="alert" role="alert">{{template "icon_error" 16}}<span>{{.}}</span></div>{{end}}
+    <div class="field">
+      <label for="email">Email</label>
+      <input class="input" id="email" name="email" type="text" inputmode="email" autocomplete="username" value="{{.Page.Email}}" required autofocus>
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input class="input" id="password" name="password" type="password" autocomplete="current-password" required>
+    </div>
+    <button type="submit" class="btn primary block">Sign in</button>
+  </div>
+</form>
+<p class="auth-foot">Forgot your password? Ask your broker's admin for a reset link.</p>
 {{end}}
