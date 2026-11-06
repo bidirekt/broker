@@ -37,13 +37,13 @@ func newListEnvironmentPagesPage(output ListEnvironmentPagesOutput, pager pages.
 	page := ListEnvironmentPagesPage{Environments: make([]EnvironmentRow, 0, len(output.Environments)), Pager: pager}
 	for _, environment := range output.Environments {
 		row := EnvironmentRow{ID: environment.ID, Name: environment.Name, DeployedParticipantCount: environment.DeployedParticipantCount}
-		if environment.LastDeployedAt.Valid {
+		if last := environment.LastDeployment; last != nil {
 			row.LastDeployment = &LastDeploymentRow{
-				Participant:    environment.LastDeploymentParticipant.String,
-				ParticipantURL: participantURL(environment.LastDeploymentParticipant.String),
-				Version:        environment.LastDeploymentVersion.String,
-				VersionURL:     versionURL(environment.LastDeploymentParticipant.String, environment.LastDeploymentVersion.String),
-				DeployedAt:     environment.LastDeployedAt.Time,
+				Participant:    last.Participant.Name,
+				ParticipantURL: participantURL(last.Participant.Name),
+				Version:        last.Version,
+				VersionURL:     versionURL(last.Participant.Name, last.Version),
+				DeployedAt:     last.DeployedAt,
 			}
 		}
 		page.Environments = append(page.Environments, row)
