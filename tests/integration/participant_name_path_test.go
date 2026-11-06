@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"strconv"
 )
 
 const participantNamePathNotFound = "<h1>Not Found</h1>"
@@ -31,13 +30,10 @@ func (this *IntegrationSuite) sendRawParticipantNamePathRequest(request string) 
 
 func (this *IntegrationSuite) TestParticipantNamePath_AnInvalidUTF8ByteInTheNameIsNotFoundOnEveryRoute() {
 	sessionCookie := this.signInAsUser(suiteWriterEmail, suiteWriterPassword)
-	_, _, participantsPage := this.getPage("/participants", sessionCookie)
-	csrfToken := this.csrfTokenFrom(participantsPage)
 
 	signedIn := "Host: localhost:8080\r\n" +
 		"Accept: text/html\r\n" +
 		"Cookie: " + suiteSessionCookieName + "=" + sessionCookie + "\r\n"
-	form := url.Values{"name": {"spirit"}}.Encode()
 
 	routes := []struct {
 		name    string
@@ -48,13 +44,6 @@ func (this *IntegrationSuite) TestParticipantNamePath_AnInvalidUTF8ByteInTheName
 		{"checks", "GET /participants/pets\xff/checks HTTP/1.1\r\n" + signedIn + "\r\n"},
 		{"relations", "GET /participants/pets\xff/relations HTTP/1.1\r\n" + signedIn + "\r\n"},
 		{"version", "GET /participants/pets\xff/versions/1.0.0 HTTP/1.1\r\n" + signedIn + "\r\n"},
-		{"rename form", "GET /participants/pets\xff/rename HTTP/1.1\r\n" + signedIn + "\r\n"},
-		{"rename", "POST /participants/pets\xff/rename HTTP/1.1\r\n" + signedIn +
-			"Origin: " + suitePublicURL + "\r\n" +
-			"X-CSRF-Token: " + csrfToken + "\r\n" +
-			"Content-Type: application/x-www-form-urlencoded\r\n" +
-			"Content-Length: " + strconv.Itoa(len(form)) + "\r\n" +
-			"\r\n" + form},
 	}
 
 	for _, route := range routes {
@@ -66,4 +55,23 @@ func (this *IntegrationSuite) TestParticipantNamePath_AnInvalidUTF8ByteInTheName
 			this.Contains(body, participantNamePathNotFound)
 		})
 	}
+}
+
+func (this *IntegrationSuite) TestParticipantNamePath_TheRenameRouteIsNotFound() {
+	status, response := this.post("/api/participants", `{"participant":"pets"}`)
+	this.Require().Equal(http.StatusOK, status, response)
+	sessionCookie := this.signInAsUser(suiteWriterEmail, suiteWriterPassword)
+
+	status, header, body := this.getPage("/participants/pets/rename", sessionCookie)
+
+	this.Equal(http.StatusNotFound, status)
+	this.Equal("text/html; charset=utf-8", header.Get("Content-Type"))
+	this.Contains(body, participantNamePathNotFound)
+
+	_, _, participantsPage := this.getPage("/participants", sessionCookie)
+	status, header, body = this.postForm("/participants/pets/rename", sessionCookie, this.csrfTokenFrom(participantsPage), url.Values{"name": {"spirit"}})
+
+	this.Equal(http.StatusNotFound, status)
+	this.Equal("text/html; charset=utf-8", header.Get("Content-Type"))
+	this.Contains(body, participantNamePathNotFound)
 }

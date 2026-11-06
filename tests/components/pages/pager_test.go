@@ -208,3 +208,18 @@ func TestReturnPageRejectsANonCanonicalValue(t *testing.T) {
 		assert.False(t, ok, "POST %q", raw)
 	}
 }
+
+func TestReturnPageRefusesAPageWhoseOffsetWouldOverflow(t *testing.T) {
+	largest := int64(math.MaxInt64 / pages.PageSize)
+
+	page, ok := returnPageFor(t, fiber.MethodGet, "/users/1/edit?page="+strconv.FormatInt(largest, 10), "")
+	require.True(t, ok)
+	assert.Equal(t, largest, page)
+	assert.Positive(t, pages.Offset(page))
+
+	_, ok = returnPageFor(t, fiber.MethodGet, "/users/1/edit?page="+strconv.FormatInt(largest+1, 10), "")
+	assert.False(t, ok, "GET")
+
+	_, ok = returnPageFor(t, fiber.MethodPost, "/users/1/edit", "page="+strconv.FormatInt(largest+1, 10))
+	assert.False(t, ok, "POST")
+}

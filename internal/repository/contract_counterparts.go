@@ -20,6 +20,8 @@ func (this *ContractRepository) LoadCounterparts(
 	}
 
 	providersQueried := make(map[string]bool)
+	providerNamesQueried := make(map[string]bool)
+	registeredProviders := make(map[string]model.RegisteredProvider)
 	catalogs := schemaCatalogs{}
 
 	for _, resource := range contract.Resources {
@@ -37,7 +39,15 @@ func (this *ContractRepository) LoadCounterparts(
 				continue
 			}
 
-			if registered, isParticipant := this.loadRegisteredProvider(ctx, resource.ConsumedProvider.String, environmentID); isParticipant {
+			if !providerNamesQueried[resource.ConsumedProvider.String] {
+				providerNamesQueried[resource.ConsumedProvider.String] = true
+
+				if registered, isParticipant := this.loadRegisteredProvider(ctx, resource.ConsumedProvider.String, environmentID); isParticipant {
+					registeredProviders[resource.ConsumedProvider.String] = registered
+				}
+			}
+
+			if registered, isParticipant := registeredProviders[resource.ConsumedProvider.String]; isParticipant {
 				counterparts.UnmatchedProviders[resource.ProviderHash] = registered
 			}
 

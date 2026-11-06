@@ -3,6 +3,7 @@ package integration_test
 import (
 	"context"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -100,6 +101,8 @@ const showEnvironmentReviewsContract = `provides:
         responses:
           200: ~
 `
+
+var showEnvironmentParticipantName = regexp.MustCompile(`<td data-l="Participant"><a class="name" href="/participants/[a-z0-9_]+">([a-z0-9_]+)</a></td>`)
 
 func (this *IntegrationSuite) mustPostForShowEnvironment(path, body string) {
 	status, response := this.post(path, body)
@@ -232,6 +235,25 @@ func (this *IntegrationSuite) TestShowEnvironment_VersionLinksArePathEscapedAndD
 	this.NotContains(body, `/participants/petstore_web/versions/`)
 }
 
+func (this *IntegrationSuite) TestShowEnvironment_DeployedNowSortedByteWise() {
+	participants := []string{"ordersapi", "orders_web", "orders2"}
+	this.createForShowEnvironment([]string{"production"}, participants)
+	for _, participant := range participants {
+		this.publishForShowEnvironment(participant, "1.0.0", showEnvironmentReviewsContract)
+		this.deployForShowEnvironment(participant, "1.0.0", "production")
+	}
+
+	_, _, body := this.getPage(this.environmentPathForShowEnvironment("production"), this.signInAsAdmin())
+
+	_, deployedNow, _ := strings.Cut(body, `<h2 class="h2">Deployed now</h2>`)
+	deployedNow, _, _ = strings.Cut(deployedNow, `<h2 class="h2">History</h2>`)
+	var names []string
+	for _, match := range showEnvironmentParticipantName.FindAllStringSubmatch(deployedNow, -1) {
+		names = append(names, match[1])
+	}
+	this.Equal([]string{"orders2", "orders_web", "ordersapi"}, names)
+}
+
 func (this *IntegrationSuite) TestShowEnvironment_JustCreatedSaysNothingDeployedYetAndHasNoChecks() {
 	this.createForShowEnvironment([]string{"qa"}, nil)
 	path := this.environmentPathForShowEnvironment("qa")
@@ -263,6 +285,25 @@ func (this *IntegrationSuite) TestShowEnvironment_ChecksWithNothingDeployedShowT
 	this.Contains(body, `<p class="sub">Nothing deployed yet</p>`)
 	this.Contains(body, `<span class="muted">nothing deployed shares an endpoint</span>`)
 	this.NotContains(body, `No checks yet`)
+}
+
+func (this *IntegrationSuite) TestShowEnvironment_CheckWithoutAStoredReportShowsNoCountsOrRoles() {
+	this.productionForShowEnvironment()
+	_, err := this.Pool.Exec(context.Background(), `UPDATE compatibility_checks SET report = NULL, environment_name = NULL`)
+	this.Require().NoError(err)
+	_, err = this.Pool.Exec(context.Background(), `UPDATE compatibility_check_results SET role = NULL`)
+	this.Require().NoError(err)
+
+	status, _, body := this.getPage(this.environmentPathForShowEnvironment("production"), this.signInAsAdmin())
+
+	this.Require().Equal(http.StatusOK, status, body)
+	this.Contains(body, `<span class="badge no">`)
+	this.Contains(body, `no</span>`)
+	this.NotContains(body, ` break`)
+	this.NotContains(body, `class="role"`)
+	this.NotContains(body, `nothing deployed shares an endpoint`)
+	this.Contains(body, `<a class="badge cpb" href="/participants/petstore_api">petstore_api <span class="v">1.4.0</span></a>`)
+	this.Contains(body, `<span class="badge cpb quiet">ghost <span class="v">no version</span></span>`)
 }
 
 func (this *IntegrationSuite) TestShowEnvironment_PaginatesHistoryAndChecksIndependently() {

@@ -22,7 +22,7 @@
     <tbody>
       {{range .Page.Participants}}
       <tr>
-        <td data-l="Participant"><a class="name" href="/participants/{{.Name}}">{{.Name}}</a></td>
+        <td data-l="Participant"><a class="name" href="{{.URL}}">{{.Name}}</a></td>
         {{if .LatestVersion.Valid}}
         <td data-l="Latest version"><span class="ver">{{.LatestVersion.String}}</span></td>
         <td data-l="Published">{{listTime .PublishedAt.Time}}</td>

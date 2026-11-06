@@ -19,7 +19,7 @@ const (
 	editUserErrorStatus       = `<div class="code-n">404</div>`
 	editUserNotFoundPage      = "<h1>Not Found</h1>"
 	editUserReadDescription   = "Sees every data screen and their own profile; runs can-i-deploy and validate."
-	editUserWriteDescription  = "Everything read does, plus publishing contracts, recording deployments, and creating and renaming participants and environments."
+	editUserWriteDescription  = "Everything read does, plus publishing contracts, recording deployments, and creating participants and environments, and renaming environments."
 )
 
 func (this *IntegrationSuite) editUserPost(userID, email, permission string) (status int, header http.Header, body string) {

@@ -26,10 +26,11 @@ type EnvironmentRow struct {
 }
 
 type LastDeploymentRow struct {
-	Participant string
-	Version     string
-	VersionURL  string
-	DeployedAt  time.Time
+	Participant    string
+	ParticipantURL string
+	Version        string
+	VersionURL     string
+	DeployedAt     time.Time
 }
 
 func newListEnvironmentPagesPage(output ListEnvironmentPagesOutput, pager pages.Pager) ListEnvironmentPagesPage {
@@ -38,10 +39,11 @@ func newListEnvironmentPagesPage(output ListEnvironmentPagesOutput, pager pages.
 		row := EnvironmentRow{ID: environment.ID, Name: environment.Name, DeployedParticipantCount: environment.DeployedParticipantCount}
 		if environment.LastDeployedAt.Valid {
 			row.LastDeployment = &LastDeploymentRow{
-				Participant: environment.LastDeploymentParticipant.String,
-				Version:     environment.LastDeploymentVersion.String,
-				VersionURL:  versionURL(environment.LastDeploymentParticipant.String, environment.LastDeploymentVersion.String),
-				DeployedAt:  environment.LastDeployedAt.Time,
+				Participant:    environment.LastDeploymentParticipant.String,
+				ParticipantURL: participantURL(environment.LastDeploymentParticipant.String),
+				Version:        environment.LastDeploymentVersion.String,
+				VersionURL:     versionURL(environment.LastDeploymentParticipant.String, environment.LastDeploymentVersion.String),
+				DeployedAt:     environment.LastDeployedAt.Time,
 			}
 		}
 		page.Environments = append(page.Environments, row)
@@ -50,10 +52,14 @@ func newListEnvironmentPagesPage(output ListEnvironmentPagesOutput, pager pages.
 	return page
 }
 
+func participantURL(participantName string) string {
+	return "/participants/" + url.PathEscape(participantName)
+}
+
 func versionURL(participantName, version string) string {
 	if version == "" || version == "." || version == ".." {
 		return ""
 	}
 
-	return "/participants/" + participantName + "/versions/" + url.PathEscape(version)
+	return participantURL(participantName) + "/versions/" + url.PathEscape(version)
 }

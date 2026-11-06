@@ -153,7 +153,7 @@ func (this *IntegrationSuite) TestListParticipantDeployments_ShowsTheHeaderAndTh
 	this.Equal("text/html; charset=utf-8", header.Get("Content-Type"))
 	this.Equal("no-store", header.Get("Cache-Control"))
 
-	this.Contains(body, `<h1 class="name">petstore_api</h1>`)
+	this.Contains(body, `<h1 class="mono">petstore_api</h1>`)
 	this.Contains(body, `Latest <a class="ver" href="/participants/petstore_api/versions/1.4.0">1.4.0</a>`)
 	this.Regexp(`(?s)<a class="badge env" href="/environments/`+productionID+`">production <span class="v">1.3.0</span></a>.*<a class="badge env" href="/environments/`+stagingID+`">staging <span class="v">1.4.0</span></a>`, body)
 
@@ -309,5 +309,18 @@ func (this *IntegrationSuite) TestListParticipantDeployments_ReadUserSeesTheHist
 	this.Equal(http.StatusOK, status)
 	this.Contains(body, "showing 1–4 of 4")
 	this.NotContains(body, `method="post" action="/participants`)
-	this.NotContains(body, "Rename")
+}
+
+func (this *IntegrationSuite) TestListParticipantDeployments_LinksArePathEscaped() {
+	this.createForParticipantDeployments([]string{"production"}, []string{"orders_web"})
+	this.publishForParticipantDeployments("orders_web", "1.0.0+build", participantDeploymentsAPIv1Contract)
+	this.deployForParticipantDeployments("orders_web", "1.0.0+build", "production")
+	productionID := this.environmentIDForParticipantDeployments("production")
+
+	status, _, body := this.getPage("/participants/orders_web/deployments", this.signInAsAdmin())
+
+	this.Require().Equal(http.StatusOK, status, body)
+	this.Contains(body, `<a class="chip" href="/participants/orders_web/deployments" aria-current="page">All</a>`)
+	this.Contains(body, `<a class="chip" href="/participants/orders_web/deployments?environment=`+productionID+`">production</a>`)
+	this.Contains(body, `<td data-l="Version"><div class="badges"><a class="ver" href="/participants/orders_web/versions/1.0.0&#43;build">1.0.0&#43;build</a></div></td>`)
 }

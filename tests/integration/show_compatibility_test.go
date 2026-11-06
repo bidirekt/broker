@@ -3,6 +3,7 @@ package integration_test
 import (
 	"context"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -52,6 +53,8 @@ const showCompatibilityReviewsContract = `provides:
         responses:
           200: ~
 `
+
+var showCompatibilityColumnName = regexp.MustCompile(`<th scope="col"><a class="badge env" href="/environments/[0-9]+">([a-z0-9_]+)</a></th>`)
 
 func (this *IntegrationSuite) mustPostForShowCompatibility(path, body string) {
 	status, response := this.post(path, body)
@@ -291,6 +294,19 @@ func (this *IntegrationSuite) TestShowCompatibility_MoreThanTwoEnvironmentsStack
 
 	this.Contains(body, `<div class="scroll"><table class="rt stacked">`)
 	this.Equal(3, strings.Count(body, `<td class="rc none"`))
+}
+
+func (this *IntegrationSuite) TestShowCompatibility_EnvironmentColumnsSortedByteWise() {
+	this.createForShowCompatibility([]string{"stagingeu", "staging_us", "staging2"}, []string{"petstore_api"})
+	this.publishForShowCompatibility("petstore_api", "1.4.0", showCompatibilityAPIContract)
+
+	_, _, body := this.getPage("/compatibility", this.signInAsAdmin())
+
+	var names []string
+	for _, match := range showCompatibilityColumnName.FindAllStringSubmatch(body, -1) {
+		names = append(names, match[1])
+	}
+	this.Equal([]string{"staging2", "staging_us", "stagingeu"}, names)
 }
 
 func (this *IntegrationSuite) TestShowCompatibility_PaginatesTheVersions() {

@@ -38,5 +38,5 @@ func (this *ListParticipantPagesUiHandler) Handle(ctx fiber.Ctx) error {
 		return respond.NotFound(ctx)
 	}
 
-	return pages.Render(ctx, fiber.StatusOK, pageFiles, listParticipantPagesTemplate, ListParticipantPagesPage{Participants: output.Participants, Pager: pager})
+	return pages.Render(ctx, fiber.StatusOK, pageFiles, listParticipantPagesTemplate, newListParticipantPagesPage(output.Participants, pager))
 }

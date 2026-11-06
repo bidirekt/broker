@@ -83,5 +83,8 @@ func layoutFor(ctx fiber.Ctx, page any) (layout string, data layoutData) {
 
 func sectionOf(path string) string {
 	section, _, _ := strings.Cut(strings.TrimPrefix(path, "/"), "/")
+	if section == "checks" {
+		return "participants"
+	}
 	return section
 }

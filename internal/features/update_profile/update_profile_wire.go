@@ -18,7 +18,7 @@ const (
 
 var permissionDescriptions = map[model.Permission]string{
 	model.PermissionRead:  "Sees every data screen and their own profile; runs can-i-deploy and validate.",
-	model.PermissionWrite: "Everything read does, plus publishing contracts, recording deployments, and creating and renaming participants and environments.",
+	model.PermissionWrite: "Everything read does, plus publishing contracts, recording deployments, and creating participants and environments, and renaming environments.",
 	model.PermissionAdmin: "Everything write can do, plus managing users. The only admin of this broker.",
 }
 

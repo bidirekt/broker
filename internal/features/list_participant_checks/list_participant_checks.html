@@ -6,20 +6,23 @@
 <nav class="crumbs" aria-label="Breadcrumbs"><a href="/participants">participants</a><span aria-hidden="true">/</span><span aria-current="page">{{$name}}</span></nav>
 <div class="head">
   <div>
-    <h1><span class="name">{{$name}}</span></h1>
-    <div class="badges">
-      <span>Latest {{if .Header.LatestVersion.Valid}}<span class="ver">{{.Header.LatestVersion.String}}</span>{{else}}<span class="muted">never published</span>{{end}}</span>
-      {{range .Header.Deployed}}<a class="badge env" href="/environments/{{.Environment.ID}}">{{.Environment.Name}} <span class="v">{{.Version}}</span></a>{{else}}{{if .Header.LatestVersion.Valid}}<span class="badge quiet">not deployed</span>{{end}}{{end}}
+    <h1 class="mono">{{$name}}</h1>
+    {{if .Header.LatestVersion.Valid}}
+    <div class="sub badges">
+      <span>Latest {{if .LatestURL}}<a class="ver" href="{{.LatestURL}}">{{.Header.LatestVersion.String}}</a>{{else}}<span class="ver">{{.Header.LatestVersion.String}}</span>{{end}}</span>
+      <span aria-hidden="true">·</span>
+      {{range .Header.Deployed}}<a class="badge env" href="/environments/{{.Environment.ID}}">{{.Environment.Name}} <span class="v">{{.Version}}</span></a>{{else}}<span class="badge quiet">not deployed</span>{{end}}
     </div>
+    {{else}}
+    <p class="sub">never published</p>
+    {{end}}
   </div>
-  {{if $.CanWrite}}<div class="acts">{{if .Header.LatestVersion.Valid}}<a class="btn" aria-disabled="true">Rename</a>{{else}}<a class="btn" href="/participants/{{$name}}/rename">Rename</a>{{end}}</div>{{end}}
 </div>
-{{if and $.CanWrite .Header.LatestVersion.Valid}}<p class="disabled-note">participant has published contracts, create a new participant and switch every consumer's consumes to it</p>{{end}}
 <nav class="tabs" aria-label="Participant">
-  <a href="/participants/{{$name}}">Versions <span class="count">{{.Header.Versions}}</span></a>
-  <a href="/participants/{{$name}}/deployments">Deployments <span class="count">{{.Header.Deployments}}</span></a>
-  <a href="/participants/{{$name}}/checks" aria-current="page">Checks <span class="count">{{.Header.Checks}}</span></a>
-  <a href="/participants/{{$name}}/relations">Relations <span class="count">{{.Header.Relations}}</span></a>
+  <a href="{{.ParticipantURL}}">Versions <span class="count">{{.Header.Versions}}</span></a>
+  <a href="{{.ParticipantURL}}/deployments">Deployments <span class="count">{{.Header.Deployments}}</span></a>
+  <a href="{{.ParticipantURL}}/checks" aria-current="page">Checks <span class="count">{{.Header.Checks}}</span></a>
+  <a href="{{.ParticipantURL}}/relations">Relations <span class="count">{{.Header.Relations}}</span></a>
 </nav>
 <section class="sheet">
   {{if .Checks}}

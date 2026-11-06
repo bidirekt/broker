@@ -743,3 +743,70 @@ func (this *IntegrationSuite) TestContractRepository_CounterpartReads_CarryTheCa
 	this.Require().Len(counterparts.Consumers[consumer.ProviderHash], 1)
 	this.Equal(consumers[0].Schemas, counterparts.Consumers[consumer.ProviderHash][0].Schemas)
 }
+
+const missingEndpointsOrdersContract = `provides:
+  rest:
+    /orders:
+      get:
+        responses:
+          204: ~
+`
+
+const missingEndpointsFrontContract = `consumes:
+  orders:
+    rest:
+      /owners:
+        get:
+          responses:
+            200: ~
+      /pets:
+        get:
+          responses:
+            200: ~
+  ghost:
+    rest:
+      /owners:
+        get:
+          responses:
+            200: ~
+      /pets:
+        get:
+          responses:
+            200: ~
+`
+
+func (this *IntegrationSuite) TestContractRepository_MissingProviderEndpoints_EachCarryTheParticipantRegisteredUnderItsName() {
+	ctx := context.Background()
+	repo := repository.NewContractRepository(this.Pool)
+	mustPost := func(path, body string) {
+		status, response := this.post(path, body)
+		this.Require().Equalf(http.StatusOK, status, "POST %s: %s", path, response)
+	}
+
+	mustPost("/api/environments", `{"environment":"production"}`)
+	mustPost("/api/participants", `{"participant":"orders"}`)
+	mustPost("/api/participants", `{"participant":"front"}`)
+	mustPost("/api/contracts", this.publishBody("orders", "1", contractFragment{"api.yaml", missingEndpointsOrdersContract}))
+	mustPost("/api/deployments", `{"participant":"orders","version":"1","environment":"production"}`)
+	mustPost("/api/contracts", this.publishBody("front", "1", contractFragment{"web.yaml", missingEndpointsFrontContract}))
+
+	var environmentID, ordersID int64
+	this.Require().NoError(this.Pool.QueryRow(ctx, `SELECT id FROM environments WHERE name = 'production'`).Scan(&environmentID))
+	this.Require().NoError(this.Pool.QueryRow(ctx, `SELECT id FROM participants WHERE name = 'orders'`).Scan(&ordersID))
+
+	front, found := repo.GetContractByNameAndVersion(ctx, "front", "1")
+	this.Require().True(found)
+	this.Require().Len(front.Resources, 4)
+	providerHashes := make(map[string]string)
+	for _, resource := range front.Resources {
+		providerHashes[resource.ConsumedProvider.String+" "+resource.Endpoint] = resource.ProviderHash
+	}
+
+	counterparts := repo.LoadCounterparts(ctx, front, environmentID)
+
+	orders := model.RegisteredProvider{ParticipantID: ordersID, DeployedVersion: null.StringFrom("1")}
+	this.Equal(map[string]model.RegisteredProvider{
+		providerHashes["orders /owners"]: orders,
+		providerHashes["orders /pets"]:   orders,
+	}, counterparts.UnmatchedProviders)
+}

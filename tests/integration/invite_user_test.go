@@ -17,7 +17,7 @@ const (
 	inviteUserPermissionInvalid = "invalid permission"
 	inviteUserEmailInUse        = "email already in use"
 	inviteUserReadDescription   = "Sees every data screen and their own profile; runs can-i-deploy and validate."
-	inviteUserWriteDescription  = "Everything read does, plus publishing contracts, recording deployments, and creating and renaming participants and environments."
+	inviteUserWriteDescription  = "Everything read does, plus publishing contracts, recording deployments, and creating participants and environments, and renaming environments."
 	inviteUserEmailError        = `aria-invalid="true" aria-describedby="email-err">`
 	inviteUserPermissionError   = `role="radiogroup" aria-labelledby="permission-label" aria-invalid="true" aria-describedby="permission-err">`
 )

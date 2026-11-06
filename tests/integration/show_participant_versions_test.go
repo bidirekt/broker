@@ -124,7 +124,7 @@ func (this *IntegrationSuite) TestShowParticipantVersions_ShowsTheHeaderWithLate
 	this.Equal("no-store", header.Get("Cache-Control"))
 	this.Contains(body, `<nav class="crumbs" aria-label="Breadcrumbs"><a href="/participants">participants</a><span aria-hidden="true">/</span><span aria-current="page">petstore_web</span></nav>`)
 	this.Contains(body, `<h1 class="mono">petstore_web</h1>`)
-	this.Contains(body, `<span>Latest <span class="ver">2.3.0</span></span><a class="badge env" href="`+production+`">production <span class="v">2.2.0</span></a><a class="badge env" href="`+staging+`">staging <span class="v">2.3.0</span></a>`)
+	this.Contains(body, `<span>Latest <a class="ver" href="/participants/petstore_web/versions/2.3.0">2.3.0</a></span>`+"\n      "+`<span aria-hidden="true">·</span>`+"\n      "+`<a class="badge env" href="`+production+`">production <span class="v">2.2.0</span></a><a class="badge env" href="`+staging+`">staging <span class="v">2.3.0</span></a>`)
 	this.Contains(body, `<a href="/participants/petstore_web" aria-current="page">Versions <span class="count">3</span></a>`)
 	this.Contains(body, `<a href="/participants/petstore_web/deployments">Deployments <span class="count">3</span></a>`)
 	this.Contains(body, `<a href="/participants/petstore_web/checks">Checks <span class="count">1</span></a>`)
@@ -186,7 +186,7 @@ func (this *IntegrationSuite) TestShowParticipantVersions_VersionLinksArePathEsc
 	this.Contains(body, `<a class="ver" href="/participants/petstore_api/versions/1.0%2Fbeta%20rc">1.0/beta rc</a>`)
 	this.Contains(body, `<td data-l="Version"><span class="ver">..</span></td>`)
 	this.Contains(body, `<td data-l="Version"><span class="ver">.</span></td>`)
-	this.Equal(1, strings.Count(body, `/participants/petstore_api/versions/`))
+	this.Equal(2, strings.Count(body, `/participants/petstore_api/versions/`))
 }
 
 func (this *IntegrationSuite) TestShowParticipantVersions_PublishedButNotDeployedSaysNotDeployed() {
@@ -195,7 +195,7 @@ func (this *IntegrationSuite) TestShowParticipantVersions_PublishedButNotDeploye
 
 	_, _, body := this.getPage("/participants/petstore_api", this.signInAsAdmin())
 
-	this.Contains(body, `<span>Latest <span class="ver">1.0.0</span></span><span class="badge quiet">not deployed</span>`)
+	this.Contains(body, `<span>Latest <a class="ver" href="/participants/petstore_api/versions/1.0.0">1.0.0</a></span>`+"\n      "+`<span aria-hidden="true">·</span>`+"\n      "+`<span class="badge quiet">not deployed</span>`)
 }
 
 func (this *IntegrationSuite) TestShowParticipantVersions_NeverPublishedShowsTheEmptyStateWithBidirektPublish() {
@@ -266,7 +266,6 @@ func (this *IntegrationSuite) TestShowParticipantVersions_ReadUserSeesThePageWit
 	this.Require().Equal(http.StatusOK, status, body)
 	this.Contains(body, `<h1 class="mono">petstore_web</h1>`)
 	this.NotContains(body, `action="/participants`)
-	this.NotContains(body, `/rename`)
 }
 
 func (this *IntegrationSuite) TestShowParticipantVersions_SignedOutIsRedirectedToSignIn() {

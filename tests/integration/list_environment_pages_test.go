@@ -190,3 +190,14 @@ func (this *IntegrationSuite) TestListEnvironmentPages_DeploymentsAreIndexedByEn
 	this.Require().NoError(err)
 	this.Equal(1, count)
 }
+
+func (this *IntegrationSuite) TestListEnvironmentPages_LastDeploymentLinksArePathEscaped() {
+	this.createEnvironmentsForListEnvironmentPages("production")
+	this.publishForListEnvironmentPages("orders_web", "1.0.0+build")
+	this.deployForListEnvironmentPages("orders_web", "1.0.0+build", "production")
+
+	status, _, body := this.getPage("/environments", this.signInAsAdmin())
+
+	this.Require().Equal(http.StatusOK, status, body)
+	this.Contains(body, `<a class="name" href="/participants/orders_web">orders_web</a> <a class="ver" href="/participants/orders_web/versions/1.0.0&#43;build">1.0.0&#43;build</a>`)
+}

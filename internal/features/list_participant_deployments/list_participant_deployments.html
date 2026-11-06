@@ -6,7 +6,7 @@
 <nav class="crumbs" aria-label="Breadcrumbs"><a href="/participants">participants</a><span aria-hidden="true">/</span><span aria-current="page">{{$name}}</span></nav>
 <div class="head">
   <div>
-    <h1 class="name">{{$name}}</h1>
+    <h1 class="mono">{{$name}}</h1>
     {{if .Header.LatestVersion.Valid}}
     <div class="sub badges">
       <span>Latest {{if .LatestURL}}<a class="ver" href="{{.LatestURL}}">{{.Header.LatestVersion.String}}</a>{{else}}<span class="ver">{{.Header.LatestVersion.String}}</span>{{end}}</span>
@@ -17,14 +17,12 @@
     <p class="sub">never published</p>
     {{end}}
   </div>
-  {{if $.CanWrite}}<div class="acts">{{if .Header.LatestVersion.Valid}}<a class="btn" aria-disabled="true">Rename</a>{{else}}<a class="btn" href="/participants/{{$name}}/rename">Rename</a>{{end}}</div>{{end}}
 </div>
-{{if and $.CanWrite .Header.LatestVersion.Valid}}<p class="disabled-note">participant has published contracts, create a new participant and switch every consumer's consumes to it</p>{{end}}
 <nav class="tabs" aria-label="Participant">
-  <a href="/participants/{{$name}}">Versions <span class="count">{{.Header.VersionCount}}</span></a>
-  <a href="/participants/{{$name}}/deployments" aria-current="page">Deployments <span class="count">{{.Header.DeploymentCount}}</span></a>
-  <a href="/participants/{{$name}}/checks">Checks <span class="count">{{.Header.CheckCount}}</span></a>
-  <a href="/participants/{{$name}}/relations">Relations <span class="count">{{.Header.RelationCount}}</span></a>
+  <a href="{{.ParticipantURL}}">Versions <span class="count">{{.Header.VersionCount}}</span></a>
+  <a href="{{.ParticipantURL}}/deployments" aria-current="page">Deployments <span class="count">{{.Header.DeploymentCount}}</span></a>
+  <a href="{{.ParticipantURL}}/checks">Checks <span class="count">{{.Header.CheckCount}}</span></a>
+  <a href="{{.ParticipantURL}}/relations">Relations <span class="count">{{.Header.RelationCount}}</span></a>
 </nav>
 {{if eq .Header.VersionCount 0}}
 <section class="sheet">
@@ -38,8 +36,8 @@
 {{else}}
 {{if .Environments}}
 <nav class="chips" aria-label="Environments">
-  <a class="chip" href="/participants/{{$name}}/deployments"{{if not .Environment}} aria-current="page"{{end}}>All</a>
-  {{range .Environments}}<a class="chip" href="/participants/{{$name}}/deployments?environment={{.ID}}"{{if and $.Page.Environment (eq $.Page.Environment.ID .ID)}} aria-current="page"{{end}}>{{.Name}}</a>{{end}}
+  <a class="chip" href="{{.ParticipantURL}}/deployments"{{if not .Environment}} aria-current="page"{{end}}>All</a>
+  {{range .Environments}}<a class="chip" href="{{$.Page.ParticipantURL}}/deployments?environment={{.ID}}"{{if and $.Page.Environment (eq $.Page.Environment.ID .ID)}} aria-current="page"{{end}}>{{.Name}}</a>{{end}}
 </nav>
 {{end}}
 <section class="sheet">

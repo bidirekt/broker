@@ -25,7 +25,11 @@ func RequestedPage(ctx fiber.Ctx, param string) (page int64, ok bool) {
 		return 1, true
 	}
 
-	page, ok = ParsePositiveInteger(string(query.Peek(param)))
+	return parsePage(string(query.Peek(param)))
+}
+
+func parsePage(raw string) (page int64, ok bool) {
+	page, ok = ParsePositiveInteger(raw)
 
 	return page, ok && page <= math.MaxInt64/PageSize
 }
@@ -70,5 +74,5 @@ func ReturnPage(ctx fiber.Ctx, param string) (page int64, ok bool) {
 		return 0, true
 	}
 
-	return ParsePositiveInteger(string(args.Peek(param)))
+	return parsePage(string(args.Peek(param)))
 }

@@ -21,7 +21,7 @@
         <span class="lbl" id="permission-label">Permission</span>
         <div class="radios" role="radiogroup" aria-labelledby="permission-label"{{if eq .Page.Field "permission"}} aria-invalid="true" aria-describedby="permission-err"{{end}}>
           <label class="radio"><input type="radio" name="permission" value="read" required{{if eq .Page.Permission "read"}} checked{{end}}{{if eq .Page.Field "permission"}} autofocus{{end}}><span><span class="mono">read</span><small>Sees every data screen and their own profile; runs can-i-deploy and validate.</small></span></label>
-          <label class="radio"><input type="radio" name="permission" value="write" required{{if eq .Page.Permission "write"}} checked{{end}}><span><span class="mono">write</span><small>Everything read does, plus publishing contracts, recording deployments, and creating and renaming participants and environments.</small></span></label>
+          <label class="radio"><input type="radio" name="permission" value="write" required{{if eq .Page.Permission "write"}} checked{{end}}><span><span class="mono">write</span><small>Everything read does, plus publishing contracts, recording deployments, and creating participants and environments, and renaming environments.</small></span></label>
         </div>
         {{if eq .Page.Field "permission"}}<p class="err" id="permission-err">{{template "icon_error" 14}}<span>{{.Page.Message}}</span></p>{{end}}
         <p class="hint">Admin can't be granted: a broker has exactly one.</p>

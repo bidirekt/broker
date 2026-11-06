@@ -24,7 +24,7 @@
         <td data-l="Environment"><a class="name" href="/environments/{{.ID}}">{{.Name}}</a></td>
         <td data-l="Participants deployed">{{.DeployedParticipantCount}}</td>
         {{with .LastDeployment}}
-        <td data-l="Last deployment"><div class="v2"><span><a class="name" href="/participants/{{.Participant}}">{{.Participant}}</a> {{if .VersionURL}}<a class="ver" href="{{.VersionURL}}">{{.Version}}</a>{{else}}<span class="ver">{{.Version}}</span>{{end}}</span><span class="time">{{listTime .DeployedAt}}</span></div></td>
+        <td data-l="Last deployment"><div class="v2"><span><a class="name" href="{{.ParticipantURL}}">{{.Participant}}</a> {{if .VersionURL}}<a class="ver" href="{{.VersionURL}}">{{.Version}}</a>{{else}}<span class="ver">{{.Version}}</span>{{end}}</span><span class="time">{{listTime .DeployedAt}}</span></div></td>
         {{else}}
         <td data-l="Last deployment"><span class="muted">not deployed</span></td>
         {{end}}

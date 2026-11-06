@@ -24,7 +24,7 @@ const (
 	profileNotice               = `<div class="flash" role="status">`
 	profileAskTheAdmin          = "Forgot the current one? Ask your broker's admin for a reset link."
 	profileReadDescription      = "Sees every data screen and their own profile; runs can-i-deploy and validate."
-	profileWriteDescription     = "Everything read does, plus publishing contracts, recording deployments, and creating and renaming participants and environments."
+	profileWriteDescription     = "Everything read does, plus publishing contracts, recording deployments, and creating participants and environments, and renaming environments."
 	profileAdminDescription     = "Everything write can do, plus managing users. The only admin of this broker."
 )
 

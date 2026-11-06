@@ -3,6 +3,7 @@ package integration_test
 import (
 	"context"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -39,6 +40,8 @@ const showOverviewGhostConsumerContract = `consumes:
           responses:
             200: ~
 `
+
+var showOverviewColumnName = regexp.MustCompile(`<th scope="col"><a class="badge env" href="/environments/[0-9]+">([a-z0-9_]+)</a></th>`)
 
 func (this *IntegrationSuite) mustPostForShowOverview(path, body string) {
 	status, response := this.post(path, body)
@@ -215,6 +218,20 @@ func (this *IntegrationSuite) TestShowOverview_PanelsShowTenRowsAndLinkTheRest()
 	activity := this.sectionOfShowOverview(body, "Recent activity", "")
 	this.Equal(10, strings.Count(activity, "<li>"))
 	this.NotContains(activity, "badge more")
+}
+
+func (this *IntegrationSuite) TestShowOverview_EnvironmentColumnsSortedByteWise() {
+	this.createForShowOverview([]string{"stagingeu", "staging_us", "staging2"}, []string{"petstore_api"})
+	this.publishForShowOverview("petstore_api", "1.0.0", showOverviewAPIContract)
+	this.deployForShowOverview("petstore_api", "1.0.0", "stagingeu")
+
+	_, _, body := this.getPage("/", this.signInAsAdmin())
+
+	var names []string
+	for _, match := range showOverviewColumnName.FindAllStringSubmatch(this.sectionOfShowOverview(body, "Deployed now", "Recent activity"), -1) {
+		names = append(names, match[1])
+	}
+	this.Equal([]string{"staging2", "staging_us", "stagingeu"}, names)
 }
 
 func (this *IntegrationSuite) TestShowOverview_EmptyPanelsInABrokerWithData() {

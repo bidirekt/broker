@@ -208,6 +208,7 @@ func (this *IntegrationSuite) TestShowCheck_ShowsAConsumerSideNoWithItsBreaksRea
 	this.Require().Equal(http.StatusOK, status, body)
 	this.Equal("text/html; charset=utf-8", header.Get("Content-Type"))
 	this.Equal("no-store", header.Get("Cache-Control"))
+	this.Contains(body, `<a href="/participants" aria-current="page">Participants</a>`)
 	this.Contains(body, `no · cannot be deployed`)
 	this.Contains(body, `<h1><span class="name">petstore_web</span> <span class="ver">2.3.0</span> cannot be deployed to <span class="name">production</span></h1>`)
 	this.Contains(body, ` UTC · just now</time>`)

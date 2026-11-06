@@ -7,23 +7,22 @@
 <div class="head">
   <div>
     <h1 class="mono">{{$name}}</h1>
+    {{if .Header.LatestVersion.Valid}}
     <div class="sub badges">
-      {{if .Header.LatestVersion.Valid}}
-      <span>Latest <span class="ver">{{.Header.LatestVersion.String}}</span></span>
+      <span>Latest {{if .LatestURL}}<a class="ver" href="{{.LatestURL}}">{{.Header.LatestVersion.String}}</a>{{else}}<span class="ver">{{.Header.LatestVersion.String}}</span>{{end}}</span>
+      <span aria-hidden="true">·</span>
       {{range .Header.Deployed}}<a class="badge env" href="/environments/{{.Environment.ID}}">{{.Environment.Name}} <span class="v">{{.Version}}</span></a>{{else}}<span class="badge quiet">not deployed</span>{{end}}
-      {{else}}
-      <span class="badge quiet">never published</span>
-      {{end}}
     </div>
+    {{else}}
+    <p class="sub">never published</p>
+    {{end}}
   </div>
-  {{if $.CanWrite}}<div class="acts">{{if .Header.LatestVersion.Valid}}<a class="btn" aria-disabled="true">Rename</a>{{else}}<a class="btn" href="/participants/{{$name}}/rename">Rename</a>{{end}}</div>{{end}}
 </div>
-{{if and $.CanWrite .Header.LatestVersion.Valid}}<p class="disabled-note">participant has published contracts, create a new participant and switch every consumer's consumes to it</p>{{end}}
 <nav class="tabs" aria-label="Participant">
-  <a href="/participants/{{$name}}">Versions <span class="count">{{.Header.VersionCount}}</span></a>
-  <a href="/participants/{{$name}}/deployments">Deployments <span class="count">{{.Header.DeploymentCount}}</span></a>
-  <a href="/participants/{{$name}}/checks">Checks <span class="count">{{.Header.CheckCount}}</span></a>
-  <a href="/participants/{{$name}}/relations" aria-current="page">Relations <span class="count">{{.RelationsCount}}</span></a>
+  <a href="{{.ParticipantURL}}">Versions <span class="count">{{.Header.VersionCount}}</span></a>
+  <a href="{{.ParticipantURL}}/deployments">Deployments <span class="count">{{.Header.DeploymentCount}}</span></a>
+  <a href="{{.ParticipantURL}}/checks">Checks <span class="count">{{.Header.CheckCount}}</span></a>
+  <a href="{{.ParticipantURL}}/relations" aria-current="page">Relations <span class="count">{{.RelationsCount}}</span></a>
 </nav>
 <div class="grid2">
   <section class="sheet">
@@ -31,7 +30,7 @@
     {{if .Consumes}}
     <ul class="list">
       {{range .Consumes}}
-      <li>{{if .Registered}}<a class="name" href="/participants/{{.Name}}">{{.Name}}</a>{{else}}<span class="name">{{.Name}}</span>{{end}}<span class="badges">{{if not .Registered}}<span class="badge quiet">not a participant</span>{{else if not .Published}}<span class="badge quiet">never published</span>{{else}}{{range .Deployed}}<a class="badge env" href="/environments/{{.Environment.ID}}">{{.Environment.Name}} <span class="v">{{.Version}}</span></a>{{else}}<span class="badge quiet">not deployed</span>{{end}}{{end}}</span></li>
+      <li>{{if .Registered}}<a class="name" href="{{.URL}}">{{.Name}}</a>{{else}}<span class="name">{{.Name}}</span>{{end}}<span class="badges">{{if not .Registered}}<span class="badge quiet">not a participant</span>{{else if not .Published}}<span class="badge quiet">never published</span>{{else}}{{range .Deployed}}<a class="badge env" href="/environments/{{.Environment.ID}}">{{.Environment.Name}} <span class="v">{{.Version}}</span></a>{{else}}<span class="badge quiet">not deployed</span>{{end}}{{end}}</span></li>
       {{end}}
     </ul>
     {{else if .Header.LatestVersion.Valid}}
@@ -50,7 +49,7 @@
     <p class="pad"><a class="badge env" href="/environments/{{.EnvironmentID}}">{{.EnvironmentName}}</a></p>
     <ul class="list">
       {{range .Consumers}}
-      <li><a class="name" href="/participants/{{.Name}}">{{.Name}}</a><span class="ver">{{.Version}}</span></li>
+      <li><a class="name" href="{{.URL}}">{{.Name}}</a><span class="ver">{{.Version}}</span></li>
       {{end}}
     </ul>
     {{end}}

@@ -92,6 +92,15 @@ const relationsWebV2Contract = `consumes:
             200: ~
 `
 
+const relationsOrdersWebContract = `consumes:
+  orders_api:
+    rest:
+      /pets:
+        get:
+          responses:
+            200: ~
+`
+
 const relationsFooter = `A can-i-deploy compares the version with the deployed counterparts that share an endpoint with it. A consumer counts only when it is deployed; a provider it consumes from that is not deployed is a break.`
 
 func (this *IntegrationSuite) mustPostForRelations(path, body string) {
@@ -149,7 +158,7 @@ func (this *IntegrationSuite) TestShowParticipantRelations_ShowsTheHeaderTabsAnd
 	this.Equal("no-store", header.Get("Cache-Control"))
 	this.Contains(body, `<nav class="crumbs" aria-label="Breadcrumbs"><a href="/participants">participants</a><span aria-hidden="true">/</span><span aria-current="page">petstore_web</span></nav>`)
 	this.Contains(body, `<h1 class="mono">petstore_web</h1>`)
-	this.Contains(body, `<span>Latest <span class="ver">2.3.0</span></span>`)
+	this.Contains(body, `<span>Latest <a class="ver" href="/participants/petstore_web/versions/2.3.0">2.3.0</a></span>`)
 	this.Contains(body, `<a class="badge env" href="`+this.environmentPathForRelations("production")+`">production <span class="v">2.2.0</span></a>`)
 	this.NotContains(body, `">staging <span class="v">2.`)
 	this.Contains(body, `<a href="/participants/petstore_web">Versions <span class="count">2</span></a>`)
@@ -204,8 +213,8 @@ func (this *IntegrationSuite) TestShowParticipantRelations_NeverPublishedPartici
 	status, _, body := this.getPage("/participants/petstore_admin/relations", this.signInAsAdmin())
 
 	this.Require().Equal(http.StatusOK, status, body)
-	this.Contains(body, `<span class="badge quiet">never published</span>`)
-	this.NotContains(body, `Latest <span class="ver">`)
+	this.Contains(body, `<p class="sub">never published</p>`)
+	this.NotContains(body, `Latest`)
 	this.NotContains(body, `from the latest version`)
 	this.Contains(body, `<span class="name">petstore_admin</span> has never published a contract, so it consumes nothing yet.`)
 	this.Contains(body, `<code class="cmd">bidirekt publish</code>`)
@@ -224,7 +233,7 @@ func (this *IntegrationSuite) TestShowParticipantRelations_PublishedButUndeploye
 
 	_, _, body := this.getPage("/participants/petstore_web/relations", this.signInAsAdmin())
 
-	this.Contains(body, `<span>Latest <span class="ver">2.2.0</span></span>`)
+	this.Contains(body, `<span>Latest <a class="ver" href="/participants/petstore_web/versions/2.2.0">2.2.0</a></span>`)
 	this.Contains(body, `<a class="name" href="/participants/petstore_api">petstore_api</a><span class="badges"><span class="badge quiet">not deployed</span></span>`)
 	this.Equal(2, strings.Count(body, `<span class="badge quiet">not deployed</span>`))
 }
@@ -238,7 +247,6 @@ func (this *IntegrationSuite) TestShowParticipantRelations_ReadUserSeesThePageWi
 	this.Require().Equal(http.StatusOK, status, body)
 	this.Contains(body, `<h1 class="mono">petstore_api</h1>`)
 	this.NotContains(body, `method="post" action="/participants`)
-	this.NotContains(body, `/rename`)
 }
 
 func (this *IntegrationSuite) TestShowParticipantRelations_SignedOutIsRedirectedToSignIn() {
@@ -268,4 +276,21 @@ func (this *IntegrationSuite) TestShowParticipantRelations_ConsumedProviderIsInd
 
 	this.Require().NoError(err)
 	this.Contains(definition, `WHERE (direction = 'consumes'::text)`)
+}
+
+func (this *IntegrationSuite) TestShowParticipantRelations_ParticipantLinksArePathEscaped() {
+	this.createForRelations([]string{"production"}, []string{"orders_web", "orders_api"})
+	this.publishForRelations("orders_api", "2.0.0", relationsAPIContract)
+	this.deployForRelations("orders_api", "2.0.0", "production")
+	this.publishForRelations("orders_web", "1.0.0+build", relationsOrdersWebContract)
+	this.deployForRelations("orders_web", "1.0.0+build", "production")
+	sessionCookie := this.signInAsAdmin()
+
+	_, _, body := this.getPage("/participants/orders_web/relations", sessionCookie)
+
+	this.Contains(body, `<li><a class="name" href="/participants/orders_api">orders_api</a><span class="badges">`)
+
+	_, _, body = this.getPage("/participants/orders_api/relations", sessionCookie)
+
+	this.Contains(body, `<li><a class="name" href="/participants/orders_web">orders_web</a><span class="ver">1.0.0&#43;build</span></li>`)
 }

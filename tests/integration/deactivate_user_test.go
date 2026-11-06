@@ -286,3 +286,14 @@ func (this *IntegrationSuite) TestDeactivateUser_AnswersNotFoundForANonCanonical
 	this.Require().True(found)
 	this.Equal(model.UserActive, user.State())
 }
+
+func (this *IntegrationSuite) TestDeactivateUser_AnswersNotFoundForAPageWhoseOffsetWouldOverflowAndChangesNothing() {
+	userID := this.createActiveUser("ana@x.com", model.PermissionWrite, deactivateUserPassword)
+
+	status, _ := this.deactivateUserPostAs(this.signInAsAdmin(), userID, url.Values{"page": {"400000000000000000"}})
+
+	this.Equal(http.StatusNotFound, status)
+	user, found := repository.NewUserRepository(this.Pool).FindByID(context.Background(), userID)
+	this.Require().True(found)
+	this.Equal(model.UserActive, user.State())
+}

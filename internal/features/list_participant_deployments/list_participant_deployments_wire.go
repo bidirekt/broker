@@ -18,12 +18,13 @@ const (
 )
 
 type ListParticipantDeploymentsPage struct {
-	Header       *repository.ParticipantDeploymentsHeader
-	LatestURL    string
-	Environments []*model.Environment
-	Environment  *model.Environment
-	Deployments  []DeploymentRow
-	Pager        pages.Pager
+	Header         *repository.ParticipantDeploymentsHeader
+	ParticipantURL string
+	LatestURL      string
+	Environments   []*model.Environment
+	Environment    *model.Environment
+	Deployments    []DeploymentRow
+	Pager          pages.Pager
 }
 
 type DeploymentRow struct {
@@ -37,12 +38,13 @@ type DeploymentRow struct {
 func newListParticipantDeploymentsPage(output ListParticipantDeploymentsOutput, pager pages.Pager) ListParticipantDeploymentsPage {
 	participantName := output.Header.Participant.Name
 	page := ListParticipantDeploymentsPage{
-		Header:       output.Header,
-		LatestURL:    versionURL(participantName, output.Header.LatestVersion.String),
-		Environments: output.Environments,
-		Environment:  output.Environment,
-		Deployments:  make([]DeploymentRow, 0, len(output.Deployments)),
-		Pager:        pager,
+		Header:         output.Header,
+		ParticipantURL: participantURL(participantName),
+		LatestURL:      versionURL(participantName, output.Header.LatestVersion.String),
+		Environments:   output.Environments,
+		Environment:    output.Environment,
+		Deployments:    make([]DeploymentRow, 0, len(output.Deployments)),
+		Pager:          pager,
 	}
 	for _, deployment := range output.Deployments {
 		page.Deployments = append(page.Deployments, DeploymentRow{
@@ -57,10 +59,14 @@ func newListParticipantDeploymentsPage(output ListParticipantDeploymentsOutput, 
 	return page
 }
 
+func participantURL(participantName string) string {
+	return "/participants/" + url.PathEscape(participantName)
+}
+
 func versionURL(participantName, version string) string {
 	if version == "" || version == "." || version == ".." {
 		return ""
 	}
 
-	return "/participants/" + participantName + "/versions/" + url.PathEscape(version)
+	return participantURL(participantName) + "/versions/" + url.PathEscape(version)
 }

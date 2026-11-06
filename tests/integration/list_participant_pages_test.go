@@ -191,3 +191,12 @@ func (this *IntegrationSuite) TestListParticipantPages_SignedOutIsRedirectedToSi
 	this.Equal(http.StatusSeeOther, status)
 	this.Equal("/sign-in", header.Get("Location"))
 }
+
+func (this *IntegrationSuite) TestListParticipantPages_ParticipantLinksArePathEscaped() {
+	this.createParticipantsForListParticipantPages("orders_web")
+
+	status, _, body := this.getPage("/participants", this.signInAsAdmin())
+
+	this.Require().Equal(http.StatusOK, status, body)
+	this.Contains(body, `<td data-l="Participant"><a class="name" href="/participants/orders_web">orders_web</a></td>`)
+}

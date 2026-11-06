@@ -180,8 +180,8 @@ func (this *IntegrationSuite) TestListParticipantChecks_ShowsTheHeaderAndThePart
 	this.Equal("no-store", header.Get("Cache-Control"))
 
 	this.Contains(body, `<nav class="crumbs" aria-label="Breadcrumbs"><a href="/participants">participants</a><span aria-hidden="true">/</span><span aria-current="page">petstore_web</span></nav>`)
-	this.Contains(body, `<h1><span class="name">petstore_web</span></h1>`)
-	this.Contains(body, `<span>Latest <span class="ver">2.3.0</span></span>`)
+	this.Contains(body, `<h1 class="mono">petstore_web</h1>`)
+	this.Contains(body, `<span>Latest <a class="ver" href="/participants/petstore_web/versions/2.3.0">2.3.0</a></span>`)
 	this.Contains(body, `<a class="badge env" href="`+production+`">production <span class="v">2.2.0</span></a>`)
 	this.NotContains(body, `not deployed`)
 	this.Contains(body, `<a href="/participants/petstore_web">Versions <span class="count">2</span></a>`)
@@ -269,7 +269,7 @@ func (this *IntegrationSuite) TestListParticipantChecks_NeverPublishedShowsThePu
 	status, _, body := this.getPage("/participants/petstore_admin/checks", this.signInAsAdmin())
 
 	this.Require().Equal(http.StatusOK, status, body)
-	this.Contains(body, `<span>Latest <span class="muted">never published</span></span>`)
+	this.Contains(body, `<p class="sub">never published</p>`)
 	this.NotContains(body, `not deployed`)
 	this.Contains(body, `<code class="cmd">bidirekt publish</code>`)
 	this.Contains(body, `Checks <span class="count">0</span>`)
@@ -329,7 +329,6 @@ func (this *IntegrationSuite) TestListParticipantChecks_ReadUserSeesThePageWitho
 	this.Require().Equal(http.StatusOK, status, body)
 	this.Contains(body, `no · 5 breaks</span>`)
 	this.NotContains(body, `action="/participants`)
-	this.NotContains(body, `/rename`)
 }
 
 func (this *IntegrationSuite) TestListParticipantChecks_SignedOutIsRedirectedToSignIn() {

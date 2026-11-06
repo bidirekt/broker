@@ -8,19 +8,21 @@
   <div>
     <h1 class="mono">{{$participant}}</h1>
     {{if .Header.LatestVersion.Valid}}
-    <div class="sub badges"><span>Latest <span class="ver">{{.Header.LatestVersion.String}}</span></span>{{range .Header.DeployedNow}}<a class="badge env" href="/environments/{{.Environment.ID}}">{{.Environment.Name}} <span class="v">{{.Version}}</span></a>{{else}}<span class="badge quiet">not deployed</span>{{end}}</div>
+    <div class="sub badges">
+      <span>Latest {{if .LatestURL}}<a class="ver" href="{{.LatestURL}}">{{.Header.LatestVersion.String}}</a>{{else}}<span class="ver">{{.Header.LatestVersion.String}}</span>{{end}}</span>
+      <span aria-hidden="true">·</span>
+      {{range .Header.DeployedNow}}<a class="badge env" href="/environments/{{.Environment.ID}}">{{.Environment.Name}} <span class="v">{{.Version}}</span></a>{{else}}<span class="badge quiet">not deployed</span>{{end}}
+    </div>
     {{else}}
     <p class="sub">never published</p>
     {{end}}
   </div>
-  {{if $.CanWrite}}<div class="acts">{{if .Header.LatestVersion.Valid}}<a class="btn" aria-disabled="true">Rename</a>{{else}}<a class="btn" href="/participants/{{$participant}}/rename">Rename</a>{{end}}</div>{{end}}
 </div>
-{{if and $.CanWrite .Header.LatestVersion.Valid}}<p class="disabled-note">participant has published contracts, create a new participant and switch every consumer's consumes to it</p>{{end}}
 <nav class="tabs" aria-label="Participant">
-  <a href="/participants/{{$participant}}" aria-current="page">Versions <span class="count">{{.Header.VersionCount}}</span></a>
-  <a href="/participants/{{$participant}}/deployments">Deployments <span class="count">{{.Header.DeploymentCount}}</span></a>
-  <a href="/participants/{{$participant}}/checks">Checks <span class="count">{{.Header.CheckCount}}</span></a>
-  <a href="/participants/{{$participant}}/relations">Relations <span class="count">{{.Header.RelationCount}}</span></a>
+  <a href="{{.ParticipantURL}}" aria-current="page">Versions <span class="count">{{.Header.VersionCount}}</span></a>
+  <a href="{{.ParticipantURL}}/deployments">Deployments <span class="count">{{.Header.DeploymentCount}}</span></a>
+  <a href="{{.ParticipantURL}}/checks">Checks <span class="count">{{.Header.CheckCount}}</span></a>
+  <a href="{{.ParticipantURL}}/relations">Relations <span class="count">{{.Header.RelationCount}}</span></a>
 </nav>
 <section class="sheet">
   {{if .Versions}}
@@ -47,7 +49,7 @@
   <div class="empty">
     <div class="ic">{{template "icon_package" 20}}</div>
     <h2 class="h2">No versions yet</h2>
-    <p>Publish this participant's contract from CI. Until the first publish you can still rename it.</p>
+    <p>Publish this participant's contract from CI.</p>
     <code class="cmd">bidirekt publish</code>
   </div>
   {{end}}
