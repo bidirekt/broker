@@ -5,6 +5,7 @@ import (
 	"mime"
 	"time"
 
+	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/components/bearer"
 	"github.com/bidirekt/broker/internal/components/config"
 	"github.com/gofiber/fiber/v3"
@@ -22,7 +23,7 @@ func NewSignInApiHandler(useCase *SignInUseCase, settings config.Settings) *Sign
 func (this *SignInApiHandler) RequireJsonFromPublicOrigin(ctx fiber.Ctx) error {
 	if origin := ctx.Get(fiber.HeaderOrigin); origin != "" && origin != this.settings.PublicURL {
 		return ctx.Status(fiber.StatusForbidden).JSON(SignInResponseBody{
-			Message: ForbiddenMessage,
+			Message: access.ForbiddenMessage,
 		})
 	}
 

@@ -18,23 +18,35 @@ components:
   feature_invite_user:        { in: internal/features/invite_user }
   feature_list_environments:  { in: internal/features/list_environments }
   feature_list_participants:  { in: internal/features/list_participants }
+  feature_list_participant_pages: { in: internal/features/list_participant_pages }
   feature_list_users:         { in: internal/features/list_users }
   feature_publish_contract:   { in: internal/features/publish_contract }
   feature_reactivate_user:    { in: internal/features/reactivate_user }
   feature_record_deployment:  { in: internal/features/record_deployment }
-  feature_rename_participant: { in: internal/features/rename_participant }
+  feature_rename_environment: { in: internal/features/rename_environment }
   feature_set_password:       { in: internal/features/set_password }
   feature_setup_admin:        { in: internal/features/setup_admin }
+  feature_show_check:         { in: internal/features/show_check }
+  feature_show_participant_versions: { in: internal/features/show_participant_versions }
+  feature_show_contract_version: { in: internal/features/show_contract_version }
   feature_sign_in:            { in: internal/features/sign_in }
   feature_sign_out:           { in: internal/features/sign_out }
   feature_update_profile:     { in: internal/features/update_profile }
   feature_validate_contract:  { in: internal/features/validate_contract }
+  feature_list_participant_deployments: { in: internal/features/list_participant_deployments }
+  feature_list_participant_checks: { in: internal/features/list_participant_checks }
+  feature_show_participant_relations: { in: internal/features/show_participant_relations }
+  feature_list_environment_pages: { in: internal/features/list_environment_pages }
+  feature_show_environment: { in: internal/features/show_environment }
+  feature_show_compatibility: { in: internal/features/show_compatibility }
+  feature_show_overview: { in: internal/features/show_overview }
   components:                 { in: internal/components }
   components_config:        { in: internal/components/config }
   components_passwords:     { in: internal/components/passwords }
   components_tokens:        { in: internal/components/tokens }
   components_input:         { in: internal/components/input }
   components_access:        { in: internal/components/access }
+  components_breakreport:   { in: internal/components/breakreport }
   components_pages:         { in: internal/components/pages }
   components_respond:       { in: internal/components/respond }
   components_bearer:        { in: internal/components/bearer }
@@ -78,30 +90,41 @@ deps:
       - feature_invite_user
       - feature_list_environments
       - feature_list_participants
+      - feature_list_participant_pages
       - feature_list_users
       - feature_publish_contract
       - feature_reactivate_user
       - feature_record_deployment
-      - feature_rename_participant
+      - feature_rename_environment
       - feature_set_password
       - feature_setup_admin
+      - feature_show_check
+      - feature_show_participant_versions
+      - feature_show_contract_version
       - feature_sign_in
       - feature_sign_out
       - feature_update_profile
       - feature_validate_contract
+      - feature_list_participant_deployments
+      - feature_list_participant_checks
+      - feature_show_participant_relations
+      - feature_list_environment_pages
+      - feature_show_environment
+      - feature_show_compatibility
+      - feature_show_overview
     canUse: [fiber]
 
   feature_can_i_deploy:
     mayDependOn: [contracts, components, components_access, repository, model, validations]
     canUse: [fiber, guregu_null]
   feature_create_environment:
-    mayDependOn: [components, components_access, repository, model, validations]
+    mayDependOn: [components, components_access, components_pages, components_respond, components_sessions, repository, model, validations]
     canUse: [fiber]
   feature_create_participant:
-    mayDependOn: [components, components_access, repository, model, validations]
+    mayDependOn: [components, components_access, components_pages, components_respond, components_sessions, repository, model, validations]
     canUse: [fiber]
   feature_deactivate_user:
-    mayDependOn: [components, components_access, components_pages, components_respond, repository, model]
+    mayDependOn: [components, components_access, components_pages, components_respond, components_sessions, repository, model]
     canUse: [fiber]
   feature_edit_user:
     mayDependOn: [components, components_access, components_pages, components_respond, repository, model, validations]
@@ -121,6 +144,9 @@ deps:
   feature_list_participants:
     mayDependOn: [components, components_access, repository, model]
     canUse: [fiber]
+  feature_list_participant_pages:
+    mayDependOn: [components, components_access, components_pages, components_respond, repository, model]
+    canUse: [fiber]
   feature_list_users:
     mayDependOn: [components, components_access, components_pages, components_respond, repository, model]
     canUse: [fiber]
@@ -128,19 +154,28 @@ deps:
     mayDependOn: [contracts, components, components_access, repository, model, validations]
     canUse: [fiber]
   feature_reactivate_user:
-    mayDependOn: [components, components_access, components_pages, components_respond, repository, model]
+    mayDependOn: [components, components_access, components_pages, components_respond, components_sessions, repository, model]
     canUse: [fiber]
   feature_record_deployment:
     mayDependOn: [components, components_access, repository, model, validations]
     canUse: [fiber]
-  feature_rename_participant:
-    mayDependOn: [components, components_access, repository, model, validations]
+  feature_rename_environment:
+    mayDependOn: [components, components_access, components_pages, components_respond, components_sessions, repository, model, validations]
     canUse: [fiber]
   feature_set_password:
     mayDependOn: [components, components_access, components_pages, components_passwords, components_respond, components_sessions, components_tokens, repository, validations]
     canUse: [fiber]
   feature_setup_admin:
     mayDependOn: [components, components_access, components_pages, components_passwords, components_respond, components_sessions, repository, model, validations]
+    canUse: [fiber]
+  feature_show_check:
+    mayDependOn: [components, components_access, components_breakreport, components_pages, components_respond, repository, model]
+    canUse: [fiber]
+  feature_show_participant_versions:
+    mayDependOn: [components, components_access, components_pages, components_respond, repository, model, validations]
+    canUse: [fiber]
+  feature_show_contract_version:
+    mayDependOn: [components, components_access, components_breakreport, components_pages, components_respond, repository, model, validations]
     canUse: [fiber]
   feature_sign_in:
     mayDependOn: [components, components_access, components_bearer, components_config, components_pages, components_passwords, components_respond, components_sessions, repository, model]
@@ -149,10 +184,32 @@ deps:
     mayDependOn: [components, components_access, components_pages, components_sessions, repository]
     canUse: [fiber]
   feature_update_profile:
-    mayDependOn: [components, components_access, components_pages, components_passwords, components_respond, repository, validations]
+    mayDependOn: [components, components_access, components_pages, components_passwords, components_respond, components_sessions, repository, model, validations]
     canUse: [fiber]
   feature_validate_contract:
     mayDependOn: [contracts, components, components_access, repository, model, validations]
+    canUse: [fiber]
+  feature_list_participant_deployments:
+    mayDependOn: [components, components_access, components_pages, components_respond, repository, model, validations]
+    canUse: [fiber, guregu_null]
+  feature_list_participant_checks:
+    mayDependOn: [components, components_access, components_breakreport, components_pages, components_respond, repository, model, validations]
+    canUse: [fiber]
+  feature_show_participant_relations:
+    mayDependOn: [components, components_access, components_pages, components_respond, repository, model, validations]
+    canUse: [fiber]
+  feature_show_environment:
+    mayDependOn: [components, components_access, components_breakreport, components_pages, components_respond, repository, model]
+    canUse: [fiber]
+
+  feature_list_environment_pages:
+    mayDependOn: [components, components_access, components_pages, components_respond, repository, model]
+    canUse: [fiber]
+  feature_show_compatibility:
+    mayDependOn: [components, components_access, components_breakreport, components_pages, components_respond, repository, model]
+    canUse: [fiber]
+  feature_show_overview:
+    mayDependOn: [components, components_access, components_breakreport, components_pages, components_respond, repository, model]
     canUse: [fiber]
 
   components:
@@ -161,6 +218,8 @@ deps:
   components_access:
     mayDependOn: [model]
     canUse: [fiber]
+  components_breakreport:
+    mayDependOn: [model]
   components_bearer:
     mayDependOn: [components_access, components_config, components_respond, repository]
     canUse: [fiber, golang_jwt]
@@ -171,7 +230,7 @@ deps:
     mayDependOn: [components_respond]
     canUse: [fiber, fasthttp]
   components_pages:
-    mayDependOn: [components_access]
+    mayDependOn: [components_access, model]
     canUse: [fiber]
   components_passwords:
     canUse: [x_crypto]
@@ -201,13 +260,17 @@ deps:
     mayDependOn:
       - bootstrap
       - components
+      - components_access
       - components_bearer
+      - components_breakreport
       - components_config
       - components_database
+      - components_pages
       - components_passwords
       - components_tokens
       - contracts
       - feature_health
+      - migrations
       - repository
       - model
       - validations

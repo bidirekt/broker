@@ -1,14 +1,33 @@
-{{define "title"}}{{with .Page.Message}}{{.}}{{else}}New {{.Page.Purpose}} link{{end}}{{end}}
+{{define "title"}}{{if .Page.Message}}New link for {{.Page.Email}}{{else}}New {{.Page.Purpose}} link{{end}}{{end}}
 
 {{define "content"}}
-<section class="narrow">
+<nav class="crumbs" aria-label="Breadcrumbs"><a href="/users">users</a><span aria-hidden="true">/</span><span aria-current="page">{{.Page.Email}}</span></nav>
 {{with .Page.Message}}
-<h1>{{.}}</h1>
-{{else}}
-<h1>New {{.Page.Purpose}} link</h1>
-<p>Send this {{.Page.Purpose}} link to {{.Page.Email}}. It works once, for 24 hours, and is not shown again. The previous link no longer works.</p>
-<p class="link"><code>{{.Page.Link}}</code></p>
-{{end}}
-<p class="back"><a href="/users">Back to users</a></p>
+<div class="head"><h1>New link for {{$.Page.Email}}</h1></div>
+<div class="alert" role="alert">{{template "icon_error" 16}}<span>{{.}}</span></div>
+<section class="sheet">
+<div class="pad form">
+  <p class="muted">Reactivate the user first, then send a new link.</p>
+  <div class="actions"><a class="btn primary" href="/users">Back to users</a></div>
+</div>
 </section>
+{{else}}
+<div class="head">
+  <div>
+    <h1>New {{.Page.Purpose}} link</h1>
+    <p class="sub">for {{.Page.Email}}</p>
+  </div>
+</div>
+<section class="sheet">
+<div class="pad form">
+  {{if .Page.ReplacedOpenLink}}<div class="warn" role="note">{{template "icon_error" 16}}<span>The previous link no longer works.</span></div>{{end}}
+  <div class="secret">
+    <p>Send this {{.Page.Purpose}} link to {{.Page.Email}}. It works once, until {{expiryTime .Page.ExpiresAt}}, and is not shown again.</p>
+    <input class="copy" type="text" readonly value="{{.Page.Link}}" aria-label="{{.Page.Purpose}} link">
+    <p class="hint">Click the field and press Cmd/Ctrl + A, then copy.</p>
+  </div>
+  <div class="actions"><a class="btn primary" href="/users">Back to users</a></div>
+</div>
+</section>
+{{end}}
 {{end}}

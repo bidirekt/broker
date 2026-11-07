@@ -47,7 +47,7 @@ func (this *CompatibilityChecker) Check(
 
 		switch resource.Direction {
 		case model.Consumes:
-			this.checkConsumer(ctx, resource, environment, counterparts, pairs, report)
+			this.checkConsumer(ctx, resource, counterparts, pairs, report)
 		case model.Provides:
 			this.checkProvider(ctx, resource, counterparts, pairs, report)
 		}
@@ -94,7 +94,7 @@ func (this *pairState) hit() bool {
 
 // replay injects the stored breaks once per pair: a verdict already aggregates every resource
 // of the pair, so the remaining resources contribute nothing.
-func (this *pairState) replay(item *IncompatibleItem) {
+func (this *pairState) replay(item *CounterpartResult) {
 	if this.injected {
 		return
 	}

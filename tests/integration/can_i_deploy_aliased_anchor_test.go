@@ -5,6 +5,23 @@ import (
 	"net/http"
 )
 
+type anchorBreak struct {
+	Reason  string            `json:"reason"`
+	Role    string            `json:"role"`
+	Details map[string]string `json:"details"`
+}
+
+type anchorResult struct {
+	Deployable         bool                                           `json:"deployable"`
+	ParticipantVersion *string                                        `json:"participantVersion"`
+	Endpoints          map[string]map[string]map[string][]anchorBreak `json:"endpoints"`
+}
+
+type anchorResponse struct {
+	Deployable bool                    `json:"deployable"`
+	Results    map[string]anchorResult `json:"results"`
+}
+
 const anchorProviderV1Contract = `
 {
   "provides": { "rest": { "/things": { "get": { "responses": { "200": "Thing" } } } } },
@@ -53,7 +70,7 @@ func (this *IntegrationSuite) TestCanIDeploy_AnchorsToAnAliasedDeployedProvider(
 	status, body := this.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
 	this.Equal(http.StatusOK, status)
 
-	var got canIDeployResponse
+	var got anchorResponse
 	this.Require().NoError(json.Unmarshal([]byte(body), &got))
 
 	this.True(got.Deployable)
@@ -85,7 +102,7 @@ func (this *IntegrationSuite) TestCanIDeploy_AnchorsToAnAliasedDeployedConsumer(
 	status, body := this.post("/api/can-i-deploy", `{"participant":"api","version":"v1","environment":"production"}`)
 	this.Equal(http.StatusOK, status)
 
-	var got canIDeployResponse
+	var got anchorResponse
 	this.Require().NoError(json.Unmarshal([]byte(body), &got))
 
 	this.True(got.Deployable)
@@ -95,4 +112,87 @@ func (this *IntegrationSuite) TestCanIDeploy_AnchorsToAnAliasedDeployedConsumer(
 	this.Empty(front.Endpoints)
 	this.Require().NotNil(front.ParticipantVersion)
 	this.Equal("a1b2c3d", *front.ParticipantVersion)
+}
+
+const anchorProviderWithPetsContract = `
+{
+  "provides": { "rest": { "/pets": { "get": { "responses": { "200": "Pet" } } } } },
+  "schemas": { "Pet": { "type": "object", "properties": { "id": { "type": "string" } } } }
+}`
+
+const anchorProviderWithoutPetsContract = `
+{
+  "provides": { "rest": { "/owners": { "get": { "responses": { "200": "Owner" } } } } },
+  "schemas": { "Owner": { "type": "object", "properties": { "id": { "type": "string" } } } }
+}`
+
+const anchorConsumerOfPetsContract = `
+{
+  "consumes": { "api": { "rest": { "/pets": { "get": { "responses": { "200": "Pet" } } } } } },
+  "schemas": { "Pet": { "type": "object", "properties": { "id": { "type": "string" } } } }
+}`
+
+func (this *IntegrationSuite) TestCanIDeploy_UndeployedProviderWhoseLatestVersionReusesAnOlderSnapshot_IsNotDeployed() {
+	mustPost := func(path, body string) {
+		status, _ := this.post(path, body)
+		this.Require().Equalf(http.StatusOK, status, "POST %s", path)
+	}
+
+	mustPost("/api/participants", `{"participant":"api"}`)
+	mustPost("/api/participants", `{"participant":"front"}`)
+	mustPost("/api/environments", `{"environment":"production"}`)
+
+	mustPost("/api/contracts", this.publishBody("api", "v1", contractFragment{"api.yaml", anchorProviderWithPetsContract}))
+	mustPost("/api/contracts", this.publishBody("api", "v2", contractFragment{"api.yaml", anchorProviderWithoutPetsContract}))
+	mustPost("/api/contracts", this.publishBody("api", "v3", contractFragment{"api.yaml", anchorProviderWithPetsContract}))
+
+	mustPost("/api/contracts", this.publishBody("front", "v1", contractFragment{"api.yaml", anchorConsumerOfPetsContract}))
+
+	status, body := this.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
+	this.Equal(http.StatusOK, status)
+
+	var got anchorResponse
+	this.Require().NoError(json.Unmarshal([]byte(body), &got))
+
+	this.False(got.Deployable)
+	api := got.Results["api"]
+	this.False(api.Deployable)
+	this.Nil(api.ParticipantVersion)
+	breaks := api.Endpoints["/pets"]["get"]["200"]
+	this.Require().Len(breaks, 1)
+	this.Equal("provider_resource_not_deployed_in_environment", breaks[0].Reason)
+	this.Equal("consumer", breaks[0].Role)
+	this.Nil(breaks[0].Details)
+}
+
+func (this *IntegrationSuite) TestCanIDeploy_UndeployedProviderWhoseLatestVersionDropsTheResource_IsNotDeployed() {
+	mustPost := func(path, body string) {
+		status, _ := this.post(path, body)
+		this.Require().Equalf(http.StatusOK, status, "POST %s", path)
+	}
+
+	mustPost("/api/participants", `{"participant":"api"}`)
+	mustPost("/api/participants", `{"participant":"front"}`)
+	mustPost("/api/environments", `{"environment":"production"}`)
+
+	mustPost("/api/contracts", this.publishBody("api", "v1", contractFragment{"api.yaml", anchorProviderWithPetsContract}))
+	mustPost("/api/contracts", this.publishBody("api", "v2", contractFragment{"api.yaml", anchorProviderWithoutPetsContract}))
+
+	mustPost("/api/contracts", this.publishBody("front", "v1", contractFragment{"api.yaml", anchorConsumerOfPetsContract}))
+
+	status, body := this.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
+	this.Equal(http.StatusOK, status)
+
+	var got anchorResponse
+	this.Require().NoError(json.Unmarshal([]byte(body), &got))
+
+	this.False(got.Deployable)
+	api := got.Results["api"]
+	this.False(api.Deployable)
+	this.Nil(api.ParticipantVersion)
+	breaks := api.Endpoints["/pets"]["get"]["200"]
+	this.Require().Len(breaks, 1)
+	this.Equal("provider_resource_not_deployed_in_environment", breaks[0].Reason)
+	this.Equal("consumer", breaks[0].Role)
+	this.Nil(breaks[0].Details)
 }

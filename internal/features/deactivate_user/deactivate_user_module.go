@@ -8,6 +8,6 @@ import (
 func Register(kernel *components.Components) {
 	userRepository := repository.NewUserRepository(kernel.Pool)
 	useCase := NewDeactivateUserUseCase(userRepository)
-	uiHandler := NewDeactivateUserUiHandler(useCase)
+	uiHandler := NewDeactivateUserUiHandler(useCase, kernel.SessionKeeper)
 	kernel.Server.Post("/users/:id/deactivate", uiHandler.Handle)
 }

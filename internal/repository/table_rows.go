@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"database/sql"
 	"time"
 
 	"github.com/bidirekt/broker/internal/model"
@@ -24,12 +23,12 @@ type tableRow struct {
 	ResourceID                 int64
 	ResourceDirection          string
 	ResourceInteraction        string
-	ResourceConsumedProvider   sql.NullString
+	ResourceConsumedProvider   null.String
 	ResourceEndpoint           string
 	ResourceMethod             string
-	ResourceResponseStatusCode sql.NullString
+	ResourceResponseStatusCode null.String
 	ResourceProviderHash       string
-	ResourceConsumerHash       sql.NullString
+	ResourceConsumerHash       null.String
 	ResourceCreatedAt          time.Time
 	ResourceVersion            string
 	ResourceVersionChangeType  string
@@ -37,10 +36,6 @@ type tableRow struct {
 	// Bodies, aligned by index
 	BodySources     []string
 	BodySchemaNames []null.String
-
-	// Deploy & Environment
-	DeploymentEnvironment sql.NullString
-	DeploymentVersion     sql.NullString
 }
 
 func (this *tableRow) toPersistedContractModel() *model.PersistedContract {
@@ -56,33 +51,23 @@ func (this *tableRow) toPersistedContractModel() *model.PersistedContract {
 
 func (this *tableRow) toResourceModel() model.PersistedResource {
 	resource := model.PersistedResource{
-		Direction:        model.Direction(this.ResourceDirection),
-		Interaction:      model.Interaction(this.ResourceInteraction),
-		Endpoint:         this.ResourceEndpoint,
-		Method:           this.ResourceMethod,
-		Bodies:           this.toResourceBodies(),
-		DeployedVersions: make(map[string]string),
-		ParticipantName:  this.ParticipantName,
-		ParticipantID:    this.ParticipantID,
-		ContractID:       this.ContractID,
-		ProviderHash:     this.ResourceProviderHash,
-		Removed:          this.ResourceVersionChangeType == string(model.ChangeRemoved),
+		Direction:          model.Direction(this.ResourceDirection),
+		Interaction:        model.Interaction(this.ResourceInteraction),
+		Endpoint:           this.ResourceEndpoint,
+		Method:             this.ResourceMethod,
+		Bodies:             this.toResourceBodies(),
+		ParticipantName:    this.ParticipantName,
+		ParticipantID:      this.ParticipantID,
+		ContractID:         this.ContractID,
+		ProviderHash:       this.ResourceProviderHash,
+		ConsumedProvider:   this.ResourceConsumedProvider,
+		ResponseStatusCode: this.ResourceResponseStatusCode,
+		ConsumerHash:       this.ResourceConsumerHash,
+		Removed:            this.ResourceVersionChangeType == string(model.ChangeRemoved),
 	}
 
 	if this.ResourceVersion != "" {
 		resource.ParticipantVersion = null.StringFrom(this.ResourceVersion)
-	}
-
-	if this.ResourceConsumedProvider.String != "" {
-		resource.ConsumedProvider = null.StringFrom(this.ResourceConsumedProvider.String)
-	}
-
-	if this.ResourceResponseStatusCode.String != "" {
-		resource.ResponseStatusCode = null.StringFrom(this.ResourceResponseStatusCode.String)
-	}
-
-	if this.ResourceConsumerHash.String != "" {
-		resource.ConsumerHash = null.StringFrom(this.ResourceConsumerHash.String)
 	}
 
 	return resource

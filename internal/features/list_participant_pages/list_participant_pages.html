@@ -1,0 +1,48 @@
+{{define "title"}}Participants{{end}}
+
+{{define "content"}}
+<div class="head">
+  <div>
+    <h1>Participants</h1>
+    <p class="sub">Every service that publishes a contract.</p>
+  </div>
+  {{if .CanWrite}}<div class="acts"><a class="btn primary" href="/participants/new-participant">Create participant</a></div>{{end}}
+</div>
+<section class="sheet">
+  {{if .Page.Participants}}
+  <div class="scroll"><table class="t stack">
+    <thead>
+      <tr>
+        <th scope="col">Participant</th>
+        <th scope="col">Latest version</th>
+        <th scope="col">Published</th>
+        <th scope="col">Deployed</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Page.Participants}}
+      <tr>
+        <td data-l="Participant"><a class="name" href="{{.URL}}">{{.Name}}</a></td>
+        {{if .LatestVersion.Valid}}
+        <td data-l="Latest version"><span class="ver">{{.LatestVersion.String}}</span></td>
+        <td data-l="Published">{{listTime .PublishedAt.Time}}</td>
+        <td data-l="Deployed">{{if .Deployments}}<div class="badges">{{range .Deployments}}<a class="badge env" href="/environments/{{.Environment.ID}}">{{.Environment.Name}} <span class="v">{{.Version}}</span></a>{{end}}</div>{{else}}<span class="muted">not deployed</span>{{end}}</td>
+        {{else}}
+        <td data-l="Latest version"><span class="muted">never published</span></td>
+        <td data-l="Published"><span class="muted">never published</span></td>
+        <td data-l="Deployed"><span class="muted">never published</span></td>
+        {{end}}
+      </tr>
+      {{end}}
+    </tbody>
+  </table></div>
+  {{template "pager" .Page.Pager}}
+  {{else}}
+  <div class="empty">
+    <h2 class="h2">No participants yet</h2>
+    <p>A participant is a service that publishes a contract. Create one {{if .CanWrite}}here, or {{end}}from CI:</p>
+    <code class="cmd">bidirekt create-participant</code>
+  </div>
+  {{end}}
+</section>
+{{end}}

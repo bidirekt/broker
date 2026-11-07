@@ -74,31 +74,12 @@ func (this *PublishContractUseCase) Execute(ctx context.Context, input PublishCo
 		return PublishContractOutput{}, err
 	}
 
-	if existing, found := this.contractRepository.LoadChecksumForVersion(ctx, uploadedContract.ParticipantID, input.Version); found {
-		if existing == uploadedContract.Checksum() {
-			return PublishContractOutput{Status: ContractPublishSuccessful}, nil
-		}
+	conflict := this.contractRepository.Publish(ctx, uploadedContract, func(current *model.PersistedContract) model.ContractDiff {
+		return contract_differ.DiffContracts(current, uploadedContract)
+	})
+	if conflict {
 		return PublishContractOutput{Status: ContractVersionConflict}, nil
 	}
 
-	if this.contractRepository.AliasVersionToSnapshot(ctx, uploadedContract) {
-		return PublishContractOutput{Status: ContractPublishSuccessful}, nil
-	}
-
-	if !this.upsert(ctx, uploadedContract) {
-		return PublishContractOutput{Status: ContractParticipantNotFound}, nil
-	}
-
 	return PublishContractOutput{Status: ContractPublishSuccessful}, nil
-}
-
-func (this *PublishContractUseCase) upsert(ctx context.Context, uploadedContract *model.UploadedContract) (upserted bool) {
-	current, existing := this.contractRepository.GetLatestContractByParticipantID(ctx, uploadedContract.ParticipantID)
-	if !existing {
-		return this.contractRepository.Create(ctx, uploadedContract)
-	}
-
-	this.contractRepository.Update(ctx, uploadedContract, current, contract_differ.DiffContracts(current, uploadedContract))
-
-	return true
 }

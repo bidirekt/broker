@@ -13,12 +13,14 @@ func (this *ContractRepository) LoadCounterparts(
 	environmentID int64,
 ) model.ResourceCounterparts {
 	counterparts := model.ResourceCounterparts{
-		Providers:        make(map[string]model.PersistedResource),
-		Consumers:        make(map[string][]model.PersistedResource),
-		ProviderStatuses: make(map[string][]string),
+		Providers:           make(map[string]model.PersistedResource),
+		Consumers:           make(map[string][]model.PersistedResource),
+		ProviderStatuses:    make(map[string][]string),
+		RegisteredProviders: make(map[string]model.RegisteredProvider),
 	}
 
 	providersQueried := make(map[string]bool)
+	providerNamesQueried := make(map[string]bool)
 	catalogs := schemaCatalogs{}
 
 	for _, resource := range contract.Resources {
@@ -29,9 +31,21 @@ func (this *ContractRepository) LoadCounterparts(
 			}
 
 			providersQueried[resource.ProviderHash] = true
+			providerName := resource.ConsumedProvider.String
 
-			provider, err := this.loadProviderResource(ctx, catalogs, resource.ProviderHash, environmentID)
-			if err == nil {
+			if !providerNamesQueried[providerName] {
+				providerNamesQueried[providerName] = true
+
+				if registered, isParticipant := this.loadRegisteredProvider(ctx, providerName, environmentID); isParticipant {
+					counterparts.RegisteredProviders[providerName] = registered
+				}
+			}
+
+			if !counterparts.RegisteredProviders[providerName].DeployedVersion.Valid {
+				continue
+			}
+
+			if provider, found := this.loadProviderResource(ctx, catalogs, resource.ProviderHash, environmentID); found {
 				counterparts.Providers[resource.ProviderHash] = provider
 
 				continue
@@ -45,7 +59,7 @@ func (this *ContractRepository) LoadCounterparts(
 				continue
 			}
 
-			counterparts.Consumers[resource.ProviderHash] = this.loadConsumerResources(ctx, catalogs, resource.ProviderHash, environmentID)
+			counterparts.Consumers[resource.ProviderHash] = this.loadDeployedResources(ctx, catalogs, model.Consumes, resource.ProviderHash, environmentID)
 		}
 	}
 

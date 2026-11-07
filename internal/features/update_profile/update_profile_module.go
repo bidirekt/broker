@@ -8,7 +8,7 @@ import (
 func Register(kernel *components.Components) {
 	userRepository := repository.NewUserRepository(kernel.Pool)
 	useCase := NewUpdateProfileUseCase(userRepository)
-	uiHandler := NewUpdateProfileUiHandler(useCase)
+	uiHandler := NewUpdateProfileUiHandler(useCase, kernel.SessionKeeper)
 	kernel.Server.Get(profilePath, uiHandler.ShowForm)
-	kernel.Server.Post(profilePath, newUpdateProfileLimiter(), uiHandler.UpdateProfile)
+	kernel.Server.Post(profilePath, newUpdateProfileLimiter(uiHandler.RespondTooManyAttempts), uiHandler.UpdateProfile)
 }

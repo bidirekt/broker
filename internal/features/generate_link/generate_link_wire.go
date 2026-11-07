@@ -1,6 +1,10 @@
 package generate_link
 
-import "github.com/bidirekt/broker/internal/model"
+import (
+	"time"
+
+	"github.com/bidirekt/broker/internal/model"
+)
 
 const (
 	UserNotFoundMessage    string = "user not found"
@@ -14,8 +18,10 @@ const (
 )
 
 type GenerateLinkPage struct {
-	Email   string
-	Purpose model.LinkPurpose
-	Link    string
-	Message string
+	Email            string
+	Purpose          model.LinkPurpose
+	Link             string
+	ExpiresAt        time.Time
+	ReplacedOpenLink bool
+	Message          string
 }

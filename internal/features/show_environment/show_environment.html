@@ -1,0 +1,123 @@
+{{define "title"}}{{.Page.Environment.Name}}{{end}}
+
+{{define "content"}}
+{{with .Page}}
+{{$name := .Environment.Name}}
+<nav class="crumbs" aria-label="Breadcrumbs"><a href="/environments">environments</a><span aria-hidden="true">/</span><span aria-current="page">{{$name}}</span></nav>
+<div class="head">
+  <div>
+    <h1 class="name">{{$name}}</h1>
+    {{if .Deployed}}
+    <p class="sub">{{len .Deployed}} {{if eq (len .Deployed) 1}}participant{{else}}participants{{end}} deployed · last deployment {{listTime .LastDeployedAt}}</p>
+    {{else}}
+    <p class="sub">Nothing deployed yet</p>
+    {{end}}
+  </div>
+  {{if $.CanWrite}}<div class="acts"><a class="btn" href="/environments/{{.Environment.ID}}/rename">Rename</a></div>{{end}}
+</div>
+{{if .Deployed}}
+<section class="sheet">
+  <div class="sheet-head"><h2 class="h2">Deployed now</h2></div>
+  <div class="scroll"><table class="t stack">
+    <thead>
+      <tr>
+        <th scope="col">Participant</th>
+        <th scope="col">Version</th>
+        <th scope="col">Since</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Deployed}}
+      <tr>
+        <td data-l="Participant"><a class="name" href="{{.ParticipantURL}}">{{.ParticipantName}}</a></td>
+        <td data-l="Version">{{template "version" .}}</td>
+        <td data-l="Since">{{listTime .DeployedAt}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table></div>
+</section>
+<section class="sheet">
+  <div class="sheet-head"><h2 class="h2">History</h2><span class="muted">{{.HistoryPager.Total}} {{if eq .HistoryPager.Total 1}}deployment{{else}}deployments{{end}}, newest first</span></div>
+  <div class="scroll"><table class="t stack">
+    <thead>
+      <tr>
+        <th scope="col">Participant</th>
+        <th scope="col">Version</th>
+        <th scope="col">Deployed</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .History}}
+      <tr>
+        <td data-l="Participant"><a class="name" href="{{.ParticipantURL}}">{{.ParticipantName}}</a></td>
+        <td data-l="Version"><div class="badges">{{template "version" .}}{{if .Rollback}}<span class="badge rb">{{template "icon_rollback" 12}}rollback</span>{{end}}</div></td>
+        <td data-l="Deployed">{{listTime .DeployedAt}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table></div>
+  <p class="sheet-foot legend"><span>{{template "icon_rollback" 12}}rollback: the version had already run in this environment and was deployed again</span></p>
+  {{template "pager" .HistoryPager}}
+</section>
+{{else}}
+<section class="sheet">
+  <div class="empty">
+    <div class="ic">{{template "icon_package" 20}}</div>
+    <h2 class="h2">No deployments yet</h2>
+    <p>Record the first deployment to <span class="name">{{$name}}</span> from your pipeline.</p>
+    <code class="cmd">bidirekt record-deployment</code>
+  </div>
+</section>
+{{end}}
+<section class="sheet">
+  <div class="sheet-head"><h2 class="h2">Checks</h2><span class="muted">can-i-deploy answers asked against {{$name}}</span></div>
+  {{if .Checks}}
+  <div class="scroll"><table class="t stack">
+    <thead>
+      <tr>
+        <th scope="col">Check</th>
+        <th scope="col">Participant</th>
+        <th scope="col">Answer</th>
+        <th scope="col">Compared with</th>
+        <th scope="col">Asked</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Checks}}
+      <tr>
+        <td data-l="Check"><a class="mono" href="/checks/{{.Check.ID}}">#{{.Check.ID}}</a></td>
+        <td data-l="Participant"><a class="name" href="{{.ParticipantURL}}">{{.Check.ParticipantName}}</a> {{if .VersionURL}}<a class="ver" href="{{.VersionURL}}">{{.Check.Version}}</a>{{else}}<span class="ver">{{.Check.Version}}</span>{{end}}</td>
+        <td data-l="Answer">{{if .Check.Deployable}}<span class="badge yes">{{template "icon_check" 12}}yes</span>{{else}}<span class="badge no">{{template "icon_x" 12}}no{{if .Report.Stored}} · {{template "breaks" .Report.Breaks}}{{end}}</span>{{end}}</td>
+        <td data-l="Compared with">
+          <div class="badges">
+            {{range .Shown}}<span>{{template "role" .Role}}{{if .ParticipantURL}}<a class="badge cpb{{if .Breaks}} no{{else if not .Version}} quiet{{end}}" href="{{.ParticipantURL}}">{{template "counterpart" .}}</a>{{else}}<span class="badge cpb{{if .Breaks}} no{{else if not .Version}} quiet{{end}}">{{template "counterpart" .}}</span>{{end}}</span>{{end}}
+            {{if .More}}<a class="badge more" href="/checks/{{.Check.ID}}">+{{.More}} more</a>{{end}}
+            {{if and .Report.Stored (not .Report.Counterparts)}}<span class="muted">nothing deployed shares an endpoint</span>{{end}}
+          </div>
+        </td>
+        <td data-l="Asked">{{listTime .Check.CreatedAt}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table></div>
+  {{template "pager" .ChecksPager}}
+  {{else}}
+  <div class="empty">
+    <div class="ic">{{template "icon_check" 20}}</div>
+    <h2 class="h2">No checks yet</h2>
+    <p>Ask whether a version can be deployed to <span class="name">{{$name}}</span>, and the answer shows up here.</p>
+    <code class="cmd">bidirekt can-i-deploy</code>
+  </div>
+  {{end}}
+</section>
+{{end}}
+{{end}}
+
+{{define "version"}}{{if .VersionURL}}<a class="ver" href="{{.VersionURL}}">{{.Version}}</a>{{else}}<span class="ver">{{.Version}}</span>{{end}}{{end}}
+
+{{define "counterpart"}}{{.Name}} <span class="v">{{if .Version}}{{.Version}}{{else}}no version{{end}}</span>{{if .Breaks}} · {{template "breaks" .Breaks}}{{end}}{{end}}
+
+{{define "role"}}{{if eq . "both"}}<span class="role">PROVIDER · CONSUMER</span>{{else if eq . "provider"}}<span class="role">PROVIDER</span>{{else if eq . "consumer"}}<span class="role">CONSUMER</span>{{end}}{{end}}
+
+{{define "breaks"}}{{.}} {{if eq . 1}}break{{else}}breaks{{end}}{{end}}

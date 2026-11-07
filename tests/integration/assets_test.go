@@ -45,13 +45,13 @@ func (this *IntegrationSuite) TestHappyPath_AppScriptConfiguresHtmx() {
 }
 
 func (this *IntegrationSuite) TestHappyPath_StylesheetIsServedAsCSS() {
-	status, contentType, _ := this.fetchAsset("/assets/app.css")
+	status, contentType, _ := this.fetchAsset("/assets/bundle.css")
 	this.Equal(http.StatusOK, status)
 	this.Contains(contentType, "text/css")
 }
 
 func (this *IntegrationSuite) TestUnhappyPath_AssetsAreServedOnlyAtTheirExactPath() {
-	req := httptest.NewRequest("GET", "/ASSETS/app.css", nil)
+	req := httptest.NewRequest("GET", "/ASSETS/bundle.css", nil)
 	req.AddCookie(&http.Cookie{Name: "bidirekt_session", Value: this.signInAsAdmin()})
 
 	resp, err := this.Components.Server.Test(req, fiber.TestConfig{Timeout: 10 * time.Second})

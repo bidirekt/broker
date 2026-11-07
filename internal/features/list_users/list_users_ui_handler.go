@@ -25,9 +25,19 @@ func (this *ListUsersUiHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondForbidden(ctx)
 	}
 
-	output := this.useCase.Execute(ctx.Context(), ListUsersInput{})
+	page, ok := pages.RequestedPage(ctx, pageParam)
+	if !ok {
+		return respond.NotFound(ctx)
+	}
 
-	return pages.Render(ctx, fiber.StatusOK, pageFiles, listUsersTemplate, ListUsersPage{Users: output.Users})
+	output := this.useCase.Execute(ctx.Context(), ListUsersInput{Page: page})
+
+	pager, ok := pages.NewPager(ctx, pageParam, page, output.Total)
+	if !ok {
+		return respond.NotFound(ctx)
+	}
+
+	return pages.Render(ctx, fiber.StatusOK, pageFiles, listUsersTemplate, ListUsersPage{Users: output.Users, Pager: pager})
 }
 
 func (this *ListUsersUiHandler) respondForbidden(ctx fiber.Ctx) error {

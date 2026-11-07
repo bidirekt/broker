@@ -1,23 +1,21 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{template "title" .}} · Bidirekt</title>
-  <link rel="stylesheet" href="/assets/app.css">
+  <link rel="stylesheet" href="/assets/bundle.css">
   <script src="/assets/htmx.min.js"></script>
   <script src="/assets/app.js"></script>
 </head>
-<body hx-boost="true">
-  <header class="topbar">
-    <div class="frame topbar-inner">
-      <span class="brand">{{template "mark"}}Bidirekt</span>
+<body class="bk" hx-boost="true">
+  <header class="top">
+    <div class="top-in">
+      <a class="brand" href="/">{{template "mark"}}Bidirekt</a>
     </div>
   </header>
-  <main class="sheet">
-    <div class="frame">
-      {{template "content" .}}
-    </div>
+  <main class="main narrow">
+    {{template "content" .}}
   </main>
 </body>
 </html>

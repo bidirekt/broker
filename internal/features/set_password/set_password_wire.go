@@ -1,7 +1,9 @@
 package set_password
 
+import "time"
+
 const (
-	PasswordInvalidMessage string = "the password must have 15 to 128 characters"
+	PasswordInvalidMessage string = "the password must have 8 to 128 characters"
 	LinkInvalidMessage     string = "this link is no longer valid, ask your admin for a new one"
 
 	tokenField        = "token"
@@ -14,8 +16,11 @@ const (
 )
 
 type SetPasswordPage struct {
-	Token   string
-	Message string
+	Token     string
+	Email     string
+	ExpiresAt time.Time
+	Field     string
+	Message   string
 }
 
 type LinkInvalidPage struct {

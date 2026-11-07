@@ -49,7 +49,7 @@ func (this *Keeper) Door(ctx fiber.Ctx) error {
 		return ctx.Next()
 	}
 
-	principal, session, ok := this.toPrincipal(ctx)
+	principal, session, ok := this.admitSession(ctx)
 	if !ok {
 		return pages.Redirect(ctx, signInPath)
 	}
@@ -92,7 +92,7 @@ func isSafeMethod(method string) bool {
 	return method == fiber.MethodGet || method == fiber.MethodHead
 }
 
-func (this *Keeper) toPrincipal(ctx fiber.Ctx) (access.Principal, access.Session, bool) {
+func (this *Keeper) admitSession(ctx fiber.Ctx) (access.Principal, access.Session, bool) {
 	cookieValue := ctx.Cookies(this.cookieName())
 	if cookieValue == "" {
 		return access.Principal{}, access.Session{}, false
@@ -120,9 +120,14 @@ func (this *Keeper) toPrincipal(ctx fiber.Ctx) (access.Principal, access.Session
 		return access.Principal{}, access.Session{}, false
 	}
 
-	this.sessions.MarkSeen(ctx.Context(), idHash)
+	admitted := access.Session{IDHash: idHash, CSRFToken: session.CSRFToken}
+	if ctx.Method() == fiber.MethodGet && respond.PageRequested(ctx) {
+		admitted.Messages = this.sessions.MarkSeenTakingMessages(ctx.Context(), idHash)
+	} else {
+		this.sessions.MarkSeen(ctx.Context(), idHash)
+	}
 
-	return principal, access.Session{IDHash: idHash, CSRFToken: session.CSRFToken}, true
+	return principal, admitted, true
 }
 
 func isUnderPath(path, prefix string) bool {
