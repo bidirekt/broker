@@ -50,7 +50,7 @@
 <section class="sheet">
   <div class="sheet-head"><h2 class="h2">Deployment history</h2></div>
   {{if .Deployments}}
-  <table class="t stack">
+  <div class="scroll"><table class="t stack">
     <thead>
       <tr>
         <th scope="col">Environment</th>
@@ -65,7 +65,7 @@
       </tr>
       {{end}}
     </tbody>
-  </table>
+  </table></div>
   {{template "pager" .DeploymentsPager}}
   {{else}}
   <p class="pad muted">not deployed</p>
@@ -74,7 +74,7 @@
 <section class="sheet">
   <div class="sheet-head"><h2 class="h2">All checks</h2></div>
   {{if .Checks}}
-  <table class="t stack">
+  <div class="scroll"><table class="t stack">
     <thead>
       <tr>
         <th scope="col">Check</th>
@@ -101,7 +101,7 @@
       </tr>
       {{end}}
     </tbody>
-  </table>
+  </table></div>
   {{template "pager" .ChecksPager}}
   {{else}}
   <p class="pad muted">not checked yet</p>

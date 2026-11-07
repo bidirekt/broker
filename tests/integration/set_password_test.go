@@ -24,6 +24,7 @@ const (
 	setPasswordFixedExpiry     = "2099-01-02 03:04:00+00"
 	setPasswordForLine         = `<p>For ` + setPasswordUserEmail + `</p>`
 	setPasswordExpiryLine      = `<p>This link works once, until <time class="time" datetime="2099-01-02T03:04:00Z" title="2099-01-02 03:04 UTC">2099-01-02 03:04 UTC</time></p>`
+	setPasswordBigMark         = `<span class="mark big" aria-hidden="true">🤝</span>`
 )
 
 var setPasswordInviteLinkInPage = regexp.MustCompile(`http://localhost:8080(/set-password\?token=([A-Za-z0-9_-]{43}))`)
@@ -225,6 +226,9 @@ func (this *IntegrationSuite) TestSetPassword_UnknownOrMissingTokenShowsTheInval
 		this.Equal(http.StatusGone, status, path)
 		this.Contains(body, `<p role="alert">`+setPasswordLinkInvalid+`</p>`, path)
 		this.Contains(body, `<a class="btn" href="/sign-in">Go to sign in</a>`, path)
+		this.Contains(body, `<section class="sheet errpage">
+  `+setPasswordBigMark+`
+  <h1>Link no longer valid</h1>`, path)
 	}
 }
 
@@ -254,6 +258,9 @@ func (this *IntegrationSuite) TestSetPassword_FormShowsTheEmailAndTheLinkExpiry(
 	this.Equal("no-store", header.Get("Cache-Control"))
 	this.Contains(page, setPasswordForLine)
 	this.Contains(page, setPasswordExpiryLine)
+	this.Contains(page, `<div class="auth-brand">
+  `+setPasswordBigMark+`
+  <h1>Set your password</h1>`)
 
 	status, _, body := this.submitSetPassword(token, "fourteen-chars")
 	this.Equal(http.StatusBadRequest, status)

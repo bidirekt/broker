@@ -42,7 +42,7 @@
 {{end}}
 <section class="sheet">
   {{if .Deployments}}
-  <table class="t stack">
+  <div class="scroll"><table class="t stack">
     <thead>
       <tr>
         <th scope="col">Environment</th>
@@ -59,7 +59,7 @@
       </tr>
       {{end}}
     </tbody>
-  </table>
+  </table></div>
   <p class="sheet-foot legend"><span>{{template "icon_rollback" 12}}rollback: the version had already run in that environment and was deployed again</span></p>
   {{template "pager" .Pager}}
   {{else}}

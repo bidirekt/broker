@@ -10,7 +10,7 @@
 </div>
 <section class="sheet">
   {{if .Page.Environments}}
-  <table class="t stack dep">
+  <div class="scroll"><table class="t stack dep">
     <thead>
       <tr>
         <th scope="col">Environment</th>
@@ -31,7 +31,7 @@
       </tr>
       {{end}}
     </tbody>
-  </table>
+  </table></div>
   {{template "pager" .Page.Pager}}
   {{else}}
   <div class="empty">
