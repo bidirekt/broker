@@ -29,7 +29,7 @@ const (
 		FROM
 			participants
 		WHERE
-			id = $1 AND name = $2
+			id = $1
 		FOR NO KEY UPDATE
 	`
 
@@ -320,7 +320,7 @@ func (this *ContractRepository) Publish(
 	ctx context.Context,
 	contract *model.UploadedContract,
 	diff func(*model.PersistedContract) model.ContractDiff,
-) (found, conflict bool) {
+) (conflict bool) {
 	tx, err := this.pool.Begin(ctx)
 	if err != nil {
 		panic(fmt.Errorf("error starting transaction: %w", err))
@@ -328,18 +328,12 @@ func (this *ContractRepository) Publish(
 
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	// the hashes carry the name the participant was read with, so a rename since then makes this write nothing
-	tag, err := tx.Exec(ctx, lockContractParticipantQuery, contract.ParticipantID, contract.ParticipantName)
-	if err != nil {
+	if _, err := tx.Exec(ctx, lockContractParticipantQuery, contract.ParticipantID); err != nil {
 		panic(fmt.Errorf("error locking contract participant: %w", err))
 	}
 
-	if tag.RowsAffected() == 0 {
-		return false, false
-	}
-
 	if checksum, exists := this.loadChecksumForVersion(ctx, tx, contract.ParticipantID, contract.Version); exists {
-		return true, checksum != contract.Checksum()
+		return checksum != contract.Checksum()
 	}
 
 	if !this.aliasVersionToSnapshot(ctx, tx, contract) {
@@ -354,7 +348,7 @@ func (this *ContractRepository) Publish(
 		panic(fmt.Errorf("error committing transaction: %w", err))
 	}
 
-	return true, false
+	return false
 }
 
 func (this *ContractRepository) insertFirstSnapshot(

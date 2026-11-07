@@ -22,7 +22,6 @@ import (
 	"github.com/bidirekt/broker/internal/features/reactivate_user"
 	"github.com/bidirekt/broker/internal/features/record_deployment"
 	"github.com/bidirekt/broker/internal/features/rename_environment"
-	"github.com/bidirekt/broker/internal/features/rename_participant"
 	"github.com/bidirekt/broker/internal/features/set_password"
 	"github.com/bidirekt/broker/internal/features/setup_admin"
 	"github.com/bidirekt/broker/internal/features/show_check"
@@ -52,7 +51,6 @@ func Run() (*components.Components, error) {
 	validate_contract.Register(kernel)
 	can_i_deploy.Register(kernel)
 	record_deployment.Register(kernel)
-	rename_participant.Register(kernel)
 	rename_environment.Register(kernel)
 	health.Register(kernel)
 	list_participants.Register(kernel)

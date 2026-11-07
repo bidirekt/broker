@@ -121,8 +121,6 @@ func (this *IntegrationSuite) TestInputDoor_RefusesTextThatIsNotUTF8OrCarriesNUL
 			`{"environment":"a\u0000"}`, "environments"},
 		{"environment with NUL after an escaped backslash", "/api/environments", this.writerToken,
 			`{"environment":"a\\\u0000"}`, "environments"},
-		{"rename oldName with NUL", "/api/participants/rename", this.writerToken,
-			`{"oldName":"a\u0000","newName":"b"}`, "participants"},
 		{"rename environment newName with NUL", "/api/environments/rename", this.writerToken,
 			`{"oldName":"production","newName":"a\u0000"}`, "environments"},
 		{"deployment version with NUL", "/api/deployments", this.writerToken,

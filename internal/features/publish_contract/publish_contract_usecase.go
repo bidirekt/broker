@@ -74,13 +74,9 @@ func (this *PublishContractUseCase) Execute(ctx context.Context, input PublishCo
 		return PublishContractOutput{}, err
 	}
 
-	found, conflict := this.contractRepository.Publish(ctx, uploadedContract, func(current *model.PersistedContract) model.ContractDiff {
+	conflict := this.contractRepository.Publish(ctx, uploadedContract, func(current *model.PersistedContract) model.ContractDiff {
 		return contract_differ.DiffContracts(current, uploadedContract)
 	})
-	if !found {
-		return PublishContractOutput{Status: ContractParticipantNotFound}, nil
-	}
-
 	if conflict {
 		return PublishContractOutput{Status: ContractVersionConflict}, nil
 	}
