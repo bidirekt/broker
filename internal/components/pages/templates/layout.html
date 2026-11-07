@@ -30,8 +30,8 @@
     </div>
   </header>
   <main class="main">
-    {{with .Notice}}
-    <div class="flash" role="status">{{template "icon_check" 16}}<span>{{.}}</span></div>
+    {{range .Notices}}
+    <div class="flash" role="status">{{template "icon_check" 16}}<span>{{.Text}}</span></div>
     {{end}}
     {{template "content" .}}
   </main>

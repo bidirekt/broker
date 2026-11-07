@@ -34,7 +34,7 @@ func rolesProvider(participantID int64, participantName string) model.PersistedR
 		Endpoint:           "/orders",
 		Method:             "get",
 		ResponseStatusCode: null.StringFrom("204"),
-		DeployedVersions:   map[string]string{rolesEnvironment: "v1"},
+		ParticipantVersion: null.StringFrom("v1"),
 	}
 }
 
@@ -81,7 +81,10 @@ func rolesReportCheckedFrom(
 
 func TestCompatibleProviderOfTheCheckedConsumerHasTheProviderRole(t *testing.T) {
 	report := rolesReportCheckedFrom("front", []model.PersistedResource{rolesConsumer(1, "front", "orders")},
-		model.ResourceCounterparts{Providers: map[string]model.PersistedResource{rolesHash: rolesProvider(2, "orders")}})
+		model.ResourceCounterparts{
+			Providers:           map[string]model.PersistedResource{rolesHash: rolesProvider(2, "orders")},
+			RegisteredProviders: map[string]model.RegisteredProvider{"orders": {ParticipantID: 2, DeployedVersion: null.StringFrom("v1")}},
+		})
 
 	assert.True(t, report.Results["orders"].Deployable)
 	assert.Equal(t, model.CounterpartProvider, report.Results["orders"].Counterpart.Role)
@@ -120,8 +123,9 @@ func TestSelfConsumptionHasBothRoles(t *testing.T) {
 
 	report := rolesReportCheckedFrom("orders", []model.PersistedResource{provider, consumer},
 		model.ResourceCounterparts{
-			Providers: map[string]model.PersistedResource{rolesHash: provider},
-			Consumers: map[string][]model.PersistedResource{rolesHash: {consumer}},
+			Providers:           map[string]model.PersistedResource{rolesHash: provider},
+			Consumers:           map[string][]model.PersistedResource{rolesHash: {consumer}},
+			RegisteredProviders: map[string]model.RegisteredProvider{"orders": {ParticipantID: 2, DeployedVersion: null.StringFrom("v1")}},
 		})
 
 	assert.Equal(t, model.CounterpartBoth, report.Results["orders"].Counterpart.Role)
@@ -157,7 +161,10 @@ func TestAppendResultMergesTheRolesOfOneCounterpart(t *testing.T) {
 
 func TestCounterpartRoleStaysOffTheWire(t *testing.T) {
 	report := rolesReportCheckedFrom("front", []model.PersistedResource{rolesConsumer(1, "front", "orders")},
-		model.ResourceCounterparts{Providers: map[string]model.PersistedResource{rolesHash: rolesProvider(2, "orders")}})
+		model.ResourceCounterparts{
+			Providers:           map[string]model.PersistedResource{rolesHash: rolesProvider(2, "orders")},
+			RegisteredProviders: map[string]model.RegisteredProvider{"orders": {ParticipantID: 2, DeployedVersion: null.StringFrom("v1")}},
+		})
 
 	wire, err := json.Marshal(report.Hierarchical)
 	require.NoError(t, err)
@@ -169,16 +176,17 @@ func TestUnmatchedRegisteredProviderKeepsItsIdentity(t *testing.T) {
 	cases := []struct {
 		name            string
 		deployedVersion null.String
+		reason          model.BreakingReason
 	}{
-		{"deployed in the environment", null.StringFrom("v7")},
-		{"not deployed in the environment", null.String{}},
+		{"deployed in the environment", null.StringFrom("v7"), model.ReasonProviderResourceNotFound},
+		{"not deployed in the environment", null.String{}, model.ReasonProviderResourceNotDeployedInEnvironment},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			report := rolesReportCheckedFrom("front", []model.PersistedResource{rolesConsumer(1, "front", "orders")},
-				model.ResourceCounterparts{UnmatchedProviders: map[string]model.RegisteredProvider{
-					rolesHash: {ParticipantID: 2, DeployedVersion: tc.deployedVersion},
+				model.ResourceCounterparts{RegisteredProviders: map[string]model.RegisteredProvider{
+					"orders": {ParticipantID: 2, DeployedVersion: tc.deployedVersion},
 				}})
 
 			result := report.Results["orders"]
@@ -186,16 +194,21 @@ func TestUnmatchedRegisteredProviderKeepsItsIdentity(t *testing.T) {
 			assert.Equal(t, tc.deployedVersion, result.Counterpart.ParticipantVersion)
 			assert.Zero(t, result.Counterpart.ContractID)
 			assert.Equal(t, tc.deployedVersion, report.Hierarchical["orders"].Version)
-			assert.Equal(t, model.ReasonProviderResourceNotFound, result.Breaks[0].Reason)
+			require.Len(t, result.Breaks, 1)
+			assert.Equal(t, tc.reason, result.Breaks[0].Reason)
+			assert.Nil(t, result.Breaks[0].Details)
 		})
 	}
 }
 
-func TestUnmatchedNameThatIsNotAParticipantHasNoIdentity(t *testing.T) {
+func TestUnmatchedNameThatIsNotAParticipantIsNotDeployedWithNoIdentity(t *testing.T) {
 	report := rolesReportCheckedFrom("front", []model.PersistedResource{rolesConsumer(1, "front", "orders")},
 		model.ResourceCounterparts{})
 
 	result := report.Results["orders"]
 	assert.Zero(t, result.Counterpart.ParticipantID)
 	assert.False(t, result.Counterpart.ParticipantVersion.Valid)
+	require.Len(t, result.Breaks, 1)
+	assert.Equal(t, model.ReasonProviderResourceNotDeployedInEnvironment, result.Breaks[0].Reason)
+	assert.Nil(t, result.Breaks[0].Details)
 }

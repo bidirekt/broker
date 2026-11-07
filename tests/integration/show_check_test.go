@@ -222,9 +222,9 @@ func (this *IntegrationSuite) TestShowCheck_ShowsAConsumerSideNoWithItsBreaksRea
 	this.Contains(body, `<p class="ix-name">response 200</p>`)
 	this.Contains(body, `<b class="name">petstore_web</b> reads response 200, but <b class="name">petstore_api</b> answers only 204`)
 	this.Contains(body, `petstore_api 1.4.0, deployed in production, declares the endpoint but not this interaction (declared: 204)`)
-	this.Contains(body, `not deployed in production (deployed in: staging)`)
-	this.Contains(body, `petstore_admin is not deployed in production, and no version it published provides this endpoint`)
-	this.Contains(body, `ghost is not a participant of this broker`)
+	this.Equal(3, strings.Count(body, `<p class="muted">not deployed in production</p>`))
+	this.Contains(body, `<b class="name">petstore_web</b> calls <code>GET /admin</code>, but <b class="name">petstore_admin</b> is not deployed in <b class="name">production</b>`)
+	this.Contains(body, `<b class="name">petstore_web</b> calls <code>GET /ghosts</code>, but <b class="name">ghost</b> is not deployed in <b class="name">production</b>`)
 
 	this.Contains(body, `<span class="prop">FIELD</span><span>Pet.status</span><span class="badge">2 places</span>`)
 	this.Contains(body, `<b class="name">petstore_web</b> reads it, but <b class="name">petstore_api</b> doesn&#39;t provide it`)
@@ -244,7 +244,7 @@ func (this *IntegrationSuite) environmentPathForShowCheck(name string) string {
 	return "/environments/" + strconv.FormatInt(id, 10)
 }
 
-func (this *IntegrationSuite) TestShowCheck_LinksTheCheckEnvironmentButNeitherTheSummaryNorTheDeployedEnvironments() {
+func (this *IntegrationSuite) TestShowCheck_LinksTheCheckEnvironmentButNotTheSummaryAndNamesNoOtherEnvironment() {
 	checkPath := this.consumerSideCheckForShowCheck()
 
 	_, _, body := this.getPage(checkPath, this.signInAsAdmin())
@@ -260,8 +260,7 @@ func (this *IntegrationSuite) TestShowCheck_LinksTheCheckEnvironmentButNeitherTh
 	this.Contains(summaries[2][1], `no · 2 breaks`)
 	this.Contains(summaries[3][1], `no · 1 break</span>`)
 	this.Contains(body, `<div><dt>Environment</dt><dd><a class="name" href="`+this.environmentPathForShowCheck("production")+`">production</a></dd></div>`)
-	this.Contains(body, `not deployed in production (deployed in: staging)`)
-	this.NotContains(body, `href="`+this.environmentPathForShowCheck("staging")+`"`)
+	this.NotContains(body, "staging")
 }
 
 func (this *IntegrationSuite) TestShowCheck_LinksTheCheckedParticipantAndItsVersion() {

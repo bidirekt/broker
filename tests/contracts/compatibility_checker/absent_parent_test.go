@@ -140,7 +140,7 @@ func groupsResources(interaction string, consumerBody, providerBody groupsBody) 
 		ResponseStatusCode: status,
 		Bodies:             providerBody.bodies,
 		Schemas:            providerBody.schemas,
-		DeployedVersions:   map[string]string{groupsEnvironment: "1.0.0"},
+		ParticipantVersion: null.StringFrom("1.0.0"),
 	}
 
 	return consumer, provider
@@ -184,7 +184,8 @@ func assertGroupsBreaks(
 
 	t.Run("checked from the consumer", func(t *testing.T) {
 		assert.Equal(t, expected, groupsBreaksCheckedFrom(consumer, model.ResourceCounterparts{
-			Providers: map[string]model.PersistedResource{groupsProviderHash: provider},
+			Providers:           map[string]model.PersistedResource{groupsProviderHash: provider},
+			RegisteredProviders: map[string]model.RegisteredProvider{groupsProviderName: {DeployedVersion: null.StringFrom("1.0.0")}},
 		}, groupsProviderName, interaction))
 	})
 

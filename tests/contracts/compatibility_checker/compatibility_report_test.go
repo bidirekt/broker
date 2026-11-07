@@ -59,7 +59,7 @@ func postPetsResources(
 		ResponseStatusCode: status,
 		Bodies:             []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Pet")}},
 		Schemas:            model.Schemas{"Pet": providerSchema},
-		DeployedVersions:   map[string]string{production: "1.0.0"},
+		ParticipantVersion: null.StringFrom("1.0.0"),
 	}
 
 	return consumer, provider
@@ -108,7 +108,8 @@ func TestFreshPropertyBreaksCarryTheRoleOfTheCheckedSide(t *testing.T) {
 
 		t.Run(string(tc.reason)+" in "+tc.interaction+" checked from the consumer", func(t *testing.T) {
 			report := checkFrom(consumer, model.ResourceCounterparts{
-				Providers: map[string]model.PersistedResource{postPetsHash: provider},
+				Providers:           map[string]model.PersistedResource{postPetsHash: provider},
+				RegisteredProviders: map[string]model.RegisteredProvider{petstoreAPI: {DeployedVersion: null.StringFrom("1.0.0")}},
 			})
 
 			leaves := report.Hierarchical[petstoreAPI].Endpoints["/pets"]["post"][tc.interaction]
@@ -134,9 +135,6 @@ func TestFreshResourceBreaksCarryTheirFixedRole(t *testing.T) {
 	pet := model.Schema{"": {Type: "object"}, "name": {Type: "string"}}
 	consumer, provider := postPetsResources("201", pet, pet)
 
-	undeployed := provider
-	undeployed.DeployedVersions = map[string]string{"staging": "1.0.0"}
-
 	removed := provider
 	removed.Removed = true
 
@@ -148,20 +146,20 @@ func TestFreshResourceBreaksCarryTheirFixedRole(t *testing.T) {
 		role         model.BreakRole
 	}{
 		{
-			reason:       model.ReasonProviderResourceNotFound,
+			reason:  model.ReasonProviderResourceNotFound,
+			checked: consumer,
+			counterparts: model.ResourceCounterparts{
+				RegisteredProviders: map[string]model.RegisteredProvider{petstoreAPI: {DeployedVersion: null.StringFrom("1.0.0")}},
+			},
+			counterpart: petstoreAPI,
+			role:        model.RoleConsumer,
+		},
+		{
+			reason:       model.ReasonProviderResourceNotDeployedInEnvironment,
 			checked:      consumer,
 			counterparts: model.ResourceCounterparts{},
 			counterpart:  petstoreAPI,
 			role:         model.RoleConsumer,
-		},
-		{
-			reason:  model.ReasonProviderResourceNotDeployedInEnvironment,
-			checked: consumer,
-			counterparts: model.ResourceCounterparts{
-				Providers: map[string]model.PersistedResource{postPetsHash: undeployed},
-			},
-			counterpart: petstoreAPI,
-			role:        model.RoleConsumer,
 		},
 		{
 			reason:  model.ReasonProviderResourceRemovedButStillConsumed,
@@ -251,7 +249,8 @@ func TestFreshBreaksOfAnInteractionAreSortedByProperty(t *testing.T) {
 	consumer, provider := postPetsResources("201", readByTheConsumer, model.Schema{"": {Type: "object"}})
 
 	report := checkFrom(consumer, model.ResourceCounterparts{
-		Providers: map[string]model.PersistedResource{postPetsHash: provider},
+		Providers:           map[string]model.PersistedResource{postPetsHash: provider},
+		RegisteredProviders: map[string]model.RegisteredProvider{petstoreAPI: {DeployedVersion: null.StringFrom("1.0.0")}},
 	})
 
 	var properties []string

@@ -158,7 +158,7 @@ func (this *IntegrationSuite) TestCompatibilityPersistence_BootstrapCheckRecords
 	this.True(deployable)
 }
 
-func (this *IntegrationSuite) TestCompatibilityPersistence_NotFoundCounterpartKeepsItsName() {
+func (this *IntegrationSuite) TestCompatibilityPersistence_CounterpartThatIsNotAParticipantKeepsItsName() {
 	this.mustPostForPersistence("/api/participants", `{"participant":"front"}`)
 	this.mustPostForPersistence("/api/environments", `{"environment":"production"}`)
 	this.mustPostForPersistence("/api/contracts",
@@ -171,7 +171,7 @@ func (this *IntegrationSuite) TestCompatibilityPersistence_NotFoundCounterpartKe
 	var got persistenceCanIDeployResponse
 	this.Require().NoError(json.Unmarshal([]byte(body), &got))
 	this.False(got.Deployable)
-	this.Equal("provider_resource_not_found",
+	this.Equal("provider_resource_not_deployed_in_environment",
 		got.Results["ghost"].Endpoints["/ghosts"]["get"]["200"][0].Reason)
 
 	this.Equal(1, this.countRows("compatibility_checks"))

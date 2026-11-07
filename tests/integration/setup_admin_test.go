@@ -103,6 +103,7 @@ func (this *IntegrationSuite) TestSetupAdmin_PageAsksForTheAdminsEmailAndPasswor
 
 	this.Equal(http.StatusOK, status)
 	this.Equal("text/html; charset=utf-8", header.Get("Content-Type"))
+	this.Equal("no-store", header.Get("Cache-Control"))
 	this.Contains(body, "<h1>Create the admin</h1>")
 	this.Contains(body, `<form class="sheet formcard" method="post" action="/setup">`)
 	this.Contains(body, `<input class="input" id="email" name="email" type="text" inputmode="email" autocomplete="email" value="" required autofocus>`)

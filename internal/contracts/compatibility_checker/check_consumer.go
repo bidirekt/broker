@@ -4,27 +4,33 @@ import (
 	"context"
 
 	"github.com/bidirekt/broker/internal/model"
-	"github.com/guregu/null"
 )
 
 func (this *CompatibilityChecker) checkConsumer(
 	ctx context.Context,
 	consumerResource model.PersistedResource,
-	environment *model.Environment,
 	counterparts model.ResourceCounterparts,
 	pairs *checkedPairs,
 	report *ContractCompatibilityReport,
 ) {
-	providerResource, found := counterparts.Providers[consumerResource.ProviderHash]
+	providerName := consumerResource.ConsumedProvider.String
+	registered := counterparts.RegisteredProviders[providerName]
 
 	result := NewCounterpartResult()
 	result.Counterpart.Role = model.CounterpartProvider
+	result.Counterpart.ParticipantID = registered.ParticipantID
 
+	if !registered.DeployedVersion.Valid {
+		result.AppendContractBreakChange(NewProviderResourceNotDeployed(&consumerResource))
+
+		report.AppendResult(providerName, result)
+
+		return
+	}
+
+	providerResource, found := counterparts.Providers[consumerResource.ProviderHash]
 	if !found {
-		if registered, isParticipant := counterparts.UnmatchedProviders[consumerResource.ProviderHash]; isParticipant {
-			result.Counterpart.ParticipantID = registered.ParticipantID
-			result.Counterpart.ParticipantVersion = registered.DeployedVersion
-		}
+		result.Counterpart.ParticipantVersion = registered.DeployedVersion
 
 		notFound := NewProviderResourceNotFound(&consumerResource)
 		if providerStatuses, declaresMethod := counterparts.ProviderStatuses[consumerResource.ProviderHash]; declaresMethod {
@@ -33,27 +39,11 @@ func (this *CompatibilityChecker) checkConsumer(
 
 		result.AppendContractBreakChange(notFound)
 
-		report.AppendResult(consumerResource.ConsumedProvider.String, result)
+		report.AppendResult(providerName, result)
 
 		return
 	}
 
-	version, deployed := providerResource.DeployedVersionIn(environment.Name)
-	if !deployed {
-		result.Counterpart.ParticipantID = providerResource.ParticipantID
-
-		result.AppendContractBreakChange(NewProviderResourceNotDeployed(
-			&consumerResource,
-			providerResource.DeployedEnvironments(),
-		))
-
-		report.AppendResult(consumerResource.ConsumedProvider.String, result)
-
-		return
-	}
-
-	providerResource.ParticipantVersion = null.StringFrom(version)
-	result.Counterpart.ParticipantID = providerResource.ParticipantID
 	result.Counterpart.ContractID = providerResource.ContractID
 	result.Counterpart.ParticipantVersion = providerResource.ParticipantVersion
 	result.Counterpart.ParticipantName = providerResource.ParticipantName
@@ -69,5 +59,5 @@ func (this *CompatibilityChecker) checkConsumer(
 		}
 	}
 
-	report.AppendResult(consumerResource.ConsumedProvider.String, result)
+	report.AppendResult(providerName, result)
 }

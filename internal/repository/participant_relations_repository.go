@@ -177,13 +177,13 @@ func (this *ParticipantRepository) ListConsumersByEnvironment(ctx context.Contex
 	var environments []model.EnvironmentConsumers
 	for rows.Next() {
 		var environment model.Environment
-		var consumer model.DeployedConsumer
-		if err := rows.Scan(&environment.ID, &environment.Name, &consumer.Name, &consumer.Version); err != nil {
+		consumer := model.Deployment{Participant: &model.Participant{}}
+		if err := rows.Scan(&environment.ID, &environment.Name, &consumer.Participant.Name, &consumer.Version); err != nil {
 			panic(fmt.Errorf("error scanning consumers by environment: %w", err))
 		}
 
-		if len(environments) == 0 || environments[len(environments)-1].EnvironmentID != environment.ID {
-			environments = append(environments, model.EnvironmentConsumers{EnvironmentID: environment.ID, EnvironmentName: environment.Name})
+		if len(environments) == 0 || environments[len(environments)-1].Environment.ID != environment.ID {
+			environments = append(environments, model.EnvironmentConsumers{Environment: environment})
 		}
 		last := &environments[len(environments)-1]
 		last.Consumers = append(last.Consumers, consumer)

@@ -19,12 +19,6 @@ type ConsumedProvider struct {
 }
 
 type EnvironmentConsumers struct {
-	EnvironmentID   int64
-	EnvironmentName string
-	Consumers       []DeployedConsumer
-}
-
-type DeployedConsumer struct {
-	Name    string
-	Version string
+	Environment Environment
+	Consumers   []Deployment
 }

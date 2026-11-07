@@ -122,7 +122,7 @@ func (this *Keeper) admitSession(ctx fiber.Ctx) (access.Principal, access.Sessio
 
 	admitted := access.Session{IDHash: idHash, CSRFToken: session.CSRFToken}
 	if ctx.Method() == fiber.MethodGet && respond.PageRequested(ctx) {
-		admitted.Message = this.sessions.MarkSeenTakingMessage(ctx.Context(), idHash)
+		admitted.Messages = this.sessions.MarkSeenTakingMessages(ctx.Context(), idHash)
 	} else {
 		this.sessions.MarkSeen(ctx.Context(), idHash)
 	}

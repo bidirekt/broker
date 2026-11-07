@@ -76,20 +76,9 @@ func reasonLine(checked checkedInteraction, contractBreak storedBreak) string {
 
 	switch contractBreak.Reason {
 	case model.ReasonProviderResourceNotDeployedInEnvironment:
-		line := "not deployed in " + environment
-		if environments := contractBreak.Details["deployedEnvironments"]; environments != "" {
-			line += " (deployed in: " + environments + ")"
-		}
-		return line
+		return "not deployed in " + environment
 	case model.ReasonProviderResourceNotFound:
-		switch {
-		case counterpart.Version != "":
-			return deployedCounterpart + ", deployed in " + environment + ", doesn't provide this endpoint"
-		case counterpart.Registered:
-			return counterpart.Name + " is not deployed in " + environment + ", and no version it published provides this endpoint"
-		default:
-			return counterpart.Name + " is not a participant of this broker"
-		}
+		return deployedCounterpart + ", deployed in " + environment + ", doesn't provide this endpoint"
 	case model.ReasonProviderResourceInteractionNotFound:
 		line := deployedCounterpart + ", deployed in " + environment + ", declares the endpoint but not this interaction"
 		if statuses := contractBreak.Details["providerStatuses"]; statuses != "" {

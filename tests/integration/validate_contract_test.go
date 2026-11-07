@@ -546,7 +546,8 @@ func (this *IntegrationSuite) TestValidateContract_ConsumerOfNeverPublishedProvi
 	this.False(response.Deployable)
 	breaks := response.Results["catalog"].Endpoints["/items"]["get"]["200"]
 	this.Require().Len(breaks, 1)
-	this.Equal("provider_resource_not_found", breaks[0].Reason)
+	this.Equal("provider_resource_not_deployed_in_environment", breaks[0].Reason)
+	this.Nil(breaks[0].Details)
 }
 
 func (this *IntegrationSuite) TestValidateContract_ConsumerOfProviderNotDeployedInEnvironment() {

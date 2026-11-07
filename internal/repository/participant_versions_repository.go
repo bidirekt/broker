@@ -81,6 +81,15 @@ const (
 			e.name COLLATE "C"
 	`
 
+	countParticipantPublishedVersionsQuery = `
+		SELECT
+			COUNT(*)
+		FROM
+			contract_versions
+		WHERE
+			participant_id = $1
+	`
+
 	listParticipantPublishedVersionsQuery = `
 		SELECT
 			cv.version,
@@ -153,13 +162,28 @@ func (this *ParticipantVersionsRepository) listDeployedNow(ctx context.Context, 
 	return deployed
 }
 
-func (this *ParticipantVersionsRepository) ListPublishedVersions(ctx context.Context, participantID int64, limit, offset int) []model.PublishedVersion {
-	rows, err := this.pool.Query(ctx, listParticipantPublishedVersionsQuery, participantID, limit, offset)
+func (this *ParticipantVersionsRepository) ListPublishedVersions(
+	ctx context.Context,
+	participantID int64,
+	limit, offset int,
+) (versions []model.PublishedVersion, total int) {
+	tx, err := this.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	if err != nil {
+		panic(fmt.Errorf("error starting transaction: %w", err))
+	}
+
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if err := tx.QueryRow(ctx, countParticipantPublishedVersionsQuery, participantID).Scan(&total); err != nil {
+		panic(fmt.Errorf("error counting participant published versions: %w", err))
+	}
+
+	rows, err := tx.Query(ctx, listParticipantPublishedVersionsQuery, participantID, limit, offset)
 	if err != nil {
 		panic(fmt.Errorf("error listing participant published versions: %w", err))
 	}
 
-	versions, err := pgx.AppendRows(make([]model.PublishedVersion, 0), rows, func(row pgx.CollectableRow) (model.PublishedVersion, error) {
+	versions, err = pgx.AppendRows(make([]model.PublishedVersion, 0), rows, func(row pgx.CollectableRow) (model.PublishedVersion, error) {
 		var (
 			version          model.PublishedVersion
 			environmentIDs   []int64
@@ -180,5 +204,5 @@ func (this *ParticipantVersionsRepository) ListPublishedVersions(ctx context.Con
 		panic(fmt.Errorf("error scanning participant published versions: %w", err))
 	}
 
-	return versions
+	return versions, total
 }

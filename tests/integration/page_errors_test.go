@@ -76,6 +76,7 @@ func (this *IntegrationSuite) TestUnhappyPath_UnknownPageAnswers404AsHTMLWithCSP
 	status, header, body := this.requestPage("GET", "/no-such-page")
 	this.Equal(http.StatusNotFound, status)
 	this.Equal("text/html; charset=utf-8", header.Get("Content-Type"))
+	this.Equal("no-store", header.Get("Cache-Control"))
 	this.Equal(pageContentSecurityPolicy, header.Get("Content-Security-Policy"))
 	this.Contains(body, "<!doctype html>")
 	this.Contains(body, `<div class="code-n">404</div>`)

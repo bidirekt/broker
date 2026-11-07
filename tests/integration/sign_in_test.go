@@ -52,6 +52,7 @@ func (this *IntegrationSuite) TestSignIn_PageShowsOneFormWithCSP() {
 	status, header, body := this.getPage("/sign-in", "")
 	this.Equal(http.StatusOK, status)
 	this.Equal("text/html; charset=utf-8", header.Get("Content-Type"))
+	this.Equal("no-store", header.Get("Cache-Control"))
 	this.Equal(signInPageContentSecurityPolicy, header.Get("Content-Security-Policy"))
 	this.Equal(1, strings.Count(body, "<form"))
 	this.Contains(body, `<form class="sheet formcard" method="post" action="/sign-in">`)

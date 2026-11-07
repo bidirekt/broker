@@ -107,11 +107,12 @@ func ordersBreaks(t *testing.T, interaction string, consumerSide, providerSide o
 		ResponseStatusCode: status,
 		Bodies:             providerSide.bodies,
 		Schemas:            providerSide.schemas,
-		DeployedVersions:   map[string]string{ordersEnvironment: "1.0.0"},
+		ParticipantVersion: null.StringFrom("1.0.0"),
 	}
 
 	fromTheConsumer := ordersBreaksCheckedFrom(consumer, model.ResourceCounterparts{
-		Providers: map[string]model.PersistedResource{ordersProviderHash: provider},
+		Providers:           map[string]model.PersistedResource{ordersProviderHash: provider},
+		RegisteredProviders: map[string]model.RegisteredProvider{ordersProviderName: {DeployedVersion: null.StringFrom("1.0.0")}},
 	}, ordersProviderName, interaction)
 
 	fromTheProvider := ordersBreaksCheckedFrom(provider, model.ResourceCounterparts{

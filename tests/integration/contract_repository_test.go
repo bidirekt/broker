@@ -332,7 +332,7 @@ func (this *IntegrationSuite) assertEveryReadReturnsTheFileResourceWithAnUndescr
 	this.Require().True(found, "provider resource of a consumer")
 	this.Equal("/files/*", provider.Endpoint, "provider resource of a consumer")
 	this.Equal(undescribed, provider.Bodies, "provider resource of a consumer")
-	this.Equal(map[string]string{"production": providerVersion}, provider.DeployedVersions, "provider resource of a consumer")
+	this.Equal(null.StringFrom(providerVersion), provider.ParticipantVersion, "provider resource of a consumer")
 
 	consumers := repo.GetConsumersResourcesByProviderHashAndEnvironmentID(ctx, providerResource.ProviderHash, environmentID)
 	this.Require().Len(consumers, 1, "consumers of a provider")
@@ -744,7 +744,7 @@ func (this *IntegrationSuite) TestContractRepository_CounterpartReads_CarryTheCa
 	this.Equal(consumers[0].Schemas, counterparts.Consumers[consumer.ProviderHash][0].Schemas)
 }
 
-const missingEndpointsOrdersContract = `provides:
+const registeredNamesOrdersContract = `provides:
   rest:
     /orders:
       get:
@@ -752,30 +752,40 @@ const missingEndpointsOrdersContract = `provides:
           204: ~
 `
 
-const missingEndpointsFrontContract = `consumes:
+const registeredNamesBillingContract = `provides:
+  rest:
+    /invoices:
+      get:
+        responses:
+          200: ~
+`
+
+const registeredNamesFrontContract = `consumes:
   orders:
     rest:
-      /owners:
+      /orders:
+        get:
+          responses:
+            204: ~
+      /pets:
         get:
           responses:
             200: ~
-      /pets:
+  billing:
+    rest:
+      /invoices:
         get:
           responses:
             200: ~
   ghost:
     rest:
-      /owners:
-        get:
-          responses:
-            200: ~
-      /pets:
+      /ghosts:
         get:
           responses:
             200: ~
 `
 
-func (this *IntegrationSuite) TestContractRepository_MissingProviderEndpoints_EachCarryTheParticipantRegisteredUnderItsName() {
+func (this *IntegrationSuite) TestContractRepository_LoadCounterparts_CarriesEachRegisteredNameAndLoadsOnlyDeployedProviders() {
 	ctx := context.Background()
 	repo := repository.NewContractRepository(this.Pool)
 	mustPost := func(path, body string) {
@@ -785,14 +795,17 @@ func (this *IntegrationSuite) TestContractRepository_MissingProviderEndpoints_Ea
 
 	mustPost("/api/environments", `{"environment":"production"}`)
 	mustPost("/api/participants", `{"participant":"orders"}`)
+	mustPost("/api/participants", `{"participant":"billing"}`)
 	mustPost("/api/participants", `{"participant":"front"}`)
-	mustPost("/api/contracts", this.publishBody("orders", "1", contractFragment{"api.yaml", missingEndpointsOrdersContract}))
+	mustPost("/api/contracts", this.publishBody("orders", "1", contractFragment{"api.yaml", registeredNamesOrdersContract}))
 	mustPost("/api/deployments", `{"participant":"orders","version":"1","environment":"production"}`)
-	mustPost("/api/contracts", this.publishBody("front", "1", contractFragment{"web.yaml", missingEndpointsFrontContract}))
+	mustPost("/api/contracts", this.publishBody("billing", "1", contractFragment{"api.yaml", registeredNamesBillingContract}))
+	mustPost("/api/contracts", this.publishBody("front", "1", contractFragment{"web.yaml", registeredNamesFrontContract}))
 
-	var environmentID, ordersID int64
+	var environmentID, ordersID, billingID int64
 	this.Require().NoError(this.Pool.QueryRow(ctx, `SELECT id FROM environments WHERE name = 'production'`).Scan(&environmentID))
 	this.Require().NoError(this.Pool.QueryRow(ctx, `SELECT id FROM participants WHERE name = 'orders'`).Scan(&ordersID))
+	this.Require().NoError(this.Pool.QueryRow(ctx, `SELECT id FROM participants WHERE name = 'billing'`).Scan(&billingID))
 
 	front, found := repo.GetContractByNameAndVersion(ctx, "front", "1")
 	this.Require().True(found)
@@ -804,9 +817,17 @@ func (this *IntegrationSuite) TestContractRepository_MissingProviderEndpoints_Ea
 
 	counterparts := repo.LoadCounterparts(ctx, front, environmentID)
 
-	orders := model.RegisteredProvider{ParticipantID: ordersID, DeployedVersion: null.StringFrom("1")}
 	this.Equal(map[string]model.RegisteredProvider{
-		providerHashes["orders /owners"]: orders,
-		providerHashes["orders /pets"]:   orders,
-	}, counterparts.UnmatchedProviders)
+		"orders":  {ParticipantID: ordersID, DeployedVersion: null.StringFrom("1")},
+		"billing": {ParticipantID: billingID},
+	}, counterparts.RegisteredProviders)
+	this.Require().Len(counterparts.Providers, 1)
+	orders, found := counterparts.Providers[providerHashes["orders /orders"]]
+	this.Require().True(found)
+	this.Equal(ordersID, orders.ParticipantID)
+	this.Equal(null.StringFrom("1"), orders.ParticipantVersion)
+	this.Empty(counterparts.ProviderStatuses)
+
+	_, found = repo.GetProviderResourceByProviderHashAndEnvironmentID(ctx, providerHashes["billing /invoices"], environmentID)
+	this.False(found)
 }

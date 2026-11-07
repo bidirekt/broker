@@ -6,6 +6,7 @@ import (
 	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/components/pages"
 	"github.com/bidirekt/broker/internal/components/sessions"
+	"github.com/bidirekt/broker/internal/model"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -45,7 +46,7 @@ func (this *UpdateProfileUiHandler) UpdateProfile(ctx fiber.Ctx) error {
 		return this.render(ctx, fiber.StatusBadRequest, newPasswordFormField, PasswordInvalidMessage)
 	}
 
-	this.sessionKeeper.SetMessage(ctx, PasswordChangedMessage)
+	this.sessionKeeper.AddMessage(ctx, model.MessageSuccess, PasswordChangedMessage)
 	return pages.Redirect(ctx, profilePath)
 }
 

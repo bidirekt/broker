@@ -136,7 +136,7 @@ func participantURL(participantName string) string {
 }
 
 func versionURL(participantName, version string) string {
-	if version == "." || version == ".." {
+	if version == "" || version == "." || version == ".." {
 		return ""
 	}
 

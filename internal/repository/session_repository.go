@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/bidirekt/broker/internal/model"
-	"github.com/guregu/null"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -44,21 +43,21 @@ const (
 	`
 
 	// a CTE read only in RETURNING would return NULL; RETURNING OLD needs Postgres 18 and the compose runs 17
-	markSessionSeenTakingMessageQuery = `
+	markSessionSeenTakingMessagesQuery = `
 		UPDATE sessions s
 		SET
-			last_seen_at = now(), message = NULL
+			last_seen_at = now(), messages = NULL
 		FROM
-			(SELECT id_hash, message FROM sessions WHERE id_hash = $1 FOR UPDATE) prior
+			(SELECT id_hash, messages FROM sessions WHERE id_hash = $1 FOR UPDATE) prior
 		WHERE
 			s.id_hash = prior.id_hash
-		RETURNING prior.message
+		RETURNING coalesce(prior.messages, '[]'::jsonb)
 	`
 
-	setSessionMessageQuery = `
+	addSessionMessageQuery = `
 		UPDATE sessions
 		SET
-			message = $2
+			messages = coalesce(messages, '[]'::jsonb) || jsonb_build_array(jsonb_build_object('kind', $2::text, 'text', $3::text))
 		WHERE
 			id_hash = $1
 	`
@@ -129,23 +128,23 @@ func (this *SessionRepository) MarkSeen(ctx context.Context, idHash []byte) {
 	}
 }
 
-func (this *SessionRepository) MarkSeenTakingMessage(ctx context.Context, idHash []byte) (message string) {
-	var taken null.String
-	err := this.pool.QueryRow(ctx, markSessionSeenTakingMessageQuery, idHash).Scan(&taken)
+func (this *SessionRepository) MarkSeenTakingMessages(ctx context.Context, idHash []byte) []model.SessionMessage {
+	taken := []model.SessionMessage{}
+	err := this.pool.QueryRow(ctx, markSessionSeenTakingMessagesQuery, idHash).Scan(&taken)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return ""
+		return []model.SessionMessage{}
 	}
 
 	if err != nil {
-		panic(fmt.Errorf("error marking session seen taking its message: %w", err))
+		panic(fmt.Errorf("error marking session seen taking its messages: %w", err))
 	}
 
-	return taken.String
+	return taken
 }
 
-func (this *SessionRepository) SetMessage(ctx context.Context, idHash []byte, message string) {
-	if _, err := this.pool.Exec(ctx, setSessionMessageQuery, idHash, message); err != nil {
-		panic(fmt.Errorf("error setting session message: %w", err))
+func (this *SessionRepository) AddMessage(ctx context.Context, idHash []byte, message model.SessionMessage) {
+	if _, err := this.pool.Exec(ctx, addSessionMessageQuery, idHash, message.Kind, message.Text); err != nil {
+		panic(fmt.Errorf("error adding session message: %w", err))
 	}
 }
 

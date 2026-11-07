@@ -50,7 +50,7 @@ func (this *CreateEnvironmentUiHandler) Create(ctx fiber.Ctx) error {
 		return this.respondProblem(ctx, fiber.StatusConflict, page, EnvironmentAlreadyExistsMessage)
 	}
 
-	this.sessionKeeper.SetMessage(ctx, EnvironmentCreatedMessage)
+	this.sessionKeeper.AddMessage(ctx, model.MessageSuccess, EnvironmentCreatedMessage)
 	return pages.Redirect(ctx, environmentPathPrefix+strconv.FormatInt(output.ID, 10))
 }
 

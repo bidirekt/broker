@@ -343,3 +343,17 @@ func (this *IntegrationSuite) TestShowOverview_IndexesExist() {
 		this.Equal(1, count, index.definition)
 	}
 }
+
+func (this *IntegrationSuite) TestLatestContractVersions_JoinOnAParticipantScansOnlyItsVersions() {
+	var plan string
+	this.Require().NoError(this.Pool.QueryRow(context.Background(), `
+		EXPLAIN (FORMAT JSON)
+		SELECT p.id, lv.version
+		FROM participants p
+		LEFT JOIN latest_contract_versions lv ON lv.participant_id = p.id
+		WHERE p.name = $1
+	`, "petstore_api").Scan(&plan))
+
+	this.Contains(plan, `"Relation Name": "contract_versions"`)
+	this.NotContains(plan, `"Node Type": "Unique"`)
+}

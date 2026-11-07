@@ -19,7 +19,7 @@ type Principal struct {
 type Session struct {
 	IDHash    []byte
 	CSRFToken string
-	Message   string
+	Messages  []model.SessionMessage
 }
 
 type principalKey struct{}

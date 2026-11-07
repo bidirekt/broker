@@ -12,7 +12,8 @@ type counterpartVersionResult struct {
 }
 
 type counterpartVersionLeaf struct {
-	Reason string `json:"reason"`
+	Reason  string            `json:"reason"`
+	Details map[string]string `json:"details"`
 }
 
 type counterpartVersionResponse struct {
@@ -145,34 +146,51 @@ func (this *IntegrationSuite) TestCounterpartVersion_DeployedProviderWithoutTheS
 		counterpartVersionMissingStatusYAML, "provider_resource_interaction_not_found", "/orders")
 }
 
-func (this *IntegrationSuite) TestCounterpartVersion_RegisteredProviderNotDeployedHereHasNoVersion() {
+func (this *IntegrationSuite) assertOrdersNotDeployedForCounterpartVersion(participantID *int64) {
+	for name, result := range this.checkFrontForCounterpartVersion(counterpartVersionMissingEndpointYAML) {
+		leaves := result.Endpoints["/pets"]["get"]["200"]
+		this.Require().Lenf(leaves, 1, name)
+		this.Equalf("provider_resource_not_deployed_in_environment", leaves[0].Reason, name)
+		this.Nilf(leaves[0].Details, name)
+		this.Nilf(result.ParticipantVersion, name)
+	}
+
+	row := this.storedOrdersRowForCounterpartVersion()
+	this.Equal(participantID, row.ParticipantID)
+	this.Nil(row.Version)
+}
+
+func (this *IntegrationSuite) TestCounterpartVersion_ProviderDeployedOnlyElsewhereIsNotDeployedWithNoVersion() {
 	this.setupForCounterpartVersion()
 	this.publishForCounterpartVersion("orders", "v1", counterpartVersionProviderYAML)
 	this.deployForCounterpartVersion("orders", "v1", "staging")
 	this.publishForCounterpartVersion("front", "v1", counterpartVersionMissingEndpointYAML)
 
-	for name, result := range this.checkFrontForCounterpartVersion(counterpartVersionMissingEndpointYAML) {
-		this.Equalf("provider_resource_not_found", result.Endpoints["/pets"]["get"]["200"][0].Reason, name)
-		this.Nilf(result.ParticipantVersion, name)
-	}
-
-	row := this.storedOrdersRowForCounterpartVersion()
-	this.Require().NotNil(row.ParticipantID)
-	this.Equal(this.ordersIDForCounterpartVersion(), *row.ParticipantID)
-	this.Nil(row.Version)
+	ordersID := this.ordersIDForCounterpartVersion()
+	this.assertOrdersNotDeployedForCounterpartVersion(&ordersID)
 }
 
-func (this *IntegrationSuite) TestCounterpartVersion_RegisteredProviderNeverPublishedHasNoVersion() {
+func (this *IntegrationSuite) TestCounterpartVersion_ProviderDeployedNowhereWithoutTheEndpointIsNotDeployedWithNoVersion() {
+	this.setupForCounterpartVersion()
+	this.publishForCounterpartVersion("orders", "v1", counterpartVersionProviderYAML)
+	this.publishForCounterpartVersion("front", "v1", counterpartVersionMissingEndpointYAML)
+
+	ordersID := this.ordersIDForCounterpartVersion()
+	this.assertOrdersNotDeployedForCounterpartVersion(&ordersID)
+}
+
+func (this *IntegrationSuite) TestCounterpartVersion_RegisteredProviderNeverPublishedIsNotDeployedWithNoVersion() {
 	this.setupForCounterpartVersion()
 	this.publishForCounterpartVersion("front", "v1", counterpartVersionMissingEndpointYAML)
 
-	for name, result := range this.checkFrontForCounterpartVersion(counterpartVersionMissingEndpointYAML) {
-		this.Equalf("provider_resource_not_found", result.Endpoints["/pets"]["get"]["200"][0].Reason, name)
-		this.Nilf(result.ParticipantVersion, name)
-	}
+	ordersID := this.ordersIDForCounterpartVersion()
+	this.assertOrdersNotDeployedForCounterpartVersion(&ordersID)
+}
 
-	row := this.storedOrdersRowForCounterpartVersion()
-	this.Require().NotNil(row.ParticipantID)
-	this.Equal(this.ordersIDForCounterpartVersion(), *row.ParticipantID)
-	this.Nil(row.Version)
+func (this *IntegrationSuite) TestCounterpartVersion_NameThatIsNotAParticipantIsNotDeployedWithNoParticipant() {
+	this.mustPostForCounterpartVersion("/api/environments", `{"environment":"production"}`)
+	this.mustPostForCounterpartVersion("/api/participants", `{"participant":"front"}`)
+	this.publishForCounterpartVersion("front", "v1", counterpartVersionMissingEndpointYAML)
+
+	this.assertOrdersNotDeployedForCounterpartVersion(nil)
 }

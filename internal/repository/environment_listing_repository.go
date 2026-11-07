@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/bidirekt/broker/internal/model"
+	"github.com/guregu/null"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -71,10 +72,24 @@ func (this *EnvironmentListingRepository) List(ctx context.Context, limit, offse
 	}
 
 	environments, err = pgx.AppendRows(make([]*model.EnvironmentListing, 0), rows, func(row pgx.CollectableRow) (*model.EnvironmentListing, error) {
-		environment := &model.EnvironmentListing{}
-		err := row.Scan(&environment.ID, &environment.Name, &environment.DeployedParticipantCount,
-			&environment.LastDeploymentParticipant, &environment.LastDeploymentVersion, &environment.LastDeployedAt)
-		return environment, err
+		var (
+			environment              = &model.EnvironmentListing{}
+			participantName, version null.String
+			deployedAt               null.Time
+		)
+		if err := row.Scan(&environment.ID, &environment.Name, &environment.DeployedParticipantCount, &participantName, &version, &deployedAt); err != nil {
+			return environment, err
+		}
+
+		if deployedAt.Valid {
+			environment.LastDeployment = &model.Deployment{
+				Participant: &model.Participant{Name: participantName.String},
+				Version:     version.String,
+				DeployedAt:  deployedAt.Time,
+			}
+		}
+
+		return environment, nil
 	})
 	if err != nil {
 		panic(fmt.Errorf("error listing environments: %w", err))

@@ -90,7 +90,13 @@
         <td data-l="Check"><a href="/checks/{{.Check.ID}}">#{{.Check.ID}}</a></td>
         <td data-l="Environment"><a class="badge env" href="/environments/{{.Check.EnvironmentID}}">{{.Check.EnvironmentName}}</a></td>
         <td data-l="Answer">{{template "answer" .}}</td>
-        <td data-l="Compared with">{{if .Report.Counterparts}}<span class="badges">{{$stored := .Report.Stored}}{{range .Report.Counterparts}}<span class="badge cpb{{if and $stored .Breaks}} no{{end}}">{{.Name}} {{if .Version}}<span class="v">{{.Version}}</span>{{else}}<span class="v">no version</span>{{end}}{{if and $stored .Breaks}} · {{.Breaks}} {{if eq .Breaks 1}}break{{else}}breaks{{end}}{{end}}</span>{{end}}</span>{{else}}<span class="muted">nothing shares an endpoint</span>{{end}}</td>
+        <td data-l="Compared with">
+          <div class="badges">
+            {{range .Shown}}<span>{{template "role" .Role}}<span class="badge cpb{{if .Breaks}} no{{else if not .Version}} quiet{{end}}">{{.Name}} <span class="v">{{if .Version}}{{.Version}}{{else}}no version{{end}}</span>{{if .Breaks}} · {{template "breaks" .Breaks}}{{end}}</span></span>{{end}}
+            {{if .More}}<a class="badge more" href="/checks/{{.Check.ID}}">+{{.More}} more</a>{{end}}
+            {{if and .Report.Stored (not .Report.Counterparts)}}<span class="muted">nothing deployed shares an endpoint</span>{{end}}
+          </div>
+        </td>
         <td data-l="Asked">{{detailTime .Check.CreatedAt}}</td>
       </tr>
       {{end}}
@@ -104,4 +110,8 @@
 {{end}}
 {{end}}
 
-{{define "answer"}}{{if .Check.Deployable}}<span class="badge yes">{{template "icon_check" 12}}yes</span>{{else if .Report.Stored}}<span class="badge no">{{template "icon_x" 12}}no · {{.Report.Breaks}} {{if eq .Report.Breaks 1}}break{{else}}breaks{{end}}</span>{{else}}<span class="badge no">{{template "icon_x" 12}}no</span>{{end}}{{end}}
+{{define "answer"}}{{if .Check.Deployable}}<span class="badge yes">{{template "icon_check" 12}}yes</span>{{else if .Report.Stored}}<span class="badge no">{{template "icon_x" 12}}no · {{template "breaks" .Report.Breaks}}</span>{{else}}<span class="badge no">{{template "icon_x" 12}}no</span>{{end}}{{end}}
+
+{{define "role"}}{{if eq . "both"}}<span class="role">PROVIDER · CONSUMER</span>{{else if eq . "provider"}}<span class="role">PROVIDER</span>{{else if eq . "consumer"}}<span class="role">CONSUMER</span>{{end}}{{end}}
+
+{{define "breaks"}}{{.}} {{if eq . 1}}break{{else}}breaks{{end}}{{end}}

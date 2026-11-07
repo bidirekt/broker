@@ -131,6 +131,7 @@ func (this *IntegrationSuite) TestGenerateLink_HtmxShowsTheLinkWithoutPushingThe
 	this.Require().Equal(http.StatusOK, status)
 	this.Regexp(generateLinkInPage, body)
 	this.Equal("false", header.Get("HX-Push-Url"))
+	this.Equal("text/html; charset=utf-8", header.Get("Content-Type"))
 	this.Equal("no-store", header.Get("Cache-Control"))
 }
 
