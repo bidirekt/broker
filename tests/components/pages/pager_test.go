@@ -97,6 +97,26 @@ func TestPagerShowsTwentyFiveItemsAPage(t *testing.T) {
 	assert.Equal(t, 50, pages.Offset(3))
 }
 
+func TestPagerOfSizeShowsThatManyItemsAPage(t *testing.T) {
+	app := fiber.New()
+	var first, last pages.Pager
+	var pastLastOK bool
+	app.Get("/things", func(ctx fiber.Ctx) error {
+		first, _ = pages.NewPagerOfSize(ctx, pagerParam, 1, 45, 20)
+		last, _ = pages.NewPagerOfSize(ctx, pagerParam, 3, 45, 20)
+		_, pastLastOK = pages.NewPagerOfSize(ctx, pagerParam, 4, 45, 20)
+		return ctx.SendStatus(fiber.StatusNoContent)
+	})
+
+	_, err := app.Test(httptest.NewRequest(fiber.MethodGet, "/things", nil))
+	require.NoError(t, err)
+
+	assert.Equal(t, pages.Pager{Page: 1, First: 1, Last: 20, Total: 45, NextURL: "/things?versions_page=2"}, first)
+	assert.Equal(t, pages.Pager{Page: 3, First: 41, Last: 45, Total: 45, PreviousURL: "/things?versions_page=2"}, last)
+	assert.False(t, pastLastOK)
+	assert.Equal(t, 40, pages.OffsetOfSize(3, 20))
+}
+
 func TestPagerRejectsAPagePastTheLast(t *testing.T) {
 	assert.True(t, pagerFor(t, "/things?"+pagerParam+"=2", 26).ok)
 	assert.False(t, pagerFor(t, "/things?"+pagerParam+"=2", 25).ok)
@@ -222,4 +242,27 @@ func TestReturnPageRefusesAPageWhoseOffsetWouldOverflow(t *testing.T) {
 
 	_, ok = returnPageFor(t, fiber.MethodPost, "/users/1/edit", "page="+strconv.FormatInt(largest+1, 10))
 	assert.False(t, ok, "POST")
+}
+
+func TestPagerNavPartialShowsOnlyTheNavigation(t *testing.T) {
+	page := fstest.MapFS{"page.html": {Data: []byte(
+		`{{define "title"}}Pager{{end}}{{define "content"}}{{template "pager_nav" .Page}}{{end}}`,
+	)}}
+
+	app := fiber.New()
+	app.Get("/things", func(ctx fiber.Ctx) error {
+		pager, _ := pages.NewPager(ctx, pagerParam, 2, 60)
+		return pages.Render(ctx, fiber.StatusOK, page, "page.html", pager)
+	})
+
+	response, err := app.Test(httptest.NewRequest(fiber.MethodGet, "/things?"+pagerParam+"=2", nil))
+	require.NoError(t, err)
+	body, err := io.ReadAll(response.Body)
+	require.NoError(t, err)
+
+	assert.Contains(t, string(body), `<nav class="pager" aria-label="Pages">`)
+	assert.Contains(t, string(body), `<a href="/things?versions_page=1" rel="prev">Previous</a>`)
+	assert.Contains(t, string(body), `<a href="/things?versions_page=3" rel="next">Next</a>`)
+	assert.NotContains(t, string(body), `showing`)
+	assert.NotContains(t, string(body), `sheet-foot`)
 }

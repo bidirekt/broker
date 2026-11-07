@@ -59,6 +59,30 @@ const (
 		LIMIT $2 OFFSET $3
 	`
 
+	listCompatibilityLatestVersionsQuery = `
+		SELECT
+			cv.version,
+			cv.created_at,
+			COALESCE(array_agg(e.id ORDER BY e.name COLLATE "C") FILTER (WHERE e.id IS NOT NULL), '{}'),
+			COALESCE(array_agg(e.name ORDER BY e.name COLLATE "C") FILTER (WHERE e.id IS NOT NULL), '{}')
+		FROM
+			contract_versions cv
+		LEFT JOIN
+			current_deployments cd ON cd.participant_id = cv.participant_id AND cd.version = cv.version
+		LEFT JOIN
+			environments e ON e.id = cd.environment_id
+		WHERE
+			cv.participant_id = $1
+		GROUP BY
+			cv.id
+		HAVING
+			cv.id IN (SELECT id FROM contract_versions WHERE participant_id = $1 ORDER BY id DESC LIMIT $2)
+		OR
+			count(cd.environment_id) > 0
+		ORDER BY
+			cv.id DESC
+	`
+
 	listCompatibilityLatestChecksQuery = `
 		SELECT DISTINCT ON (c.version, c.environment_id)
 			c.id, c.participant_id, p.name, c.contract_id, c.version, c.environment_id,
@@ -85,23 +109,6 @@ const (
 			check_id = ANY($1)
 		ORDER BY
 			check_id, counterpart_name COLLATE "C"
-	`
-
-	listCompatibilityDeploymentsSinceChecksQuery = `
-		SELECT
-			c.id,
-			COUNT(*),
-			array_agg(DISTINCT p.name COLLATE "C" ORDER BY p.name COLLATE "C")
-		FROM
-			compatibility_checks c
-			JOIN deployments d ON d.environment_id = c.environment_id
-				AND d.deployed_at > c.created_at
-				AND d.participant_id <> c.participant_id
-			JOIN participants p ON p.id = d.participant_id
-		WHERE
-			c.id = ANY($1)
-		GROUP BY
-			c.id
 	`
 )
 
@@ -165,7 +172,20 @@ func (this *CompatibilityPageRepository) ListVersions(
 		panic(fmt.Errorf("error listing compatibility versions: %w", err))
 	}
 
-	versions, err = pgx.AppendRows(make([]model.PublishedVersion, 0), rows, func(row pgx.CollectableRow) (model.PublishedVersion, error) {
+	return collectPublishedVersions(rows), total
+}
+
+func (this *CompatibilityPageRepository) ListLatestVersions(ctx context.Context, participantID int64, latest int) []model.PublishedVersion {
+	rows, err := this.pool.Query(ctx, listCompatibilityLatestVersionsQuery, participantID, latest)
+	if err != nil {
+		panic(fmt.Errorf("error listing compatibility latest versions: %w", err))
+	}
+
+	return collectPublishedVersions(rows)
+}
+
+func collectPublishedVersions(rows pgx.Rows) []model.PublishedVersion {
+	versions, err := pgx.AppendRows(make([]model.PublishedVersion, 0), rows, func(row pgx.CollectableRow) (model.PublishedVersion, error) {
 		var (
 			version          model.PublishedVersion
 			environmentIDs   []int64
@@ -186,7 +206,7 @@ func (this *CompatibilityPageRepository) ListVersions(
 		panic(fmt.Errorf("error scanning compatibility versions: %w", err))
 	}
 
-	return versions, total
+	return versions
 }
 
 func (this *CompatibilityPageRepository) ListLatestChecks(ctx context.Context, participantID int64, versions []string) []model.CompatibilityCheck {
@@ -251,30 +271,4 @@ func (this *CompatibilityPageRepository) ListResultsByCheck(ctx context.Context,
 	}
 
 	return resultsByCheck
-}
-
-func (this *CompatibilityPageRepository) ListDeploymentsSinceChecks(ctx context.Context, checkIDs []int64) map[int64]model.DeploymentsSinceCheck {
-	rows, err := this.pool.Query(ctx, listCompatibilityDeploymentsSinceChecksQuery, checkIDs)
-	if err != nil {
-		panic(fmt.Errorf("error listing deployments since checks: %w", err))
-	}
-
-	defer rows.Close()
-
-	deploymentsByCheck := make(map[int64]model.DeploymentsSinceCheck, len(checkIDs))
-	for rows.Next() {
-		var (
-			checkID int64
-			since   model.DeploymentsSinceCheck
-		)
-		if err := rows.Scan(&checkID, &since.Count, &since.Participants); err != nil {
-			panic(fmt.Errorf("error scanning deployments since checks: %w", err))
-		}
-		deploymentsByCheck[checkID] = since
-	}
-	if err := rows.Err(); err != nil {
-		panic(fmt.Errorf("error scanning deployments since checks: %w", err))
-	}
-
-	return deploymentsByCheck
 }
