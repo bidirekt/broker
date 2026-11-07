@@ -20,7 +20,7 @@ const (
 	setPasswordNewPassword     = "ana-new-staple-for-the-horse"
 	setPasswordOtherPassword   = "ana-another-staple-for-the-horse"
 	setPasswordLinkInvalid     = "this link is no longer valid, ask your admin for a new one"
-	setPasswordPasswordInvalid = "the password must have 15 to 128 characters"
+	setPasswordPasswordInvalid = "the password must have 8 to 128 characters"
 	setPasswordFixedExpiry     = "2099-01-02 03:04:00+00"
 	setPasswordForLine         = `<p>For ` + setPasswordUserEmail + `</p>`
 	setPasswordExpiryLine      = `<p>This link works once, until <time class="time" datetime="2099-01-02T03:04:00Z" title="2099-01-02 03:04 UTC">2099-01-02 03:04 UTC</time></p>`
@@ -123,7 +123,7 @@ func (this *IntegrationSuite) TestSetPassword_HtmxSubmitRedirectsWithHXRedirect(
 func (this *IntegrationSuite) TestSetPassword_HtmxShortPasswordAnswers400WithoutPushingTheFormURL() {
 	token := this.createInvitedUserWithLink(setPasswordUserEmail)
 
-	status, header, body := this.submitSetPasswordWithHtmx(token, "fourteen-chars")
+	status, header, body := this.submitSetPasswordWithHtmx(token, "seven-c")
 	this.Equal(http.StatusBadRequest, status)
 	this.Contains(body, setPasswordPasswordInvalid)
 	this.Equal("false", header.Get("HX-Push-Url"))
@@ -235,13 +235,13 @@ func (this *IntegrationSuite) TestSetPassword_UnknownOrMissingTokenShowsTheInval
 func (this *IntegrationSuite) TestSetPassword_ShortPasswordAnswers400AndKeepsTheLinkUsable() {
 	token := this.createInvitedUserWithLink(setPasswordUserEmail)
 
-	status, _, body := this.submitSetPassword(token, "fourteen-chars")
+	status, _, body := this.submitSetPassword(token, "seven-c")
 	this.Equal(http.StatusBadRequest, status)
 	this.Contains(body, `autocomplete="new-password" required autofocus aria-invalid="true" aria-describedby="password-err">`)
 	this.Contains(body, `<p class="err" id="password-err">`)
 	this.Contains(body, `<span>`+setPasswordPasswordInvalid+`</span></p>`)
 	this.Contains(body, `<input type="hidden" name="token" value="`+token+`">`)
-	this.NotContains(body, "fourteen-chars")
+	this.NotContains(body, "seven-c")
 
 	status, _, _ = this.getPage("/set-password?token="+token, "")
 	this.Equal(http.StatusOK, status)
@@ -262,7 +262,7 @@ func (this *IntegrationSuite) TestSetPassword_FormShowsTheEmailAndTheLinkExpiry(
   `+setPasswordBigMark+`
   <h1>Set your password</h1>`)
 
-	status, _, body := this.submitSetPassword(token, "fourteen-chars")
+	status, _, body := this.submitSetPassword(token, "seven-c")
 	this.Equal(http.StatusBadRequest, status)
 	this.Contains(body, setPasswordPasswordInvalid)
 	this.Contains(body, setPasswordForLine)
@@ -281,7 +281,7 @@ func (this *IntegrationSuite) TestSetPassword_ShortPasswordOnAnExpiredLinkShowsT
 	_, err := this.Pool.Exec(context.Background(), `UPDATE one_time_links SET expires_at = now() - interval '1 minute'`)
 	this.Require().NoError(err)
 
-	status, _, body := this.submitSetPassword(token, "fourteen-chars")
+	status, _, body := this.submitSetPassword(token, "seven-c")
 	this.Equal(http.StatusGone, status)
 	this.Contains(body, setPasswordLinkInvalid)
 	this.NotContains(body, setPasswordPasswordInvalid)

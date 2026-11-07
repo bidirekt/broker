@@ -16,7 +16,7 @@ const (
 	profileCurrentPassword      = "ana-correct-horse-battery"
 	profileNewPassword          = "ana-new-staple-for-the-horse"
 	profileCurrentPasswordWrong = "the current password is wrong"
-	profilePasswordInvalid      = "the password must have 15 to 128 characters"
+	profilePasswordInvalid      = "the password must have 8 to 128 characters"
 	profilePasswordChanged      = "password changed"
 	profileAdminEmail           = "admin@example.com"
 	profileAdminSecret          = "suite-admin-correct-horse"
@@ -138,7 +138,7 @@ func (this *IntegrationSuite) TestUpdateProfile_ShortNewPassword_Answers400AndKe
 
 	status, _, body := this.postForm("/profile", cookie, csrfToken, url.Values{
 		"current_password": {profileCurrentPassword},
-		"new_password":     {"fourteen-chars"},
+		"new_password":     {"seven-c"},
 	})
 	this.Equal(http.StatusBadRequest, status)
 	this.Contains(body, `name="new_password" type="password" autocomplete="new-password" required autofocus aria-invalid="true" aria-describedby="new_password-err">`)
