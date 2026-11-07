@@ -5,7 +5,7 @@ import "github.com/bidirekt/broker/internal/model"
 const (
 	PasswordChangedMessage        string = "password changed"
 	CurrentPasswordWrongMessage   string = "the current password is wrong"
-	PasswordInvalidMessage        string = "the password must have 15 to 128 characters"
+	PasswordInvalidMessage        string = "the password must have 8 to 128 characters"
 	TooManyProfileAttemptsMessage string = "too many attempts, try again later"
 
 	currentPasswordFormField = "current_password"

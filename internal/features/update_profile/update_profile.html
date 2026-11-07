@@ -23,7 +23,7 @@
         <label for="new_password">New password</label>
         <input class="input" id="new_password" name="new_password" type="password" autocomplete="new-password" required{{if eq .Page.Field "new_password"}} autofocus aria-invalid="true" aria-describedby="new_password-err"{{end}}>
         {{if eq .Page.Field "new_password"}}<p class="err" id="new_password-err">{{template "icon_error" 14}}<span>{{.Page.Message}}</span></p>{{end}}
-        <p class="hint">15 to 128 characters. A long passphrase works well.</p>
+        <p class="hint">8 to 128 characters. A long passphrase works well.</p>
       </div>
     </div>
     <div class="form-foot"><button type="submit" class="btn primary">Change password</button></div>
@@ -31,7 +31,7 @@
   <aside class="sheet aside" aria-label="About passwords">
     <h2>About passwords</h2>
     <ul>
-      <li>15 to 128 characters.</li>
+      <li>8 to 128 characters.</li>
       {{if not .ManagesUsers}}<li>Forgot the current one? Ask your broker's admin for a reset link.</li>{{end}}
     </ul>
   </aside>

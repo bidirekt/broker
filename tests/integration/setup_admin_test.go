@@ -22,7 +22,7 @@ const (
 	setupAdminForeignOrigin = "http://evil.example"
 	setupAdminCookieName    = "bidirekt_session"
 	setupAdminEmailInvalid  = "invalid email"
-	setupAdminPasswordShort = "the password must have 15 to 128 characters"
+	setupAdminPasswordShort = "the password must have 8 to 128 characters"
 )
 
 func (this *IntegrationSuite) startSetupAdminApp() *components.Components {
@@ -194,7 +194,7 @@ func (this *IntegrationSuite) TestSetupAdmin_SubPathsOfSetupAreNotRouted() {
 	}
 }
 
-func (this *IntegrationSuite) TestSetupAdmin_RefusesAnInvalidEmailOrAFourteenCharacterPasswordWithTheForm() {
+func (this *IntegrationSuite) TestSetupAdmin_RefusesAnInvalidEmailOrASevenCharacterPasswordWithTheForm() {
 	app := this.startSetupAdminApp()
 
 	status, _, body := this.setupAdminPost(app, "admin.x.com", setupAdminPassword)
@@ -204,7 +204,7 @@ func (this *IntegrationSuite) TestSetupAdmin_RefusesAnInvalidEmailOrAFourteenCha
 	this.Contains(body, `<span>`+setupAdminEmailInvalid+`</span></p>`)
 	this.NotContains(body, `password-err`)
 
-	status, _, body = this.setupAdminPost(app, setupAdminEmail, "fourteen-chars")
+	status, _, body = this.setupAdminPost(app, setupAdminEmail, "seven-c")
 	this.Equal(http.StatusBadRequest, status)
 	this.Contains(body, `autocomplete="new-password" required autofocus aria-invalid="true" aria-describedby="password-err">`)
 	this.Contains(body, `<p class="err" id="password-err">`)

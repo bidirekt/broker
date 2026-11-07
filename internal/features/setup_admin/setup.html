@@ -18,7 +18,7 @@
       <label for="password">Password</label>
       <input class="input" id="password" name="password" type="password" autocomplete="new-password" required{{if eq .Page.Field "password"}} autofocus aria-invalid="true" aria-describedby="password-err"{{end}}>
       {{if eq .Page.Field "password"}}<p class="err" id="password-err">{{template "icon_error" 14}}<span>{{.Page.Message}}</span></p>{{end}}
-      <p class="hint">15 to 128 characters. A long passphrase works well.</p>
+      <p class="hint">8 to 128 characters. A long passphrase works well.</p>
     </div>
     <button type="submit" class="btn primary block">Create the admin</button>
   </div>

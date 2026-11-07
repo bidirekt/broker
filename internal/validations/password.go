@@ -6,14 +6,14 @@ import (
 )
 
 const (
-	minPasswordCharacters = 15
+	minPasswordCharacters = 8
 	maxPasswordCharacters = 128
 )
 
 func Password(value string) error {
 	characters := utf8.RuneCountInString(value)
 	if characters < minPasswordCharacters || characters > maxPasswordCharacters {
-		return errors.New("must have 15 to 128 characters")
+		return errors.New("must have 8 to 128 characters")
 	}
 
 	return nil
