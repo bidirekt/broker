@@ -26,7 +26,7 @@
 </nav>
 <section class="sheet">
   {{if .Checks}}
-  <table class="t stack">
+  <div class="scroll"><table class="t stack">
     <thead>
       <tr>
         <th scope="col">Check</th>
@@ -55,7 +55,7 @@
       </tr>
       {{end}}
     </tbody>
-  </table>
+  </table></div>
   {{template "pager" .Pager}}
   {{else if .Header.LatestVersion.Valid}}
   <div class="empty">

@@ -197,7 +197,8 @@ func (this *IntegrationSuite) TestShowEnvironment_ShowsWhatIsDeployedTheHistoryA
 	this.NotContains(body, `href="/checks/`+strconv.FormatInt(stagingID, 10)+`"`)
 
 	this.Regexp(`(?s)<h2 class="h2">Checks</h2>.*?<div class="scroll"><table class="t stack">`, body)
-	this.Equal(1, strings.Count(body, `<div class="scroll">`))
+	this.Equal(3, strings.Count(body, `<div class="scroll"><table class="t stack">`))
+	this.Equal(strings.Count(body, `<table`), strings.Count(body, `<div class="scroll"><table`))
 	this.Contains(body, `<td data-l="Participant"><a class="name" href="/participants/petstore_web">petstore_web</a> <a class="ver" href="/participants/petstore_web/versions/2.3.0">2.3.0</a></td>`)
 	this.Contains(body, `no · 5 breaks</span>`)
 	this.Contains(body, `<span><span class="role">PROVIDER</span><span class="badge cpb no">ghost <span class="v">no version</span> · 1 break</span></span>`)

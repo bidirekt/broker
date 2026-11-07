@@ -12,6 +12,11 @@ var (
 	layoutExternalLink = regexp.MustCompile(`(?:src|href)="(?:https?:)?//`)
 )
 
+const (
+	layoutBrand   = `<a class="brand" href="/"><span class="mark" aria-hidden="true">🤝</span>Bidirekt</a>`
+	layoutBigMark = `<span class="mark big" aria-hidden="true">🤝</span>`
+)
+
 func (this *IntegrationSuite) TestLayout_SignedInPageIsDarkWithTheTopBar() {
 	cookie := this.signInAsAdmin()
 
@@ -21,7 +26,8 @@ func (this *IntegrationSuite) TestLayout_SignedInPageIsDarkWithTheTopBar() {
 	this.Contains(body, `<html lang="en" data-theme="dark">`)
 	this.Contains(body, `<body class="bk" hx-boost="true" hx-headers='{"X-CSRF-Token": "`)
 	this.Contains(body, `<link rel="stylesheet" href="/assets/bundle.css">`)
-	this.Contains(body, `<a class="brand" href="/">`)
+	this.Contains(body, layoutBrand)
+	this.NotContains(body, layoutBigMark)
 	this.Contains(body, `<span class="email">`+suiteAdminEmail+`</span>`)
 	this.Contains(body, `<button type="submit" class="linkbtn">Sign out</button>`)
 	this.Contains(body, `<a href="/participants">Participants</a>`)
@@ -37,7 +43,10 @@ func (this *IntegrationSuite) TestLayout_SignedOutPageIsLightWithOnlyTheBrand() 
 	this.Contains(body, `<html lang="en" data-theme="light">`)
 	this.Contains(body, `<body class="bk" hx-boost="true">`)
 	this.Contains(body, `<link rel="stylesheet" href="/assets/bundle.css">`)
-	this.Contains(body, `<a class="brand" href="/">`)
+	this.Contains(body, layoutBrand)
+	this.Contains(body, `<div class="auth-brand">
+  `+layoutBigMark+`
+  <h1>Sign in to Bidirekt</h1>`)
 	this.NotContains(body, `class="nav"`)
 	this.NotContains(body, `class="email"`)
 	this.assertLayoutIsSelfContained(body)

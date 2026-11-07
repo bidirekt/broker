@@ -9,7 +9,7 @@
   <div class="acts"><a class="btn primary" href="/users/invite">Invite a user</a></div>
 </div>
 <section class="sheet">
-  <table class="t stack">
+  <div class="scroll"><table class="t stack">
     <thead>
       <tr>
         <th scope="col">Email</th>
@@ -46,7 +46,7 @@
       </tr>
       {{end}}
     </tbody>
-  </table>
+  </table></div>
   {{template "pager" .Page.Pager}}
 </section>
 {{end}}
