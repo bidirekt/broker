@@ -3,6 +3,9 @@ language: en-US
 reviews:
   profile: chill
   poem: false
+  pre_merge_checks:
+    description:
+      mode: "off"
   auto_review:
     enabled: true
     drafts: false
