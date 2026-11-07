@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/bidirekt/broker/internal/components/access"
+	"github.com/bidirekt/broker/internal/model"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -28,7 +29,7 @@ type layoutData struct {
 	ManagesUsers bool
 	CanWrite     bool
 	Section      string
-	Notice       string
+	Notices      []model.SessionMessage
 	Page         any
 }
 
@@ -76,7 +77,7 @@ func layoutFor(ctx fiber.Ctx, page any) (layout string, data layoutData) {
 		ManagesUsers: principal.ManagesUsers(),
 		CanWrite:     principal.CanWrite(),
 		Section:      sectionOf(ctx.Path()),
-		Notice:       session.Message,
+		Notices:      session.Messages,
 		Page:         page,
 	}
 }

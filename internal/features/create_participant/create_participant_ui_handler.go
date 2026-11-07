@@ -50,7 +50,7 @@ func (this *CreateParticipantUiHandler) Create(ctx fiber.Ctx) error {
 		return this.respondProblem(ctx, fiber.StatusConflict, page, ParticipantAlreadyExistsMessage)
 	}
 
-	this.sessionKeeper.SetMessage(ctx, ParticipantCreatedMessage)
+	this.sessionKeeper.AddMessage(ctx, model.MessageSuccess, ParticipantCreatedMessage)
 	return pages.Redirect(ctx, participantPathPrefix+page.Name)
 }
 

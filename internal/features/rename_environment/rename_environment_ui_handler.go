@@ -73,7 +73,7 @@ func (this *RenameEnvironmentUiHandler) RenameEnvironment(ctx fiber.Ctx) error {
 		return this.respondProblem(ctx, fiber.StatusConflict, page, EnvironmentAlreadyExistsMessage)
 	}
 
-	this.sessionKeeper.SetMessage(ctx, EnvironmentRenamedMessage)
+	this.sessionKeeper.AddMessage(ctx, model.MessageSuccess, EnvironmentRenamedMessage)
 	return pages.Redirect(ctx, "/environments/"+strconv.FormatInt(environmentID, 10))
 }
 

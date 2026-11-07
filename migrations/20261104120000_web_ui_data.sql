@@ -44,7 +44,7 @@ ALTER TABLE compatibility_check_results
   ADD COLUMN role text NULL CHECK (role IN ('provider','consumer','both'));
 
 ALTER TABLE sessions
-  ADD COLUMN message text NULL;
+  ADD COLUMN messages jsonb NULL CHECK (jsonb_typeof(messages) = 'array');
 
 CREATE INDEX ON compatibility_checks (participant_id, created_at DESC);
 

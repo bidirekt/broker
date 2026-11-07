@@ -235,7 +235,7 @@ deps:
     mayDependOn: [components_respond]
     canUse: [fiber, fasthttp]
   components_pages:
-    mayDependOn: [components_access]
+    mayDependOn: [components_access, model]
     canUse: [fiber]
   components_passwords:
     canUse: [x_crypto]

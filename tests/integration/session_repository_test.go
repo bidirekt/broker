@@ -220,54 +220,84 @@ func (this *IntegrationSuite) TestSessionRepository_DeleteExpired_RemovesIdleAnd
 	this.True(ok)
 }
 
-func (this *IntegrationSuite) TestSessionRepository_MarkSeenTakingMessage_ReturnsTheMessageOnceAndBumpsLastSeenAt() {
+func (this *IntegrationSuite) TestSessionRepository_MarkSeenTakingMessages_ReturnsTheMessagesOnceInOrderAndBumpsLastSeenAt() {
 	ctx := context.Background()
 	repo := repository.NewSessionRepository(this.Pool)
 	userID := this.sessionRepositoryCreateActiveUser()
 
 	this.Require().True(repo.Create(ctx, sessionRepositoryUserSession("ana-session", userID), sessionRepositoryPasswordHash))
-	repo.SetMessage(ctx, []byte("ana-session"), "participant created")
+	repo.AddMessage(ctx, []byte("ana-session"), model.NewSessionMessage(model.MessageSuccess, "participant created"))
+	repo.AddMessage(ctx, []byte("ana-session"), model.NewSessionMessage(model.MessageSuccess, "environment created"))
 	_, err := this.Pool.Exec(ctx, `UPDATE sessions SET last_seen_at = now() - interval '1 hour'`)
 	this.Require().NoError(err)
 
-	this.Equal("participant created", repo.MarkSeenTakingMessage(ctx, []byte("ana-session")))
+	this.Equal([]model.SessionMessage{
+		{Kind: model.MessageSuccess, Text: "participant created"},
+		{Kind: model.MessageSuccess, Text: "environment created"},
+	}, repo.MarkSeenTakingMessages(ctx, []byte("ana-session")))
 
 	found, ok := repo.FindByIDHash(ctx, []byte("ana-session"))
 	this.Require().True(ok)
 	this.WithinDuration(time.Now(), found.LastSeenAt, time.Minute)
 
-	this.Empty(repo.MarkSeenTakingMessage(ctx, []byte("ana-session")))
+	this.Equal([]model.SessionMessage{}, repo.MarkSeenTakingMessages(ctx, []byte("ana-session")))
 }
 
-func (this *IntegrationSuite) TestSessionRepository_MarkSeenTakingMessage_TakesOnlyThatSessionsMessage() {
+func (this *IntegrationSuite) TestSessionRepository_AddMessage_StoresAJSONArrayOfKindAndText() {
+	ctx := context.Background()
+	repo := repository.NewSessionRepository(this.Pool)
+	userID := this.sessionRepositoryCreateActiveUser()
+
+	this.Require().True(repo.Create(ctx, sessionRepositoryUserSession("ana-session", userID), sessionRepositoryPasswordHash))
+	repo.AddMessage(ctx, []byte("ana-session"), model.NewSessionMessage(model.MessageSuccess, "participant created"))
+
+	var stored string
+	err := this.Pool.QueryRow(ctx, `SELECT messages::text FROM sessions WHERE id_hash = $1`, []byte("ana-session")).Scan(&stored)
+	this.Require().NoError(err)
+	this.JSONEq(`[{"kind":"success","text":"participant created"}]`, stored)
+}
+
+func (this *IntegrationSuite) TestSessionRepository_MessagesThatAreNotAnArray_AreRejected() {
+	ctx := context.Background()
+	repo := repository.NewSessionRepository(this.Pool)
+	userID := this.sessionRepositoryCreateActiveUser()
+
+	this.Require().True(repo.Create(ctx, sessionRepositoryUserSession("ana-session", userID), sessionRepositoryPasswordHash))
+
+	_, err := this.Pool.Exec(ctx, `UPDATE sessions SET messages = '{"kind":"success","text":"participant created"}'::jsonb WHERE id_hash = $1`, []byte("ana-session"))
+	this.Require().Error(err)
+	this.Contains(err.Error(), "sessions_messages_check")
+}
+
+func (this *IntegrationSuite) TestSessionRepository_MarkSeenTakingMessages_TakesOnlyThatSessionsMessages() {
 	ctx := context.Background()
 	repo := repository.NewSessionRepository(this.Pool)
 	userID := this.sessionRepositoryCreateActiveUser()
 
 	this.Require().True(repo.Create(ctx, sessionRepositoryUserSession("ana-laptop", userID), sessionRepositoryPasswordHash))
 	this.Require().True(repo.Create(ctx, sessionRepositoryUserSession("ana-phone", userID), sessionRepositoryPasswordHash))
-	repo.SetMessage(ctx, []byte("ana-laptop"), "participant created")
-	repo.SetMessage(ctx, []byte("ana-phone"), "environment created")
+	repo.AddMessage(ctx, []byte("ana-laptop"), model.NewSessionMessage(model.MessageSuccess, "participant created"))
+	repo.AddMessage(ctx, []byte("ana-phone"), model.NewSessionMessage(model.MessageSuccess, "environment created"))
 
-	this.Equal("participant created", repo.MarkSeenTakingMessage(ctx, []byte("ana-laptop")))
-	this.Equal("environment created", repo.MarkSeenTakingMessage(ctx, []byte("ana-phone")))
+	this.Equal([]model.SessionMessage{{Kind: model.MessageSuccess, Text: "participant created"}}, repo.MarkSeenTakingMessages(ctx, []byte("ana-laptop")))
+	this.Equal([]model.SessionMessage{{Kind: model.MessageSuccess, Text: "environment created"}}, repo.MarkSeenTakingMessages(ctx, []byte("ana-phone")))
 }
 
-func (this *IntegrationSuite) TestSessionRepository_MarkSeenTakingMessageOfAnUnknownSession_ReturnsNone() {
+func (this *IntegrationSuite) TestSessionRepository_MarkSeenTakingMessagesOfAnUnknownSession_ReturnsNone() {
 	repo := repository.NewSessionRepository(this.Pool)
 
-	this.Empty(repo.MarkSeenTakingMessage(context.Background(), []byte("no-such-session")))
+	this.Empty(repo.MarkSeenTakingMessages(context.Background(), []byte("no-such-session")))
 }
 
-func (this *IntegrationSuite) TestSessionRepository_MarkSeen_KeepsTheMessage() {
+func (this *IntegrationSuite) TestSessionRepository_MarkSeen_KeepsTheMessages() {
 	ctx := context.Background()
 	repo := repository.NewSessionRepository(this.Pool)
 	userID := this.sessionRepositoryCreateActiveUser()
 
 	this.Require().True(repo.Create(ctx, sessionRepositoryUserSession("ana-session", userID), sessionRepositoryPasswordHash))
-	repo.SetMessage(ctx, []byte("ana-session"), "participant created")
+	repo.AddMessage(ctx, []byte("ana-session"), model.NewSessionMessage(model.MessageSuccess, "participant created"))
 
 	repo.MarkSeen(ctx, []byte("ana-session"))
 
-	this.Equal("participant created", repo.MarkSeenTakingMessage(ctx, []byte("ana-session")))
+	this.Equal([]model.SessionMessage{{Kind: model.MessageSuccess, Text: "participant created"}}, repo.MarkSeenTakingMessages(ctx, []byte("ana-session")))
 }

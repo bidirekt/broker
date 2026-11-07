@@ -5,6 +5,7 @@ import (
 	"github.com/bidirekt/broker/internal/components/pages"
 	"github.com/bidirekt/broker/internal/components/respond"
 	"github.com/bidirekt/broker/internal/components/sessions"
+	"github.com/bidirekt/broker/internal/model"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -39,7 +40,7 @@ func (this *ReactivateUserUiHandler) Handle(ctx fiber.Ctx) error {
 	case TargetIsTheAdmin:
 		return this.respondForbidden(ctx)
 	case UserReactivated:
-		this.sessionKeeper.SetMessage(ctx, UserReactivatedMessage+output.User.Email)
+		this.sessionKeeper.AddMessage(ctx, model.MessageSuccess, UserReactivatedMessage+output.User.Email)
 	}
 
 	return pages.Redirect(ctx, usersPathFor(returnPage))
