@@ -16,7 +16,7 @@ reviews:
     - path: "**/*_test.go"
       instructions: |
         - tests/<pkg>/ mirrors internal/<pkg>/ (or pkg/<pkg>/) one to one, sub-packages included; flag a test directory without a matching package. tests/integration and tests/e2e are the only exceptions.
-        - Each test file is self-contained: it defines its own constants and inline setup and never reuses a fixture or helper from a sibling file. Duplication is preferred.
+        - Each test file is self-contained: it defines its own constants and inline setup and never reuses a fixture or helper from a sibling file. Duplication is preferred. The integration suite's shared infrastructure in tests/integration/suite_test.go (IntegrationSuite methods such as Pool, createActiveUser, signInAs*, getPage, postForm, countRows and its suite* constants) is not a sibling fixture; using it is expected.
         - No narrative comment blocks in tests.
     - path: "internal/repository/**/*.go"
       instructions: |
