@@ -32,19 +32,31 @@ func (this *ShowCompatibilityUiHandler) Handle(ctx fiber.Ctx) error {
 	}
 
 	query := ctx.Request().URI().QueryArgs()
+	versions := defaultVersions
+	if query.Has(versionsParam) {
+		versions = string(query.Peek(versionsParam))
+	}
+	filter, ok := versionsFilter(versions, page)
+	if !ok {
+		return respond.NotFound(ctx)
+	}
+
 	output := this.useCase.Execute(ctx.Context(), ShowCompatibilityInput{
 		Participant:      string(query.Peek(participantParam)),
 		ParticipantGiven: query.Has(participantParam),
-		Page:             page,
+		Versions:         filter,
 	})
 	if output.Status == ParticipantNotFound {
 		return respond.NotFound(ctx)
 	}
 
-	pager, ok := pages.NewPager(ctx, pageParam, page, output.VersionsTotal)
-	if !ok {
-		return respond.NotFound(ctx)
+	pager := pages.Pager{Page: page}
+	if filter.All {
+		pager, ok = pages.NewPagerOfSize(ctx, pageParam, page, output.VersionsTotal, allVersionsPageSize)
+		if !ok {
+			return respond.NotFound(ctx)
+		}
 	}
 
-	return pages.Render(ctx, fiber.StatusOK, pageFiles, showCompatibilityTemplate, newShowCompatibilityPage(output, pager))
+	return pages.Render(ctx, fiber.StatusOK, pageFiles, showCompatibilityTemplate, newShowCompatibilityPage(output, versions, pager))
 }
