@@ -27,9 +27,15 @@
         {{range .Participants}}<option value="{{.Name}}"{{if .Selected}} selected{{end}}>{{.Name}}</option>{{end}}
       </select>
     </div>
+    <div class="field">
+      <label for="versions">Versions</label>
+      <select class="select" id="versions" name="versions">
+        {{range .Versions}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+      </select>
+    </div>
     <div><button type="submit" class="btn primary">Show</button></div>
   </form>
-  <p class="filters-note">Newest first.</p>
+  <p class="filters-note">Newest first. Versions deployed somewhere are always included, even if older.</p>
 </section>
 {{if not .Rows}}
 <section class="sheet">
@@ -52,13 +58,13 @@
 {{else}}
 <section class="sheet">
   <div class="sheet-head">
-    <h2 class="h2"><a class="name" href="{{.ParticipantURL}}">{{$participant}}</a> <span class="muted">· {{.Pager.Total}} {{if eq .Pager.Total 1}}version{{else}}versions{{end}}</span></h2>
-    <p class="legend"><span>{{template "icon_check" 12}}can deploy</span><span>{{template "icon_x" 12}}cannot deploy</span><span>{{template "icon_deactivated" 12}}not checked yet</span></p>
+    <h2 class="h2"><a class="name" href="{{.ParticipantURL}}">{{$participant}}</a> <span class="muted">· {{.VersionsCount}} {{if eq .VersionsCount 1}}version{{else}}versions{{end}}</span></h2>
+    <p class="legend"><span>{{template "icon_check" 14}}yes, can deploy</span><span>{{template "icon_x" 14}}no · breaks</span><span>{{template "icon_deactivated" 14}}not checked yet</span></p>
   </div>
-  <div class="scroll"><table class="rt{{if .Stacked}} stacked{{end}}">
+  <div class="scroll"><table class="mt">
     <thead>
       <tr>
-        <th scope="col">Version of <span class="name">{{$participant}}</span></th>
+        <th scope="col"><span class="muted">Version of</span> <span class="name">{{$participant}}</span></th>
         {{range .Environments}}<th scope="col"><a class="badge env" href="/environments/{{.ID}}">{{.Name}}</a></th>{{end}}
       </tr>
     </thead>
@@ -66,65 +72,59 @@
       {{range .Rows}}
       {{$version := .Version}}
       <tr>
-        <th scope="row"><div class="vh">{{if .VersionURL}}<a class="ver" href="{{.VersionURL}}">{{.Version}}</a>{{else}}<span class="ver">{{.Version}}</span>{{end}}<span class="time">published {{listTime .PublishedAt}}</span></div></th>
+        <th scope="row"><span class="vh">{{if .VersionURL}}<a class="ver" href="{{.VersionURL}}">{{.Version}}</a>{{else}}<span class="ver">{{.Version}}</span>{{end}}</span><span class="time">published {{listTime .PublishedAt}}</span><span class="dep-l">Deployed in</span><span class="badges dep">{{range .DeployedIn}}<span class="badge env">{{.Name}}</span>{{else}}<span class="muted">not deployed</span>{{end}}</span></th>
         {{range .Cells}}
         {{$environment := .Environment.Name}}
-        {{$deployed := .Deployed}}
         {{with .Check}}
-        <td class="rc {{if .Check.Deployable}}ok{{else}}bad{{end}}" data-env="{{$environment}}">
-          <div class="rc-head">
-            {{if .Check.Deployable}}<a class="res ok" href="/checks/{{.Check.ID}}">{{template "icon_check" 12}}can deploy</a>{{else}}<a class="res bad" href="/checks/{{.Check.ID}}">{{template "icon_x" 12}}cannot deploy{{if .Report.Stored}} · {{template "breaks" .Report.Breaks}}{{end}}</a>{{end}}
-            {{if $deployed}}<span class="badge deployed">deployed version</span>{{end}}
-            <span class="rc-sub">check <a href="/checks/{{.Check.ID}}">#{{.Check.ID}}</a> · {{listTime .Check.CreatedAt}}</span>
-          </div>
-          {{if .Counterparts}}
-          {{$stored := .Report.Stored}}
-          <table class="cpt">
-            <thead>
-              <tr>
-                <th scope="col">Counterpart</th>
-                <th scope="col">Role</th>
-                <th scope="col">Version</th>
-                <th scope="col">Result</th>
-              </tr>
-            </thead>
-            <tbody>
-              {{range .Counterparts}}
-              <tr>
-                <td>{{if .ParticipantURL}}<a class="name" href="{{.ParticipantURL}}">{{.Name}}</a>{{else}}<span class="name">{{.Name}}</span>{{end}}</td>
-                <td class="rl">{{if $stored}}{{template "role" .Role}}{{end}}</td>
-                <td class="ver">{{if .Version}}{{.Version}}{{else}}no version{{end}}</td>
-                <td class="st-cell">{{if .Deployable}}<span class="st ok">{{template "icon_check" 12}}compatible</span>{{else if and $stored .Breaks}}<span class="st bad">{{template "icon_x" 12}}{{template "breaks" .Breaks}}</span>{{else}}<span class="st bad">{{template "icon_x" 12}}not compatible</span>{{end}}</td>
-              </tr>
-              {{end}}
-            </tbody>
-          </table>
-          {{else if .Report.Stored}}
-          <p class="rc-sub">nothing deployed in {{$environment}} shares an endpoint</p>
-          {{end}}
-          {{with .StaleNote}}<p class="rc-stale">{{template "icon_error" 14}}<span>{{.}}</span></p>{{end}}
-        </td>
+        <td class="mc {{if .Check.Deployable}}ok{{else}}bad{{end}}" data-env="{{$environment}}">{{if .Check.Deployable}}<a class="res ok" href="/checks/{{.Check.ID}}">{{template "icon_check" 14}}yes</a>{{else}}<a class="res bad" href="/checks/{{.Check.ID}}">{{template "icon_x" 14}}no{{if .Report.Stored}} · {{template "breaks" .Report.Breaks}}{{end}}</a>{{end}}<span class="mc-sub">check <a href="/checks/{{.Check.ID}}">#{{.Check.ID}}</a> · {{listTime .Check.CreatedAt}}</span></td>
         {{else}}
-        <td class="rc none" data-env="{{$environment}}">
-          <div class="rc-head">
-            <span class="res none">{{template "icon_deactivated" 12}}not checked yet</span>
-            {{if $deployed}}<span class="badge deployed">deployed version</span>{{end}}
-          </div>
-          <p class="rc-sub">no can-i-deploy for {{$version}} in {{$environment}} yet</p>
+        <td class="mc none" data-env="{{$environment}}"><span class="res none">{{template "icon_deactivated" 14}}not checked yet</span><span class="mc-sub">no can-i-deploy for {{$version}} in {{$environment}} yet</span></td>
+        {{end}}
+        {{end}}
+      </tr>
+      <tr class="mrow-det">
+        <td colspan="{{$.Page.Columns}}">
+          <details class="mdets"{{if .Open}} open{{end}}>
+            <summary><span class="chev">{{template "icon_chevron" 12}}</span>compared with · <span class="ver">{{.Version}}</span></summary>
+            <div class="mdet-grid {{$.Page.DetailGrid}}">
+              {{range .Cells}}
+              {{$environment := .Environment.Name}}
+              <div class="mdet">
+                <p class="group-label"><span class="badge env">{{$environment}}</span></p>
+                {{with .Check}}
+                {{if .Counterparts}}
+                {{$stored := .Report.Stored}}
+                <table class="cpt">
+                  <tbody>
+                    {{range .Counterparts}}
+                    <tr>
+                      <td>{{if .ParticipantURL}}<a class="name" href="{{.ParticipantURL}}">{{.Name}}</a>{{else}}<span class="name">{{.Name}}</span>{{end}} <span class="ver">{{if .Version}}{{.Version}}{{else}}no version{{end}}</span></td>
+                      <td class="st-cell">{{if .Deployable}}<span class="st ok">{{template "icon_check" 12}}compatible</span>{{else if and $stored .Breaks}}<span class="st bad">{{template "icon_x" 12}}{{template "breaks" .Breaks}}</span>{{else}}<span class="st bad">{{template "icon_x" 12}}not compatible</span>{{end}}</td>
+                    </tr>
+                    {{end}}
+                  </tbody>
+                </table>
+                {{if .VersionMissing}}<p class="muted small">no version: not deployed in {{$environment}}</p>{{end}}
+                {{else if .Report.Stored}}
+                <p class="muted small">nothing deployed in {{$environment}} shares an endpoint</p>
+                {{end}}
+                {{else}}
+                <p class="muted small">not checked yet</p>
+                {{end}}
+              </div>
+              {{end}}
+            </div>
+          </details>
         </td>
-        {{end}}
-        {{end}}
       </tr>
       {{end}}
     </tbody>
   </table></div>
-  {{template "pager" .Pager}}
+  <div class="sheet-foot">{{template "pager_nav" .Pager}}</div>
 </section>
 {{end}}
 {{end}}
 {{end}}
 {{end}}
-
-{{define "role"}}{{if eq . "both"}}provider · consumer{{else}}{{.}}{{end}}{{end}}
 
 {{define "breaks"}}{{.}} {{if eq . 1}}break{{else}}breaks{{end}}{{end}}

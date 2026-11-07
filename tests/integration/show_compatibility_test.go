@@ -34,6 +34,13 @@ const showCompatibilityAPIRemovedContract = `provides:
       get:
         responses:
           200: ~
+consumes:
+  petstore_reviews:
+    rest:
+      /reviews:
+        get:
+          responses:
+            200: ~
 `
 
 const showCompatibilityWebContract = `consumes:
@@ -46,6 +53,15 @@ const showCompatibilityWebContract = `consumes:
             404: ~
 `
 
+const showCompatibilityAdminContract = `consumes:
+  petstore_api:
+    rest:
+      /pets:
+        get:
+          responses:
+            200: ~
+`
+
 const showCompatibilityReviewsContract = `provides:
   rest:
     /reviews:
@@ -54,7 +70,12 @@ const showCompatibilityReviewsContract = `provides:
           200: ~
 `
 
-var showCompatibilityColumnName = regexp.MustCompile(`<th scope="col"><a class="badge env" href="/environments/[0-9]+">([a-z0-9_]+)</a></th>`)
+var (
+	showCompatibilityColumnName  = regexp.MustCompile(`<th scope="col"><a class="badge env" href="/environments/[0-9]+">([a-z0-9_]+)</a></th>`)
+	showCompatibilityRowVersion  = regexp.MustCompile(`<th scope="row"><span class="vh"><a class="ver" href="/participants/petstore_api/versions/[0-9]+">([0-9]+)</a></span>`)
+	showCompatibilityBreakCount  = regexp.MustCompile(`<div><b>([0-9]+)</b><span>breaks?</span></div>`)
+	showCompatibilityVerdictText = regexp.MustCompile(`no · ([0-9]+) breaks?</a>`)
+)
 
 func (this *IntegrationSuite) mustPostForShowCompatibility(path, body string) {
 	status, response := this.post(path, body)
@@ -89,37 +110,47 @@ func (this *IntegrationSuite) checkForShowCompatibility(participant, version, en
 	return strconv.FormatInt(id, 10)
 }
 
-func (this *IntegrationSuite) environmentIDForShowCompatibility(environment string) string {
-	var environmentID int64
-	this.Require().NoError(this.Pool.QueryRow(context.Background(), `SELECT id FROM environments WHERE name = $1`, environment).Scan(&environmentID))
-
-	return strconv.FormatInt(environmentID, 10)
-}
-
-func (this *IntegrationSuite) gridForShowCompatibility() (staleID, breakingID, stagingID string) {
-	this.createForShowCompatibility([]string{"staging", "production"}, []string{"petstore_web", "petstore_api", "petstore_reviews"})
+func (this *IntegrationSuite) tableForShowCompatibility() (compatibleID, breakingID, stagingID string) {
+	this.createForShowCompatibility([]string{"staging", "production"},
+		[]string{"petstore_web", "petstore_api", "petstore_admin", "petstore_reviews"})
 	this.publishForShowCompatibility("petstore_api", "1.4.0", showCompatibilityAPIContract)
 	this.publishForShowCompatibility("petstore_api", "1.5.0", showCompatibilityAPIRemovedContract)
 	this.publishForShowCompatibility("petstore_web", "2.2.0", showCompatibilityWebContract)
+	this.publishForShowCompatibility("petstore_admin", "3.0.0", showCompatibilityAdminContract)
 	this.publishForShowCompatibility("petstore_reviews", "1.0.0", showCompatibilityReviewsContract)
 	this.deployForShowCompatibility("petstore_api", "1.4.0", "production")
 	this.deployForShowCompatibility("petstore_web", "2.2.0", "production")
-
-	this.checkForShowCompatibility("petstore_api", "1.4.0", "staging")
-	staleID = this.checkForShowCompatibility("petstore_api", "1.4.0", "production")
-	this.publishForShowCompatibility("petstore_web", "2.3.0", showCompatibilityWebContract)
-	this.deployForShowCompatibility("petstore_web", "2.3.0", "production")
-	this.deployForShowCompatibility("petstore_reviews", "1.0.0", "production")
+	this.deployForShowCompatibility("petstore_admin", "3.0.0", "production")
 	this.deployForShowCompatibility("petstore_reviews", "1.0.0", "staging")
-	this.deployForShowCompatibility("petstore_api", "1.4.0", "production")
+
+	compatibleID = this.checkForShowCompatibility("petstore_api", "1.4.0", "production")
 	breakingID = this.checkForShowCompatibility("petstore_api", "1.5.0", "production")
 	stagingID = this.checkForShowCompatibility("petstore_api", "1.4.0", "staging")
 
-	return staleID, breakingID, stagingID
+	return compatibleID, breakingID, stagingID
 }
 
-func (this *IntegrationSuite) TestShowCompatibility_ShowsTheVersionsByEnvironmentsGrid() {
-	staleID, breakingID, stagingID := this.gridForShowCompatibility()
+func (this *IntegrationSuite) publishManyForShowCompatibility(count int) {
+	this.createForShowCompatibility([]string{"production"}, []string{"petstore_api"})
+	this.publishForShowCompatibility("petstore_api", "1", showCompatibilityAPIContract)
+	_, err := this.Pool.Exec(context.Background(), `
+		INSERT INTO contract_versions (participant_id, version, contract_id, contract_content)
+		SELECT participant_id, (g + 1)::text, contract_id, contract_content
+		FROM contract_versions CROSS JOIN generate_series(1, $1::int) g`, count-1)
+	this.Require().NoError(err)
+}
+
+func (this *IntegrationSuite) rowVersionsForShowCompatibility(body string) []string {
+	var versions []string
+	for _, match := range showCompatibilityRowVersion.FindAllStringSubmatch(body, -1) {
+		versions = append(versions, match[1])
+	}
+
+	return versions
+}
+
+func (this *IntegrationSuite) TestShowCompatibility_ShowsTwoRowsPerVersion() {
+	compatibleID, breakingID, stagingID := this.tableForShowCompatibility()
 
 	status, header, body := this.getPage("/compatibility?participant=petstore_api", this.signInAsAdmin())
 
@@ -128,46 +159,87 @@ func (this *IntegrationSuite) TestShowCompatibility_ShowsTheVersionsByEnvironmen
 	this.Equal("no-store", header.Get("Cache-Control"))
 	this.Contains(body, `<a href="/compatibility" aria-current="page">Compatibility</a>`)
 
-	this.Contains(body, `<form method="get" action="/compatibility" class="filters compact">`)
-	this.Contains(body, `<option value="petstore_api" selected>petstore_api</option><option value="petstore_reviews">petstore_reviews</option><option value="petstore_web">petstore_web</option>`)
-	this.Contains(body, `<button type="submit" class="btn primary">Show</button>`)
+	this.Contains(body, `<div class="scroll"><table class="mt">`)
+	this.Contains(body, `<th scope="col"><span class="muted">Version of</span> <span class="name">petstore_api</span></th>`)
+	this.Contains(body, `<span class="muted">· 2 versions</span>`)
+	this.Contains(body, `yes, can deploy</span>`)
+	this.Contains(body, `no · breaks</span>`)
+	this.Contains(body, `not checked yet</span></p>`)
+	this.Equal(2, strings.Count(body, `<tr class="mrow-det">`))
+	this.Equal(2, strings.Count(body, `<td colspan="3">`))
 
-	production := `<th scope="col"><a class="badge env" href="/environments/` + this.environmentIDForShowCompatibility("production") + `">production</a></th>`
-	staging := `<th scope="col"><a class="badge env" href="/environments/` + this.environmentIDForShowCompatibility("staging") + `">staging</a></th>`
-	this.Contains(body, production)
-	this.Contains(body, staging)
-	this.Less(strings.Index(body, production), strings.Index(body, staging))
-	this.Contains(body, `<div class="scroll"><table class="rt">`)
-
-	newest := `<a class="ver" href="/participants/petstore_api/versions/1.5.0">1.5.0</a>`
-	oldest := `<a class="ver" href="/participants/petstore_api/versions/1.4.0">1.4.0</a>`
+	newest := `<th scope="row"><span class="vh"><a class="ver" href="/participants/petstore_api/versions/1.5.0">1.5.0</a></span><span class="time">published <time class="time" datetime="`
+	oldest := `<th scope="row"><span class="vh"><a class="ver" href="/participants/petstore_api/versions/1.4.0">1.4.0</a></span><span class="time">published <time class="time" datetime="`
 	this.Contains(body, newest)
 	this.Contains(body, oldest)
 	this.Less(strings.Index(body, newest), strings.Index(body, oldest))
-	this.Contains(body, `<span class="muted">· 2 versions</span>`)
+	this.Contains(body, `<span class="dep-l">Deployed in</span><span class="badges dep"><span class="muted">not deployed</span></span></th>`)
+	this.Contains(body, `<span class="dep-l">Deployed in</span><span class="badges dep"><span class="badge env">production</span></span></th>`)
 
-	this.Contains(body, `<a class="res bad" href="/checks/`+breakingID+`">`)
-	this.Contains(body, `cannot deploy · 1 break</a>`)
-	this.Contains(body, `<span class="rc-sub">check <a href="/checks/`+breakingID+`">#`+breakingID+`</a> · <time class="time" datetime="`)
-	this.Contains(body, `<td><a class="name" href="/participants/petstore_web">petstore_web</a></td>
-                <td class="rl">consumer</td>
-                <td class="ver">2.3.0</td>
-                <td class="st-cell"><span class="st bad">`)
-	this.Contains(body, `1 break</span></td>`)
-	this.Contains(body, `<td class="ver">2.2.0</td>
-                <td class="st-cell"><span class="st ok">`)
+	this.Contains(body, `<td class="mc bad" data-env="production"><a class="res bad" href="/checks/`+breakingID+`">`)
+	this.Contains(body, `<td class="mc ok" data-env="production"><a class="res ok" href="/checks/`+compatibleID+`">`)
+	this.Contains(body, `<td class="mc ok" data-env="staging"><a class="res ok" href="/checks/`+stagingID+`">`)
+	this.Contains(body, `yes</a><span class="mc-sub">check <a href="/checks/`+compatibleID+`">#`+compatibleID+`</a> · <time class="time" datetime="`)
+	this.Contains(body, `<span class="mc-sub">check <a href="/checks/`+breakingID+`">#`+breakingID+`</a> · <time class="time" datetime="`)
+	this.Regexp(`<a class="res bad" href="/checks/`+breakingID+`"><svg[^>]*><path[^>]*/></svg>no · 2 breaks</a>`, body)
+	this.Contains(body, `<td class="mc none" data-env="staging"><span class="res none">`)
+	this.Contains(body, `not checked yet</span><span class="mc-sub">no can-i-deploy for 1.5.0 in staging yet</span></td>`)
 
-	this.Contains(body, `<a class="res ok" href="/checks/`+staleID+`">`)
-	this.Equal(1, strings.Count(body, `<span class="badge deployed">deployed version</span>`))
-	this.NotContains(body, `<span class="badge env">deployed version</span>`)
-	this.Contains(body, `<span>Since this check, 2 deployments to production: petstore_reviews, petstore_web. Ask again before deploying.</span>`)
-	this.Equal(1, strings.Count(body, `class="rc-stale"`))
+	this.NotContains(body, `deployed version`)
+	this.NotContains(body, `rc-stale`)
+	this.NotContains(body, `Since this check`)
+	this.NotContains(body, `class="rl"`)
+	this.NotContains(body, `class="rt`)
+}
 
-	this.Contains(body, `href="/checks/`+stagingID+`"`)
-	this.Equal(3, strings.Count(body, `<td class="rc ok"`)+strings.Count(body, `<td class="rc bad"`))
-	this.Contains(body, `not checked yet</span>`)
-	this.Contains(body, `<p class="rc-sub">no can-i-deploy for 1.5.0 in staging yet</p>`)
-	this.Contains(body, `showing 1–2 of 2`)
+func (this *IntegrationSuite) TestShowCompatibility_ListsEveryCounterpartBreakingFirst() {
+	this.tableForShowCompatibility()
+
+	_, _, body := this.getPage("/compatibility?participant=petstore_api", this.signInAsAdmin())
+
+	newestDetails := body[strings.Index(body, `compared with · <span class="ver">1.5.0</span>`):strings.Index(body, `compared with · <span class="ver">1.4.0</span>`)]
+	this.Contains(newestDetails, `<div class="mdet-grid n2">`)
+	production := newestDetails[strings.Index(newestDetails, `<p class="group-label"><span class="badge env">production</span></p>`):]
+
+	reviews := `<td><a class="name" href="/participants/petstore_reviews">petstore_reviews</a> <span class="ver">no version</span></td>`
+	web := `<td><a class="name" href="/participants/petstore_web">petstore_web</a> <span class="ver">2.2.0</span></td>`
+	admin := `<td><a class="name" href="/participants/petstore_admin">petstore_admin</a> <span class="ver">3.0.0</span></td>`
+	this.Contains(production, reviews)
+	this.Contains(production, web)
+	this.Contains(production, admin)
+	this.Less(strings.Index(production, reviews), strings.Index(production, web))
+	this.Less(strings.Index(production, web), strings.Index(production, admin))
+	this.Contains(production, `1 break</span></td>`)
+	this.Contains(production, `compatible</span></td>`)
+	this.Contains(production, `<p class="muted small">no version: not deployed in production</p>`)
+	this.NotContains(body, `more</`)
+}
+
+func (this *IntegrationSuite) TestShowCompatibility_OpensOnlyTheNewestVersionsDetails() {
+	this.tableForShowCompatibility()
+
+	_, _, body := this.getPage("/compatibility?participant=petstore_api", this.signInAsAdmin())
+
+	opened := `<details class="mdets" open>`
+	closed := `<details class="mdets">`
+	this.Equal(1, strings.Count(body, opened))
+	this.Equal(1, strings.Count(body, closed))
+	this.Less(strings.Index(body, opened), strings.Index(body, `compared with · <span class="ver">1.5.0</span>`))
+	this.Less(strings.Index(body, `compared with · <span class="ver">1.5.0</span>`), strings.Index(body, closed))
+	this.Less(strings.Index(body, closed), strings.Index(body, `compared with · <span class="ver">1.4.0</span>`))
+}
+
+func (this *IntegrationSuite) TestShowCompatibility_DetailsSayWhenThereIsNothingToList() {
+	this.tableForShowCompatibility()
+
+	_, _, body := this.getPage("/compatibility?participant=petstore_api", this.signInAsAdmin())
+
+	newestDetails := body[strings.Index(body, `compared with · <span class="ver">1.5.0</span>`):strings.Index(body, `compared with · <span class="ver">1.4.0</span>`)]
+	this.Contains(newestDetails, `<p class="muted small">not checked yet</p>`)
+
+	oldestDetails := body[strings.Index(body, `compared with · <span class="ver">1.4.0</span>`):]
+	this.Contains(oldestDetails, `<p class="muted small">nothing deployed in staging shares an endpoint</p>`)
+	this.NotContains(oldestDetails, `not checked yet`)
 }
 
 func (this *IntegrationSuite) TestShowCompatibility_ShowsOnlyTheLatestCheckPerVersionAndEnvironment() {
@@ -180,30 +252,97 @@ func (this *IntegrationSuite) TestShowCompatibility_ShowsOnlyTheLatestCheckPerVe
 
 	this.Contains(body, `href="/checks/`+latestID+`"`)
 	this.NotContains(body, `href="/checks/`+olderID+`"`)
-	this.Contains(body, `<p class="rc-sub">nothing deployed in staging shares an endpoint</p>`)
+	this.Contains(body, `<div class="mdet-grid n1">`)
 }
 
 func (this *IntegrationSuite) TestShowCompatibility_CountsTheSameBreaksAsTheCheckPage() {
-	_, breakingID, _ := this.gridForShowCompatibility()
+	_, breakingID, _ := this.tableForShowCompatibility()
 	cookie := this.signInAsAdmin()
 
-	_, _, grid := this.getPage("/compatibility?participant=petstore_api", cookie)
+	_, _, table := this.getPage("/compatibility?participant=petstore_api", cookie)
 	_, _, check := this.getPage("/checks/"+breakingID, cookie)
 
-	this.Contains(grid, `cannot deploy · 1 break</a>`)
-	this.Contains(check, `<div><b>1</b><span>break</span></div>`)
+	tableCount := showCompatibilityVerdictText.FindStringSubmatch(table)
+	checkCount := showCompatibilityBreakCount.FindStringSubmatch(check)
+	this.Require().NotNil(tableCount)
+	this.Require().NotNil(checkCount)
+	this.Equal(checkCount[1], tableCount[1])
 }
 
-func (this *IntegrationSuite) TestShowCompatibility_StaleNoteIgnoresTheCheckedParticipantsOwnDeployments() {
-	this.createForShowCompatibility([]string{"production"}, []string{"petstore_api"})
-	this.publishForShowCompatibility("petstore_api", "1.4.0", showCompatibilityAPIContract)
-	this.publishForShowCompatibility("petstore_api", "1.5.0", showCompatibilityAPIContract)
-	this.checkForShowCompatibility("petstore_api", "1.4.0", "production")
-	this.deployForShowCompatibility("petstore_api", "1.5.0", "production")
+func (this *IntegrationSuite) TestShowCompatibility_LatestVersionsKeepOlderDeployedOnes() {
+	this.publishManyForShowCompatibility(12)
+	this.deployForShowCompatibility("petstore_api", "1", "production")
+	cookie := this.signInAsAdmin()
+
+	status, _, body := this.getPage("/compatibility?participant=petstore_api", cookie)
+	this.Require().Equal(http.StatusOK, status, body)
+	this.Equal([]string{"12", "11", "10", "9", "8", "7", "6", "5", "4", "3", "1"}, this.rowVersionsForShowCompatibility(body))
+	this.Contains(body, `<span class="muted">· 11 versions</span>`)
+	this.Contains(body, `<option value="10" selected>last 10 versions</option>`)
+
+	status, _, body = this.getPage("/compatibility?participant=petstore_api&versions=5", cookie)
+	this.Require().Equal(http.StatusOK, status, body)
+	this.Equal([]string{"12", "11", "10", "9", "8", "1"}, this.rowVersionsForShowCompatibility(body))
+	this.Contains(body, `<option value="5" selected>last 5 versions</option>`)
+	this.Contains(body, `<option value="all">all versions, 20 per page</option>`)
+}
+
+func (this *IntegrationSuite) TestShowCompatibility_InvalidVersionsIsNotFound() {
+	this.publishManyForShowCompatibility(1)
+	cookie := this.signInAsAdmin()
+
+	for _, query := range []string{"versions=7", "versions=", "versions=ALL", "versions=010", "versions=10&page=2", "versions=abc"} {
+		status, _, _ := this.getPage("/compatibility?participant=petstore_api&"+query, cookie)
+		this.Equal(http.StatusNotFound, status, query)
+	}
+}
+
+func (this *IntegrationSuite) TestShowCompatibility_AllVersionsPagesTwentyAtATime() {
+	this.publishManyForShowCompatibility(25)
+	cookie := this.signInAsAdmin()
+
+	status, _, first := this.getPage("/compatibility?participant=petstore_api&versions=all", cookie)
+	this.Require().Equal(http.StatusOK, status, first)
+	this.Len(this.rowVersionsForShowCompatibility(first), 20)
+	this.Equal("25", this.rowVersionsForShowCompatibility(first)[0])
+	this.Contains(first, `<span class="muted">· 25 versions</span>`)
+	this.Contains(first, `<option value="all" selected>all versions, 20 per page</option>`)
+	this.Contains(first, `href="/compatibility?page=2&amp;participant=petstore_api&amp;versions=all" rel="next"`)
+
+	status, _, second := this.getPage("/compatibility?participant=petstore_api&versions=all&page=2", cookie)
+	this.Require().Equal(http.StatusOK, status, second)
+	this.Equal([]string{"5", "4", "3", "2", "1"}, this.rowVersionsForShowCompatibility(second))
+	this.Contains(second, `href="/compatibility?page=1&amp;participant=petstore_api&amp;versions=all" rel="prev"`)
+
+	for _, query := range []string{"page=3", "page=0", "page=01", "page=+1", "page=", "page=abc"} {
+		status, _, _ := this.getPage("/compatibility?participant=petstore_api&versions=all&"+query, cookie)
+		this.Equal(http.StatusNotFound, status, query)
+	}
+}
+
+func (this *IntegrationSuite) TestShowCompatibility_FooterIsNavigationOnly() {
+	this.publishManyForShowCompatibility(2)
 
 	_, _, body := this.getPage("/compatibility?participant=petstore_api", this.signInAsAdmin())
 
-	this.NotContains(body, `Since this check`)
+	this.Contains(body, `<div class="sheet-foot"><nav class="pager" aria-label="Pages">`)
+	this.Contains(body, `<span class="off">Previous</span>`)
+	this.Contains(body, `<span aria-current="page">1</span>`)
+	this.Contains(body, `<span class="off">Next</span>`)
+	this.NotContains(body, `showing `)
+}
+
+func (this *IntegrationSuite) TestShowCompatibility_FiltersKeepTheParticipantAndVersions() {
+	this.createForShowCompatibility([]string{"production"}, []string{"petstore_web", "petstore_api", "petstore_reviews"})
+
+	status, _, body := this.getPage("/compatibility?participant=petstore_api", this.signInAsAdmin())
+
+	this.Require().Equal(http.StatusOK, status, body)
+	this.Contains(body, `<form method="get" action="/compatibility" class="filters compact">`)
+	this.Contains(body, `<option value="petstore_api" selected>petstore_api</option><option value="petstore_reviews">petstore_reviews</option><option value="petstore_web">petstore_web</option>`)
+	this.Contains(body, `<option value="5">last 5 versions</option><option value="10" selected>last 10 versions</option><option value="20">last 20 versions</option><option value="50">last 50 versions</option><option value="all">all versions, 20 per page</option>`)
+	this.Contains(body, `<button type="submit" class="btn primary">Show</button>`)
+	this.Contains(body, `<p class="filters-note">Newest first. Versions deployed somewhere are always included, even if older.</p>`)
 }
 
 func (this *IntegrationSuite) TestShowCompatibility_WithoutParticipantShowsTheFirstAlphabetically() {
@@ -263,7 +402,7 @@ func (this *IntegrationSuite) TestShowCompatibility_NeverPublishedHasNothingToCo
 	this.NotContains(body, `<table`)
 }
 
-func (this *IntegrationSuite) TestShowCompatibility_CheckWithoutReportShowsNoRoleAndNoCount() {
+func (this *IntegrationSuite) TestShowCompatibility_CheckWithoutReportShowsNoCount() {
 	this.createForShowCompatibility([]string{"production"}, []string{"petstore_api", "petstore_web"})
 	this.publishForShowCompatibility("petstore_api", "1.4.0", showCompatibilityAPIContract)
 	_, err := this.Pool.Exec(context.Background(), `
@@ -279,21 +418,27 @@ func (this *IntegrationSuite) TestShowCompatibility_CheckWithoutReportShowsNoRol
 
 	_, _, body := this.getPage("/compatibility?participant=petstore_api", this.signInAsAdmin())
 
-	this.Contains(body, `cannot deploy</a>`)
-	this.NotContains(body, `cannot deploy · `)
-	this.Contains(body, `<td class="rl"></td>`)
-	this.Contains(body, `not compatible</span>`)
+	this.Regexp(`<a class="res bad" href="/checks/[0-9]+"><svg[^>]*><path[^>]*/></svg>no</a>`, body)
+	this.Contains(body, `<td><a class="name" href="/participants/petstore_web">petstore_web</a> <span class="ver">2.2.0</span></td>`)
+	this.Contains(body, `not compatible</span></td>`)
 	this.NotContains(body, `break</span>`)
+	this.NotContains(body, `breaks</span></td>`)
 }
 
-func (this *IntegrationSuite) TestShowCompatibility_MoreThanTwoEnvironmentsStack() {
+func (this *IntegrationSuite) TestShowCompatibility_DetailGridFollowsTheEnvironmentCount() {
 	this.createForShowCompatibility([]string{"production", "qa", "staging"}, []string{"petstore_api"})
 	this.publishForShowCompatibility("petstore_api", "1.4.0", showCompatibilityAPIContract)
+	cookie := this.signInAsAdmin()
 
-	_, _, body := this.getPage("/compatibility", this.signInAsAdmin())
+	_, _, body := this.getPage("/compatibility", cookie)
+	this.Contains(body, `<div class="mdet-grid n3">`)
+	this.Contains(body, `<td colspan="4">`)
+	this.Equal(3, strings.Count(body, `<td class="mc none"`))
 
-	this.Contains(body, `<div class="scroll"><table class="rt stacked">`)
-	this.Equal(3, strings.Count(body, `<td class="rc none"`))
+	this.createForShowCompatibility([]string{"dev", "eu", "us", "sandbox"}, nil)
+	_, _, body = this.getPage("/compatibility", cookie)
+	this.Contains(body, `<div class="mdet-grid n6">`)
+	this.Equal(7, strings.Count(body, `<div class="mdet">`))
 }
 
 func (this *IntegrationSuite) TestShowCompatibility_EnvironmentColumnsSortedByteWise() {
@@ -309,44 +454,15 @@ func (this *IntegrationSuite) TestShowCompatibility_EnvironmentColumnsSortedByte
 	this.Equal([]string{"staging2", "staging_us", "stagingeu"}, names)
 }
 
-func (this *IntegrationSuite) TestShowCompatibility_PaginatesTheVersions() {
-	this.createForShowCompatibility([]string{"production"}, []string{"petstore_api"})
-	this.publishForShowCompatibility("petstore_api", "1", showCompatibilityAPIContract)
-	_, err := this.Pool.Exec(context.Background(), `
-		INSERT INTO contract_versions (participant_id, version, contract_id, contract_content)
-		SELECT participant_id, (g + 1)::text, contract_id, contract_content
-		FROM contract_versions CROSS JOIN generate_series(1, 25) g`)
-	this.Require().NoError(err)
-	cookie := this.signInAsAdmin()
-
-	status, _, first := this.getPage("/compatibility?participant=petstore_api", cookie)
-	this.Require().Equal(http.StatusOK, status, first)
-	this.Contains(first, `showing 1–25 of 26`)
-	this.Contains(first, `>26</a>`)
-	this.NotContains(first, `versions/1">1</a>`)
-	this.Contains(first, `href="/compatibility?page=2&amp;participant=petstore_api" rel="next"`)
-
-	status, _, second := this.getPage("/compatibility?participant=petstore_api&page=2", cookie)
-	this.Require().Equal(http.StatusOK, status, second)
-	this.Contains(second, `showing 26–26 of 26`)
-	this.Contains(second, `<a class="ver" href="/participants/petstore_api/versions/1">1</a>`)
-	this.Contains(second, `href="/compatibility?page=1&amp;participant=petstore_api" rel="prev"`)
-
-	for _, query := range []string{"page=3", "page=0", "page=01", "page=+1", "page=", "page=abc"} {
-		status, _, _ := this.getPage("/compatibility?participant=petstore_api&"+query, cookie)
-		this.Equal(http.StatusNotFound, status, query)
-	}
-}
-
 func (this *IntegrationSuite) TestShowCompatibility_ReadUserSeesThePageWithoutWriteActions() {
-	this.gridForShowCompatibility()
+	this.tableForShowCompatibility()
 	this.createActiveUser(showCompatibilityReaderEmail, model.PermissionRead, showCompatibilityReaderPassword)
 
 	status, _, body := this.getPage("/compatibility?participant=petstore_api",
 		this.signInAsUser(showCompatibilityReaderEmail, showCompatibilityReaderPassword))
 
 	this.Require().Equal(http.StatusOK, status, body)
-	this.Contains(body, `cannot deploy · 1 break</a>`)
+	this.Contains(body, `no · 2 breaks</a>`)
 	this.Equal(1, strings.Count(body, `method="post"`))
 	this.Contains(body, `<form method="post" action="/sign-out">`)
 }

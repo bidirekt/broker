@@ -1,9 +1,11 @@
 package show_compatibility
 
 import (
+	"cmp"
 	"fmt"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,19 +16,28 @@ import (
 
 const (
 	participantParam = "participant"
+	versionsParam    = "versions"
 	pageParam        = "page"
+
+	allVersions     = "all"
+	defaultVersions = "10"
 
 	showCompatibilityTemplate = "show_compatibility.html"
 
-	maxSideBySideEnvironments = 2
+	maxDetailColumns = 6
 )
+
+var latestVersionsChoices = []int{5, 10, 20, 50}
 
 type ShowCompatibilityPage struct {
 	Participants   []ParticipantOption
+	Versions       []VersionsOption
 	Participant    *model.Participant
 	ParticipantURL string
 	Environments   []model.Environment
-	Stacked        bool
+	Columns        int
+	DetailGrid     string
+	VersionsCount  int
 	Rows           []VersionRow
 	Pager          pages.Pager
 }
@@ -36,23 +47,30 @@ type ParticipantOption struct {
 	Selected bool
 }
 
+type VersionsOption struct {
+	Value    string
+	Label    string
+	Selected bool
+}
+
 type VersionRow struct {
 	Version     string
 	VersionURL  string
 	PublishedAt time.Time
+	DeployedIn  []model.Environment
+	Open        bool
 	Cells       []Cell
 }
 
 type Cell struct {
 	Environment model.Environment
-	Deployed    bool
 	Check       *CheckCell
 }
 
 type CheckCell struct {
 	ReportedCheck
-	Counterparts []CounterpartRow
-	StaleNote    string
+	Counterparts   []CounterpartRow
+	VersionMissing bool
 }
 
 type CounterpartRow struct {
@@ -65,12 +83,47 @@ type cellKey struct {
 	environmentID int64
 }
 
-func newShowCompatibilityPage(output ShowCompatibilityOutput, pager pages.Pager) ShowCompatibilityPage {
+func versionsFilter(value string, page int64) (filter VersionsFilter, ok bool) {
+	if value == allVersions {
+		return VersionsFilter{All: true, Page: page}, true
+	}
+
+	for _, latest := range latestVersionsChoices {
+		if value == strconv.Itoa(latest) {
+			return VersionsFilter{Latest: latest, Page: page}, page == 1
+		}
+	}
+
+	return VersionsFilter{}, false
+}
+
+func versionsOptions(selected string) []VersionsOption {
+	options := make([]VersionsOption, 0, len(latestVersionsChoices)+1)
+	for _, latest := range latestVersionsChoices {
+		value := strconv.Itoa(latest)
+		options = append(options, VersionsOption{
+			Value:    value,
+			Label:    fmt.Sprintf("last %d versions", latest),
+			Selected: value == selected,
+		})
+	}
+
+	return append(options, VersionsOption{
+		Value:    allVersions,
+		Label:    fmt.Sprintf("all versions, %d per page", allVersionsPageSize),
+		Selected: selected == allVersions,
+	})
+}
+
+func newShowCompatibilityPage(output ShowCompatibilityOutput, versions string, pager pages.Pager) ShowCompatibilityPage {
 	page := ShowCompatibilityPage{
-		Participant:  output.Participant,
-		Environments: output.Environments,
-		Stacked:      len(output.Environments) > maxSideBySideEnvironments,
-		Pager:        pager,
+		Versions:      versionsOptions(versions),
+		Participant:   output.Participant,
+		Environments:  output.Environments,
+		Columns:       len(output.Environments) + 1,
+		DetailGrid:    fmt.Sprintf("n%d", min(len(output.Environments), maxDetailColumns)),
+		VersionsCount: output.VersionsTotal,
+		Pager:         pager,
 	}
 	for _, name := range output.Participants {
 		page.Participants = append(page.Participants, ParticipantOption{
@@ -88,21 +141,18 @@ func newShowCompatibilityPage(output ShowCompatibilityOutput, pager pages.Pager)
 		checksByCell[cellKey{reported.Check.Version, reported.Check.EnvironmentID}] = reported
 	}
 
-	for _, version := range output.Versions {
+	for i, version := range output.Versions {
 		row := VersionRow{
 			Version:     version.Version,
 			VersionURL:  versionURL(output.Participant.Name, version.Version),
 			PublishedAt: version.PublishedAt,
+			DeployedIn:  version.DeployedIn,
+			Open:        i == 0,
 		}
 		for _, environment := range output.Environments {
-			cell := Cell{
-				Environment: environment,
-				Deployed: slices.ContainsFunc(version.DeployedIn, func(deployedIn model.Environment) bool {
-					return deployedIn.ID == environment.ID
-				}),
-			}
+			cell := Cell{Environment: environment}
 			if reported, checked := checksByCell[cellKey{version.Version, environment.ID}]; checked {
-				cell.Check = toCheckCell(reported, environment)
+				cell.Check = toCheckCell(reported)
 			}
 			row.Cells = append(row.Cells, cell)
 		}
@@ -112,18 +162,19 @@ func newShowCompatibilityPage(output ShowCompatibilityOutput, pager pages.Pager)
 	return page
 }
 
-func toCheckCell(reported ReportedCheck, environment model.Environment) *CheckCell {
+func toCheckCell(reported ReportedCheck) *CheckCell {
 	counterparts := slices.Clone(reported.Report.Counterparts)
-	slices.SortStableFunc(counterparts, func(a, b breakreport.Counterpart) int {
-		return compareBreakingFirst(a.Deployable, b.Deployable)
+	slices.SortFunc(counterparts, func(a, b breakreport.Counterpart) int {
+		return cmp.Or(compareBreakingFirst(a.Deployable, b.Deployable), strings.Compare(a.Name, b.Name))
 	})
 
-	cell := &CheckCell{ReportedCheck: reported, StaleNote: staleNote(reported.DeploymentsSince, environment)}
+	cell := &CheckCell{ReportedCheck: reported}
 	for _, counterpart := range counterparts {
 		row := CounterpartRow{Counterpart: counterpart}
 		if counterpart.Registered {
 			row.ParticipantURL = participantURL(counterpart.Name)
 		}
+		cell.VersionMissing = cell.VersionMissing || counterpart.Version == ""
 		cell.Counterparts = append(cell.Counterparts, row)
 	}
 
@@ -139,20 +190,6 @@ func compareBreakingFirst(a, b bool) int {
 	}
 
 	return 1
-}
-
-func staleNote(since model.DeploymentsSinceCheck, environment model.Environment) string {
-	if since.Count == 0 {
-		return ""
-	}
-
-	deployments := "deployments"
-	if since.Count == 1 {
-		deployments = "deployment"
-	}
-
-	return fmt.Sprintf("Since this check, %d %s to %s: %s. Ask again before deploying.",
-		since.Count, deployments, environment.Name, strings.Join(since.Participants, ", "))
 }
 
 func participantURL(participantName string) string {

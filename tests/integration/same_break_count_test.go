@@ -120,7 +120,7 @@ func (this *IntegrationSuite) TestSameBreakCount_OneCheckShowsTheSameBreakCountO
 		"/participants/petstore_api/checks":                     `no · 3 breaks</span>`,
 		"/participants/petstore_api/versions/2.0.0":             `no · 3 breaks</span>`,
 		"/environments/" + strconv.FormatInt(environmentID, 10): `no · 3 breaks</span>`,
-		"/compatibility?participant=petstore_api":               `cannot deploy · 3 breaks</a>`,
+		"/compatibility?participant=petstore_api":               `no · 3 breaks</a>`,
 		"/": `3 breaks · check #` + check + `</a>`,
 	}
 	for path, count := range screens {
