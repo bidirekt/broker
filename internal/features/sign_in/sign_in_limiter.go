@@ -21,19 +21,19 @@ type signInLimiter struct {
 	perAccount fiber.Handler
 }
 
-func newSignInLimiter() *signInLimiter {
+func newSignInLimiter(respondTooManyAttempts fiber.Handler) *signInLimiter {
 	return &signInLimiter{
-		perIP: newSignInFailureLimiter(signInFailuresPerIP, func(ctx fiber.Ctx) string {
+		perIP: newSignInFailureLimiter(signInFailuresPerIP, respondTooManyAttempts, func(ctx fiber.Ctx) string {
 			return ctx.IP()
 		}),
-		perAccount: newSignInFailureLimiter(signInFailuresPerAccount, func(ctx fiber.Ctx) string {
+		perAccount: newSignInFailureLimiter(signInFailuresPerAccount, respondTooManyAttempts, func(ctx fiber.Ctx) string {
 			email, _ := ctx.Locals(signInEmailLocalsName).(string)
 			return ctx.IP() + " " + email
 		}),
 	}
 }
 
-func newSignInFailureLimiter(maxFailures int, key func(fiber.Ctx) string) fiber.Handler {
+func newSignInFailureLimiter(maxFailures int, respondTooManyAttempts fiber.Handler, key func(fiber.Ctx) string) fiber.Handler {
 	return limiter.New(limiter.Config{
 		Max:                    maxFailures,
 		Expiration:             signInFailureWindow,
@@ -41,6 +41,10 @@ func newSignInFailureLimiter(maxFailures int, key func(fiber.Ctx) string) fiber.
 		SkipSuccessfulRequests: true,
 		KeyGenerator:           key,
 		LimitReached: func(ctx fiber.Ctx) error {
+			if respond.PageRequested(ctx) {
+				return respondTooManyAttempts(ctx)
+			}
+
 			return respond.Problem(ctx, fiber.StatusTooManyRequests, TooManySignInAttemptsMessage)
 		},
 	})

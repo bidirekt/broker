@@ -16,10 +16,13 @@ import (
 )
 
 const (
-	generateLinkPassword        = "generate-link-correct-horse"
-	generateLinkPreviousToken   = "generate-link-previous-token"
-	generateLinkUserNotFound    = "user not found"
-	generateLinkUserDeactivated = "deactivated users cannot get a link"
+	generateLinkPassword         = "generate-link-correct-horse"
+	generateLinkPreviousToken    = "generate-link-previous-token"
+	generateLinkUserNotFoundPage = "<h1>user not found</h1>"
+	generateLinkErrorStatus      = `<div class="code-n">404</div>`
+	generateLinkUserDeactivated  = "deactivated users cannot get a link"
+	generateLinkWarnIcon         = `<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 1.8l6.5 11.7h-13z"/><path d="M8 6.5v3M8 11.6v.01"/></svg>`
+	generateLinkPreviousWarning  = `<div class="warn" role="note">` + generateLinkWarnIcon + `<span>The previous link no longer works.</span></div>`
 )
 
 var generateLinkInPage = regexp.MustCompile(`http://localhost:8080/set-password\?token=([A-Za-z0-9_-]{43})`)
@@ -34,11 +37,15 @@ func (this *IntegrationSuite) generateLinkFor(userID string) (status int, body s
 }
 
 func (this *IntegrationSuite) generateLinkPreviousOpenLink(userID int64) []byte {
+	return this.generateLinkPreviousLink(userID, time.Now().Add(time.Hour))
+}
+
+func (this *IntegrationSuite) generateLinkPreviousLink(userID int64, expiresAt time.Time) []byte {
 	tokenHash := sha256.Sum256([]byte(generateLinkPreviousToken))
-	_, found, deactivated := repository.NewOneTimeLinkRepository(this.Pool).ReplaceOpen(context.Background(), &model.OneTimeLink{
+	_, found, deactivated, _ := repository.NewOneTimeLinkRepository(this.Pool).ReplaceOpen(context.Background(), &model.OneTimeLink{
 		TokenHash: tokenHash[:],
 		UserID:    userID,
-		ExpiresAt: time.Now().Add(time.Hour),
+		ExpiresAt: expiresAt,
 	})
 	this.Require().True(found)
 	this.Require().False(deactivated)
@@ -60,6 +67,11 @@ func (this *IntegrationSuite) generateLinkAssertReplaced(userID int64, previousH
 	this.Equal(userID, user.ID)
 	this.Equal(purpose, link.Purpose)
 	this.WithinDuration(time.Now().Add(24*time.Hour), link.ExpiresAt, time.Minute)
+	this.Contains(body, `<h1>New `+string(purpose)+` link</h1>`)
+	this.Contains(body, `<p class="sub">for `+user.Email+`</p>`)
+	this.Contains(body, `Send this `+string(purpose)+` link to `+user.Email+`. It works once, until <time class="time" datetime="`+link.ExpiresAt.UTC().Format(time.RFC3339Nano)+`" title="`+link.ExpiresAt.UTC().Format("2006-01-02 15:04")+` UTC">`+link.ExpiresAt.UTC().Format("2006-01-02 15:04")+` UTC</time>, and is not shown again.`)
+	this.Contains(body, `<input class="copy" type="text" readonly value="`+match[0]+`"`)
+	this.Contains(body, generateLinkPreviousWarning)
 	this.Equal(1, this.countRows("one_time_links"))
 
 	_, _, list := this.getPage("/users", this.signInAsAdmin())
@@ -89,6 +101,20 @@ func (this *IntegrationSuite) TestGenerateLink_ActiveUserGetsAResetLinkReplacing
 	this.generateLinkAssertReplaced(userID, previousHash, body, model.LinkPurposeReset)
 }
 
+func (this *IntegrationSuite) TestGenerateLink_DoesNotWarnAboutAPreviousLinkThatWasNotThereOrHadExpired() {
+	withoutLinkID := this.createActiveUser("ana@x.com", model.PermissionRead, generateLinkPassword)
+	expiredLinkID := this.createActiveUser("bob@x.com", model.PermissionRead, generateLinkPassword)
+	this.generateLinkPreviousLink(expiredLinkID, time.Now().Add(-time.Minute))
+
+	for _, userID := range []int64{withoutLinkID, expiredLinkID} {
+		status, body := this.generateLinkFor(fmt.Sprint(userID))
+
+		this.Require().Equal(http.StatusOK, status)
+		this.Regexp(generateLinkInPage, body)
+		this.NotContains(body, "The previous link no longer works.")
+	}
+}
+
 func (this *IntegrationSuite) TestGenerateLink_HtmxShowsTheLinkWithoutPushingTheFormURLOrBeingStored() {
 	userID := this.createActiveUser("bob@x.com", model.PermissionWrite, generateLinkPassword)
 	cookie := this.signInAsAdmin()
@@ -105,6 +131,7 @@ func (this *IntegrationSuite) TestGenerateLink_HtmxShowsTheLinkWithoutPushingThe
 	this.Require().Equal(http.StatusOK, status)
 	this.Regexp(generateLinkInPage, body)
 	this.Equal("false", header.Get("HX-Push-Url"))
+	this.Equal("text/html; charset=utf-8", header.Get("Content-Type"))
 	this.Equal("no-store", header.Get("Cache-Control"))
 }
 
@@ -115,7 +142,8 @@ func (this *IntegrationSuite) TestGenerateLink_RefusesADeactivatedUser() {
 	status, body := this.generateLinkFor(fmt.Sprint(userID))
 
 	this.Equal(http.StatusConflict, status)
-	this.Contains(body, generateLinkUserDeactivated)
+	this.Contains(body, "<h1>New link for zoe@x.com</h1>")
+	this.Contains(body, `</svg><span>`+generateLinkUserDeactivated+`</span></div>`)
 	this.NotRegexp(generateLinkInPage, body)
 	this.Equal(0, this.countRows("one_time_links"))
 }
@@ -127,7 +155,8 @@ func (this *IntegrationSuite) TestGenerateLink_AnswersUserNotFoundForAnUnknownOr
 		status, body := this.generateLinkFor(id)
 
 		this.Equal(http.StatusNotFound, status, id)
-		this.Contains(body, generateLinkUserNotFound, id)
+		this.Contains(body, generateLinkUserNotFoundPage, id)
+		this.Contains(body, generateLinkErrorStatus, id)
 	}
 
 	this.Equal(0, this.countRows("one_time_links"))
@@ -143,7 +172,7 @@ func (this *IntegrationSuite) TestGenerateLink_ButtonIsHiddenForADeactivatedUser
 	status, _, body := this.getPage("/users", this.signInAsAdmin())
 
 	this.Require().Equal(http.StatusOK, status)
-	this.Contains(body, fmt.Sprintf(`<form method="post" action="/users/%d/link"><button type="submit">New invite link</button></form>`, invitedID))
-	this.Contains(body, fmt.Sprintf(`<form method="post" action="/users/%d/link"><button type="submit">New reset link</button></form>`, activeID))
+	this.Contains(body, fmt.Sprintf(`<form method="post" action="/users/%d/link"><button type="submit" class="btn sm">New invite link</button></form>`, invitedID))
+	this.Contains(body, fmt.Sprintf(`<form method="post" action="/users/%d/link"><button type="submit" class="btn sm">New reset link</button></form>`, activeID))
 	this.NotContains(body, fmt.Sprintf(`action="/users/%d/link"`, deactivatedID))
 }

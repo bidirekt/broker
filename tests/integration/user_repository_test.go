@@ -86,7 +86,7 @@ func (this *IntegrationSuite) TestUserRepository_CreateInvited_StoresAnInvitedUs
 	this.False(ok)
 }
 
-func (this *IntegrationSuite) TestUserRepository_List_OrdersByEmailByteWise() {
+func (this *IntegrationSuite) TestUserRepository_List_PagesByEmailByteWiseWithTheTotal() {
 	this.deleteSuiteWriter()
 
 	ctx := context.Background()
@@ -99,12 +99,25 @@ func (this *IntegrationSuite) TestUserRepository_List_OrdersByEmailByteWise() {
 		))
 	}
 
-	var emails []string
-	for _, user := range repo.List(ctx) {
-		emails = append(emails, user.Email)
+	emailsOf := func(users []*model.User) (emails []string) {
+		for _, user := range users {
+			emails = append(emails, user.Email)
+		}
+
+		return emails
 	}
 
-	this.Equal([]string{"Zed@x.com", "admin@example.com", "ana@x.com", "bob@x.com"}, emails)
+	users, total := repo.List(ctx, 25, 0)
+	this.Equal([]string{"Zed@x.com", "admin@example.com", "ana@x.com", "bob@x.com"}, emailsOf(users))
+	this.Equal(4, total)
+
+	users, total = repo.List(ctx, 3, 3)
+	this.Equal([]string{"bob@x.com"}, emailsOf(users))
+	this.Equal(4, total)
+
+	users, total = repo.List(ctx, 3, 6)
+	this.Empty(users)
+	this.Equal(4, total)
 }
 
 func (this *IntegrationSuite) TestUserRepository_UpdateEmailAndPermission_ReportsTheClashAndKeepsSessions() {
@@ -249,7 +262,7 @@ func (this *IntegrationSuite) TestUserRepository_SetPasswordWithLinkWhileReplace
 	reset := &model.OneTimeLink{TokenHash: []byte("ana-reset"), UserID: user.ID, ExpiresAt: time.Now().Add(24 * time.Hour)}
 	var userFound, deactivated bool
 	replaceFinished := userRepositoryInBackground(func() {
-		_, userFound, deactivated = links.ReplaceOpen(ctx, reset)
+		_, userFound, deactivated, _ = links.ReplaceOpen(ctx, reset)
 	})
 	this.userRepositoryAwaitLockWaiters(2)
 
@@ -347,7 +360,7 @@ func (this *IntegrationSuite) TestUserRepository_ChangePasswordKeepingSession_En
 		&model.OneTimeLink{TokenHash: []byte("ana-invite"), Purpose: model.LinkPurposeInvite, ExpiresAt: time.Now().Add(24 * time.Hour)},
 	))
 	this.Require().True(repo.SetPasswordWithLink(ctx, []byte("ana-invite"), userRepositoryPasswordHash))
-	_, found, deactivated := links.ReplaceOpen(ctx, &model.OneTimeLink{TokenHash: []byte("ana-reset"), UserID: user.ID, ExpiresAt: time.Now().Add(24 * time.Hour)})
+	_, found, deactivated, _ := links.ReplaceOpen(ctx, &model.OneTimeLink{TokenHash: []byte("ana-reset"), UserID: user.ID, ExpiresAt: time.Now().Add(24 * time.Hour)})
 	this.Require().True(found)
 	this.Require().False(deactivated)
 	_, _, usable := links.FindUsable(ctx, []byte("ana-reset"))
@@ -371,7 +384,7 @@ func (this *IntegrationSuite) TestUserRepository_ChangePasswordKeepingSessionAft
 		&model.OneTimeLink{TokenHash: []byte("ana-invite"), Purpose: model.LinkPurposeInvite, ExpiresAt: time.Now().Add(24 * time.Hour)},
 	))
 	this.Require().True(repo.SetPasswordWithLink(ctx, []byte("ana-invite"), userRepositoryPasswordHash))
-	_, found, deactivated := links.ReplaceOpen(ctx, &model.OneTimeLink{TokenHash: []byte("ana-reset"), UserID: user.ID, ExpiresAt: time.Now().Add(24 * time.Hour)})
+	_, found, deactivated, _ := links.ReplaceOpen(ctx, &model.OneTimeLink{TokenHash: []byte("ana-reset"), UserID: user.ID, ExpiresAt: time.Now().Add(24 * time.Hour)})
 	this.Require().True(found)
 	this.Require().False(deactivated)
 	this.Require().True(repo.SetPasswordWithLink(ctx, []byte("ana-reset"), userRepositoryResetPasswordHash))

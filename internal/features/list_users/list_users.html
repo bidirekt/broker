@@ -1,44 +1,54 @@
 {{define "title"}}Users{{end}}
 
 {{define "content"}}
-<div class="title-row">
-  <h1>Users</h1>
-  <a class="button" href="/users/invite">Invite a user</a>
+<div class="head">
+  <div>
+    <h1>Users</h1>
+    <p class="sub">Everyone with an account on this broker.</p>
+  </div>
+  <div class="acts"><a class="btn primary" href="/users/invite">Invite a user</a></div>
 </div>
-<table>
-  <thead>
-    <tr>
-      <th>Email</th>
-      <th>Permission</th>
-      <th>State</th>
-      <th><span class="visually-hidden">Actions</span></th>
-    </tr>
-  </thead>
-  <tbody>
-    {{range .Page.Users}}
-    <tr data-state="{{.State}}">
-      <td>{{.Email}}</td>
-      <td>{{.Permission}}</td>
-      <td>{{.State}}</td>
-      <td class="actions">
-        {{if ne .Permission "admin"}}
-        <div class="row-actions">
-          <a href="/users/{{.ID}}/edit">Edit</a>
-          {{if eq .State "invited"}}
-          <form method="post" action="/users/{{.ID}}/link"><button type="submit">New invite link</button></form>
-          {{else if eq .State "active"}}
-          <form method="post" action="/users/{{.ID}}/link"><button type="submit">New reset link</button></form>
-          {{end}}
-          {{if eq .State "deactivated"}}
-          <form method="post" action="/users/{{.ID}}/reactivate"><button type="submit">Reactivate</button></form>
+<section class="sheet">
+  <div class="scroll"><table class="t stack">
+    <thead>
+      <tr>
+        <th scope="col">Email</th>
+        <th scope="col">Permission</th>
+        <th scope="col">State</th>
+        <th scope="col"><span class="sr">Actions</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Page.Users}}
+      <tr data-state="{{.State}}">
+        <td data-l="Email"><span class="mono">{{.Email}}</span></td>
+        <td data-l="Permission"><span class="badge perm">{{.Permission}}</span></td>
+        <td data-l="State">{{template "state" .State}}</td>
+        <td class="acts">
+          {{if eq .Permission "admin"}}
+          <span class="muted">You</span>
           {{else}}
-          <form method="post" action="/users/{{.ID}}/deactivate"><button type="submit">Deactivate</button></form>
+          <div class="actions">
+            <a class="btn sm" href="/users/{{.ID}}/edit?page={{$.Page.Pager.Page}}">Edit</a>
+            {{if eq .State "invited"}}
+            <form method="post" action="/users/{{.ID}}/link"><button type="submit" class="btn sm">New invite link</button></form>
+            {{else if eq .State "active"}}
+            <form method="post" action="/users/{{.ID}}/link"><button type="submit" class="btn sm">New reset link</button></form>
+            {{end}}
+            {{if eq .State "deactivated"}}
+            <form method="post" action="/users/{{.ID}}/reactivate"><input type="hidden" name="page" value="{{$.Page.Pager.Page}}"><button type="submit" class="btn sm">Reactivate</button></form>
+            {{else}}
+            <form method="post" action="/users/{{.ID}}/deactivate"><input type="hidden" name="page" value="{{$.Page.Pager.Page}}"><button type="submit" class="btn sm danger">Deactivate</button></form>
+            {{end}}
+          </div>
           {{end}}
-        </div>
-        {{end}}
-      </td>
-    </tr>
-    {{end}}
-  </tbody>
-</table>
+        </td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table></div>
+  {{template "pager" .Page.Pager}}
+</section>
 {{end}}
+
+{{define "state"}}{{if eq . "active"}}<span class="badge yes">{{template "icon_check" 12}}active</span>{{else if eq . "invited"}}<span class="badge">{{template "icon_invited" 12}}invited</span>{{else}}<span class="badge quiet">{{template "icon_deactivated" 12}}deactivated</span>{{end}}{{end}}

@@ -1,17 +1,26 @@
 {{define "title"}}Create the admin{{end}}
 
 {{define "content"}}
-<section class="narrow">
-<h1>Create the admin</h1>
-{{with .Page.Message}}<p role="alert">{{.}}</p>{{end}}
-<div class="panel">
-<form method="post" action="/setup">
-  <label for="email">Email</label>
-  <input id="email" name="email" type="text" inputmode="email" autocomplete="email" value="{{.Page.Email}}" required autofocus>
-  <label for="password">Password</label>
-  <input id="password" name="password" type="password" autocomplete="new-password" required>
-  <button type="submit">Create the admin</button>
-</form>
+<div class="auth-brand">
+  {{template "mark_big"}}
+  <h1>Create the admin</h1>
+  <p>This is a fresh broker. Create its admin account to start.</p>
 </div>
-</section>
+<form class="sheet formcard" method="post" action="/setup">
+  <div class="form">
+    <div class="warn" role="note">{{template "icon_error" 16}}<span><b>This will be the only admin.</b> The admin manages users: invites them and sets their permission. No one else can become admin later.</span></div>
+    <div class="field">
+      <label for="email">Email</label>
+      <input class="input" id="email" name="email" type="text" inputmode="email" autocomplete="email" value="{{.Page.Email}}" required{{if not .Page.Field}} autofocus{{end}}{{if eq .Page.Field "email"}} autofocus aria-invalid="true" aria-describedby="email-err"{{end}}>
+      {{if eq .Page.Field "email"}}<p class="err" id="email-err">{{template "icon_error" 14}}<span>{{.Page.Message}}</span></p>{{end}}
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input class="input" id="password" name="password" type="password" autocomplete="new-password" required{{if eq .Page.Field "password"}} autofocus aria-invalid="true" aria-describedby="password-err"{{end}}>
+      {{if eq .Page.Field "password"}}<p class="err" id="password-err">{{template "icon_error" 14}}<span>{{.Page.Message}}</span></p>{{end}}
+      <p class="hint">8 to 128 characters. A long passphrase works well.</p>
+    </div>
+    <button type="submit" class="btn primary block">Create the admin</button>
+  </div>
+</form>
 {{end}}

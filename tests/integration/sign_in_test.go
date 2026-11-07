@@ -52,10 +52,13 @@ func (this *IntegrationSuite) TestSignIn_PageShowsOneFormWithCSP() {
 	status, header, body := this.getPage("/sign-in", "")
 	this.Equal(http.StatusOK, status)
 	this.Equal("text/html; charset=utf-8", header.Get("Content-Type"))
+	this.Equal("no-store", header.Get("Cache-Control"))
 	this.Equal(signInPageContentSecurityPolicy, header.Get("Content-Security-Policy"))
 	this.Equal(1, strings.Count(body, "<form"))
-	this.Contains(body, `<form method="post" action="/sign-in">`)
+	this.Contains(body, `<form class="sheet formcard" method="post" action="/sign-in">`)
 	this.Contains(body, `<label for="email">Email</label>`)
+	this.Contains(body, `<input class="input" id="email" name="email" type="text" inputmode="email"`)
+	this.Contains(body, `<button type="submit" class="btn primary block">Sign in</button>`)
 	this.NotContains(body, "Email or username")
 	this.Equal(1, strings.Count(body, "username"))
 	this.Contains(body, `autocomplete="username"`)
@@ -63,12 +66,12 @@ func (this *IntegrationSuite) TestSignIn_PageShowsOneFormWithCSP() {
 	this.NotContains(body, `action="/sign-out"`)
 }
 
-func (this *IntegrationSuite) TestSignIn_AdminLandsOnUsers() {
+func (this *IntegrationSuite) TestSignIn_AdminLandsOnTheOverview() {
 	cookie := this.signInAsAdmin()
 
-	status, header, _ := this.getPage("/", cookie)
-	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/users", header.Get("Location"))
+	status, _, body := this.getPage("/", cookie)
+	this.Equal(http.StatusOK, status)
+	this.Contains(body, "<h1>Overview</h1>")
 
 	var adminSessions int
 	err := this.Pool.QueryRow(context.Background(), `SELECT count(*) FROM sessions WHERE user_id = $1`, this.adminID).Scan(&adminSessions)
@@ -87,7 +90,7 @@ func (this *IntegrationSuite) TestSignIn_SignedInPagesCarryTheSessionCSRFToken()
 	this.Equal(csrfToken, this.csrfTokenFrom(body))
 }
 
-func (this *IntegrationSuite) TestSignIn_UserLandsOnProfile() {
+func (this *IntegrationSuite) TestSignIn_UserLandsOnTheOverview() {
 	this.createActiveUser(signInUserEmail, model.PermissionWrite, signInUserPassword)
 
 	status, header, _ := this.postForm("/sign-in", "", "", this.signInForm(signInUserEmail, signInUserPassword))
@@ -95,9 +98,9 @@ func (this *IntegrationSuite) TestSignIn_UserLandsOnProfile() {
 	this.Equal("/", header.Get("Location"))
 
 	cookie := this.signInAsUser(signInUserEmail, signInUserPassword)
-	status, header, _ = this.getPage("/", cookie)
-	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/profile", header.Get("Location"))
+	status, _, body := this.getPage("/", cookie)
+	this.Equal(http.StatusOK, status)
+	this.Contains(body, "<h1>Overview</h1>")
 }
 
 func (this *IntegrationSuite) TestSignIn_AdminNavigationLinksToUsersAndProfile() {
@@ -144,7 +147,8 @@ func (this *IntegrationSuite) TestSignIn_WrongPasswordShowsMessageAndKeepsEmail(
 	status, header, body := this.postForm("/sign-in", "", "", this.signInForm(signInUserEmail, "not-the-right-password"))
 	this.Equal(http.StatusUnauthorized, status)
 	this.Empty(header.Get("Set-Cookie"))
-	this.Contains(body, signInInvalidCredentials)
+	this.Contains(body, `<div class="alert" role="alert">`)
+	this.Contains(body, `<span>`+signInInvalidCredentials+`</span></div>`)
 	this.Contains(body, `value="ana@x.com"`)
 	this.NotContains(body, "not-the-right-password")
 	this.Equal(0, this.countRows("sessions"))

@@ -42,6 +42,26 @@ const (
 			id_hash = $1
 	`
 
+	// a CTE read only in RETURNING would return NULL; RETURNING OLD needs Postgres 18 and the compose runs 17
+	markSessionSeenTakingMessagesQuery = `
+		UPDATE sessions s
+		SET
+			last_seen_at = now(), messages = NULL
+		FROM
+			(SELECT id_hash, messages FROM sessions WHERE id_hash = $1 FOR UPDATE) prior
+		WHERE
+			s.id_hash = prior.id_hash
+		RETURNING coalesce(prior.messages, '[]'::jsonb)
+	`
+
+	addSessionMessageQuery = `
+		UPDATE sessions
+		SET
+			messages = coalesce(messages, '[]'::jsonb) || jsonb_build_array(jsonb_build_object('kind', $2::text, 'text', $3::text))
+		WHERE
+			id_hash = $1
+	`
+
 	deleteSessionQuery = `
 		DELETE FROM sessions
 		WHERE
@@ -105,6 +125,26 @@ func (this *SessionRepository) FindByIDHash(ctx context.Context, idHash []byte) 
 func (this *SessionRepository) MarkSeen(ctx context.Context, idHash []byte) {
 	if _, err := this.pool.Exec(ctx, markSessionSeenQuery, idHash); err != nil {
 		panic(fmt.Errorf("error marking session seen: %w", err))
+	}
+}
+
+func (this *SessionRepository) MarkSeenTakingMessages(ctx context.Context, idHash []byte) []model.SessionMessage {
+	taken := []model.SessionMessage{}
+	err := this.pool.QueryRow(ctx, markSessionSeenTakingMessagesQuery, idHash).Scan(&taken)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return []model.SessionMessage{}
+	}
+
+	if err != nil {
+		panic(fmt.Errorf("error marking session seen taking its messages: %w", err))
+	}
+
+	return taken
+}
+
+func (this *SessionRepository) AddMessage(ctx context.Context, idHash []byte, message model.SessionMessage) {
+	if _, err := this.pool.Exec(ctx, addSessionMessageQuery, idHash, message.Kind, message.Text); err != nil {
+		panic(fmt.Errorf("error adding session message: %w", err))
 	}
 }
 

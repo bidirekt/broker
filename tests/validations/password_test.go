@@ -9,27 +9,27 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPassword_AcceptsFifteenToOneHundredTwentyEightCharacters(t *testing.T) {
-	for _, length := range []int{15, 16, 127, 128} {
+func TestPassword_AcceptsEightToOneHundredTwentyEightCharacters(t *testing.T) {
+	for _, length := range []int{8, 9, 127, 128} {
 		t.Run(strconv.Itoa(length), func(t *testing.T) {
 			assert.NoError(t, validations.Password(strings.Repeat("a", length)))
 		})
 	}
 }
 
-func TestPassword_RejectsFewerThanFifteenOrMoreThanOneHundredTwentyEightCharacters(t *testing.T) {
-	for _, length := range []int{0, 14, 129} {
+func TestPassword_RejectsFewerThanEightOrMoreThanOneHundredTwentyEightCharacters(t *testing.T) {
+	for _, length := range []int{0, 7, 129} {
 		t.Run(strconv.Itoa(length), func(t *testing.T) {
-			assert.EqualError(t, validations.Password(strings.Repeat("a", length)), "must have 15 to 128 characters")
+			assert.EqualError(t, validations.Password(strings.Repeat("a", length)), "must have 8 to 128 characters")
 		})
 	}
 }
 
 func TestPassword_CountsMultiByteCharactersAsOne(t *testing.T) {
-	assert.NoError(t, validations.Password(strings.Repeat("é", 15)))
+	assert.NoError(t, validations.Password(strings.Repeat("é", 8)))
 	assert.NoError(t, validations.Password(strings.Repeat("🔑", 128)))
-	assert.EqualError(t, validations.Password(strings.Repeat("é", 14)), "must have 15 to 128 characters")
-	assert.EqualError(t, validations.Password(strings.Repeat("🔑", 129)), "must have 15 to 128 characters")
+	assert.EqualError(t, validations.Password(strings.Repeat("é", 7)), "must have 8 to 128 characters")
+	assert.EqualError(t, validations.Password(strings.Repeat("🔑", 129)), "must have 8 to 128 characters")
 }
 
 func TestPassword_HasNoCompositionRules(t *testing.T) {

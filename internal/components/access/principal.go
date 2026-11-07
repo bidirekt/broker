@@ -12,12 +12,14 @@ const (
 
 type Principal struct {
 	UserID     int64
+	Email      string
 	Permission model.Permission
 }
 
 type Session struct {
 	IDHash    []byte
 	CSRFToken string
+	Messages  []model.SessionMessage
 }
 
 type principalKey struct{}
@@ -29,11 +31,15 @@ func PrincipalOf(user *model.User) (Principal, bool) {
 		return Principal{}, false
 	}
 
-	return Principal{UserID: user.ID, Permission: user.Permission}, true
+	return Principal{UserID: user.ID, Email: user.Email, Permission: user.Permission}, true
 }
 
 func (this Principal) ManagesUsers() bool {
 	return this.Permission == model.PermissionAdmin
+}
+
+func (this Principal) CanWrite() bool {
+	return this.Permission.Includes(model.PermissionWrite)
 }
 
 func GrantPrincipal(ctx fiber.Ctx, principal Principal) {

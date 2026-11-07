@@ -25,10 +25,12 @@ type GenerateLinkInput struct {
 }
 
 type GenerateLinkOutput struct {
-	Status  GenerateLinkStatus
-	Email   string
-	Purpose model.LinkPurpose
-	Link    string
+	Status           GenerateLinkStatus
+	Email            string
+	Purpose          model.LinkPurpose
+	Link             string
+	ExpiresAt        time.Time
+	ReplacedOpenLink bool
 }
 
 type GenerateLinkUseCase struct {
@@ -56,19 +58,21 @@ func (this *GenerateLinkUseCase) Execute(ctx context.Context, input GenerateLink
 		UserID:    input.UserID,
 		ExpiresAt: time.Now().Add(linkLifetime),
 	}
-	email, found, deactivated := this.linkRepository.ReplaceOpen(ctx, link)
+	email, found, deactivated, replacedOpenLink := this.linkRepository.ReplaceOpen(ctx, link)
 	if !found {
 		return GenerateLinkOutput{Status: UserNotFound}, nil
 	}
 
 	if deactivated {
-		return GenerateLinkOutput{Status: UserDeactivated}, nil
+		return GenerateLinkOutput{Status: UserDeactivated, Email: email}, nil
 	}
 
 	return GenerateLinkOutput{
-		Status:  LinkGenerated,
-		Email:   email,
-		Purpose: link.Purpose,
-		Link:    this.publicURL + setPasswordPath + token,
+		Status:           LinkGenerated,
+		Email:            email,
+		Purpose:          link.Purpose,
+		Link:             this.publicURL + setPasswordPath + token,
+		ExpiresAt:        link.ExpiresAt,
+		ReplacedOpenLink: replacedOpenLink,
 	}, nil
 }

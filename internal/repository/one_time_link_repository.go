@@ -22,9 +22,16 @@ const (
 	`
 
 	deleteOpenLinkQuery = `
-		DELETE FROM one_time_links
-		WHERE
-			user_id = $1 AND used_at IS NULL
+		WITH deleted AS (
+			DELETE FROM one_time_links
+			WHERE
+				user_id = $1 AND used_at IS NULL
+			RETURNING expires_at
+		)
+		SELECT
+			COALESCE(bool_or(expires_at > now()), false)
+		FROM
+			deleted
 	`
 
 	insertLinkQuery = `
@@ -32,6 +39,7 @@ const (
 			(token_hash, user_id, purpose, expires_at)
 		VALUES
 			($1, $2, $3, $4)
+		RETURNING expires_at
 	`
 
 	findUsableLinkQuery = `
@@ -64,8 +72,8 @@ func NewOneTimeLinkRepository(pool *pgxpool.Pool) *OneTimeLinkRepository {
 	return &OneTimeLinkRepository{pool: pool}
 }
 
-// ReplaceOpen sets link.Purpose: invite for a user without a password, reset otherwise.
-func (this *OneTimeLinkRepository) ReplaceOpen(ctx context.Context, link *model.OneTimeLink) (email string, found, deactivated bool) {
+// ReplaceOpen sets link.Purpose (invite for a user without a password, reset otherwise) and link.ExpiresAt to the stored value.
+func (this *OneTimeLinkRepository) ReplaceOpen(ctx context.Context, link *model.OneTimeLink) (email string, found, deactivated, replacedUsable bool) {
 	tx, err := this.pool.Begin(ctx)
 	if err != nil {
 		panic(fmt.Errorf("error starting transaction: %w", err))
@@ -79,7 +87,7 @@ func (this *OneTimeLinkRepository) ReplaceOpen(ctx context.Context, link *model.
 	var active, hasPassword bool
 	err = tx.QueryRow(ctx, lockLinkUserQuery, link.UserID).Scan(&email, &active, &hasPassword)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", false, false
+		return "", false, false, false
 	}
 
 	if err != nil {
@@ -87,7 +95,7 @@ func (this *OneTimeLinkRepository) ReplaceOpen(ctx context.Context, link *model.
 	}
 
 	if !active {
-		return "", true, true
+		return email, true, true, false
 	}
 
 	link.Purpose = model.LinkPurposeReset
@@ -95,11 +103,11 @@ func (this *OneTimeLinkRepository) ReplaceOpen(ctx context.Context, link *model.
 		link.Purpose = model.LinkPurposeInvite
 	}
 
-	if _, err := tx.Exec(ctx, deleteOpenLinkQuery, link.UserID); err != nil {
+	if err := tx.QueryRow(ctx, deleteOpenLinkQuery, link.UserID).Scan(&replacedUsable); err != nil {
 		panic(fmt.Errorf("error deleting open link: %w", err))
 	}
 
-	if _, err := tx.Exec(ctx, insertLinkQuery, link.TokenHash, link.UserID, link.Purpose, link.ExpiresAt); err != nil {
+	if err := tx.QueryRow(ctx, insertLinkQuery, link.TokenHash, link.UserID, link.Purpose, link.ExpiresAt).Scan(&link.ExpiresAt); err != nil {
 		panic(fmt.Errorf("error inserting link: %w", err))
 	}
 
@@ -107,7 +115,7 @@ func (this *OneTimeLinkRepository) ReplaceOpen(ctx context.Context, link *model.
 		panic(fmt.Errorf("error committing transaction: %w", err))
 	}
 
-	return email, true, false
+	return email, true, false, replacedUsable
 }
 
 func (this *OneTimeLinkRepository) FindUsable(ctx context.Context, tokenHash []byte) (*model.OneTimeLink, *model.User, bool) {

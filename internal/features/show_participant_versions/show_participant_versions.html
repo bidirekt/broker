@@ -1,0 +1,58 @@
+{{define "title"}}{{.Page.Header.Participant.Name}}{{end}}
+
+{{define "content"}}
+{{with .Page}}
+{{$participant := .Header.Participant.Name}}
+<nav class="crumbs" aria-label="Breadcrumbs"><a href="/participants">participants</a><span aria-hidden="true">/</span><span aria-current="page">{{$participant}}</span></nav>
+<div class="head">
+  <div>
+    <h1 class="mono">{{$participant}}</h1>
+    {{if .Header.LatestVersion.Valid}}
+    <div class="sub badges">
+      <span>Latest {{if .LatestURL}}<a class="ver" href="{{.LatestURL}}">{{.Header.LatestVersion.String}}</a>{{else}}<span class="ver">{{.Header.LatestVersion.String}}</span>{{end}}</span>
+      <span aria-hidden="true">·</span>
+      {{range .Header.DeployedNow}}<a class="badge env" href="/environments/{{.Environment.ID}}">{{.Environment.Name}} <span class="v">{{.Version}}</span></a>{{else}}<span class="badge quiet">not deployed</span>{{end}}
+    </div>
+    {{else}}
+    <p class="sub">never published</p>
+    {{end}}
+  </div>
+</div>
+<nav class="tabs" aria-label="Participant">
+  <a href="{{.ParticipantURL}}" aria-current="page">Versions <span class="count">{{.Header.VersionCount}}</span></a>
+  <a href="{{.ParticipantURL}}/deployments">Deployments <span class="count">{{.Header.DeploymentCount}}</span></a>
+  <a href="{{.ParticipantURL}}/checks">Checks <span class="count">{{.Header.CheckCount}}</span></a>
+  <a href="{{.ParticipantURL}}/relations">Relations <span class="count">{{.Header.RelationCount}}</span></a>
+</nav>
+<section class="sheet">
+  {{if .Versions}}
+  <div class="scroll"><table class="t stack">
+    <thead>
+      <tr>
+        <th scope="col">Version</th>
+        <th scope="col">Published</th>
+        <th scope="col">Deployed now</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Versions}}
+      <tr>
+        <td data-l="Version">{{if .URL}}<a class="ver" href="{{.URL}}">{{.Version}}</a>{{else}}<span class="ver">{{.Version}}</span>{{end}}</td>
+        <td data-l="Published">{{listTime .PublishedAt}}</td>
+        <td data-l="Deployed now">{{if .DeployedIn}}<span class="badges">{{range .DeployedIn}}<a class="badge env" href="/environments/{{.ID}}">{{.Name}}</a>{{end}}</span>{{else}}<span class="muted">not deployed</span>{{end}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table></div>
+  {{template "pager" .Pager}}
+  {{else}}
+  <div class="empty">
+    <div class="ic">{{template "icon_package" 20}}</div>
+    <h2 class="h2">No versions yet</h2>
+    <p>Publish this participant's contract from CI.</p>
+    <code class="cmd">bidirekt publish</code>
+  </div>
+  {{end}}
+</section>
+{{end}}
+{{end}}

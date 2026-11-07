@@ -2,7 +2,6 @@ package validate_contract
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/bidirekt/broker/internal/contracts/compatibility_checker"
 	"github.com/bidirekt/broker/internal/contracts/contract_differ"
@@ -91,10 +90,7 @@ func (this *ValidateContractUseCase) Execute(ctx context.Context, input Validate
 		return ValidateContractOutput{}, err
 	}
 
-	removedResources, err := this.toRemovedSinceDeployed(ctx, participant, environment, uploadedContract)
-	if err != nil {
-		return ValidateContractOutput{}, err
-	}
+	removedResources := this.toRemovedSinceDeployed(ctx, participant, environment, uploadedContract)
 
 	localContract := toPersistedContract(uploadedContract, removedResources)
 
@@ -115,18 +111,15 @@ func (this *ValidateContractUseCase) toRemovedSinceDeployed(
 	participant *model.Participant,
 	environment *model.Environment,
 	uploadedContract *model.UploadedContract,
-) (map[string]model.PersistedResource, error) {
-	version, deployed := this.deploymentRepository.CurrentVersionInEnv(ctx, participant.ID, environment.ID)
+) map[string]model.PersistedResource {
+	version, contractID, deployed := this.deploymentRepository.CurrentDeploymentInEnv(ctx, participant.ID, environment.ID)
 	if !deployed {
-		return nil, nil
+		return nil
 	}
 
-	deployedContract, exists := this.contractRepository.GetContractByNameAndVersion(ctx, participant.Name, version)
-	if !exists {
-		return nil, fmt.Errorf("deployed version %q of participant %q has no contract", version, participant.Name)
-	}
+	deployedContract := this.contractRepository.GetContractByIDAndVersion(ctx, contractID, version)
 
-	return contract_differ.RemovedSinceDeployed(deployedContract, uploadedContract), nil
+	return contract_differ.RemovedSinceDeployed(deployedContract, uploadedContract)
 }
 
 func toPersistedContract(

@@ -1,15 +1,21 @@
 package deactivate_user
 
+import "strconv"
+
 const (
-	UserNotFoundMessage string = "user not found"
+	UserNotFoundMessage    string = "user not found"
+	UserDeactivatedMessage string = "user deactivated: "
 
 	userIDParam = "id"
+	pageParam   = "page"
 
 	usersPath = "/users"
-
-	deactivateUserTemplate = "deactivate_user.html"
 )
 
-type DeactivateUserPage struct {
-	Message string
+func usersPathFor(page int64) string {
+	if page == 0 {
+		return usersPath
+	}
+
+	return usersPath + "?" + pageParam + "=" + strconv.FormatInt(page, 10)
 }

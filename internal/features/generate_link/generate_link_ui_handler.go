@@ -2,7 +2,6 @@ package generate_link
 
 import (
 	"embed"
-	"strconv"
 
 	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/components/pages"
@@ -26,10 +25,9 @@ func (this *GenerateLinkUiHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondForbidden(ctx)
 	}
 
-	rawUserID := ctx.Params(userIDParam)
-	userID, err := strconv.ParseInt(rawUserID, 10, 64)
-	if err != nil || strconv.FormatInt(userID, 10) != rawUserID {
-		return this.respondWithMessage(ctx, fiber.StatusNotFound, UserNotFoundMessage)
+	userID, ok := pages.ParsePositiveInteger(ctx.Params(userIDParam))
+	if !ok {
+		return this.respondUserNotFound(ctx)
 	}
 
 	output, err := this.useCase.Execute(ctx.Context(), GenerateLinkInput{UserID: userID})
@@ -39,17 +37,19 @@ func (this *GenerateLinkUiHandler) Handle(ctx fiber.Ctx) error {
 
 	switch output.Status {
 	case UserNotFound:
-		return this.respondWithMessage(ctx, fiber.StatusNotFound, UserNotFoundMessage)
+		return this.respondUserNotFound(ctx)
 	case UserDeactivated:
-		return this.respondWithMessage(ctx, fiber.StatusConflict, UserDeactivatedMessage)
+		return this.respondWithMessage(ctx, fiber.StatusConflict, output.Email, UserDeactivatedMessage)
 	case TargetIsTheAdmin:
 		return this.respondForbidden(ctx)
 	}
 
 	return pages.Render(ctx, fiber.StatusOK, pageFiles, generateLinkTemplate, GenerateLinkPage{
-		Email:   output.Email,
-		Purpose: output.Purpose,
-		Link:    output.Link,
+		Email:            output.Email,
+		Purpose:          output.Purpose,
+		Link:             output.Link,
+		ExpiresAt:        output.ExpiresAt,
+		ReplacedOpenLink: output.ReplacedOpenLink,
 	})
 }
 
@@ -57,6 +57,10 @@ func (this *GenerateLinkUiHandler) respondForbidden(ctx fiber.Ctx) error {
 	return respond.Problem(ctx, fiber.StatusForbidden, access.NoAccessMessage)
 }
 
-func (this *GenerateLinkUiHandler) respondWithMessage(ctx fiber.Ctx, status int, message string) error {
-	return pages.Render(ctx, status, pageFiles, generateLinkTemplate, GenerateLinkPage{Message: message})
+func (this *GenerateLinkUiHandler) respondUserNotFound(ctx fiber.Ctx) error {
+	return respond.Problem(ctx, fiber.StatusNotFound, UserNotFoundMessage)
+}
+
+func (this *GenerateLinkUiHandler) respondWithMessage(ctx fiber.Ctx, status int, email string, message string) error {
+	return pages.Render(ctx, status, pageFiles, generateLinkTemplate, GenerateLinkPage{Email: email, Message: message})
 }

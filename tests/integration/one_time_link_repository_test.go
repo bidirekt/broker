@@ -53,9 +53,10 @@ func (this *IntegrationSuite) TestOneTimeLinkRepository_ReplaceOpen_InvalidatesT
 		&model.OneTimeLink{TokenHash: []byte("first-link"), Purpose: model.LinkPurposeInvite, ExpiresAt: time.Now().Add(24 * time.Hour)},
 	))
 
-	email, userFound, deactivated := repo.ReplaceOpen(ctx, &model.OneTimeLink{TokenHash: []byte("second-link"), UserID: user.ID, ExpiresAt: time.Now().Add(24 * time.Hour)})
+	email, userFound, deactivated, replacedUsable := repo.ReplaceOpen(ctx, &model.OneTimeLink{TokenHash: []byte("second-link"), UserID: user.ID, ExpiresAt: time.Now().Add(24 * time.Hour)})
 	this.True(userFound)
 	this.False(deactivated)
+	this.True(replacedUsable)
 	this.Equal(oneTimeLinkRepositoryEmail, email)
 
 	_, _, ok := repo.FindUsable(ctx, []byte("first-link"))
@@ -75,6 +76,19 @@ func (this *IntegrationSuite) TestOneTimeLinkRepository_ReplaceOpen_InvalidatesT
 	this.Equal(1, open)
 }
 
+func (this *IntegrationSuite) TestOneTimeLinkRepository_ReplaceOpen_ReportsNoUsableLinkReplacedWhenThereWasNoneOrItHadExpired() {
+	ctx := context.Background()
+	repo := repository.NewOneTimeLinkRepository(this.Pool)
+	userID := this.oneTimeLinkRepositoryCreateActiveUser()
+
+	_, _, _, replacedUsable := repo.ReplaceOpen(ctx, &model.OneTimeLink{TokenHash: []byte("first-link"), UserID: userID, ExpiresAt: time.Now().Add(-time.Minute)})
+	this.False(replacedUsable, "there was no link before")
+
+	_, _, _, replacedUsable = repo.ReplaceOpen(ctx, &model.OneTimeLink{TokenHash: []byte("second-link"), UserID: userID, ExpiresAt: time.Now().Add(24 * time.Hour)})
+	this.False(replacedUsable, "the replaced link had expired")
+	this.Equal(1, this.countRows("one_time_links"))
+}
+
 func (this *IntegrationSuite) TestOneTimeLinkRepository_ReplaceOpen_RefusesAUserDeactivatedWhileWaitingForTheLock() {
 	ctx := context.Background()
 	users := repository.NewUserRepository(this.Pool)
@@ -87,9 +101,10 @@ func (this *IntegrationSuite) TestOneTimeLinkRepository_ReplaceOpen_RefusesAUser
 	_, err = deactivation.Exec(ctx, `UPDATE users SET active = false, updated_at = now() WHERE id = $1`, userID)
 	this.Require().NoError(err)
 
+	var email string
 	var found, deactivated bool
 	replaceFinished := oneTimeLinkRepositoryInBackground(func() {
-		_, found, deactivated = repo.ReplaceOpen(ctx, &model.OneTimeLink{TokenHash: []byte("ana-reset"), UserID: userID, ExpiresAt: time.Now().Add(24 * time.Hour)})
+		email, found, deactivated, _ = repo.ReplaceOpen(ctx, &model.OneTimeLink{TokenHash: []byte("ana-reset"), UserID: userID, ExpiresAt: time.Now().Add(24 * time.Hour)})
 	})
 	this.oneTimeLinkRepositoryAwaitLockWaiters(1)
 
@@ -97,6 +112,7 @@ func (this *IntegrationSuite) TestOneTimeLinkRepository_ReplaceOpen_RefusesAUser
 	this.Nil(<-replaceFinished)
 	this.True(found)
 	this.True(deactivated)
+	this.Equal(oneTimeLinkRepositoryEmail, email)
 	this.Equal(0, this.countRows("one_time_links"))
 
 	this.Require().True(users.Reactivate(ctx, userID))
@@ -110,13 +126,14 @@ func (this *IntegrationSuite) TestOneTimeLinkRepository_ReplaceOpen_ReportsAnUnk
 
 	repo := repository.NewOneTimeLinkRepository(this.Pool)
 
-	email, found, deactivated := repo.ReplaceOpen(context.Background(),
+	email, found, deactivated, replacedUsable := repo.ReplaceOpen(context.Background(),
 		&model.OneTimeLink{TokenHash: []byte("nobody-link"), UserID: 1, ExpiresAt: time.Now().Add(24 * time.Hour)},
 	)
 
 	this.Empty(email)
 	this.False(found)
 	this.False(deactivated)
+	this.False(replacedUsable)
 	this.Equal(0, this.countRows("one_time_links"))
 }
 
