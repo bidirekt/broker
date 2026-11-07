@@ -3,6 +3,7 @@ package list_users
 import (
 	"context"
 
+	"github.com/bidirekt/broker/internal/components/pages"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/bidirekt/broker/internal/repository"
 )
@@ -13,11 +14,14 @@ const (
 	UsersListed ListUsersStatus = iota
 )
 
-type ListUsersInput struct{}
+type ListUsersInput struct {
+	Page int64
+}
 
 type ListUsersOutput struct {
 	Status ListUsersStatus
 	Users  []*model.User
+	Total  int
 }
 
 type ListUsersUseCase struct {
@@ -29,8 +33,7 @@ func NewListUsersUseCase(userRepository *repository.UserRepository) *ListUsersUs
 }
 
 func (this *ListUsersUseCase) Execute(ctx context.Context, input ListUsersInput) ListUsersOutput {
-	return ListUsersOutput{
-		Status: UsersListed,
-		Users:  this.userRepository.List(ctx),
-	}
+	users, total := this.userRepository.List(ctx, pages.PageSize, pages.Offset(input.Page))
+
+	return ListUsersOutput{Status: UsersListed, Users: users, Total: total}
 }

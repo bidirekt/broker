@@ -27,8 +27,9 @@ type InviteUserInput struct {
 }
 
 type InviteUserOutput struct {
-	Status InviteUserStatus
-	Link   string
+	Status    InviteUserStatus
+	Link      string
+	ExpiresAt time.Time
 }
 
 type InviteUserUseCase struct {
@@ -55,17 +56,14 @@ func (this *InviteUserUseCase) Execute(ctx context.Context, input InviteUserInpu
 		return InviteUserOutput{}, err
 	}
 
-	created := this.userRepository.CreateInvited(ctx,
-		&model.User{Email: input.Email, Permission: permission},
-		&model.OneTimeLink{
-			TokenHash: tokens.Hash(token),
-			Purpose:   model.LinkPurposeInvite,
-			ExpiresAt: time.Now().Add(inviteLinkLifetime),
-		},
-	)
-	if !created {
+	link := &model.OneTimeLink{
+		TokenHash: tokens.Hash(token),
+		Purpose:   model.LinkPurposeInvite,
+		ExpiresAt: time.Now().Add(inviteLinkLifetime),
+	}
+	if !this.userRepository.CreateInvited(ctx, &model.User{Email: input.Email, Permission: permission}, link) {
 		return InviteUserOutput{Status: EmailAlreadyInUse}, nil
 	}
 
-	return InviteUserOutput{Status: UserInvited, Link: this.publicURL + setPasswordPath + token}, nil
+	return InviteUserOutput{Status: UserInvited, Link: this.publicURL + setPasswordPath + token, ExpiresAt: link.ExpiresAt}, nil
 }

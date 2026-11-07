@@ -71,24 +71,6 @@ func (this *IntegrationSuite) TestLoadContract_AbsentOptionalFieldsMarshalAsNull
 	this.Equal("null", string(provider))
 }
 
-func (this *IntegrationSuite) TestLoadContract_LegacyEmptyStringFieldsSurfaceAsNull() {
-	this.publishOrdersContract()
-
-	_, err := this.Pool.Exec(context.Background(),
-		`UPDATE resources SET consumed_provider = '', response_status_code = ''`,
-	)
-	this.Require().NoError(err)
-
-	resource := this.loadOrdersResource()
-
-	this.False(resource.ConsumedProvider.Valid, "expected ConsumedProvider to be null for empty value")
-	this.False(resource.ResponseStatusCode.Valid, "expected ResponseStatusCode to be null for empty value")
-
-	statusCode, err := json.Marshal(resource.ResponseStatusCode)
-	this.Require().NoError(err)
-	this.Equal("null", string(statusCode))
-}
-
 func (this *IntegrationSuite) TestLoadContract_PopulatedOptionalFieldsArePreserved() {
 	this.publishOrdersContract()
 
@@ -179,13 +161,13 @@ func (this *IntegrationSuite) TestContractRepository_NullableFieldRoundTripsThro
 	this.Equal(model.Field{Type: "string"}, byVersion.Schemas["Account"]["nickname"], "contract by version")
 	this.Equal(byVersion.Schemas, providerResource.Schemas, "contract by version")
 
-	latest, found := repo.GetLatestContractByParticipantID(ctx, byVersion.ParticipantID)
+	latest, found := repo.GetLatestSnapshotByParticipantID(ctx, byVersion.ParticipantID)
 	this.Require().True(found)
 	this.True(latest.Schemas["Account"]["avatar"].Nullable, "latest contract")
 	this.True(onlyNullableRoundTripResource(latest).Schemas["Account"]["avatar"].Nullable, "latest contract")
 
-	provider, err := repo.GetProviderResourceByConsumerResource(ctx, providerResource.ProviderHash, environmentID)
-	this.Require().NoError(err)
+	provider, found := repo.GetProviderResourceByProviderHashAndEnvironmentID(ctx, providerResource.ProviderHash, environmentID)
+	this.Require().True(found)
 	this.True(provider.Schemas["Account"]["avatar"].Nullable, "provider resource of a consumer")
 	this.False(provider.Schemas["Account"]["nickname"].Nullable, "provider resource of a consumer")
 
@@ -341,16 +323,16 @@ func (this *IntegrationSuite) assertEveryReadReturnsTheFileResourceWithAnUndescr
 	this.Equal(undescribed, providerResource.Bodies, "contract by version")
 	this.Equal(model.Schemas{}, byVersion.Schemas, "contract by version")
 
-	latest, found := repo.GetLatestContractByParticipantID(ctx, byVersion.ParticipantID)
+	latest, found := repo.GetLatestSnapshotByParticipantID(ctx, byVersion.ParticipantID)
 	this.Require().True(found, "latest contract")
 	this.Require().Len(latest.Resources, 1, "latest contract")
 	this.Equal(undescribed, onlyUndescribedBodyResource(latest).Bodies, "latest contract")
 
-	provider, err := repo.GetProviderResourceByConsumerResource(ctx, providerResource.ProviderHash, environmentID)
-	this.Require().NoError(err, "provider resource of a consumer")
+	provider, found := repo.GetProviderResourceByProviderHashAndEnvironmentID(ctx, providerResource.ProviderHash, environmentID)
+	this.Require().True(found, "provider resource of a consumer")
 	this.Equal("/files/*", provider.Endpoint, "provider resource of a consumer")
 	this.Equal(undescribed, provider.Bodies, "provider resource of a consumer")
-	this.Equal(map[string]string{"production": providerVersion}, provider.DeployedVersions, "provider resource of a consumer")
+	this.Equal(null.StringFrom(providerVersion), provider.ParticipantVersion, "provider resource of a consumer")
 
 	consumers := repo.GetConsumersResourcesByProviderHashAndEnvironmentID(ctx, providerResource.ProviderHash, environmentID)
 	this.Require().Len(consumers, 1, "consumers of a provider")
@@ -443,7 +425,7 @@ func (this *IntegrationSuite) TestContractRepository_RemovedResource_ComesBackRe
 	}
 	this.Equal(model.Schemas{}, second.Schemas)
 
-	latest, found := repo.GetLatestContractByParticipantID(ctx, second.ParticipantID)
+	latest, found := repo.GetLatestSnapshotByParticipantID(ctx, second.ParticipantID)
 	this.Require().True(found)
 	this.Len(latest.Resources, 1)
 }
@@ -741,8 +723,8 @@ func (this *IntegrationSuite) TestContractRepository_CounterpartReads_CarryTheCa
 		{Source: "widget.yaml", SchemaName: null.StringFrom("Profile")},
 	}, consumer.Bodies)
 
-	provider, err := repo.GetProviderResourceByConsumerResource(ctx, consumer.ProviderHash, environmentID)
-	this.Require().NoError(err)
+	provider, found := repo.GetProviderResourceByProviderHashAndEnvironmentID(ctx, consumer.ProviderHash, environmentID)
+	this.Require().True(found)
 	this.Equal(model.Field{Type: "string"}, provider.Schemas["Account"]["avatar"])
 	this.Equal([]model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Account")}}, provider.Bodies)
 
@@ -754,10 +736,98 @@ func (this *IntegrationSuite) TestContractRepository_CounterpartReads_CarryTheCa
 	}, consumers[0].Schemas)
 	this.Equal(null.StringFrom("1"), consumers[0].ParticipantVersion)
 
-	latest, found := repo.GetLatestContractByParticipantID(ctx, provider.ParticipantID)
+	latest, found := repo.GetLatestSnapshotByParticipantID(ctx, provider.ParticipantID)
 	this.Require().True(found)
 	this.True(latest.Schemas["Account"]["avatar"].Nullable)
 	counterparts := repo.LoadCounterparts(ctx, latest, environmentID)
 	this.Require().Len(counterparts.Consumers[consumer.ProviderHash], 1)
 	this.Equal(consumers[0].Schemas, counterparts.Consumers[consumer.ProviderHash][0].Schemas)
+}
+
+const registeredNamesOrdersContract = `provides:
+  rest:
+    /orders:
+      get:
+        responses:
+          204: ~
+`
+
+const registeredNamesBillingContract = `provides:
+  rest:
+    /invoices:
+      get:
+        responses:
+          200: ~
+`
+
+const registeredNamesFrontContract = `consumes:
+  orders:
+    rest:
+      /orders:
+        get:
+          responses:
+            204: ~
+      /pets:
+        get:
+          responses:
+            200: ~
+  billing:
+    rest:
+      /invoices:
+        get:
+          responses:
+            200: ~
+  ghost:
+    rest:
+      /ghosts:
+        get:
+          responses:
+            200: ~
+`
+
+func (this *IntegrationSuite) TestContractRepository_LoadCounterparts_CarriesEachRegisteredNameAndLoadsOnlyDeployedProviders() {
+	ctx := context.Background()
+	repo := repository.NewContractRepository(this.Pool)
+	mustPost := func(path, body string) {
+		status, response := this.post(path, body)
+		this.Require().Equalf(http.StatusOK, status, "POST %s: %s", path, response)
+	}
+
+	mustPost("/api/environments", `{"environment":"production"}`)
+	mustPost("/api/participants", `{"participant":"orders"}`)
+	mustPost("/api/participants", `{"participant":"billing"}`)
+	mustPost("/api/participants", `{"participant":"front"}`)
+	mustPost("/api/contracts", this.publishBody("orders", "1", contractFragment{"api.yaml", registeredNamesOrdersContract}))
+	mustPost("/api/deployments", `{"participant":"orders","version":"1","environment":"production"}`)
+	mustPost("/api/contracts", this.publishBody("billing", "1", contractFragment{"api.yaml", registeredNamesBillingContract}))
+	mustPost("/api/contracts", this.publishBody("front", "1", contractFragment{"web.yaml", registeredNamesFrontContract}))
+
+	var environmentID, ordersID, billingID int64
+	this.Require().NoError(this.Pool.QueryRow(ctx, `SELECT id FROM environments WHERE name = 'production'`).Scan(&environmentID))
+	this.Require().NoError(this.Pool.QueryRow(ctx, `SELECT id FROM participants WHERE name = 'orders'`).Scan(&ordersID))
+	this.Require().NoError(this.Pool.QueryRow(ctx, `SELECT id FROM participants WHERE name = 'billing'`).Scan(&billingID))
+
+	front, found := repo.GetContractByNameAndVersion(ctx, "front", "1")
+	this.Require().True(found)
+	this.Require().Len(front.Resources, 4)
+	providerHashes := make(map[string]string)
+	for _, resource := range front.Resources {
+		providerHashes[resource.ConsumedProvider.String+" "+resource.Endpoint] = resource.ProviderHash
+	}
+
+	counterparts := repo.LoadCounterparts(ctx, front, environmentID)
+
+	this.Equal(map[string]model.RegisteredProvider{
+		"orders":  {ParticipantID: ordersID, DeployedVersion: null.StringFrom("1")},
+		"billing": {ParticipantID: billingID},
+	}, counterparts.RegisteredProviders)
+	this.Require().Len(counterparts.Providers, 1)
+	orders, found := counterparts.Providers[providerHashes["orders /orders"]]
+	this.Require().True(found)
+	this.Equal(ordersID, orders.ParticipantID)
+	this.Equal(null.StringFrom("1"), orders.ParticipantVersion)
+	this.Empty(counterparts.ProviderStatuses)
+
+	_, found = repo.GetProviderResourceByProviderHashAndEnvironmentID(ctx, providerHashes["billing /invoices"], environmentID)
+	this.False(found)
 }

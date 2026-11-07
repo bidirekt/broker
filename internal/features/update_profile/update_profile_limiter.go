@@ -15,7 +15,7 @@ const (
 	profileFailuresPerUser = 10
 )
 
-func newUpdateProfileLimiter() fiber.Handler {
+func newUpdateProfileLimiter(respondTooManyAttempts fiber.Handler) fiber.Handler {
 	return limiter.New(limiter.Config{
 		Max:                    profileFailuresPerUser,
 		Expiration:             profileFailureWindow,
@@ -26,6 +26,10 @@ func newUpdateProfileLimiter() fiber.Handler {
 			return strconv.FormatInt(principal.UserID, 10)
 		},
 		LimitReached: func(ctx fiber.Ctx) error {
+			if respond.PageRequested(ctx) {
+				return respondTooManyAttempts(ctx)
+			}
+
 			return respond.Problem(ctx, fiber.StatusTooManyRequests, TooManyProfileAttemptsMessage)
 		},
 	})

@@ -130,7 +130,7 @@ func (this *ParticipantRepository) Rename(ctx context.Context, oldName, newName 
 
 	_, err = tx.Exec(ctx, renameParticipantQuery, id, newName)
 	if isUniqueViolation(err) {
-		return false, true, false
+		return true, true, false
 	}
 
 	if err != nil {

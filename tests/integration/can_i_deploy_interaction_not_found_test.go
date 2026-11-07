@@ -208,7 +208,7 @@ func (this *IntegrationSuite) TestCanIDeploy_InteractionNotFound_ListsTheStatuse
 	}
 }
 
-func (this *IntegrationSuite) TestCanIDeploy_ProviderNotDeployedInTheEnvironment_StaysProviderResourceNotFound() {
+func (this *IntegrationSuite) TestCanIDeploy_ProviderNotDeployedInTheEnvironment_IsNotDeployed() {
 	this.setupForInteractionNotFound("production", "staging")
 	this.publishForInteractionNotFound("api", "1", interactionNotFoundProviderYAML)
 	this.deployForInteractionNotFound("api", "1", "staging")
@@ -217,7 +217,7 @@ func (this *IntegrationSuite) TestCanIDeploy_ProviderNotDeployedInTheEnvironment
 	for name, response := range this.canIDeployAndValidateSiteForInteractionNotFound(interactionNotFoundUnsubscribeConsumerYAML) {
 		this.False(response.Deployable, name)
 		this.JSONEq(`{"/newsletter/unsubscribe": {"post": {"200": [
-			{"reason": "provider_resource_not_found", "role": "consumer"}
+			{"reason": "provider_resource_not_deployed_in_environment", "role": "consumer"}
 		]}}}`, string(response.Results["api"].Endpoints), name)
 	}
 }

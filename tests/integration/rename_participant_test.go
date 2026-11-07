@@ -262,26 +262,47 @@ func (this *IntegrationSuite) TestRenameParticipant_AFirstPublishResumingAfterTh
 	publish := this.publishBody("pets_service", "v1", contractFragment{"api.yaml", renameV1ContractBody})
 	newcomerPublish := this.publishBody("pets_service", "v1", contractFragment{"api.yaml", renameNewcomerContractBody})
 
-	firstVersionInsertOnHold, err := this.Pool.Begin(ctx)
+	renameOnHold, err := this.renameParticipantConnect().Begin(ctx)
 	this.Require().NoError(err)
-	defer this.renameParticipantDropVersionInsertHold(firstVersionInsertOnHold)
-	this.renameParticipantHoldFirstVersionInsert(firstVersionInsertOnHold)
+	defer func() { _ = renameOnHold.Rollback(ctx) }()
+	_, err = renameOnHold.Exec(ctx, `SELECT 1 FROM participants WHERE id = $1 FOR UPDATE`, originalID)
+	this.Require().NoError(err)
+
+	var renameStatus int
+	renameFinished := renameParticipantInBackground(func() {
+		renameStatus, _ = this.renameParticipantSend("/api/participants/rename", `{"oldName":"pets_service","newName":"orders_service"}`)
+	})
+	this.renameParticipantAwaitLockWaiters(1)
+
+	publishOnHold, err := this.renameParticipantConnect().Begin(ctx)
+	this.Require().NoError(err)
+	defer func() { _ = publishOnHold.Rollback(ctx) }()
+	publishOnHoldLocked := renameParticipantInBackground(func() {
+		if _, err := publishOnHold.Exec(ctx, `SELECT 1 FROM participants WHERE id = $1 FOR UPDATE`, originalID); err != nil {
+			panic(err)
+		}
+	})
+	this.renameParticipantAwaitLockWaiters(2)
 
 	var publishStatus int
 	var publishResponse string
 	publishFinished := renameParticipantInBackground(func() {
 		publishStatus, publishResponse = this.renameParticipantSend("/api/contracts", publish)
 	})
+	this.renameParticipantAwaitLockWaiters(3)
+
+	this.Require().NoError(renameOnHold.Rollback(ctx))
+	this.Require().Nil(<-renameFinished)
+	this.Require().Equal(http.StatusOK, renameStatus)
+	this.Require().Nil(<-publishOnHoldLocked)
 	this.renameParticipantAwaitLockWaiters(1)
 
-	status, _ = this.post("/api/participants/rename", `{"oldName":"pets_service","newName":"orders_service"}`)
-	this.Require().Equal(http.StatusOK, status)
 	status, _ = this.post("/api/participants", renamePetsBody)
 	this.Require().Equal(http.StatusOK, status)
 	status, _ = this.post("/api/contracts", newcomerPublish)
 	this.Require().Equal(http.StatusOK, status)
 
-	this.Require().NoError(firstVersionInsertOnHold.Rollback(ctx))
+	this.Require().NoError(publishOnHold.Rollback(ctx))
 	this.Require().Nil(<-publishFinished)
 
 	this.Equal(http.StatusNotFound, publishStatus)
@@ -318,40 +339,13 @@ func (this *IntegrationSuite) renameParticipantAwaitLockWaiters(count int) {
 	}, 10*time.Second, 10*time.Millisecond)
 }
 
-func (this *IntegrationSuite) renameParticipantHoldFirstVersionInsert(onHold pgx.Tx) {
+func (this *IntegrationSuite) renameParticipantConnect() *pgx.Conn {
 	ctx := context.Background()
-	_, err := onHold.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext('rename_participant_first_version_insert'))`)
+	conn, err := pgx.ConnectConfig(ctx, this.Pool.Config().ConnConfig)
 	this.Require().NoError(err)
+	this.T().Cleanup(func() { _ = conn.Close(ctx) })
 
-	_, err = this.Pool.Exec(ctx, `
-		CREATE SEQUENCE rename_participant_version_inserts;
-
-		CREATE FUNCTION rename_participant_hold_first_version_insert() RETURNS trigger LANGUAGE plpgsql AS $$
-		BEGIN
-			IF nextval('rename_participant_version_inserts') = 1 THEN
-				PERFORM pg_advisory_xact_lock_shared(hashtext('rename_participant_first_version_insert'));
-			END IF;
-			RETURN NULL;
-		END
-		$$;
-
-		CREATE TRIGGER rename_participant_hold_first_version_insert
-			BEFORE INSERT ON contract_versions
-			FOR EACH STATEMENT EXECUTE FUNCTION rename_participant_hold_first_version_insert();
-	`)
-	this.Require().NoError(err)
-}
-
-func (this *IntegrationSuite) renameParticipantDropVersionInsertHold(onHold pgx.Tx) {
-	ctx := context.Background()
-	_ = onHold.Rollback(ctx)
-
-	_, err := this.Pool.Exec(ctx, `
-		DROP TRIGGER IF EXISTS rename_participant_hold_first_version_insert ON contract_versions;
-		DROP FUNCTION IF EXISTS rename_participant_hold_first_version_insert();
-		DROP SEQUENCE IF EXISTS rename_participant_version_inserts;
-	`)
-	this.NoError(err)
+	return conn
 }
 
 func (this *IntegrationSuite) renameParticipantVersionCount(participantID int64) int {

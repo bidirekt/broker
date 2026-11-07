@@ -51,21 +51,21 @@ func TestRemovedProviderBreaksOncePerConsumer(t *testing.T) {
 
 	assert.Len(t, results, 2)
 
-	byConsumer := make(map[string]*compatibility_checker.IncompatibleItem, len(results))
+	byConsumer := make(map[string]*compatibility_checker.CounterpartResult, len(results))
 	for _, result := range results {
-		byConsumer[result.IncompatibleCounterpart.ParticipantName] = result
+		byConsumer[result.Counterpart.ParticipantName] = result
 	}
 
 	web := byConsumer["web"]
 	assert.False(t, web.Deployable)
-	assert.Equal(t, int64(3), web.IncompatibleCounterpart.ParticipantID)
-	assert.Equal(t, null.StringFrom("v7"), web.IncompatibleCounterpart.ParticipantVersion)
-	assert.Zero(t, web.IncompatibleCounterpart.ContractID)
+	assert.Equal(t, int64(3), web.Counterpart.ParticipantID)
+	assert.Equal(t, null.StringFrom("v7"), web.Counterpart.ParticipantVersion)
+	assert.Zero(t, web.Counterpart.ContractID)
 
 	assert.Len(t, web.Breaks, 1)
 	assert.Equal(
 		t,
-		compatibility_checker.ReasonProviderResourceRemovedButStillConsumed,
+		model.ReasonProviderResourceRemovedButStillConsumed,
 		web.Breaks[0].Reason,
 	)
 	assert.Nil(t, web.Breaks[0].Details)
@@ -77,9 +77,9 @@ func TestRemovedProviderBreaksOncePerConsumer(t *testing.T) {
 	assert.Equal(t, "200", web.Breaks[0].InteractionKey())
 
 	mobile := byConsumer["mobile"]
-	assert.Equal(t, int64(5), mobile.IncompatibleCounterpart.ParticipantID)
-	assert.Equal(t, null.StringFrom("v2"), mobile.IncompatibleCounterpart.ParticipantVersion)
-	assert.Zero(t, mobile.IncompatibleCounterpart.ContractID)
+	assert.Equal(t, int64(5), mobile.Counterpart.ParticipantID)
+	assert.Equal(t, null.StringFrom("v2"), mobile.Counterpart.ParticipantVersion)
+	assert.Zero(t, mobile.Counterpart.ContractID)
 	assert.Len(t, mobile.Breaks, 1)
 	assert.Equal(t, "mobile", mobile.Breaks[0].CounterpartResource.ParticipantName)
 }
@@ -95,7 +95,7 @@ func TestRemovedProviderWithoutConsumersHasNoBreak(t *testing.T) {
 }
 
 func TestRemovedProviderResultKeepsTheRealContractIDInAnyOrder(t *testing.T) {
-	removal := func() *compatibility_checker.IncompatibleItem {
+	removal := func() *compatibility_checker.CounterpartResult {
 		results := compatibility_checker.CheckRemovedProviderResource(
 			removedProviderResource(),
 			nil,
@@ -105,9 +105,9 @@ func TestRemovedProviderResultKeepsTheRealContractIDInAnyOrder(t *testing.T) {
 		return results[0]
 	}
 
-	matched := func() *compatibility_checker.IncompatibleItem {
-		item := compatibility_checker.NewIncompatibleItem()
-		item.IncompatibleCounterpart = compatibility_checker.IncompatibleCounterpart{
+	matched := func() *compatibility_checker.CounterpartResult {
+		item := compatibility_checker.NewCounterpartResult()
+		item.Counterpart = compatibility_checker.Counterpart{
 			ParticipantID:      3,
 			ContractID:         42,
 			ParticipantName:    "web",
@@ -128,10 +128,10 @@ func TestRemovedProviderResultKeepsTheRealContractIDInAnyOrder(t *testing.T) {
 	for _, report := range []*compatibility_checker.ContractCompatibilityReport{removalFirst, matchedFirst} {
 		result := report.Results["web"]
 
-		assert.Equal(t, int64(42), result.IncompatibleCounterpart.ContractID)
-		assert.Equal(t, int64(3), result.IncompatibleCounterpart.ParticipantID)
-		assert.Equal(t, "web", result.IncompatibleCounterpart.ParticipantName)
-		assert.Equal(t, null.StringFrom("v7"), result.IncompatibleCounterpart.ParticipantVersion)
+		assert.Equal(t, int64(42), result.Counterpart.ContractID)
+		assert.Equal(t, int64(3), result.Counterpart.ParticipantID)
+		assert.Equal(t, "web", result.Counterpart.ParticipantName)
+		assert.Equal(t, null.StringFrom("v7"), result.Counterpart.ParticipantVersion)
 		assert.Len(t, result.Breaks, 1)
 	}
 }
@@ -179,11 +179,11 @@ func TestRemovedProvider_StatusChangeOnSurvivingMethod_BreaksAsInteractionRemove
 	assert.Len(t, results, 1)
 	web := results[0]
 	assert.False(t, web.Deployable)
-	assert.Zero(t, web.IncompatibleCounterpart.ContractID)
+	assert.Zero(t, web.Counterpart.ContractID)
 	assert.Len(t, web.Breaks, 1)
 	assert.Equal(
 		t,
-		compatibility_checker.ReasonProviderResourceInteractionRemovedButStillConsumed,
+		model.ReasonProviderResourceInteractionRemovedButStillConsumed,
 		web.Breaks[0].Reason,
 	)
 	assert.Equal(t, map[string]string{"providerStatuses": "204, 2XX, 404"}, web.Breaks[0].Details)
@@ -215,7 +215,7 @@ func TestRemovedProvider_RequestDroppedOnSurvivingMethod_BreaksAsInteractionRemo
 	assert.Len(t, results[0].Breaks, 1)
 	assert.Equal(
 		t,
-		compatibility_checker.ReasonProviderResourceInteractionRemovedButStillConsumed,
+		model.ReasonProviderResourceInteractionRemovedButStillConsumed,
 		results[0].Breaks[0].Reason,
 	)
 	assert.Nil(t, results[0].Breaks[0].Details)
@@ -240,7 +240,7 @@ func TestRemovedProvider_ResponseDroppedWhereOnlyARequestRemains_BreaksAsInterac
 	assert.Len(t, results[0].Breaks, 1)
 	assert.Equal(
 		t,
-		compatibility_checker.ReasonProviderResourceInteractionRemovedButStillConsumed,
+		model.ReasonProviderResourceInteractionRemovedButStillConsumed,
 		results[0].Breaks[0].Reason,
 	)
 	assert.Nil(t, results[0].Breaks[0].Details)
@@ -269,7 +269,7 @@ func TestRemovedProvider_MethodGoneWhileEndpointRemains_KeepsTheRemovedReason(t 
 	assert.Len(t, results[0].Breaks, 1)
 	assert.Equal(
 		t,
-		compatibility_checker.ReasonProviderResourceRemovedButStillConsumed,
+		model.ReasonProviderResourceRemovedButStillConsumed,
 		results[0].Breaks[0].Reason,
 	)
 	assert.Nil(t, results[0].Breaks[0].Details)

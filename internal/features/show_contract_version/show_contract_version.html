@@ -1,0 +1,117 @@
+{{define "title"}}{{.Page.ContractVersion.ParticipantName}} {{.Page.ContractVersion.Version}}{{end}}
+
+{{define "content"}}
+{{with .Page}}
+<nav class="crumbs" aria-label="Breadcrumbs"><a href="/participants">participants</a><span aria-hidden="true">/</span><a href="{{.ParticipantURL}}">{{.ContractVersion.ParticipantName}}</a><span aria-hidden="true">/</span><span aria-current="page">{{.ContractVersion.Version}}</span></nav>
+<div class="head">
+  <div>
+    <h1><span class="name">{{.ContractVersion.ParticipantName}}</span> <span class="ver">{{.ContractVersion.Version}}</span></h1>
+    <p class="sub">Published {{detailTime .ContractVersion.CreatedAt}}</p>
+  </div>
+</div>
+<div class="grid2">
+  <section class="sheet">
+    <div class="sheet-head"><h2 class="h2">Deployed now</h2></div>
+    {{if .CurrentDeployments}}
+    <ul class="list">
+      {{range .CurrentDeployments}}
+      <li><a class="badge env" href="/environments/{{.Environment.ID}}">{{.Environment.Name}}</a><span class="muted">since {{detailTime .DeployedAt}}</span></li>
+      {{end}}
+    </ul>
+    {{else}}
+    <p class="pad muted">not deployed</p>
+    {{end}}
+  </section>
+  <section class="sheet">
+    <div class="sheet-head"><h2 class="h2">Latest check per environment</h2></div>
+    {{if .LatestChecks}}
+    <ul class="list">
+      {{range .LatestChecks}}
+      <li><a class="badge env" href="/environments/{{.Check.EnvironmentID}}">{{.Check.EnvironmentName}}</a>{{template "answer" .}}<a href="/checks/{{.Check.ID}}">check #{{.Check.ID}}</a><span class="muted">{{detailTime .Check.CreatedAt}}</span></li>
+      {{end}}
+    </ul>
+    {{else}}
+    <p class="pad muted">not checked yet</p>
+    {{end}}
+  </section>
+</div>
+<section class="sheet">
+  <div class="sheet-head"><h2 class="h2">Contract</h2><span class="muted">Exactly as published · {{len .Files}} {{if eq (len .Files) 1}}file{{else}}files{{end}}</span></div>
+  <nav class="files" aria-label="Files">
+    {{range $index, $file := .Files}}<a href="#file-{{$index}}">{{$file.Source}}</a>{{end}}
+  </nav>
+</section>
+{{range $index, $file := .Files}}
+<section class="sheet" id="file-{{$index}}">
+  <div class="file-head"><span class="path">{{$file.Source}}</span><span class="muted">{{len $file.Lines}} {{if eq (len $file.Lines) 1}}line{{else}}lines{{end}} · select the text to copy</span></div>
+  <pre class="code">{{range $file.Lines}}<span class="l">{{.}}</span>{{end}}</pre>
+</section>
+{{end}}
+<section class="sheet">
+  <div class="sheet-head"><h2 class="h2">Deployment history</h2></div>
+  {{if .Deployments}}
+  <div class="scroll"><table class="t stack">
+    <thead>
+      <tr>
+        <th scope="col">Environment</th>
+        <th scope="col">Deployed</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Deployments}}
+      <tr>
+        <td data-l="Environment"><span class="badges"><a class="badge env" href="/environments/{{.Environment.ID}}">{{.Environment.Name}}</a>{{if .Rollback}}<span class="badge rb">{{template "icon_rollback" 12}}rollback</span>{{end}}</span></td>
+        <td data-l="Deployed">{{detailTime .DeployedAt}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table></div>
+  {{template "pager" .DeploymentsPager}}
+  {{else}}
+  <p class="pad muted">not deployed</p>
+  {{end}}
+</section>
+<section class="sheet">
+  <div class="sheet-head"><h2 class="h2">All checks</h2></div>
+  {{if .Checks}}
+  <div class="scroll"><table class="t stack">
+    <thead>
+      <tr>
+        <th scope="col">Check</th>
+        <th scope="col">Environment</th>
+        <th scope="col">Answer</th>
+        <th scope="col">Compared with</th>
+        <th scope="col">Asked</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Checks}}
+      <tr>
+        <td data-l="Check"><a href="/checks/{{.Check.ID}}">#{{.Check.ID}}</a></td>
+        <td data-l="Environment"><a class="badge env" href="/environments/{{.Check.EnvironmentID}}">{{.Check.EnvironmentName}}</a></td>
+        <td data-l="Answer">{{template "answer" .}}</td>
+        <td data-l="Compared with">
+          <div class="badges">
+            {{range .Shown}}<span>{{template "role" .Role}}<span class="badge cpb{{if .Breaks}} no{{else if not .Version}} quiet{{end}}">{{.Name}} <span class="v">{{if .Version}}{{.Version}}{{else}}no version{{end}}</span>{{if .Breaks}} · {{template "breaks" .Breaks}}{{end}}</span></span>{{end}}
+            {{if .More}}<a class="badge more" href="/checks/{{.Check.ID}}">+{{.More}} more</a>{{end}}
+            {{if and .Report.Stored (not .Report.Counterparts)}}<span class="muted">nothing deployed shares an endpoint</span>{{end}}
+          </div>
+        </td>
+        <td data-l="Asked">{{detailTime .Check.CreatedAt}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table></div>
+  {{template "pager" .ChecksPager}}
+  {{else}}
+  <p class="pad muted">not checked yet</p>
+  {{end}}
+</section>
+{{end}}
+{{end}}
+
+{{define "answer"}}{{if .Check.Deployable}}<span class="badge yes">{{template "icon_check" 12}}yes</span>{{else if .Report.Stored}}<span class="badge no">{{template "icon_x" 12}}no · {{template "breaks" .Report.Breaks}}</span>{{else}}<span class="badge no">{{template "icon_x" 12}}no</span>{{end}}{{end}}
+
+{{define "role"}}{{if eq . "both"}}<span class="role">PROVIDER · CONSUMER</span>{{else if eq . "provider"}}<span class="role">PROVIDER</span>{{else if eq . "consumer"}}<span class="role">CONSUMER</span>{{end}}{{end}}
+
+{{define "breaks"}}{{.}} {{if eq . 1}}break{{else}}breaks{{end}}{{end}}

@@ -6,14 +6,11 @@ const (
 	SignInInvalidInputMessage     string = "sign in invalid input"
 	SignedInMessage               string = "signed in"
 	TooManySignInAttemptsMessage  string = "too many attempts, try again later"
-	ForbiddenMessage              string = "forbidden"
 
 	emailFormField    = "email"
 	passwordFormField = "password"
 
-	homePath    = "/"
-	usersPath   = "/users"
-	profilePath = "/profile"
+	homePath = "/"
 
 	signInTemplate = "sign_in.html"
 )
