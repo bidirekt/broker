@@ -364,7 +364,6 @@ func (this *IntegrationSuite) TestCanIDeploy_RecordsOneRowPerDependency() {
 	this.Equal("app", got.Participant)
 	this.Equal("v1", got.Version)
 
-	// a never_published provider has no version to report
 	this.Contains(body, `"participantVersion":null`)
 
 	this.Require().Len(got.Results, 3)
@@ -376,7 +375,7 @@ func (this *IntegrationSuite) TestCanIDeploy_RecordsOneRowPerDependency() {
 		breaks := result.Endpoints["/"+provider]["get"]["200"]
 		this.Require().Lenf(breaks, 1, "missing break for %s", provider)
 		b := breaks[0]
-		this.Equal("provider_resource_not_found", b.Reason)
+		this.Equal("provider_resource_not_deployed_in_environment", b.Reason)
 		this.Equal("consumer", b.Role)
 		this.Empty(b.Details)
 	}
@@ -595,7 +594,7 @@ func (this *IntegrationSuite) TestCanIDeploy_ProviderExistsButNotDeployedInTarge
 	b := breaks[0]
 	this.Equal("provider_resource_not_deployed_in_environment", b.Reason)
 	this.Equal("consumer", b.Role)
-	this.Equal(map[string]string{"deployedEnvironments": "staging"}, b.Details)
+	this.Empty(b.Details)
 
 	this.Equal(1, this.countRows("compatibility_checks"))
 	this.Equal(1, this.countRows("compatibility_check_results"))

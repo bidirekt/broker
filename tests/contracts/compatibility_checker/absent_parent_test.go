@@ -58,7 +58,7 @@ func (this groupsWithoutVerdict) GetVerdict(context.Context, int64, int64) (*mod
 }
 
 type groupsBreak struct {
-	reason   compatibility_checker.BreakingReason
+	reason   model.BreakingReason
 	property string
 }
 
@@ -140,7 +140,7 @@ func groupsResources(interaction string, consumerBody, providerBody groupsBody) 
 		ResponseStatusCode: status,
 		Bodies:             providerBody.bodies,
 		Schemas:            providerBody.schemas,
-		DeployedVersions:   map[string]string{groupsEnvironment: "1.0.0"},
+		ParticipantVersion: null.StringFrom("1.0.0"),
 	}
 
 	return consumer, provider
@@ -184,7 +184,8 @@ func assertGroupsBreaks(
 
 	t.Run("checked from the consumer", func(t *testing.T) {
 		assert.Equal(t, expected, groupsBreaksCheckedFrom(consumer, model.ResourceCounterparts{
-			Providers: map[string]model.PersistedResource{groupsProviderHash: provider},
+			Providers:           map[string]model.PersistedResource{groupsProviderHash: provider},
+			RegisteredProviders: map[string]model.RegisteredProvider{groupsProviderName: {DeployedVersion: null.StringFrom("1.0.0")}},
 		}, groupsProviderName, interaction))
 	})
 
@@ -213,9 +214,9 @@ func TestRequestWithAPartialAddressBreaksOnItsMissingChildren(t *testing.T) {
 	}
 
 	assertGroupsBreaks(t, "request", groupsSchema(sentByTheConsumer), groupsSchema(groupRequestReadByTheProvider()), []groupsBreak{
-		{compatibility_checker.ReasonPropertyMissingInConsumer, "$.address.city"},
-		{compatibility_checker.ReasonPropertyMissingInConsumer, "$.address.state"},
-		{compatibility_checker.ReasonPropertyMissingInConsumer, "$.address.zipCode"},
+		{model.ReasonPropertyMissingInConsumer, "$.address.city"},
+		{model.ReasonPropertyMissingInConsumer, "$.address.state"},
+		{model.ReasonPropertyMissingInConsumer, "$.address.zipCode"},
 	})
 }
 
@@ -244,7 +245,7 @@ func TestAbsentRequiredParentBreaksOnlyOnItself(t *testing.T) {
 		}
 
 		assertGroupsBreaks(t, "request", groupsSchema(sentByTheConsumer), groupsSchema(readByTheProvider), []groupsBreak{
-			{compatibility_checker.ReasonPropertyMissingInConsumer, "$.address"},
+			{model.ReasonPropertyMissingInConsumer, "$.address"},
 		})
 	})
 
@@ -258,7 +259,7 @@ func TestAbsentRequiredParentBreaksOnlyOnItself(t *testing.T) {
 		providedByTheProvider := model.Schema{"": {Type: "object"}}
 
 		assertGroupsBreaks(t, "201", groupsSchema(readByTheConsumer), groupsSchema(providedByTheProvider), []groupsBreak{
-			{compatibility_checker.ReasonPropertyMissingInProvider, "$.address"},
+			{model.ReasonPropertyMissingInProvider, "$.address"},
 		})
 	})
 }
@@ -295,7 +296,7 @@ func TestArrayItemsAndMapValuesAreChildrenOfTheirCollection(t *testing.T) {
 			assertGroupsBreaks(t, "request",
 				groupsSchema(root),
 				groupsSchema(tc.collection),
-				[]groupsBreak{{compatibility_checker.ReasonPropertyMissingInConsumer, tc.path}},
+				[]groupsBreak{{model.ReasonPropertyMissingInConsumer, tc.path}},
 			)
 		})
 
@@ -303,7 +304,7 @@ func TestArrayItemsAndMapValuesAreChildrenOfTheirCollection(t *testing.T) {
 			assertGroupsBreaks(t, "201",
 				groupsSchema(tc.collection),
 				groupsSchema(root),
-				[]groupsBreak{{compatibility_checker.ReasonPropertyMissingInProvider, tc.path}},
+				[]groupsBreak{{model.ReasonPropertyMissingInProvider, tc.path}},
 			)
 		})
 	}

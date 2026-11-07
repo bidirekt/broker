@@ -27,8 +27,8 @@ func (this avatarsWithoutVerdict) GetVerdict(context.Context, int64, int64) (*mo
 }
 
 type avatarsBreak struct {
-	reason  compatibility_checker.BreakingReason
-	role    compatibility_checker.BreakRole
+	reason  model.BreakingReason
+	role    model.BreakRole
 	details map[string]string
 }
 
@@ -74,7 +74,7 @@ func avatarsResources(
 		ResponseStatusCode: status,
 		Bodies:             []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Profile")}},
 		Schemas:            model.Schemas{"Profile": providerSchema},
-		DeployedVersions:   map[string]string{avatarsEnvironment: "1.0.0"},
+		ParticipantVersion: null.StringFrom("1.0.0"),
 	}
 
 	return consumer, provider
@@ -107,8 +107,8 @@ func avatarsBreaksCheckedFrom(
 }
 
 func avatarsBreakAt(
-	reason compatibility_checker.BreakingReason,
-	role compatibility_checker.BreakRole,
+	reason model.BreakingReason,
+	role model.BreakRole,
 	property, propertyType string,
 	declaredBy ...string,
 ) avatarsBreak {
@@ -127,9 +127,9 @@ func avatarsBreakAt(
 	return avatarsBreak{reason, role, details}
 }
 
-type avatarsExpectation func(role compatibility_checker.BreakRole) []avatarsBreak
+type avatarsExpectation func(role model.BreakRole) []avatarsBreak
 
-func noAvatarsBreak(compatibility_checker.BreakRole) []avatarsBreak {
+func noAvatarsBreak(model.BreakRole) []avatarsBreak {
 	return nil
 }
 
@@ -144,13 +144,14 @@ func assertAvatarsBreaks(
 	consumer, provider := avatarsResources(interaction, consumerSchema, providerSchema)
 
 	t.Run("checked from the consumer", func(t *testing.T) {
-		assert.Equal(t, expected(compatibility_checker.RoleConsumer), avatarsBreaksCheckedFrom(consumer, model.ResourceCounterparts{
-			Providers: map[string]model.PersistedResource{avatarsProviderHash: provider},
+		assert.Equal(t, expected(model.RoleConsumer), avatarsBreaksCheckedFrom(consumer, model.ResourceCounterparts{
+			Providers:           map[string]model.PersistedResource{avatarsProviderHash: provider},
+			RegisteredProviders: map[string]model.RegisteredProvider{avatarsProviderName: {DeployedVersion: null.StringFrom("1.0.0")}},
 		}, avatarsProviderName, interaction))
 	})
 
 	t.Run("checked from the provider", func(t *testing.T) {
-		assert.Equal(t, expected(compatibility_checker.RoleProvider), avatarsBreaksCheckedFrom(provider, model.ResourceCounterparts{
+		assert.Equal(t, expected(model.RoleProvider), avatarsBreaksCheckedFrom(provider, model.ResourceCounterparts{
 			Consumers: map[string][]model.PersistedResource{avatarsProviderHash: {consumer}},
 		}, avatarsConsumerName, interaction))
 	})
@@ -162,9 +163,9 @@ func avatarProperty(nullable bool) model.Schema {
 
 func TestNullableResponse_ProviderNullableConsumerNot_Breaks(t *testing.T) {
 	assertAvatarsBreaks(t, "200", avatarProperty(false), avatarProperty(true),
-		func(role compatibility_checker.BreakRole) []avatarsBreak {
+		func(role model.BreakRole) []avatarsBreak {
 			return []avatarsBreak{avatarsBreakAt(
-				compatibility_checker.ReasonPropertyNullableInProviderNotNullableInConsumer, role, "$.avatar", "string", "consumer", "provider")}
+				model.ReasonPropertyNullableInProviderNotNullableInConsumer, role, "$.avatar", "string", "consumer", "provider")}
 		})
 }
 
@@ -178,9 +179,9 @@ func TestNullableResponse_BothNullable_IsCompatible(t *testing.T) {
 
 func TestNullableRequest_ConsumerNullableProviderNot_Breaks(t *testing.T) {
 	assertAvatarsBreaks(t, "request", avatarProperty(true), avatarProperty(false),
-		func(role compatibility_checker.BreakRole) []avatarsBreak {
+		func(role model.BreakRole) []avatarsBreak {
 			return []avatarsBreak{avatarsBreakAt(
-				compatibility_checker.ReasonPropertyNullableInConsumerNotNullableInProvider, role, "$.avatar", "string", "consumer", "provider")}
+				model.ReasonPropertyNullableInConsumerNotNullableInProvider, role, "$.avatar", "string", "consumer", "provider")}
 		})
 }
 
@@ -208,8 +209,8 @@ func TestNullable_TypeNotAccepted_ReportsOnlyTheTypeMismatch(t *testing.T) {
 	stringAvatar := avatarsSchema(model.Schema{"avatar": {Type: "string", Nullable: true}})
 	integerAvatar := avatarsSchema(model.Schema{"avatar": {Type: "integer"}})
 
-	typeMismatch := func(role compatibility_checker.BreakRole) []avatarsBreak {
-		return []avatarsBreak{{compatibility_checker.ReasonPropertyTypeMismatch, role, map[string]string{
+	typeMismatch := func(role model.BreakRole) []avatarsBreak {
+		return []avatarsBreak{{model.ReasonPropertyTypeMismatch, role, map[string]string{
 			"property":             "$.avatar",
 			"consumerName":         avatarsConsumerName,
 			"providerName":         avatarsProviderName,
@@ -234,10 +235,10 @@ func TestNullableResponse_IsIndependentFromOptional(t *testing.T) {
 	optionalAndNullable := avatarsSchema(model.Schema{"avatar": {Type: "string", Optional: true, Nullable: true}})
 
 	assertAvatarsBreaks(t, "200", required, optionalAndNullable,
-		func(role compatibility_checker.BreakRole) []avatarsBreak {
+		func(role model.BreakRole) []avatarsBreak {
 			return []avatarsBreak{
-				avatarsBreakAt(compatibility_checker.ReasonPropertyNullableInProviderNotNullableInConsumer, role, "$.avatar", "string", "consumer", "provider"),
-				avatarsBreakAt(compatibility_checker.ReasonPropertyOptionalInProviderRequiredInConsumer, role, "$.avatar", "string", "consumer", "provider"),
+				avatarsBreakAt(model.ReasonPropertyNullableInProviderNotNullableInConsumer, role, "$.avatar", "string", "consumer", "provider"),
+				avatarsBreakAt(model.ReasonPropertyOptionalInProviderRequiredInConsumer, role, "$.avatar", "string", "consumer", "provider"),
 			}
 		})
 }
@@ -254,9 +255,9 @@ func TestNullableResponse_ChildrenOfANullableParent_AreComparedNormally(t *testi
 	})
 
 	assertAvatarsBreaks(t, "200", consumerManager, providerManager,
-		func(role compatibility_checker.BreakRole) []avatarsBreak {
+		func(role model.BreakRole) []avatarsBreak {
 			return []avatarsBreak{avatarsBreakAt(
-				compatibility_checker.ReasonPropertyMissingInProvider, role, "$.manager.email", "string", "consumer")}
+				model.ReasonPropertyMissingInProvider, role, "$.manager.email", "string", "consumer")}
 		})
 }
 
@@ -272,8 +273,8 @@ func TestNullableRequest_ChildrenOfANullableParent_AreComparedNormally(t *testin
 	})
 
 	assertAvatarsBreaks(t, "request", consumerManager, providerManager,
-		func(role compatibility_checker.BreakRole) []avatarsBreak {
+		func(role model.BreakRole) []avatarsBreak {
 			return []avatarsBreak{avatarsBreakAt(
-				compatibility_checker.ReasonPropertyMissingInConsumer, role, "$.manager.email", "string", "provider")}
+				model.ReasonPropertyMissingInConsumer, role, "$.manager.email", "string", "provider")}
 		})
 }

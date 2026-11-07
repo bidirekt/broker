@@ -20,6 +20,7 @@ type CreateEnvironmentInput struct {
 
 type CreateEnvironmentOutput struct {
 	Status CreateEnvironmentStatus
+	ID     int64
 }
 
 type CreateEnvironmentUseCase struct {
@@ -31,10 +32,11 @@ func NewCreateEnvironmentUseCase(environmentRepository *repository.EnvironmentRe
 }
 
 func (this *CreateEnvironmentUseCase) Execute(ctx context.Context, input CreateEnvironmentInput) CreateEnvironmentOutput {
-	created := this.environmentRepository.Create(ctx, model.NewEnvironment(input.Environment))
+	environment := model.NewEnvironment(input.Environment)
+	created := this.environmentRepository.Create(ctx, environment)
 	if !created {
 		return CreateEnvironmentOutput{Status: EnvironmentAlreadyExists}
 	}
 
-	return CreateEnvironmentOutput{Status: EnvironmentCreated}
+	return CreateEnvironmentOutput{Status: EnvironmentCreated, ID: environment.ID}
 }

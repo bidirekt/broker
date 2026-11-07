@@ -1,0 +1,114 @@
+{{define "title"}}Overview{{end}}
+
+{{define "content"}}
+{{with .Page}}
+<div class="head">
+  <div>
+    <h1>Overview</h1>
+    {{if .Empty}}
+    <p class="sub">This broker has no data yet.</p>
+    {{else}}
+    <p class="sub">What is deployed, what the last checks said, and what happened last.</p>
+    {{end}}
+  </div>
+</div>
+<section class="sheet">
+  <div class="statstrip">
+    <div><b>{{.Numbers.Participants}}</b><span>{{if eq .Numbers.Participants 1}}participant{{else}}participants{{end}} · {{.Numbers.NeverPublished}} never published</span></div>
+    <div><b>{{.Numbers.Environments}}</b><span>{{if eq .Numbers.Environments 1}}environment{{else}}environments{{end}}</span></div>
+    <div><b>{{.Numbers.VersionsPublished}}</b><span>{{if eq .Numbers.VersionsPublished 1}}version{{else}}versions{{end}} published</span></div>
+    <div><b>{{.Numbers.ChecksThisMonth}}</b><span>{{if eq .Numbers.ChecksThisMonth 1}}check{{else}}checks{{end}} this month</span></div>
+  </div>
+</section>
+{{if .Empty}}
+<section class="sheet">
+  <div class="empty">
+    <div class="ic">{{template "icon_terminal" 20}}</div>
+    <h2 class="h2">Put data in from your pipelines</h2>
+    <p>The CLI and CI fill the broker. Run these in order; each command has <code>--help</code>.</p>
+  </div>
+  <div class="pad">
+    <ol class="steps">
+      <li><p>Register each service once, by its snake_case name.</p><code class="cmd">bidirekt create-participant</code></li>
+      <li><p>Create the environments you deploy to, like staging and production.</p><code class="cmd">bidirekt create-environment</code></li>
+      <li><p>Publish a version of a participant's contract from your CI.</p><code class="cmd">bidirekt publish</code></li>
+      <li><p>Before a deploy, ask whether this version is compatible with what's deployed.</p><code class="cmd">bidirekt can-i-deploy</code></li>
+      <li><p>Deploy the version with your own pipeline.</p></li>
+      <li><p>After a deploy, record which version is now running where.</p><code class="cmd">bidirekt record-deployment</code></li>
+    </ol>
+  </div>
+  {{if $.CanWrite}}
+  <div class="sheet-foot">
+    <span>Prefer the UI for setup?</span>
+    <div class="badges"><a class="btn" href="/participants/new-participant">Create participant</a><a class="btn" href="/environments/new-environment">Create environment</a></div>
+  </div>
+  {{end}}
+</section>
+{{else}}
+<section class="sheet">
+  <div class="sheet-head"><h2 class="h2">Last check said no</h2><span class="muted">the latest can-i-deploy of each participant and environment whose answer was no</span></div>
+  {{if .SaidNo}}
+  <div>
+    {{range .SaidNo}}
+    <div class="attn">
+      <span class="ic">{{template "icon_x" 14}}</span>
+      <div class="what"><a class="name" href="{{.ParticipantURL}}">{{.Check.ParticipantName}}</a> {{if .VersionURL}}<a class="ver" href="{{.VersionURL}}">{{.Check.Version}}</a>{{else}}<span class="ver">{{.Check.Version}}</span>{{end}}<br><b>cannot be deployed</b> to <a class="name" href="/environments/{{.Check.EnvironmentID}}">{{.Check.EnvironmentName}}</a>{{if .DeployedThereAnyway}} <span class="muted">· deployed there anyway</span>{{end}}</div>
+      <a class="badge no" href="/checks/{{.Check.ID}}">{{template "icon_x" 12}}{{if .Report.Stored}}{{template "breaks" .Report.Breaks}} · {{end}}check #{{.Check.ID}}</a>
+      <span class="time">{{listTime .Check.CreatedAt}}</span>
+    </div>
+    {{end}}
+  </div>
+  {{if .SaidNoMore}}<div class="sheet-foot"><a class="badge more" href="/environments">+{{.SaidNoMore}} more</a></div>{{end}}
+  {{else}}
+  <p class="pad muted">No check said no.</p>
+  {{end}}
+</section>
+<section class="sheet">
+  <div class="sheet-head"><h2 class="h2">Deployed now</h2></div>
+  {{if .Deployed}}
+  <div class="scroll"><table class="t stack dep">
+    <thead>
+      <tr>
+        <th scope="col">Participant</th>
+        {{range .Environments}}<th scope="col"><a class="badge env" href="/environments/{{.ID}}">{{.Name}}</a></th>{{end}}
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Deployed}}
+      <tr>
+        <td data-l="Participant"><a class="name" href="{{.ParticipantURL}}">{{.ParticipantName}}</a></td>
+        {{range .Cells}}<td data-l="{{.Environment.Name}}">{{if .Deployed}}<div class="v2">{{if .VersionURL}}<a class="ver" href="{{.VersionURL}}">{{.Version}}</a>{{else}}<span class="ver">{{.Version}}</span>{{end}}<span class="time">{{listTime .DeployedAt}}</span></div>{{else}}<span class="muted">not deployed</span>{{end}}</td>{{end}}
+      </tr>
+      {{end}}
+    </tbody>
+  </table></div>
+  <div class="sheet-foot">
+    <span>{{.DeployedParticipantsTotal}} of {{.Numbers.Participants}} {{if eq .Numbers.Participants 1}}participant is{{else}}participants are{{end}} deployed · {{.Numbers.NeverPublished}} never published</span>
+    {{if .DeployedMore}}<a class="badge more" href="/participants">+{{.DeployedMore}} more</a>{{end}}
+  </div>
+  {{else}}
+  <p class="pad muted">Nothing deployed yet.</p>
+  {{end}}
+</section>
+<section class="sheet">
+  <div class="sheet-head"><h2 class="h2">Recent activity</h2><span class="muted">deployments and can-i-deploy answers, newest first</span></div>
+  {{if .Activity}}
+  <ul class="feed">
+    {{range .Activity}}
+    <li>
+      {{with .Deployment}}<span class="ic{{if .Rollback}} rb{{end}}">{{if .Rollback}}{{template "icon_rollback" 14}}{{else}}{{template "icon_deploy" 14}}{{end}}</span>{{else}}{{if .Check.Check.Deployable}}<span class="ic yes">{{template "icon_check" 14}}</span>{{else}}<span class="ic no">{{template "icon_x" 14}}</span>{{end}}{{end}}
+      <div class="what"><a class="name" href="{{.ParticipantURL}}">{{.ParticipantName}}</a> {{if .VersionURL}}<a class="ver" href="{{.VersionURL}}">{{.Version}}</a>{{else}}<span class="ver">{{.Version}}</span>{{end}} <span class="arrow" aria-hidden="true">→</span><span class="sr">to</span> <a class="name" href="/environments/{{.EnvironmentID}}">{{.EnvironmentName}}</a></div>
+      <span class="ev">{{with .Deployment}}<span class="badges"><span class="badge">deployed</span>{{if .Rollback}}<span class="badge rb">{{template "icon_rollback" 12}}rollback</span>{{end}}</span>{{else}}{{with .Check}}{{if .Check.Deployable}}<a class="badge yes" href="/checks/{{.Check.ID}}">{{template "icon_check" 12}}can-i-deploy yes</a>{{else}}<a class="badge no" href="/checks/{{.Check.ID}}">{{template "icon_x" 12}}can-i-deploy no{{if .Report.Stored}} · {{template "breaks" .Report.Breaks}}{{end}}</a>{{end}}{{end}}{{end}}</span>
+      <span class="time">{{listTime .At}}</span>
+    </li>
+    {{end}}
+  </ul>
+  {{else}}
+  <p class="pad muted">No activity yet.</p>
+  {{end}}
+</section>
+{{end}}
+{{end}}
+{{end}}
+
+{{define "breaks"}}{{.}} {{if eq . 1}}break{{else}}breaks{{end}}{{end}}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/jackc/pgx/v5"
@@ -17,48 +16,52 @@ const (
 	`
 
 	insertDeploymentQuery = `
-		WITH prior AS (
-			SELECT version, deployed_at
-			FROM deployments
-			WHERE participant_id = $1 AND environment_id = $3
-		),
-		latest AS (
-			SELECT version
-			FROM prior
-			ORDER BY deployed_at DESC
-			LIMIT 1
-		)
 		INSERT INTO deployments
 			(participant_id, version, environment_id, rollback, deployed_at)
 		SELECT
 			$1,
 			$2,
 			$3,
-			EXISTS (SELECT 1 FROM prior WHERE version = $2),
+			EXISTS (
+				SELECT 1 FROM deployments
+				WHERE participant_id = $1 AND environment_id = $3 AND version = $2
+			),
 			clock_timestamp()
-		WHERE COALESCE((SELECT version FROM latest), '') <> $2
+		WHERE NOT EXISTS (
+			SELECT 1 FROM current_deployments
+			WHERE participant_id = $1 AND environment_id = $3 AND version = $2
+		)
 		RETURNING id, rollback, deployed_at
 	`
 
-	currentVersionInEnvQuery = `
-		SELECT DISTINCT ON (participant_id)
-			version
-		FROM
-			deployments
-		WHERE
-			participant_id = $1 AND environment_id = $2
-		ORDER BY
-			participant_id, deployed_at DESC
-		LIMIT 1
+	upsertCurrentDeploymentQuery = `
+		INSERT INTO current_deployments
+			(participant_id, environment_id, version, contract_id, deployed_at)
+		VALUES (
+			$1,
+			$2,
+			$3,
+			(SELECT contract_id FROM contract_versions WHERE participant_id = $1 AND version = $3),
+			$4
+		)
+		ON CONFLICT (participant_id, environment_id) DO UPDATE SET
+			version = EXCLUDED.version,
+			contract_id = EXCLUDED.contract_id,
+			deployed_at = EXCLUDED.deployed_at
+	`
+
+	currentDeploymentInEnvQuery = `
+		SELECT version, contract_id
+		FROM current_deployments
+		WHERE participant_id = $1 AND environment_id = $2
 	`
 
 	listCurrentDeploymentsInEnvQuery = `
-		SELECT DISTINCT ON (d.participant_id)
-			p.id, p.name, d.version, d.deployed_at
-		FROM deployments d
-		JOIN participants p ON p.id = d.participant_id
-		WHERE d.environment_id = $1
-		ORDER BY d.participant_id, d.deployed_at DESC
+		SELECT p.id, p.name, cd.version, cd.deployed_at
+		FROM current_deployments cd
+		JOIN participants p ON p.id = cd.participant_id
+		WHERE cd.environment_id = $1
+		ORDER BY p.name COLLATE "C"
 	`
 )
 
@@ -97,6 +100,17 @@ func (this *DeploymentRepository) Insert(ctx context.Context, d *model.Deploymen
 		panic(fmt.Errorf("error inserting deployment: %w", err))
 	}
 
+	if _, err := tx.Exec(
+		ctx,
+		upsertCurrentDeploymentQuery,
+		d.Participant.ID,
+		d.Environment.ID,
+		d.Version,
+		d.DeployedAt,
+	); err != nil {
+		panic(fmt.Errorf("error upserting current deployment: %w", err))
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		panic(fmt.Errorf("error committing transaction: %w", err))
 	}
@@ -104,16 +118,21 @@ func (this *DeploymentRepository) Insert(ctx context.Context, d *model.Deploymen
 	return true
 }
 
-func (this *DeploymentRepository) CurrentVersionInEnv(ctx context.Context, participantID int64, environmentID int64) (string, bool) {
-	var version string
-	err := this.pool.QueryRow(ctx, currentVersionInEnvQuery, participantID, environmentID).Scan(&version)
+func (this *DeploymentRepository) CurrentDeploymentInEnv(
+	ctx context.Context,
+	participantID int64,
+	environmentID int64,
+) (version string, contractID int64, deployed bool) {
+	err := this.pool.QueryRow(ctx, currentDeploymentInEnvQuery, participantID, environmentID).Scan(&version, &contractID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", false
+		return "", 0, false
 	}
+
 	if err != nil {
-		panic(fmt.Errorf("error loading current version in env: %w", err))
+		panic(fmt.Errorf("error loading current deployment in env: %w", err))
 	}
-	return version, true
+
+	return version, contractID, true
 }
 
 func (this *DeploymentRepository) ListCurrentDeploymentsInEnv(ctx context.Context, environmentID int64) []model.Deployment {
@@ -121,24 +140,20 @@ func (this *DeploymentRepository) ListCurrentDeploymentsInEnv(ctx context.Contex
 	if err != nil {
 		panic(fmt.Errorf("error listing current deployments in env: %w", err))
 	}
-	defer rows.Close()
 
-	var deployments []model.Deployment
-	for rows.Next() {
-		var (
-			participantID   int64
-			participantName string
-			version         string
-			deployedAt      time.Time
-		)
-		if err := rows.Scan(&participantID, &participantName, &version, &deployedAt); err != nil {
-			panic(fmt.Errorf("error scanning deployment row: %w", err))
-		}
-		deployments = append(deployments, model.Deployment{
-			Participant: &model.Participant{ID: participantID, Name: participantName},
-			Version:     version,
-			DeployedAt:  deployedAt,
-		})
+	deployments, err := pgx.AppendRows(make([]model.Deployment, 0), rows, func(row pgx.CollectableRow) (model.Deployment, error) {
+		deployment := model.Deployment{Participant: &model.Participant{}}
+		err := row.Scan(&deployment.Participant.ID, &deployment.Participant.Name, &deployment.Version, &deployment.DeployedAt)
+
+		return deployment, err
+	})
+	if err != nil {
+		panic(fmt.Errorf("error scanning deployment row: %w", err))
 	}
+
+	if err := rows.Err(); err != nil {
+		panic(fmt.Errorf("error reading current deployments in env: %w", err))
+	}
+
 	return deployments
 }

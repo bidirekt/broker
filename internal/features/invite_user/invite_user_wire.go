@@ -1,5 +1,7 @@
 package invite_user
 
+import "time"
+
 const (
 	EmailInvalidMessage      string = "invalid email"
 	PermissionInvalidMessage string = "invalid permission"
@@ -16,6 +18,8 @@ const (
 type InviteUserPage struct {
 	Email      string
 	Permission string
+	Field      string
 	Message    string
 	Link       string
+	ExpiresAt  time.Time
 }

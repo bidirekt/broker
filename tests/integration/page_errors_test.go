@@ -23,6 +23,9 @@ const (
 	pageContentSecurityPolicy = "default-src 'self'; frame-ancestors 'none'"
 	pageErrorsSessionCookie   = "page-errors-session-cookie"
 	pageErrorsCSRFToken       = "page-errors-csrf-token"
+	pageErrorsSignOutForm     = `action="/sign-out"`
+	pageErrorsTryAgain        = `<a class="btn primary" href="">Try again</a>`
+	pageErrorsGoToOverview    = `href="/">Go to overview</a>`
 )
 
 func (this *IntegrationSuite) requestPage(method, path string) (status int, header http.Header, body string) {
@@ -73,12 +76,16 @@ func (this *IntegrationSuite) TestUnhappyPath_UnknownPageAnswers404AsHTMLWithCSP
 	status, header, body := this.requestPage("GET", "/no-such-page")
 	this.Equal(http.StatusNotFound, status)
 	this.Equal("text/html; charset=utf-8", header.Get("Content-Type"))
+	this.Equal("no-store", header.Get("Cache-Control"))
 	this.Equal(pageContentSecurityPolicy, header.Get("Content-Security-Policy"))
 	this.Contains(body, "<!doctype html>")
+	this.Contains(body, `<div class="code-n">404</div>`)
 	this.Contains(body, "<h1>Not Found</h1>")
+	this.Contains(body, pageErrorsTryAgain)
+	this.Contains(body, pageErrorsGoToOverview)
 	this.Contains(body, `src="/assets/htmx.min.js"`)
 	this.NotContains(body, "<style")
-	this.Contains(body, `action="/sign-out"`)
+	this.Contains(body, pageErrorsSignOutForm)
 	this.Contains(body, pageErrorsCSRFToken)
 }
 
@@ -99,8 +106,13 @@ func (this *IntegrationSuite) TestUnhappyPath_PageFailureAnswers500AsSomethingWe
 	this.Equal(http.StatusInternalServerError, status)
 	this.Equal("text/html; charset=utf-8", header.Get("Content-Type"))
 	this.Equal(pageContentSecurityPolicy, header.Get("Content-Security-Policy"))
-	this.Contains(body, "something went wrong")
+	this.Contains(body, `<div class="code-n">500</div>`)
+	this.Contains(body, "<h1>something went wrong</h1>")
 	this.NotContains(body, "database exploded")
+	this.Contains(body, pageErrorsTryAgain)
+	this.Contains(body, pageErrorsGoToOverview)
+	this.Contains(body, pageErrorsSignOutForm)
+	this.Contains(body, suiteAdminEmail)
 }
 
 func (this *IntegrationSuite) TestUnhappyPath_PageFiberErrorKeepsItsCodeAndMessage() {
@@ -111,7 +123,8 @@ func (this *IntegrationSuite) TestUnhappyPath_PageFiberErrorKeepsItsCodeAndMessa
 	status, header, body := this.requestPage("GET", "/__conflicting_page")
 	this.Equal(http.StatusConflict, status)
 	this.Equal("text/html; charset=utf-8", header.Get("Content-Type"))
-	this.Contains(body, "that email is already taken")
+	this.Contains(body, `<div class="code-n">409</div>`)
+	this.Contains(body, "<h1>that email is already taken</h1>")
 }
 
 func (this *IntegrationSuite) TestUnhappyPath_HtmxPagePostRefusedWith403DoesNotPushTheFormURL() {
@@ -122,6 +135,8 @@ func (this *IntegrationSuite) TestUnhappyPath_HtmxPagePostRefusedWith403DoesNotP
 	this.Equal(http.StatusForbidden, status)
 	this.Equal("text/html; charset=utf-8", header.Get("Content-Type"))
 	this.Contains(body, "<h1>forbidden</h1>")
+	this.NotContains(body, "Try again")
+	this.Contains(body, pageErrorsGoToOverview)
 	this.Equal("false", header.Get("HX-Push-Url"))
 	this.Equal("no-store", header.Get("Cache-Control"))
 }
@@ -138,7 +153,11 @@ func (this *IntegrationSuite) TestUnhappyPath_HtmxPagePostFailureAnswers500Witho
 
 	status, header, body := this.sendPageErrorsRequest(req)
 	this.Equal(http.StatusInternalServerError, status)
-	this.Contains(body, "something went wrong")
+	this.Contains(body, "<h1>something went wrong</h1>")
+	this.NotContains(body, "Try again")
+	this.Contains(body, pageErrorsGoToOverview)
+	this.Contains(body, pageErrorsSignOutForm)
+	this.Contains(body, suiteAdminEmail)
 	this.Equal("false", header.Get("HX-Push-Url"))
 }
 

@@ -1,0 +1,33 @@
+{{define "title"}}Rename {{.Page.Name}}{{end}}
+
+{{define "content"}}
+<nav class="crumbs" aria-label="Breadcrumbs"><a href="/environments">environments</a><span aria-hidden="true">/</span><a href="/environments/{{.Page.ID}}">{{.Page.Name}}</a><span aria-hidden="true">/</span><span aria-current="page">rename</span></nav>
+<div class="head">
+  <div>
+    <h1>Rename {{.Page.Name}}</h1>
+    <p class="sub">Allowed at any time.</p>
+  </div>
+</div>
+<div class="formgrid">
+  <form class="sheet formcard" method="post" action="/environments/{{.Page.ID}}/rename">
+    <div class="form">
+      <div class="warn" role="note">{{template "icon_error" 16}}<span><b>Pipelines use this name.</b> Until they are updated, any pipeline still using <span class="mono">{{.Page.Name}}</span> gets <code>environment not found</code>. Deployments and checks stay attached to the environment.</span></div>
+      <div class="field">
+        <label for="name">New name</label>
+        <input class="input mono" id="name" name="name" type="text" autocomplete="off" value="{{.Page.NewName}}" required autofocus{{if eq .Page.Field "name"}} aria-invalid="true" aria-describedby="name-err"{{end}}>
+        {{if eq .Page.Field "name"}}<p class="err" id="name-err">{{template "icon_error" 14}}<span>{{.Page.Message}}</span></p>{{end}}
+        <p class="hint">Shown exactly as written.</p>
+      </div>
+    </div>
+    <div class="form-foot"><button type="submit" class="btn primary">Rename</button><a class="btn" href="/environments/{{.Page.ID}}">Cancel</a></div>
+  </form>
+  <aside class="sheet aside" aria-label="About renaming">
+    <h2>About renaming</h2>
+    <ul>
+      <li>Allowed at any time.</li>
+      <li>Deployments and checks stay attached to the environment.</li>
+      <li>Update every pipeline that uses the old name.</li>
+    </ul>
+  </aside>
+</div>
+{{end}}

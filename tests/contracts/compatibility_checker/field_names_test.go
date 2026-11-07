@@ -102,11 +102,12 @@ func billingFields(t *testing.T, interaction string, consumerSide, providerSide 
 		ResponseStatusCode: status,
 		Bodies:             providerSide.bodies,
 		Schemas:            providerSide.schemas,
-		DeployedVersions:   map[string]string{billingEnvironment: "1.0.0"},
+		ParticipantVersion: null.StringFrom("1.0.0"),
 	}
 
 	fromTheConsumer := billingFieldsCheckedFrom(consumer, model.ResourceCounterparts{
-		Providers: map[string]model.PersistedResource{billingProviderHash: provider},
+		Providers:           map[string]model.PersistedResource{billingProviderHash: provider},
+		RegisteredProviders: map[string]model.RegisteredProvider{billingProviderName: {DeployedVersion: null.StringFrom("1.0.0")}},
 	}, billingProviderName, interaction)
 
 	fromTheProvider := billingFieldsCheckedFrom(provider, model.ResourceCounterparts{

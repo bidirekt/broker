@@ -48,9 +48,9 @@ func (this *SetupAdminUiHandler) SetUp(ctx fiber.Ctx) error {
 	case AlreadySetUp:
 		return respond.NotFound(ctx)
 	case EmailInvalid:
-		return this.respondProblem(ctx, page, EmailInvalidMessage)
+		return this.respondProblem(ctx, page, emailFormField, EmailInvalidMessage)
 	case PasswordInvalid:
-		return this.respondProblem(ctx, page, PasswordInvalidMessage)
+		return this.respondProblem(ctx, page, passwordFormField, PasswordInvalidMessage)
 	case SetUpConcurrently:
 		return pages.Redirect(ctx, signInPath)
 	}
@@ -64,14 +64,15 @@ func (this *SetupAdminUiHandler) SetUp(ctx fiber.Ctx) error {
 		return pages.Redirect(ctx, signInPath)
 	}
 
-	return pages.Redirect(ctx, usersPath)
+	return pages.Redirect(ctx, homePath)
 }
 
 func (this *SetupAdminUiHandler) respondForbidden(ctx fiber.Ctx) error {
 	return respond.Problem(ctx, fiber.StatusForbidden, access.ForbiddenMessage)
 }
 
-func (this *SetupAdminUiHandler) respondProblem(ctx fiber.Ctx, page SetupPage, message string) error {
+func (this *SetupAdminUiHandler) respondProblem(ctx fiber.Ctx, page SetupPage, field string, message string) error {
+	page.Field = field
 	page.Message = message
 	return pages.Render(ctx, fiber.StatusBadRequest, pageFiles, setupTemplate, page)
 }

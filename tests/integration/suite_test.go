@@ -104,6 +104,7 @@ func (this *IntegrationSuite) SetupTest() {
 			compatibility_check_results,
 			compatibility_checks,
 			compatibility_verdicts,
+			current_deployments,
 			deployments,
 			resource_bodies,
 			field_versions,

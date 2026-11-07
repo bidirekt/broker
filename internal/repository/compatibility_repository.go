@@ -14,18 +14,18 @@ import (
 const (
 	insertCompatibilityCheckQuery = `
 		INSERT INTO compatibility_checks
-			(participant_id, contract_id, version, environment_id, deployable)
+			(participant_id, contract_id, version, environment_id, environment_name, deployable, report)
 		VALUES
-			($1, $2, $3, $4, $5)
+			($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id, created_at
 	`
 
 	insertCompatibilityCheckResultQuery = `
 		INSERT INTO compatibility_check_results
 			(check_id, counterpart_name, counterpart_participant_id, counterpart_version,
-			 verdict_contract_id_one, verdict_contract_id_two, deployable)
+			 verdict_contract_id_one, verdict_contract_id_two, deployable, role)
 		VALUES
-			($1, $2, $3, $4, $5, $6, $7)
+			($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id
 	`
 
@@ -35,6 +35,30 @@ const (
 		VALUES
 			($1, $2, $3)
 		ON CONFLICT DO NOTHING
+	`
+
+	findCompatibilityCheckQuery = `
+		SELECT
+			c.id, c.participant_id, p.name, c.contract_id, c.version, c.environment_id,
+			COALESCE(c.environment_name, e.name), c.deployable, c.report, c.created_at
+		FROM
+			compatibility_checks c
+			JOIN participants p ON p.id = c.participant_id
+			JOIN environments e ON e.id = c.environment_id
+		WHERE
+			c.id = $1
+	`
+
+	listCompatibilityCheckResultsQuery = `
+		SELECT
+			id, check_id, counterpart_name, counterpart_participant_id, counterpart_version,
+			verdict_contract_id_one, verdict_contract_id_two, deployable, COALESCE(role, '')
+		FROM
+			compatibility_check_results
+		WHERE
+			check_id = $1
+		ORDER BY
+			counterpart_name COLLATE "C"
 	`
 
 	findCompatibilityVerdictQuery = `
@@ -84,6 +108,59 @@ func (this *CompatibilityRepository) RecordCheck(
 	}
 }
 
+func (this *CompatibilityRepository) FindCheck(ctx context.Context, checkID int64) (*model.CompatibilityCheck, bool) {
+	check := &model.CompatibilityCheck{}
+
+	err := this.pool.QueryRow(ctx, findCompatibilityCheckQuery, checkID).Scan(
+		&check.ID,
+		&check.ParticipantID,
+		&check.ParticipantName,
+		&check.ContractID,
+		&check.Version,
+		&check.EnvironmentID,
+		&check.EnvironmentName,
+		&check.Deployable,
+		&check.Report,
+		&check.CreatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, false
+	}
+	if err != nil {
+		panic(fmt.Errorf("error finding compatibility check: %w", err))
+	}
+
+	return check, true
+}
+
+func (this *CompatibilityRepository) ListCheckResults(ctx context.Context, checkID int64) []model.CompatibilityCheckResult {
+	rows, err := this.pool.Query(ctx, listCompatibilityCheckResultsQuery, checkID)
+	if err != nil {
+		panic(fmt.Errorf("error listing compatibility check results: %w", err))
+	}
+
+	results, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (model.CompatibilityCheckResult, error) {
+		var result model.CompatibilityCheckResult
+		err := row.Scan(
+			&result.ID,
+			&result.CheckID,
+			&result.CounterpartName,
+			&result.CounterpartParticipantID,
+			&result.CounterpartVersion,
+			&result.VerdictContractIDOne,
+			&result.VerdictContractIDTwo,
+			&result.Deployable,
+			&result.Role,
+		)
+		return result, err
+	})
+	if err != nil {
+		panic(fmt.Errorf("error scanning compatibility check results: %w", err))
+	}
+
+	return results
+}
+
 func (this *CompatibilityRepository) GetVerdict(
 	ctx context.Context,
 	one, two int64,
@@ -126,7 +203,9 @@ func (this *CompatibilityRepository) insertCheck(
 		check.ContractID,
 		check.Version,
 		check.EnvironmentID,
+		check.EnvironmentName,
 		check.Deployable,
+		check.Report,
 	).Scan(&check.ID, &check.CreatedAt); err != nil {
 		panic(fmt.Errorf("error inserting compatibility check: %w", err))
 	}
@@ -147,6 +226,7 @@ func (this *CompatibilityRepository) insertCheckResult(
 		result.VerdictContractIDOne,
 		result.VerdictContractIDTwo,
 		result.Deployable,
+		result.Role,
 	).Scan(&result.ID); err != nil {
 		panic(fmt.Errorf("error inserting compatibility check result: %w", err))
 	}
