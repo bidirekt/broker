@@ -337,7 +337,7 @@ func (this *IntegrationSuite) TestListParticipantChecks_SignedOutIsRedirectedToS
 	status, header, _ := this.getPage("/participants/petstore_web/checks", "")
 
 	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/sign-in", header.Get("Location"))
+	this.Equal("/sign-in?next=%2Fparticipants%2Fpetstore_web%2Fchecks", header.Get("Location"))
 }
 
 func (this *IntegrationSuite) TestListParticipantChecks_UnknownParticipantIsNotFound() {

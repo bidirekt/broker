@@ -329,7 +329,7 @@ func (this *IntegrationSuite) TestShowOverview_SignedOutIsRedirectedToSignIn() {
 	status, header, _ := this.getPage("/", "")
 
 	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/sign-in", header.Get("Location"))
+	this.Equal("/sign-in?next=%2F", header.Get("Location"))
 }
 
 func (this *IntegrationSuite) TestShowOverview_IndexesExist() {

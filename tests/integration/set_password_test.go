@@ -163,7 +163,7 @@ func (this *IntegrationSuite) TestSetPassword_ResetLinkEndsTheExistingSessionAnd
 	this.Equal(0, this.countRows("sessions"))
 	status, header, _ = this.getPage("/profile", cookie)
 	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/sign-in", header.Get("Location"))
+	this.Equal("/sign-in?next=%2Fprofile", header.Get("Location"))
 
 	this.Equal(http.StatusUnauthorized, this.signInStatus(setPasswordUserEmail, setPasswordOldPassword))
 	this.NotEmpty(this.signInAsUser(setPasswordUserEmail, setPasswordNewPassword))

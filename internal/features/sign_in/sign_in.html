@@ -17,6 +17,7 @@
       <label for="password">Password</label>
       <input class="input" id="password" name="password" type="password" autocomplete="current-password" required>
     </div>
+    <input type="hidden" name="next" value="{{.Page.Next}}">
     <button type="submit" class="btn primary block">Sign in</button>
   </div>
 </form>

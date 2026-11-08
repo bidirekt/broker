@@ -296,7 +296,7 @@ func (this *IntegrationSuite) TestListParticipantDeployments_SignedOutIsRedirect
 	status, header, _ := this.getPage(participantDeploymentsPath, "")
 
 	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/sign-in", header.Get("Location"))
+	this.Equal("/sign-in?next=%2Fparticipants%2Fpetstore_api%2Fdeployments", header.Get("Location"))
 }
 
 func (this *IntegrationSuite) TestListParticipantDeployments_ReadUserSeesTheHistoryWithoutWriteActions() {

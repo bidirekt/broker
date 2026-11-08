@@ -123,7 +123,7 @@ func (this *IntegrationSuite) TestCreateEnvironmentUi_SignedOutIsRedirectedToSig
 	status, header, _ := this.getPage(createEnvironmentUiPath, "")
 
 	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/sign-in", header.Get("Location"))
+	this.Equal("/sign-in?next=%2Fenvironments%2Fnew-environment", header.Get("Location"))
 }
 
 func (this *IntegrationSuite) TestCreateEnvironmentUi_EnvironmentsListOffersCreateOnlyToWriters() {

@@ -147,7 +147,7 @@ func (this *IntegrationSuite) TestDeactivateUser_EndsTheSessionsTheSignInAndTheP
 
 	status, header, _ = this.getPage("/profile", userCookie)
 	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/sign-in", header.Get("Location"))
+	this.Equal("/sign-in?next=%2Fprofile", header.Get("Location"))
 
 	status, _, _ = this.postForm("/sign-in", "", "", url.Values{"email": {deactivateUserEmail}, "password": {deactivateUserPassword}})
 	this.Equal(http.StatusUnauthorized, status)

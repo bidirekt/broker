@@ -255,7 +255,7 @@ func (this *IntegrationSuite) TestShowParticipantRelations_SignedOutIsRedirected
 	status, header, _ := this.getPage("/participants/petstore_api/relations", "")
 
 	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/sign-in", header.Get("Location"))
+	this.Equal("/sign-in?next=%2Fparticipants%2Fpetstore_api%2Frelations", header.Get("Location"))
 }
 
 func (this *IntegrationSuite) TestShowParticipantRelations_UnknownParticipantIsNotFound() {
