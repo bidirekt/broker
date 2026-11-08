@@ -9,6 +9,7 @@ components:
   cmd:                        { in: cmd/** }
   bootstrap:                  { in: internal }
   feature_can_i_deploy:       { in: internal/features/can_i_deploy }
+  feature_create_api_key:     { in: internal/features/create_api_key }
   feature_create_environment: { in: internal/features/create_environment }
   feature_create_participant: { in: internal/features/create_participant }
   feature_deactivate_user:    { in: internal/features/deactivate_user }
@@ -24,6 +25,7 @@ components:
   feature_reactivate_user:    { in: internal/features/reactivate_user }
   feature_record_deployment:  { in: internal/features/record_deployment }
   feature_rename_environment: { in: internal/features/rename_environment }
+  feature_revoke_api_key:     { in: internal/features/revoke_api_key }
   feature_set_password:       { in: internal/features/set_password }
   feature_setup_admin:        { in: internal/features/setup_admin }
   feature_show_check:         { in: internal/features/show_check }
@@ -81,6 +83,7 @@ deps:
       - components
       - components_config
       - feature_can_i_deploy
+      - feature_create_api_key
       - feature_create_environment
       - feature_create_participant
       - feature_deactivate_user
@@ -96,6 +99,7 @@ deps:
       - feature_reactivate_user
       - feature_record_deployment
       - feature_rename_environment
+      - feature_revoke_api_key
       - feature_set_password
       - feature_setup_admin
       - feature_show_check
@@ -116,6 +120,9 @@ deps:
 
   feature_can_i_deploy:
     mayDependOn: [contracts, components, components_access, repository, model, validations]
+    canUse: [fiber, guregu_null]
+  feature_create_api_key:
+    mayDependOn: [components, components_access, components_pages, components_respond, components_tokens, repository, model]
     canUse: [fiber, guregu_null]
   feature_create_environment:
     mayDependOn: [components, components_access, components_pages, components_respond, components_sessions, repository, model, validations]
@@ -162,8 +169,11 @@ deps:
   feature_rename_environment:
     mayDependOn: [components, components_access, components_pages, components_respond, components_sessions, repository, model, validations]
     canUse: [fiber]
+  feature_revoke_api_key:
+    mayDependOn: [components, components_access, components_pages, components_respond, components_sessions, repository, model]
+    canUse: [fiber]
   feature_set_password:
-    mayDependOn: [components, components_access, components_pages, components_passwords, components_respond, components_sessions, components_tokens, repository, validations]
+    mayDependOn: [components, components_access, components_pages, components_passwords, components_respond, components_sessions, components_tokens, repository, model, validations]
     canUse: [fiber]
   feature_setup_admin:
     mayDependOn: [components, components_access, components_pages, components_passwords, components_respond, components_sessions, repository, model, validations]
@@ -185,7 +195,7 @@ deps:
     canUse: [fiber]
   feature_update_profile:
     mayDependOn: [components, components_access, components_pages, components_passwords, components_respond, components_sessions, repository, model, validations]
-    canUse: [fiber]
+    canUse: [fiber, guregu_null]
   feature_validate_contract:
     mayDependOn: [contracts, components, components_access, repository, model, validations]
     canUse: [fiber]
@@ -213,7 +223,7 @@ deps:
     canUse: [fiber]
 
   components:
-    mayDependOn: [components_config, components_database, components_server, components_sessions, repository]
+    mayDependOn: [components_bearer, components_config, components_database, components_server, components_sessions, repository]
     canUse: [fiber, pgx]
   components_access:
     mayDependOn: [model]
@@ -221,7 +231,7 @@ deps:
   components_breakreport:
     mayDependOn: [model]
   components_bearer:
-    mayDependOn: [components_access, components_config, components_respond, repository]
+    mayDependOn: [components_access, components_config, components_pages, components_respond, components_tokens, repository, model]
     canUse: [fiber, golang_jwt]
   components_database:
     mayDependOn: [components_config, pkg, migrations]
@@ -238,8 +248,8 @@ deps:
     mayDependOn: [components_pages]
     canUse: [fiber]
   components_server:
-    mayDependOn: [components_bearer, components_config, components_input, components_pages, components_respond, components_sessions, repository]
-    canUse: [fiber, pgx]
+    mayDependOn: [components_bearer, components_config, components_input, components_pages, components_respond, components_sessions]
+    canUse: [fiber]
   components_sessions:
     mayDependOn: [components_access, components_config, components_pages, components_respond, components_tokens, repository, model]
     canUse: [fiber]

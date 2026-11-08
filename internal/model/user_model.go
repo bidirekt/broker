@@ -22,6 +22,14 @@ func (this Permission) Includes(needed Permission) bool {
 	return neededStep >= 0 && held >= neededStep
 }
 
+func (this Permission) CappedBy(ceiling Permission) Permission {
+	if ceiling.Includes(this) {
+		return this
+	}
+
+	return ceiling
+}
+
 func (this Permission) IsGrantable() bool {
 	return this == PermissionRead || this == PermissionWrite
 }

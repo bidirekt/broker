@@ -25,6 +25,7 @@ const (
 	setPasswordForLine         = `<p>For ` + setPasswordUserEmail + `</p>`
 	setPasswordExpiryLine      = `<p>This link works once, until <time class="time" datetime="2099-01-02T03:04:00Z" title="2099-01-02 03:04 UTC">2099-01-02 03:04 UTC</time></p>`
 	setPasswordBigMark         = `<span class="mark big" aria-hidden="true">🤝</span>`
+	setPasswordKeepsAPIKeys    = "Setting a new password doesn't revoke your API keys."
 )
 
 var setPasswordInviteLinkInPage = regexp.MustCompile(`http://localhost:8080(/set-password\?token=([A-Za-z0-9_-]{43}))`)
@@ -103,6 +104,7 @@ func (this *IntegrationSuite) TestSetPassword_InvitedUserSetsAPasswordAndSignsIn
 	this.Contains(page, `<input type="hidden" name="token" value="`+match[2]+`">`)
 	this.Contains(page, `name="password"`)
 	this.NotContains(page, `action="/sign-out"`)
+	this.NotContains(page, setPasswordKeepsAPIKeys)
 
 	status, header, _ := this.submitSetPassword(match[2], setPasswordNewPassword)
 	this.Equal(http.StatusSeeOther, status)
@@ -145,8 +147,14 @@ func (this *IntegrationSuite) TestSetPassword_ResetLinkEndsTheExistingSessionAnd
 	cookie := this.signInAsUser(setPasswordUserEmail, setPasswordOldPassword)
 	token := this.createResetLink(userID)
 
-	status, _, _ := this.getPage("/set-password?token="+token, "")
+	status, _, page := this.getPage("/set-password?token="+token, "")
 	this.Require().Equal(http.StatusOK, status)
+	this.Contains(page, `<p class="hint">`+setPasswordKeepsAPIKeys+`</p>`)
+
+	status, _, body := this.submitSetPassword(token, "seven-c")
+	this.Require().Equal(http.StatusBadRequest, status)
+	this.Contains(body, setPasswordPasswordInvalid)
+	this.Contains(body, `<p class="hint">`+setPasswordKeepsAPIKeys+`</p>`)
 
 	status, header, _ := this.submitSetPassword(token, setPasswordNewPassword)
 	this.Require().Equal(http.StatusSeeOther, status)
@@ -238,6 +246,7 @@ func (this *IntegrationSuite) TestSetPassword_ShortPasswordAnswers400AndKeepsThe
 	status, _, body := this.submitSetPassword(token, "seven-c")
 	this.Equal(http.StatusBadRequest, status)
 	this.Contains(body, `autocomplete="new-password" required autofocus aria-invalid="true" aria-describedby="password-err">`)
+	this.NotContains(body, setPasswordKeepsAPIKeys)
 	this.Contains(body, `<p class="err" id="password-err">`)
 	this.Contains(body, `<span>`+setPasswordPasswordInvalid+`</span></p>`)
 	this.Contains(body, `<input type="hidden" name="token" value="`+token+`">`)

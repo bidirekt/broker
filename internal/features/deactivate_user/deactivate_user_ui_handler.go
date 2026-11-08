@@ -1,6 +1,8 @@
 package deactivate_user
 
 import (
+	"fmt"
+
 	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/components/pages"
 	"github.com/bidirekt/broker/internal/components/respond"
@@ -40,7 +42,7 @@ func (this *DeactivateUserUiHandler) Handle(ctx fiber.Ctx) error {
 	case TargetIsTheAdmin:
 		return this.respondForbidden(ctx)
 	case UserDeactivated:
-		this.sessionKeeper.AddMessage(ctx, model.MessageSuccess, UserDeactivatedMessage+output.User.Email)
+		this.sessionKeeper.AddMessage(ctx, model.MessageSuccess, fmt.Sprintf(UserDeactivatedMessageFormat, output.User.Email))
 	}
 
 	return pages.Redirect(ctx, usersPathFor(returnPage))

@@ -7,6 +7,7 @@ import (
 	"github.com/bidirekt/broker/internal"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/bidirekt/broker/internal/repository"
+	"github.com/guregu/null"
 )
 
 func (this *IntegrationSuite) TestStartup_DeletesExpiredSessionsAndLinksAndKeepsTheAdminSession() {
@@ -59,6 +60,39 @@ func (this *IntegrationSuite) TestStartup_DeletesExpiredSessionsAndLinksAndKeeps
 	this.True(found)
 }
 
+func (this *IntegrationSuite) TestStartup_DeletesExpiredAPIKeysAndKeepsTheOnesThatNeverExpire() {
+	ctx := context.Background()
+	apiKeys := repository.NewAPIKeyRepository(this.Pool)
+	userID := this.createActiveUser("kai@x.com", model.PermissionWrite, "kai-correct-horse-battery")
+
+	for hash, expiresAt := range map[string]null.Time{
+		"kai-expired-key":  null.TimeFrom(time.Now().Add(-time.Minute)),
+		"kai-eternal-key":  {},
+		"kai-upcoming-key": null.TimeFrom(time.Now().Add(time.Hour)),
+	} {
+		this.Require().True(apiKeys.Create(ctx, &model.APIKey{
+			UserID:        userID,
+			KeyHash:       []byte(hash),
+			DisplayPrefix: "bdk_" + hash[:8],
+			Name:          hash,
+			Permission:    model.PermissionRead,
+			ExpiresAt:     expiresAt,
+		}))
+	}
+
+	restarted, err := internal.Run()
+	this.Require().NoError(err)
+	restarted.Pool.Close()
+
+	this.Equal(2, this.countRows("api_keys"))
+	_, _, found := apiKeys.FindByHash(ctx, []byte("kai-expired-key"))
+	this.False(found)
+	_, _, found = apiKeys.FindByHash(ctx, []byte("kai-eternal-key"))
+	this.True(found)
+	_, _, found = apiKeys.FindByHash(ctx, []byte("kai-upcoming-key"))
+	this.True(found)
+}
+
 func (this *IntegrationSuite) TestStartup_GivesUpOnACleanupThatCannotGetItsLockAndSaysWhy() {
 	ctx := context.Background()
 	sessionsLock, err := this.Pool.Begin(ctx)
@@ -78,7 +112,7 @@ func (this *IntegrationSuite) TestStartup_GivesUpOnACleanupThatCannotGetItsLockA
 
 	select {
 	case err := <-finished:
-		this.ErrorContains(err, "failed to delete stale sessions and links")
+		this.ErrorContains(err, "failed to delete expired credentials")
 	case <-time.After(time.Minute):
 		this.Fail("the start-up cleanup still waits for the sessions lock")
 	}

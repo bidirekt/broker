@@ -152,6 +152,12 @@ const (
 			user_id = $1
 	`
 
+	deleteUserAPIKeysQuery = `
+		DELETE FROM api_keys
+		WHERE
+			user_id = $1
+	`
+
 	deleteUserOtherSessionsQuery = `
 		DELETE FROM sessions
 		WHERE
@@ -308,6 +314,10 @@ func (this *UserRepository) Deactivate(ctx context.Context, id int64) (changed b
 
 	if _, err := tx.Exec(ctx, deleteUserSessionsQuery, id); err != nil {
 		panic(fmt.Errorf("error deleting user sessions: %w", err))
+	}
+
+	if _, err := tx.Exec(ctx, deleteUserAPIKeysQuery, id); err != nil {
+		panic(fmt.Errorf("error deleting user API keys: %w", err))
 	}
 
 	if _, err := tx.Exec(ctx, deleteOpenLinkQuery, id); err != nil {

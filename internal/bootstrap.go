@@ -4,6 +4,7 @@ import (
 	"github.com/bidirekt/broker/internal/components"
 	"github.com/bidirekt/broker/internal/components/config"
 	"github.com/bidirekt/broker/internal/features/can_i_deploy"
+	"github.com/bidirekt/broker/internal/features/create_api_key"
 	"github.com/bidirekt/broker/internal/features/create_environment"
 	"github.com/bidirekt/broker/internal/features/create_participant"
 	"github.com/bidirekt/broker/internal/features/deactivate_user"
@@ -22,6 +23,7 @@ import (
 	"github.com/bidirekt/broker/internal/features/reactivate_user"
 	"github.com/bidirekt/broker/internal/features/record_deployment"
 	"github.com/bidirekt/broker/internal/features/rename_environment"
+	"github.com/bidirekt/broker/internal/features/revoke_api_key"
 	"github.com/bidirekt/broker/internal/features/set_password"
 	"github.com/bidirekt/broker/internal/features/setup_admin"
 	"github.com/bidirekt/broker/internal/features/show_check"
@@ -58,6 +60,8 @@ func Run() (*components.Components, error) {
 	sign_in.Register(kernel)
 	sign_out.Register(kernel)
 	update_profile.Register(kernel)
+	create_api_key.Register(kernel)
+	revoke_api_key.Register(kernel)
 	list_users.Register(kernel)
 	invite_user.Register(kernel)
 	edit_user.Register(kernel)

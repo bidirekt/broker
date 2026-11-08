@@ -19,6 +19,7 @@ type SetPasswordPage struct {
 	Token     string
 	Email     string
 	ExpiresAt time.Time
+	IsReset   bool
 	Field     string
 	Message   string
 }
