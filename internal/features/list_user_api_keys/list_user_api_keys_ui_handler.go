@@ -52,7 +52,7 @@ func (this *ListUserAPIKeysUiHandler) Handle(ctx fiber.Ctx) error {
 	return pages.Render(ctx, fiber.StatusOK, pageFiles, listUserAPIKeysTemplate, ListUserAPIKeysPage{
 		UserID:  output.User.ID,
 		Email:   output.User.Email,
-		APIKeys: newAPIKeyRows(output.Keys, output.User.Permission, time.Now()),
+		APIKeys: toAPIKeyRows(output.Keys, output.User.Permission, time.Now()),
 		Pager:   pager,
 	})
 }
