@@ -1,6 +1,7 @@
 package sessions
 
 import (
+	"net/url"
 	"sync/atomic"
 	"time"
 
@@ -50,7 +51,7 @@ func (this *Keeper) Door(ctx fiber.Ctx) error {
 
 	principal, session, ok := this.admitSession(ctx)
 	if !ok {
-		return pages.Redirect(ctx, signInPath)
+		return pages.Redirect(ctx, signInPathFrom(ctx))
 	}
 
 	access.GrantPrincipal(ctx, principal)
@@ -85,6 +86,14 @@ func isPageOutsideSessionDoor(path string) bool {
 	}
 
 	return false
+}
+
+func signInPathFrom(ctx fiber.Ctx) string {
+	if !isSafeMethod(ctx.Method()) {
+		return signInPath
+	}
+
+	return signInPath + "?next=" + url.QueryEscape(ctx.OriginalURL())
 }
 
 func isSafeMethod(method string) bool {

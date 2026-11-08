@@ -442,5 +442,5 @@ func (this *IntegrationSuite) TestShowCompatibility_SignedOutIsRedirectedToSignI
 	status, header, _ := this.getPage("/compatibility", "")
 
 	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/sign-in", header.Get("Location"))
+	this.Equal("/sign-in?next=%2Fcompatibility", header.Get("Location"))
 }

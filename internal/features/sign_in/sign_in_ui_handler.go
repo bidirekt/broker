@@ -23,7 +23,9 @@ func NewSignInUiHandler(useCase *SignInUseCase, sessionKeeper *sessions.Keeper) 
 }
 
 func (this *SignInUiHandler) ShowForm(ctx fiber.Ctx) error {
-	return pages.Render(ctx, fiber.StatusOK, pageFiles, signInTemplate, SignInPage{})
+	return pages.Render(ctx, fiber.StatusOK, pageFiles, signInTemplate, SignInPage{
+		Next: safeNextPathFrom(ctx.Query(nextField)),
+	})
 }
 
 func (this *SignInUiHandler) RequireSameOrigin(ctx fiber.Ctx) error {
@@ -54,16 +56,21 @@ func (this *SignInUiHandler) SignIn(ctx fiber.Ctx) error {
 		return this.respondInvalidCredentials(ctx, email)
 	}
 
-	return pages.Redirect(ctx, homePath)
+	return pages.Redirect(ctx, this.next(ctx))
 }
 
 func (this *SignInUiHandler) Email(ctx fiber.Ctx) string {
 	return ctx.FormValue(emailFormField)
 }
 
+func (this *SignInUiHandler) next(ctx fiber.Ctx) string {
+	return safeNextPathFrom(ctx.FormValue(nextField))
+}
+
 func (this *SignInUiHandler) RespondTooManyAttempts(ctx fiber.Ctx) error {
 	return pages.Render(ctx, fiber.StatusTooManyRequests, pageFiles, signInTemplate, SignInPage{
 		Email:   this.Email(ctx),
+		Next:    this.next(ctx),
 		Message: TooManySignInAttemptsMessage,
 	})
 }
@@ -75,6 +82,7 @@ func (this *SignInUiHandler) respondForbidden(ctx fiber.Ctx) error {
 func (this *SignInUiHandler) respondInvalidCredentials(ctx fiber.Ctx, email string) error {
 	return pages.Render(ctx, fiber.StatusUnauthorized, pageFiles, signInTemplate, SignInPage{
 		Email:   email,
+		Next:    this.next(ctx),
 		Message: PageInvalidCredentialsMessage,
 	})
 }

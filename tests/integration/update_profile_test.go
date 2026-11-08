@@ -168,7 +168,7 @@ func (this *IntegrationSuite) TestUpdateProfile_Success_EndsOtherSessionsAndKeep
 
 	status, header, _ = this.getPage("/profile", otherCookie)
 	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/sign-in", header.Get("Location"))
+	this.Equal("/sign-in?next=%2Fprofile", header.Get("Location"))
 
 	status, _, body := this.getPage("/profile", cookie)
 	this.Equal(http.StatusOK, status)

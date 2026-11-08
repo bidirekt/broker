@@ -379,7 +379,7 @@ func (this *IntegrationSuite) TestShowEnvironment_SignedOutIsRedirectedToSignIn(
 	status, header, _ := this.getPage(this.environmentPathForShowEnvironment("production"), "")
 
 	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/sign-in", header.Get("Location"))
+	this.Equal("/sign-in?next=%2Fenvironments%2F1", header.Get("Location"))
 }
 
 func (this *IntegrationSuite) TestShowEnvironment_ChecksIndexExists() {

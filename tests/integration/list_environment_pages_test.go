@@ -178,7 +178,7 @@ func (this *IntegrationSuite) TestListEnvironmentPages_SignedOutIsRedirectedToSi
 	status, header, _ := this.getPage("/environments", "")
 
 	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/sign-in", header.Get("Location"))
+	this.Equal("/sign-in?next=%2Fenvironments", header.Get("Location"))
 }
 
 func (this *IntegrationSuite) TestListEnvironmentPages_DeploymentsAreIndexedByEnvironmentNewestFirst() {
