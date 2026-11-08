@@ -1,7 +1,6 @@
 package sessions
 
 import (
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -41,7 +40,7 @@ func (this *Keeper) Door(ctx fiber.Ctx) error {
 		return ctx.Next()
 	}
 
-	if !isUnderPath(ctx.Path(), setupPath) && !this.isSetUp(ctx) {
+	if !pages.IsUnderPath(ctx.Path(), setupPath) && !this.isSetUp(ctx) {
 		return pages.Redirect(ctx, setupPath)
 	}
 
@@ -80,7 +79,7 @@ func (this *Keeper) isSetUp(ctx fiber.Ctx) bool {
 
 func isPageOutsideSessionDoor(path string) bool {
 	for _, prefix := range pagesOutsideSessionDoor {
-		if isUnderPath(path, prefix) {
+		if pages.IsUnderPath(path, prefix) {
 			return true
 		}
 	}
@@ -128,8 +127,4 @@ func (this *Keeper) admitSession(ctx fiber.Ctx) (access.Principal, access.Sessio
 	}
 
 	return principal, admitted, true
-}
-
-func isUnderPath(path, prefix string) bool {
-	return path == prefix || strings.HasPrefix(path, prefix+"/")
 }

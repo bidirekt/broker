@@ -5,13 +5,13 @@ import (
 
 	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/components/config"
+	"github.com/bidirekt/broker/internal/components/pages"
 	"github.com/bidirekt/broker/internal/components/respond"
 	"github.com/bidirekt/broker/internal/repository"
 	"github.com/gofiber/fiber/v3"
 )
 
 const (
-	apiPath                = "/api"
 	apiSignInPath          = "/api/sign-in"
 	bearerPrefix           = "Bearer "
 	unauthenticatedMessage = "unauthenticated"
@@ -27,7 +27,7 @@ func NewKeeper(settings config.Settings, users *repository.UserRepository) *Keep
 }
 
 func (this *Keeper) Door(ctx fiber.Ctx) error {
-	if !isUnderPath(ctx.Path(), apiPath) || ctx.Path() == apiSignInPath {
+	if !pages.IsAPIPath(ctx.Path()) || ctx.Path() == apiSignInPath {
 		return ctx.Next()
 	}
 
@@ -59,8 +59,4 @@ func (this *Keeper) toPrincipal(ctx fiber.Ctx) (access.Principal, bool) {
 	}
 
 	return access.PrincipalOf(user)
-}
-
-func isUnderPath(path, prefix string) bool {
-	return path == prefix || strings.HasPrefix(path, prefix+"/")
 }

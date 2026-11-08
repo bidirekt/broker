@@ -221,7 +221,7 @@ deps:
   components_breakreport:
     mayDependOn: [model]
   components_bearer:
-    mayDependOn: [components_access, components_config, components_respond, repository]
+    mayDependOn: [components_access, components_config, components_pages, components_respond, repository]
     canUse: [fiber, golang_jwt]
   components_database:
     mayDependOn: [components_config, pkg, migrations]
