@@ -16,7 +16,7 @@
   --status-bg:light-dark(#dafbe1,#10301b);--status-ink:light-dark(#116329,#7ee2a0);--status-line:light-dark(#aceebb,#1f5a33);
   --code-bg:light-dark(#f6f8fa,#0f141a);--code-key:light-dark(#0550ae,#79c0ff);--code-str:light-dark(#0a3069,#a5d6ff);
   --focus:var(--accent);
-  --r-sheet:16px;--r-ctl:8px;--frame:1040px;--narrow:560px;
+  --r-sheet:16px;--r-ctl:8px;--frame:1240px;--narrow:560px;
   --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif;
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
 }
