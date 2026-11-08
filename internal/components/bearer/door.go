@@ -17,32 +17,32 @@ const (
 	unauthenticatedMessage = "unauthenticated"
 )
 
-type keeper struct {
+type Keeper struct {
 	settings config.Settings
 	users    *repository.UserRepository
 }
 
-func Door(settings config.Settings, users *repository.UserRepository) fiber.Handler {
-	keeper := &keeper{settings: settings, users: users}
-
-	return func(ctx fiber.Ctx) error {
-		if !isUnderPath(ctx.Path(), apiPath) || ctx.Path() == apiSignInPath {
-			return ctx.Next()
-		}
-
-		principal, ok := keeper.toPrincipal(ctx)
-		if !ok {
-			ctx.Set(fiber.HeaderWWWAuthenticate, "Bearer")
-			return respond.Problem(ctx, fiber.StatusUnauthorized, unauthenticatedMessage)
-		}
-
-		access.GrantPrincipal(ctx, principal)
-
-		return ctx.Next()
-	}
+func NewKeeper(settings config.Settings, users *repository.UserRepository) *Keeper {
+	return &Keeper{settings: settings, users: users}
 }
 
-func (this *keeper) toPrincipal(ctx fiber.Ctx) (access.Principal, bool) {
+func (this *Keeper) Door(ctx fiber.Ctx) error {
+	if !isUnderPath(ctx.Path(), apiPath) || ctx.Path() == apiSignInPath {
+		return ctx.Next()
+	}
+
+	principal, ok := this.toPrincipal(ctx)
+	if !ok {
+		ctx.Set(fiber.HeaderWWWAuthenticate, "Bearer")
+		return respond.Problem(ctx, fiber.StatusUnauthorized, unauthenticatedMessage)
+	}
+
+	access.GrantPrincipal(ctx, principal)
+
+	return ctx.Next()
+}
+
+func (this *Keeper) toPrincipal(ctx fiber.Ctx) (access.Principal, bool) {
 	token, found := strings.CutPrefix(ctx.Get(fiber.HeaderAuthorization), bearerPrefix)
 	if !found {
 		return access.Principal{}, false

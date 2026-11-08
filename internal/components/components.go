@@ -1,6 +1,7 @@
 package components
 
 import (
+	"github.com/bidirekt/broker/internal/components/bearer"
 	"github.com/bidirekt/broker/internal/components/config"
 	"github.com/bidirekt/broker/internal/components/database"
 	"github.com/bidirekt/broker/internal/components/server"
@@ -28,8 +29,10 @@ func New() (*Components, error) {
 	if err != nil {
 		return nil, err
 	}
-	sessionKeeper := sessions.NewKeeper(settings, repository.NewSessionRepository(pool), repository.NewUserRepository(pool))
-	httpServer := server.New(settings, pool, sessionKeeper)
+	users := repository.NewUserRepository(pool)
+	sessionKeeper := sessions.NewKeeper(settings, repository.NewSessionRepository(pool), users)
+	bearerKeeper := bearer.NewKeeper(settings, users)
+	httpServer := server.New(settings, sessionKeeper, bearerKeeper)
 
 	if err := database.Migrate(pool); err != nil {
 		pool.Close()

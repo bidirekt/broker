@@ -213,7 +213,7 @@ deps:
     canUse: [fiber]
 
   components:
-    mayDependOn: [components_config, components_database, components_server, components_sessions, repository]
+    mayDependOn: [components_bearer, components_config, components_database, components_server, components_sessions, repository]
     canUse: [fiber, pgx]
   components_access:
     mayDependOn: [model]
@@ -238,8 +238,8 @@ deps:
     mayDependOn: [components_pages]
     canUse: [fiber]
   components_server:
-    mayDependOn: [components_bearer, components_config, components_input, components_pages, components_respond, components_sessions, repository]
-    canUse: [fiber, pgx]
+    mayDependOn: [components_bearer, components_config, components_input, components_pages, components_respond, components_sessions]
+    canUse: [fiber]
   components_sessions:
     mayDependOn: [components_access, components_config, components_pages, components_respond, components_tokens, repository, model]
     canUse: [fiber]
