@@ -39,7 +39,7 @@ func New() (*Components, error) {
 		return nil, err
 	}
 
-	if err := deleteStaleSessionsAndLinks(pool); err != nil {
+	if err := deleteExpiredCredentials(pool); err != nil {
 		pool.Close()
 		return nil, err
 	}

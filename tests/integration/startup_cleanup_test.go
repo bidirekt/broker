@@ -78,7 +78,7 @@ func (this *IntegrationSuite) TestStartup_GivesUpOnACleanupThatCannotGetItsLockA
 
 	select {
 	case err := <-finished:
-		this.ErrorContains(err, "failed to delete stale sessions and links")
+		this.ErrorContains(err, "failed to delete expired credentials")
 	case <-time.After(time.Minute):
 		this.Fail("the start-up cleanup still waits for the sessions lock")
 	}
