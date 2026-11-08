@@ -2,9 +2,11 @@ package update_profile
 
 import (
 	"embed"
+	"time"
 
 	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/components/pages"
+	"github.com/bidirekt/broker/internal/components/respond"
 	"github.com/bidirekt/broker/internal/components/sessions"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/gofiber/fiber/v3"
@@ -23,7 +25,12 @@ func NewUpdateProfileUiHandler(useCase *UpdateProfileUseCase, sessionKeeper *ses
 }
 
 func (this *UpdateProfileUiHandler) ShowForm(ctx fiber.Ctx) error {
-	return this.render(ctx, fiber.StatusOK, "", "")
+	page, ok := pages.RequestedPage(ctx, pageParam)
+	if !ok {
+		return respond.NotFound(ctx)
+	}
+
+	return this.render(ctx, fiber.StatusOK, page, "", "")
 }
 
 func (this *UpdateProfileUiHandler) UpdateProfile(ctx fiber.Ctx) error {
@@ -41,9 +48,9 @@ func (this *UpdateProfileUiHandler) UpdateProfile(ctx fiber.Ctx) error {
 
 	switch output.Status {
 	case CurrentPasswordWrong:
-		return this.render(ctx, fiber.StatusBadRequest, currentPasswordFormField, CurrentPasswordWrongMessage)
+		return this.render(ctx, fiber.StatusBadRequest, firstPage, currentPasswordFormField, CurrentPasswordWrongMessage)
 	case PasswordInvalid:
-		return this.render(ctx, fiber.StatusBadRequest, newPasswordFormField, PasswordInvalidMessage)
+		return this.render(ctx, fiber.StatusBadRequest, firstPage, newPasswordFormField, PasswordInvalidMessage)
 	}
 
 	this.sessionKeeper.AddMessage(ctx, model.MessageSuccess, PasswordChangedMessage)
@@ -51,16 +58,24 @@ func (this *UpdateProfileUiHandler) UpdateProfile(ctx fiber.Ctx) error {
 }
 
 func (this *UpdateProfileUiHandler) RespondTooManyAttempts(ctx fiber.Ctx) error {
-	return this.render(ctx, fiber.StatusTooManyRequests, "", TooManyProfileAttemptsMessage)
+	return this.render(ctx, fiber.StatusTooManyRequests, firstPage, "", TooManyProfileAttemptsMessage)
 }
 
-func (this *UpdateProfileUiHandler) render(ctx fiber.Ctx, status int, field, message string) error {
+func (this *UpdateProfileUiHandler) render(ctx fiber.Ctx, status int, page int64, field, message string) error {
 	principal, _ := access.PrincipalFrom(ctx)
+	apiKeys := this.useCase.ListAPIKeys(ctx.Context(), ListAPIKeysInput{UserID: principal.UserID, Page: page})
+	pager, ok := pages.NewPager(ctx, pageParam, page, apiKeys.Total)
+	if !ok {
+		return respond.NotFound(ctx)
+	}
+
 	return pages.Render(ctx, status, pageFiles, updateProfileTemplate, UpdateProfilePage{
 		Email:                 principal.Email,
 		Permission:            principal.Permission,
 		PermissionDescription: permissionDescriptions[principal.Permission],
 		Field:                 field,
 		Message:               message,
+		APIKeys:               toAPIKeyRows(apiKeys.Keys, principal.Permission, time.Now()),
+		Pager:                 pager,
 	})
 }

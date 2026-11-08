@@ -119,6 +119,7 @@ func (this *IntegrationSuite) SetupTest() {
 			environments,
 			sessions,
 			one_time_links,
+			api_keys,
 			users
 			RESTART IDENTITY CASCADE`,
 	)

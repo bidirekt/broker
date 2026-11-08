@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -10,7 +11,9 @@ import (
 
 	"github.com/bidirekt/broker/internal"
 	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/tokens"
 	"github.com/bidirekt/broker/internal/model"
+	"github.com/bidirekt/broker/internal/repository"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -34,6 +37,16 @@ func (this *IntegrationSuite) startProfileLimitedApp() *components.Components {
 	this.T().Cleanup(app.Pool.Close)
 
 	return app
+}
+
+func (this *IntegrationSuite) profileLimitCreateAPIKey(userID int64, name string) {
+	this.Require().True(repository.NewAPIKeyRepository(this.Pool).Create(context.Background(), &model.APIKey{
+		UserID:        userID,
+		KeyHash:       tokens.Hash(name),
+		DisplayPrefix: "bdk_" + name,
+		Name:          name,
+		Permission:    model.PermissionRead,
+	}))
 }
 
 func (this *IntegrationSuite) profileLimitSend(app *components.Components, req *http.Request, sessionCookie string) (status int, header http.Header, body string) {
@@ -87,8 +100,10 @@ func (this *IntegrationSuite) profileLimitChangePassword(app *components.Compone
 
 func (this *IntegrationSuite) TestUpdateProfileRateLimit_EleventhAttemptAfterTenWrongCurrentPasswordsIsRefusedForThatUserOnly() {
 	app := this.startProfileLimitedApp()
-	this.createActiveUser(profileLimitAnaEmail, model.PermissionRead, profileLimitPassword)
-	this.createActiveUser(profileLimitBiaEmail, model.PermissionRead, profileLimitPassword)
+	anaID := this.createActiveUser(profileLimitAnaEmail, model.PermissionRead, profileLimitPassword)
+	biaID := this.createActiveUser(profileLimitBiaEmail, model.PermissionRead, profileLimitPassword)
+	this.profileLimitCreateAPIKey(anaID, "anaKey01")
+	this.profileLimitCreateAPIKey(biaID, "biaKey01")
 	anaCookie, anaCSRFToken := this.profileLimitSignIn(app, profileLimitAnaEmail)
 	biaCookie, biaCSRFToken := this.profileLimitSignIn(app, profileLimitBiaEmail)
 
@@ -105,6 +120,8 @@ func (this *IntegrationSuite) TestUpdateProfileRateLimit_EleventhAttemptAfterTen
 	this.Contains(body, `<div class="mono">`+profileLimitAnaEmail+`</div>`)
 	this.Contains(body, `<span class="badge perm">read</span>`)
 	this.Contains(body, profileLimitReadDescription)
+	this.Contains(body, `<td data-l="Name">anaKey01</td>`)
+	this.NotContains(body, "biaKey01")
 
 	status, header, _ := this.profileLimitChangePassword(app, biaCookie, biaCSRFToken, profileLimitPassword)
 	this.Equal(http.StatusSeeOther, status)

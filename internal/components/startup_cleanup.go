@@ -12,18 +12,19 @@ import (
 
 const startupCleanupTimeout = 5 * time.Second
 
-func deleteStaleSessionsAndLinks(pool *pgxpool.Pool) (err error) {
+func deleteExpiredCredentials(pool *pgxpool.Pool) (err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), startupCleanupTimeout)
 	defer cancel()
 
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			err = fmt.Errorf("failed to delete stale sessions and links: %v", recovered)
+			err = fmt.Errorf("failed to delete expired credentials: %v", recovered)
 		}
 	}()
 
 	repository.NewSessionRepository(pool).DeleteExpired(ctx, sessions.IdleLimit, sessions.AbsoluteLimit)
 	repository.NewOneTimeLinkRepository(pool).DeleteUsedAndExpired(ctx)
+	repository.NewAPIKeyRepository(pool).DeleteExpired(ctx)
 
 	return nil
 }

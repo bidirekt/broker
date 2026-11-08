@@ -25,6 +25,7 @@
         {{if eq .Page.Field "new_password"}}<p class="err" id="new_password-err">{{template "icon_error" 14}}<span>{{.Page.Message}}</span></p>{{end}}
         <p class="hint">8 to 128 characters. A long passphrase works well.</p>
       </div>
+      <p class="hint">Changing your password doesn't revoke your API keys.</p>
     </div>
     <div class="form-foot"><button type="submit" class="btn primary">Change password</button></div>
   </form>
@@ -36,4 +37,41 @@
     </ul>
   </aside>
 </div>
+<section class="sheet" aria-labelledby="api-keys">
+  <div class="sheet-head"><h2 class="h2" id="api-keys">API keys</h2><a class="btn sm" href="/profile/api-keys/new">New API key</a></div>
+  {{if .Page.APIKeys}}
+  <div class="scroll"><table class="t stack">
+    <thead>
+      <tr>
+        <th scope="col">Name</th>
+        <th scope="col">Key</th>
+        <th scope="col">Permission</th>
+        <th scope="col">Created</th>
+        <th scope="col">Last used</th>
+        <th scope="col">Expires</th>
+        <th scope="col"><span class="sr">Actions</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Page.APIKeys}}
+      <tr>
+        <td data-l="Name">{{.Name}}</td>
+        <td data-l="Key"><span class="mono">{{.DisplayPrefix}}</span></td>
+        <td data-l="Permission"><span class="badge perm">{{.Permission}}</span>{{if .ActsAs}} <span class="muted">· acts as {{.ActsAs}}</span>{{end}}</td>
+        <td data-l="Created">{{listTime .CreatedAt}}</td>
+        <td data-l="Last used">{{if .LastUsedAt.Valid}}{{listTime .LastUsedAt.Time}}{{else}}never{{end}}</td>
+        <td data-l="Expires">{{if .Expired}}<span class="badge quiet">expired</span>{{else if .ExpiresAt.Valid}}{{expiryTime .ExpiresAt.Time}}{{else}}never{{end}}</td>
+        <td class="acts"><form method="post" action="/profile/api-keys/{{.ID}}/revoke"><button type="submit" class="btn sm danger">Revoke</button></form></td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table></div>
+  {{template "pager" .Page.Pager}}
+  {{else}}
+  <div class="empty">
+    <div class="ic">{{template "icon_terminal" 20}}</div>
+    <h2 class="h2">No API keys yet.</h2>
+  </div>
+  {{end}}
+</section>
 {{end}}

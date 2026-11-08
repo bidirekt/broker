@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"time"
 
@@ -157,7 +158,7 @@ func (this *IntegrationSuite) TestApiAuthentication_SendsATokenOnAnotherCaseOfTh
 		this.Run("GET "+path, func() {
 			status, header, _ := this.getWithToken(path, this.writerToken)
 			this.Equal(http.StatusSeeOther, status)
-			this.Equal("/sign-in", header.Get("Location"))
+			this.Equal("/sign-in?next="+url.QueryEscape(path), header.Get("Location"))
 		})
 
 		this.Run("POST "+path, func() {

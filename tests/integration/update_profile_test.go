@@ -26,6 +26,7 @@ const (
 	profileReadDescription      = "Sees every data screen and their own profile; runs can-i-deploy and validate."
 	profileWriteDescription     = "Everything read does, plus publishing contracts, recording deployments, and creating participants and environments, and renaming environments."
 	profileAdminDescription     = "Everything write can do, plus managing users. The only admin of this broker."
+	profileKeepsAPIKeys         = `<p class="hint">Changing your password doesn't revoke your API keys.</p>`
 )
 
 var profileResetLinkInPage = regexp.MustCompile(`http://localhost:8080/set-password\?token=([A-Za-z0-9_-]{43})`)
@@ -59,6 +60,7 @@ func (this *IntegrationSuite) TestUpdateProfile_PageAsksCurrentAndNewPassword() 
 	this.Contains(body, `action="/sign-out"`)
 	this.NotContains(body, `aria-invalid`)
 	this.NotContains(body, `role="alert"`)
+	this.Contains(body, profileKeepsAPIKeys)
 }
 
 func (this *IntegrationSuite) TestUpdateProfile_IdentityCardShowsEmailPermissionAndItsDescription() {
@@ -113,6 +115,7 @@ func (this *IntegrationSuite) TestUpdateProfile_WrongCurrentPassword_Answers400A
 	this.Contains(body, profileCurrentPasswordWrong)
 	this.Contains(body, `<div class="mono">`+profileUserEmail+`</div>`)
 	this.NotContains(body, `role="alert"`)
+	this.Contains(body, profileKeepsAPIKeys)
 	this.Equal(passwordHashBefore, this.profilePasswordHash(userID))
 }
 
@@ -165,7 +168,7 @@ func (this *IntegrationSuite) TestUpdateProfile_Success_EndsOtherSessionsAndKeep
 
 	status, header, _ = this.getPage("/profile", otherCookie)
 	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/sign-in", header.Get("Location"))
+	this.Equal("/sign-in?next=%2Fprofile", header.Get("Location"))
 
 	status, _, body := this.getPage("/profile", cookie)
 	this.Equal(http.StatusOK, status)
