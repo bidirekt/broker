@@ -17,18 +17,12 @@ const (
 	ParticipantNotFound
 )
 
-const allVersionsPageSize = 20
+const versionsPageSize = 5
 
 type ShowCompatibilityInput struct {
 	Participant      string
 	ParticipantGiven bool
-	Versions         VersionsFilter
-}
-
-type VersionsFilter struct {
-	All    bool
-	Latest int
-	Page   int64
+	Page             int64
 }
 
 type ReportedCheck struct {
@@ -77,7 +71,9 @@ func (this *ShowCompatibilityUseCase) Execute(ctx context.Context, input ShowCom
 		return ShowCompatibilityOutput{Status: ParticipantNotFound}
 	}
 
-	versions, versionsTotal := this.listVersions(ctx, participant.ID, input.Versions)
+	versions, versionsTotal := this.compatibilityPageRepository.ListVersions(
+		ctx, participant.ID, versionsPageSize, pages.OffsetOfSize(input.Page, versionsPageSize),
+	)
 	environments := this.compatibilityPageRepository.ListEnvironments(ctx)
 
 	output := ShowCompatibilityOutput{
@@ -93,18 +89,6 @@ func (this *ShowCompatibilityUseCase) Execute(ctx context.Context, input ShowCom
 	}
 
 	return output
-}
-
-func (this *ShowCompatibilityUseCase) listVersions(ctx context.Context, participantID int64, filter VersionsFilter) ([]model.PublishedVersion, int) {
-	if filter.All {
-		return this.compatibilityPageRepository.ListVersions(
-			ctx, participantID, allVersionsPageSize, pages.OffsetOfSize(filter.Page, allVersionsPageSize),
-		)
-	}
-
-	versions := this.compatibilityPageRepository.ListLatestVersions(ctx, participantID, filter.Latest)
-
-	return versions, len(versions)
 }
 
 func (this *ShowCompatibilityUseCase) listReportedChecks(ctx context.Context, participantID int64, versions []model.PublishedVersion) []ReportedCheck {

@@ -269,53 +269,24 @@ func (this *IntegrationSuite) TestShowCompatibility_CountsTheSameBreaksAsTheChec
 	this.Equal(checkCount[1], tableCount[1])
 }
 
-func (this *IntegrationSuite) TestShowCompatibility_LatestVersionsKeepOlderDeployedOnes() {
-	this.publishManyForShowCompatibility(12)
+func (this *IntegrationSuite) TestShowCompatibility_PagesFiveVersionsAtATime() {
+	this.publishManyForShowCompatibility(7)
 	this.deployForShowCompatibility("petstore_api", "1", "production")
 	cookie := this.signInAsAdmin()
 
-	status, _, body := this.getPage("/compatibility?participant=petstore_api", cookie)
-	this.Require().Equal(http.StatusOK, status, body)
-	this.Equal([]string{"12", "11", "10", "9", "8", "7", "6", "5", "4", "3", "1"}, this.rowVersionsForShowCompatibility(body))
-	this.Contains(body, `<span class="muted">· 11 versions</span>`)
-	this.Contains(body, `<option value="10" selected>last 10 versions</option>`)
-
-	status, _, body = this.getPage("/compatibility?participant=petstore_api&versions=5", cookie)
-	this.Require().Equal(http.StatusOK, status, body)
-	this.Equal([]string{"12", "11", "10", "9", "8", "1"}, this.rowVersionsForShowCompatibility(body))
-	this.Contains(body, `<option value="5" selected>last 5 versions</option>`)
-	this.Contains(body, `<option value="all">all versions, 20 per page</option>`)
-}
-
-func (this *IntegrationSuite) TestShowCompatibility_InvalidVersionsIsNotFound() {
-	this.publishManyForShowCompatibility(1)
-	cookie := this.signInAsAdmin()
-
-	for _, query := range []string{"versions=7", "versions=", "versions=ALL", "versions=010", "versions=10&page=2", "versions=abc"} {
-		status, _, _ := this.getPage("/compatibility?participant=petstore_api&"+query, cookie)
-		this.Equal(http.StatusNotFound, status, query)
-	}
-}
-
-func (this *IntegrationSuite) TestShowCompatibility_AllVersionsPagesTwentyAtATime() {
-	this.publishManyForShowCompatibility(25)
-	cookie := this.signInAsAdmin()
-
-	status, _, first := this.getPage("/compatibility?participant=petstore_api&versions=all", cookie)
+	status, _, first := this.getPage("/compatibility?participant=petstore_api", cookie)
 	this.Require().Equal(http.StatusOK, status, first)
-	this.Len(this.rowVersionsForShowCompatibility(first), 20)
-	this.Equal("25", this.rowVersionsForShowCompatibility(first)[0])
-	this.Contains(first, `<span class="muted">· 25 versions</span>`)
-	this.Contains(first, `<option value="all" selected>all versions, 20 per page</option>`)
-	this.Contains(first, `href="/compatibility?page=2&amp;participant=petstore_api&amp;versions=all" rel="next"`)
+	this.Equal([]string{"7", "6", "5", "4", "3"}, this.rowVersionsForShowCompatibility(first))
+	this.Contains(first, `<span class="muted">· 7 versions</span>`)
+	this.Contains(first, `href="/compatibility?page=2&amp;participant=petstore_api" rel="next"`)
 
-	status, _, second := this.getPage("/compatibility?participant=petstore_api&versions=all&page=2", cookie)
+	status, _, second := this.getPage("/compatibility?participant=petstore_api&page=2", cookie)
 	this.Require().Equal(http.StatusOK, status, second)
-	this.Equal([]string{"5", "4", "3", "2", "1"}, this.rowVersionsForShowCompatibility(second))
-	this.Contains(second, `href="/compatibility?page=1&amp;participant=petstore_api&amp;versions=all" rel="prev"`)
+	this.Equal([]string{"2", "1"}, this.rowVersionsForShowCompatibility(second))
+	this.Contains(second, `href="/compatibility?page=1&amp;participant=petstore_api" rel="prev"`)
 
 	for _, query := range []string{"page=3", "page=0", "page=01", "page=+1", "page=", "page=abc"} {
-		status, _, _ := this.getPage("/compatibility?participant=petstore_api&versions=all&"+query, cookie)
+		status, _, _ := this.getPage("/compatibility?participant=petstore_api&"+query, cookie)
 		this.Equal(http.StatusNotFound, status, query)
 	}
 }
@@ -332,7 +303,7 @@ func (this *IntegrationSuite) TestShowCompatibility_FooterIsNavigationOnly() {
 	this.NotContains(body, `showing `)
 }
 
-func (this *IntegrationSuite) TestShowCompatibility_FiltersKeepTheParticipantAndVersions() {
+func (this *IntegrationSuite) TestShowCompatibility_FiltersKeepTheParticipant() {
 	this.createForShowCompatibility([]string{"production"}, []string{"petstore_web", "petstore_api", "petstore_reviews"})
 
 	status, _, body := this.getPage("/compatibility?participant=petstore_api", this.signInAsAdmin())
@@ -340,9 +311,9 @@ func (this *IntegrationSuite) TestShowCompatibility_FiltersKeepTheParticipantAnd
 	this.Require().Equal(http.StatusOK, status, body)
 	this.Contains(body, `<form method="get" action="/compatibility" class="filters compact">`)
 	this.Contains(body, `<option value="petstore_api" selected>petstore_api</option><option value="petstore_reviews">petstore_reviews</option><option value="petstore_web">petstore_web</option>`)
-	this.Contains(body, `<option value="5">last 5 versions</option><option value="10" selected>last 10 versions</option><option value="20">last 20 versions</option><option value="50">last 50 versions</option><option value="all">all versions, 20 per page</option>`)
+	this.NotContains(body, `name="versions"`)
 	this.Contains(body, `<button type="submit" class="btn primary">Show</button>`)
-	this.Contains(body, `<p class="filters-note">Newest first. Versions deployed somewhere are always included, even if older.</p>`)
+	this.Contains(body, `<p class="filters-note">Newest first, 5 versions per page.</p>`)
 }
 
 func (this *IntegrationSuite) TestShowCompatibility_WithoutParticipantShowsTheFirstAlphabetically() {

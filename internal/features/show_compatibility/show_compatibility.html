@@ -27,15 +27,9 @@
         {{range .Participants}}<option value="{{.Name}}"{{if .Selected}} selected{{end}}>{{.Name}}</option>{{end}}
       </select>
     </div>
-    <div class="field">
-      <label for="versions">Versions</label>
-      <select class="select" id="versions" name="versions">
-        {{range .Versions}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
-      </select>
-    </div>
     <div><button type="submit" class="btn primary">Show</button></div>
   </form>
-  <p class="filters-note">Newest first. Versions deployed somewhere are always included, even if older.</p>
+  <p class="filters-note">Newest first, 5 versions per page.</p>
 </section>
 {{if not .Rows}}
 <section class="sheet">
