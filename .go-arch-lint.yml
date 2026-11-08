@@ -20,12 +20,14 @@ components:
   feature_list_environments:  { in: internal/features/list_environments }
   feature_list_participants:  { in: internal/features/list_participants }
   feature_list_participant_pages: { in: internal/features/list_participant_pages }
+  feature_list_user_api_keys: { in: internal/features/list_user_api_keys }
   feature_list_users:         { in: internal/features/list_users }
   feature_publish_contract:   { in: internal/features/publish_contract }
   feature_reactivate_user:    { in: internal/features/reactivate_user }
   feature_record_deployment:  { in: internal/features/record_deployment }
   feature_rename_environment: { in: internal/features/rename_environment }
   feature_revoke_api_key:     { in: internal/features/revoke_api_key }
+  feature_revoke_user_api_key: { in: internal/features/revoke_user_api_key }
   feature_set_password:       { in: internal/features/set_password }
   feature_setup_admin:        { in: internal/features/setup_admin }
   feature_show_check:         { in: internal/features/show_check }
@@ -94,12 +96,14 @@ deps:
       - feature_list_environments
       - feature_list_participants
       - feature_list_participant_pages
+      - feature_list_user_api_keys
       - feature_list_users
       - feature_publish_contract
       - feature_reactivate_user
       - feature_record_deployment
       - feature_rename_environment
       - feature_revoke_api_key
+      - feature_revoke_user_api_key
       - feature_set_password
       - feature_setup_admin
       - feature_show_check
@@ -154,6 +158,9 @@ deps:
   feature_list_participant_pages:
     mayDependOn: [components, components_access, components_pages, components_respond, repository, model]
     canUse: [fiber]
+  feature_list_user_api_keys:
+    mayDependOn: [components, components_access, components_pages, components_respond, repository, model]
+    canUse: [fiber, guregu_null]
   feature_list_users:
     mayDependOn: [components, components_access, components_pages, components_respond, repository, model]
     canUse: [fiber]
@@ -170,6 +177,9 @@ deps:
     mayDependOn: [components, components_access, components_pages, components_respond, components_sessions, repository, model, validations]
     canUse: [fiber]
   feature_revoke_api_key:
+    mayDependOn: [components, components_access, components_pages, components_respond, components_sessions, repository, model]
+    canUse: [fiber]
+  feature_revoke_user_api_key:
     mayDependOn: [components, components_access, components_pages, components_respond, components_sessions, repository, model]
     canUse: [fiber]
   feature_set_password:

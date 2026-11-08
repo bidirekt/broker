@@ -1,0 +1,47 @@
+{{define "title"}}API keys of {{.Page.Email}}{{end}}
+
+{{define "content"}}
+<nav class="crumbs" aria-label="Breadcrumbs"><a href="/users">users</a><span aria-hidden="true">/</span><span aria-current="page">{{.Page.Email}}</span></nav>
+<div class="head">
+  <div>
+    <h1>API keys of {{.Page.Email}}</h1>
+    <p class="sub">Keys this user created to call the broker from the CLI or CI.</p>
+  </div>
+</div>
+<section class="sheet" aria-label="API keys">
+  {{if .Page.APIKeys}}
+  <div class="scroll"><table class="t stack">
+    <thead>
+      <tr>
+        <th scope="col">Name</th>
+        <th scope="col">Key</th>
+        <th scope="col">Permission</th>
+        <th scope="col">Created</th>
+        <th scope="col">Last used</th>
+        <th scope="col">Expires</th>
+        <th scope="col"><span class="sr">Actions</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Page.APIKeys}}
+      <tr>
+        <td data-l="Name">{{.Name}}</td>
+        <td data-l="Key"><span class="mono">{{.DisplayPrefix}}</span></td>
+        <td data-l="Permission"><span class="badge perm">{{.Permission}}</span>{{if .ActsAs}} <span class="muted">· acts as {{.ActsAs}}</span>{{end}}</td>
+        <td data-l="Created">{{listTime .CreatedAt}}</td>
+        <td data-l="Last used">{{if .LastUsedAt.Valid}}{{listTime .LastUsedAt.Time}}{{else}}never{{end}}</td>
+        <td data-l="Expires">{{if .Expired}}<span class="badge quiet">expired</span>{{else if .ExpiresAt.Valid}}{{expiryTime .ExpiresAt.Time}}{{else}}never{{end}}</td>
+        <td class="acts"><form method="post" action="/users/{{$.Page.UserID}}/api-keys/{{.ID}}/revoke"><button type="submit" class="btn sm danger">Revoke</button></form></td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table></div>
+  {{template "pager" .Page.Pager}}
+  {{else}}
+  <div class="empty">
+    <div class="ic">{{template "icon_terminal" 20}}</div>
+    <h2 class="h2">No API keys yet.</h2>
+  </div>
+  {{end}}
+</section>
+{{end}}
