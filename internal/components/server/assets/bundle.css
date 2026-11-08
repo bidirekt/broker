@@ -381,9 +381,10 @@
 .ident .av{width:40px;height:40px;border-radius:50%;background:var(--raised);border:1px solid var(--border);display:grid;place-items:center;color:var(--muted);flex:none}
 
 /* ---------- form card + aside ---------- */
-.formgrid{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;align-items:start}
+.formgrid{display:grid;grid-template-columns:minmax(0,1fr);gap:20px}
 @media (min-width:860px){.formgrid{grid-template-columns:minmax(0,1fr) 320px}}
-.formcard .form{padding:20px;gap:18px}
+.formcard{display:flex;flex-direction:column}
+.formcard .form{flex:1;padding:20px;gap:18px}
 .formcard .input,.formcard .select{max-width:480px}
 .formcard .radios{max-width:480px}
 .formcard .form>.alert,.formcard .form>.warn{margin:-2px 0 2px}
