@@ -6,6 +6,7 @@ import (
 
 	"github.com/bidirekt/broker/internal/components/passwords"
 	"github.com/bidirekt/broker/internal/components/tokens"
+	"github.com/bidirekt/broker/internal/model"
 	"github.com/bidirekt/broker/internal/repository"
 	"github.com/bidirekt/broker/internal/validations"
 )
@@ -24,15 +25,10 @@ type SetPasswordInput struct {
 	Password string
 }
 
-type SetPasswordOutput struct {
-	Status    SetPasswordStatus
-	Email     string
-	ExpiresAt time.Time
-}
-
 type FindLinkOutput struct {
 	Status    SetPasswordStatus
 	Email     string
+	Purpose   model.LinkPurpose
 	ExpiresAt time.Time
 }
 
@@ -54,27 +50,28 @@ func (this *SetPasswordUseCase) FindLink(ctx context.Context, token string) Find
 		return FindLinkOutput{Status: LinkInvalid}
 	}
 
-	return FindLinkOutput{Status: LinkFound, Email: user.Email, ExpiresAt: link.ExpiresAt}
+	return FindLinkOutput{Status: LinkFound, Email: user.Email, Purpose: link.Purpose, ExpiresAt: link.ExpiresAt}
 }
 
-func (this *SetPasswordUseCase) Execute(ctx context.Context, input SetPasswordInput) (SetPasswordOutput, error) {
+func (this *SetPasswordUseCase) Execute(ctx context.Context, input SetPasswordInput) (FindLinkOutput, error) {
 	link := this.FindLink(ctx, input.Token)
 	if link.Status != LinkFound {
-		return SetPasswordOutput{Status: LinkInvalid}, nil
+		return link, nil
 	}
 
 	if validations.Password(input.Password) != nil {
-		return SetPasswordOutput{Status: PasswordInvalid, Email: link.Email, ExpiresAt: link.ExpiresAt}, nil
+		link.Status = PasswordInvalid
+		return link, nil
 	}
 
 	passwordHash, err := passwords.Hash(input.Password)
 	if err != nil {
-		return SetPasswordOutput{}, err
+		return FindLinkOutput{}, err
 	}
 
 	if !this.userRepository.SetPasswordWithLink(ctx, tokens.Hash(input.Token), passwordHash) {
-		return SetPasswordOutput{Status: LinkInvalid}, nil
+		return FindLinkOutput{Status: LinkInvalid}, nil
 	}
 
-	return SetPasswordOutput{Status: PasswordSet}, nil
+	return FindLinkOutput{Status: PasswordSet}, nil
 }

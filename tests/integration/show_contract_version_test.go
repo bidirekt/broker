@@ -457,5 +457,5 @@ func (this *IntegrationSuite) TestShowContractVersion_SignedOutIsRedirectedToSig
 	status, header, _ := this.getPage(contractVersionPath, "")
 
 	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/sign-in", header.Get("Location"))
+	this.Equal("/sign-in?next=%2Fparticipants%2Fversion_web%2Fversions%2Frelease%252F2.0", header.Get("Location"))
 }

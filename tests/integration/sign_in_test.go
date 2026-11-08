@@ -247,11 +247,11 @@ func (this *IntegrationSuite) TestSignIn_ExpiredSessionRedirectsFromHomeToSignIn
 
 	status, header, _ := this.getPage("/", cookie)
 	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/sign-in", header.Get("Location"))
+	this.Equal("/sign-in?next=%2F", header.Get("Location"))
 }
 
 func (this *IntegrationSuite) TestSignIn_HomeWithoutSessionRedirectsToSignIn() {
 	status, header, _ := this.getPage("/", "")
 	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/sign-in", header.Get("Location"))
+	this.Equal("/sign-in?next=%2F", header.Get("Location"))
 }

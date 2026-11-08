@@ -10,11 +10,9 @@ import (
 	"github.com/bidirekt/broker/internal/components/pages"
 	"github.com/bidirekt/broker/internal/components/respond"
 	"github.com/bidirekt/broker/internal/components/sessions"
-	"github.com/bidirekt/broker/internal/repository"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/helmet"
 	"github.com/gofiber/fiber/v3/middleware/recover"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // contracts of a few thousand resources do not fit fiber's 4 MiB default
@@ -44,7 +42,7 @@ func respondError(ctx fiber.Ctx, err error) error {
 	return respond.Problem(ctx, fiber.StatusInternalServerError, message)
 }
 
-func New(settings config.Settings, pool *pgxpool.Pool, sessionKeeper *sessions.Keeper) *fiber.App {
+func New(settings config.Settings, sessionKeeper *sessions.Keeper, bearerKeeper *bearer.Keeper) *fiber.App {
 	appConfig := fiber.Config{
 		BodyLimit:     publishBodyLimit,
 		ErrorHandler:  respondError,
@@ -68,7 +66,7 @@ func New(settings config.Settings, pool *pgxpool.Pool, sessionKeeper *sessions.K
 	server.Use(input.Door())
 	serveAssets(server)
 	server.Use(sessionKeeper.Door)
-	server.Use(bearer.Door(settings, repository.NewUserRepository(pool)))
+	server.Use(bearerKeeper.Door)
 
 	return server
 }

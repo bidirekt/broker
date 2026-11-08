@@ -30,6 +30,7 @@
           {{else}}
           <div class="actions">
             <a class="btn sm" href="/users/{{.ID}}/edit?page={{$.Page.Pager.Page}}">Edit</a>
+            <a class="btn sm" href="/users/{{.ID}}/api-keys">API keys</a>
             {{if eq .State "invited"}}
             <form method="post" action="/users/{{.ID}}/link"><button type="submit" class="btn sm">New invite link</button></form>
             {{else if eq .State "active"}}

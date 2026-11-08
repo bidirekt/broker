@@ -274,7 +274,7 @@ func (this *IntegrationSuite) TestShowParticipantVersions_SignedOutIsRedirectedT
 	status, header, _ := this.getPage("/participants/petstore_web", "")
 
 	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/sign-in", header.Get("Location"))
+	this.Equal("/sign-in?next=%2Fparticipants%2Fpetstore_web", header.Get("Location"))
 }
 
 func (this *IntegrationSuite) TestShowParticipantVersions_CountsOnlyTheParticipantsOwnRows() {
