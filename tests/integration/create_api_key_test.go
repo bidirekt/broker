@@ -167,6 +167,7 @@ func (this *IntegrationSuite) TestCreateAPIKey_FieldErrorsKeepTheValuesAndCreate
 		message    string
 	}{
 		{"", "read", "90", "name", "name is required"},
+		{"   ", "read", "90", "name", "name is required"},
 		{strings.Repeat("é", 101), "read", "90", "name", "name has at most 100 characters"},
 		{createAPIKeyName, "admin", "90", "permission", "choose read or write"},
 		{createAPIKeyName, "", "90", "permission", "choose read or write"},

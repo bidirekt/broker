@@ -2,6 +2,7 @@ package create_api_key
 
 import (
 	"context"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -58,7 +59,7 @@ func NewCreateAPIKeyUseCase(apiKeyRepository *repository.APIKeyRepository) *Crea
 }
 
 func (this *CreateAPIKeyUseCase) Execute(ctx context.Context, input CreateAPIKeyInput) (CreateAPIKeyOutput, error) {
-	if input.Name == "" {
+	if strings.TrimSpace(input.Name) == "" {
 		return CreateAPIKeyOutput{Status: NameMissing}, nil
 	}
 	if utf8.RuneCountInString(input.Name) > maxNameCharacters {
