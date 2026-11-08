@@ -239,7 +239,7 @@ func (this *IntegrationSuite) TestDeactivateUser_ConfirmsWithASessionMessageOnTh
 
 	_, _, users := this.getPage("/users", cookie)
 	this.Contains(users, deactivateUserNotice)
-	this.Contains(users, "<span>user deactivated: Ana@X.com</span>")
+	this.Contains(users, "<span>user deactivated: Ana@X.com — their sessions ended and their API keys were revoked</span>")
 
 	_, _, reloaded := this.getPage("/users", cookie)
 	this.NotContains(reloaded, deactivateUserNotice)

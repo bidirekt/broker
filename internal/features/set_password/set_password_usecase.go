@@ -6,6 +6,7 @@ import (
 
 	"github.com/bidirekt/broker/internal/components/passwords"
 	"github.com/bidirekt/broker/internal/components/tokens"
+	"github.com/bidirekt/broker/internal/model"
 	"github.com/bidirekt/broker/internal/repository"
 	"github.com/bidirekt/broker/internal/validations"
 )
@@ -27,6 +28,7 @@ type SetPasswordInput struct {
 type FindLinkOutput struct {
 	Status    SetPasswordStatus
 	Email     string
+	Purpose   model.LinkPurpose
 	ExpiresAt time.Time
 }
 
@@ -48,7 +50,7 @@ func (this *SetPasswordUseCase) FindLink(ctx context.Context, token string) Find
 		return FindLinkOutput{Status: LinkInvalid}
 	}
 
-	return FindLinkOutput{Status: LinkFound, Email: user.Email, ExpiresAt: link.ExpiresAt}
+	return FindLinkOutput{Status: LinkFound, Email: user.Email, Purpose: link.Purpose, ExpiresAt: link.ExpiresAt}
 }
 
 func (this *SetPasswordUseCase) Execute(ctx context.Context, input SetPasswordInput) (FindLinkOutput, error) {

@@ -2,11 +2,13 @@ package bearer
 
 import (
 	"strings"
+	"time"
 
 	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/components/config"
 	"github.com/bidirekt/broker/internal/components/pages"
 	"github.com/bidirekt/broker/internal/components/respond"
+	"github.com/bidirekt/broker/internal/components/tokens"
 	"github.com/bidirekt/broker/internal/repository"
 	"github.com/gofiber/fiber/v3"
 )
@@ -14,16 +16,19 @@ import (
 const (
 	apiSignInPath          = "/api/sign-in"
 	bearerPrefix           = "Bearer "
+	apiKeyPrefix           = "bdk_"
+	lastUsedResolution     = time.Minute
 	unauthenticatedMessage = "unauthenticated"
 )
 
 type Keeper struct {
 	settings config.Settings
 	users    *repository.UserRepository
+	apiKeys  *repository.APIKeyRepository
 }
 
-func NewKeeper(settings config.Settings, users *repository.UserRepository) *Keeper {
-	return &Keeper{settings: settings, users: users}
+func NewKeeper(settings config.Settings, users *repository.UserRepository, apiKeys *repository.APIKeyRepository) *Keeper {
+	return &Keeper{settings: settings, users: users, apiKeys: apiKeys}
 }
 
 func (this *Keeper) Door(ctx fiber.Ctx) error {
@@ -43,11 +48,37 @@ func (this *Keeper) Door(ctx fiber.Ctx) error {
 }
 
 func (this *Keeper) toPrincipal(ctx fiber.Ctx) (access.Principal, bool) {
-	token, found := strings.CutPrefix(ctx.Get(fiber.HeaderAuthorization), bearerPrefix)
+	credential, found := strings.CutPrefix(ctx.Get(fiber.HeaderAuthorization), bearerPrefix)
 	if !found {
 		return access.Principal{}, false
 	}
 
+	if strings.HasPrefix(credential, apiKeyPrefix) {
+		return this.apiKeyToPrincipal(ctx, credential)
+	}
+
+	return this.tokenToPrincipal(ctx, credential)
+}
+
+func (this *Keeper) apiKeyToPrincipal(ctx fiber.Ctx, key string) (access.Principal, bool) {
+	apiKey, owner, found := this.apiKeys.FindByHash(ctx.Context(), tokens.Hash(key))
+	if !found || apiKey.ExpiresAt.Valid && !apiKey.ExpiresAt.Time.After(time.Now()) {
+		return access.Principal{}, false
+	}
+
+	principal, ok := access.PrincipalCappedBy(owner, apiKey.Permission)
+	if !ok {
+		return access.Principal{}, false
+	}
+
+	if !apiKey.LastUsedAt.Valid || time.Since(apiKey.LastUsedAt.Time) > lastUsedResolution {
+		this.apiKeys.MarkUsed(ctx.Context(), apiKey.ID)
+	}
+
+	return principal, true
+}
+
+func (this *Keeper) tokenToPrincipal(ctx fiber.Ctx, token string) (access.Principal, bool) {
 	userID, valid := UserIDFrom(this.settings, token)
 	if !valid {
 		return access.Principal{}, false

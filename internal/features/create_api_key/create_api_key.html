@@ -1,0 +1,67 @@
+{{define "title"}}{{if .Page.Key}}API key created{{else}}New API key{{end}}{{end}}
+
+{{define "content"}}
+<nav class="crumbs" aria-label="Breadcrumbs"><a href="/profile">profile</a><span aria-hidden="true">/</span><span aria-current="page">new API key</span></nav>
+{{if .Page.Key}}
+<div class="head"><h1>API key created</h1></div>
+<section class="sheet">
+<div class="pad form">
+  <div class="secret">
+    <p>Copy it now, it won't be shown again.</p>
+    <input class="copy" type="text" readonly value="{{.Page.Key}}" aria-label="API key">
+    <p class="hint">Click the field and press Cmd/Ctrl + A, then copy. Lost it? Revoke it on your Profile and create a new one.</p>
+  </div>
+  <div class="actions">
+    <a class="btn primary" href="/profile">Back to profile</a>
+  </div>
+</div>
+</section>
+{{else}}
+<div class="head">
+  <div>
+    <h1>New API key</h1>
+    <p class="sub">The CLI and CI use it to talk to this broker as you.</p>
+  </div>
+</div>
+<div class="formgrid">
+  <form class="sheet formcard" method="post" action="/profile/api-keys/new">
+    <div class="form">
+      <div class="field">
+        <label for="name">Name</label>
+        <input class="input" id="name" name="name" type="text" autocomplete="off" value="{{.Page.Name}}" required{{if not .Page.Field}} autofocus{{end}}{{if eq .Page.Field "name"}} autofocus aria-invalid="true" aria-describedby="name-err"{{end}}>
+        {{if eq .Page.Field "name"}}<p class="err" id="name-err">{{template "icon_error" 14}}<span>{{.Page.Message}}</span></p>{{end}}
+        <p class="hint">Say where it runs, like “laptop” or “payments CI”.</p>
+      </div>
+      <div class="field">
+        <span class="lbl" id="permission-label">Permission</span>
+        <div class="radios" role="radiogroup" aria-labelledby="permission-label"{{if eq .Page.Field "permission"}} aria-invalid="true" aria-describedby="permission-err"{{end}}>
+          <label class="radio"><input type="radio" name="permission" value="read" required{{if eq .Page.Permission "read"}} checked{{end}}{{if eq .Page.Field "permission"}} autofocus{{end}}><span><span class="mono">read</span><small>Runs can-i-deploy and validate.</small></span></label>
+          {{if $.CanWrite}}<label class="radio"><input type="radio" name="permission" value="write" required{{if eq .Page.Permission "write"}} checked{{end}}><span><span class="mono">write</span><small>Everything read does, plus publishing contracts, recording deployments, and creating participants and environments, and renaming environments.</small></span></label>{{end}}
+        </div>
+        {{if eq .Page.Field "permission"}}<p class="err" id="permission-err">{{template "icon_error" 14}}<span>{{.Page.Message}}</span></p>{{end}}
+        <p class="hint">A key never does more than you can.</p>
+      </div>
+      <div class="field">
+        <span class="lbl" id="expiration-label">Expires</span>
+        <div class="radios" role="radiogroup" aria-labelledby="expiration-label"{{if eq .Page.Field "expiration"}} aria-invalid="true" aria-describedby="expiration-err"{{end}}>
+          <label class="radio"><input type="radio" name="expiration" value="30" required{{if eq .Page.Expiration "30"}} checked{{end}}{{if eq .Page.Field "expiration"}} autofocus{{end}}><span>in 30 days</span></label>
+          <label class="radio"><input type="radio" name="expiration" value="90" required{{if eq .Page.Expiration "90"}} checked{{end}}><span>in 90 days</span></label>
+          <label class="radio"><input type="radio" name="expiration" value="365" required{{if eq .Page.Expiration "365"}} checked{{end}}><span>in 365 days</span></label>
+          <label class="radio"><input type="radio" name="expiration" value="never" required{{if eq .Page.Expiration "never"}} checked{{end}}><span>never</span></label>
+        </div>
+        {{if eq .Page.Field "expiration"}}<p class="err" id="expiration-err">{{template "icon_error" 14}}<span>{{.Page.Message}}</span></p>{{end}}
+      </div>
+    </div>
+    <div class="form-foot"><button type="submit" class="btn primary">Create API key</button><a class="btn" href="/profile">Cancel</a></div>
+  </form>
+  <aside class="sheet aside" aria-label="About API keys">
+    <h2>About API keys</h2>
+    <ul>
+      <li>You see the key once, right after you create it.</li>
+      <li>Run <code>bidirekt login</code> and paste it there.</li>
+      <li>Revoke it on your Profile whenever you want.</li>
+    </ul>
+  </aside>
+</div>
+{{end}}
+{{end}}

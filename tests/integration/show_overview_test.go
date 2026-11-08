@@ -261,6 +261,7 @@ func (this *IntegrationSuite) TestShowOverview_EmptyBrokerShowsTheCliStepsInOrde
 	this.Contains(body, `<div><b>0</b><span>environments</span></div>`)
 
 	steps := []string{
+		`<li><p><a href="/profile/api-keys/new">Create an API key in your Profile</a>, then run <code>bidirekt login</code>.</p></li>`,
 		`<code class="cmd">bidirekt create-participant</code>`,
 		`<code class="cmd">bidirekt create-environment</code>`,
 		`<code class="cmd">bidirekt publish</code>`,
@@ -268,9 +269,11 @@ func (this *IntegrationSuite) TestShowOverview_EmptyBrokerShowsTheCliStepsInOrde
 		`<li><p>Deploy the version with your own pipeline.</p></li>`,
 		`<code class="cmd">bidirekt record-deployment</code>`,
 	}
-	for index := 1; index < len(steps); index++ {
-		this.Require().Contains(body, steps[index])
-		this.Less(strings.Index(body, steps[index-1]), strings.Index(body, steps[index]), steps[index])
+	for index, step := range steps {
+		this.Require().Contains(body, step)
+		if index > 0 {
+			this.Less(strings.Index(body, steps[index-1]), strings.Index(body, step), step)
+		}
 	}
 
 	this.Contains(body, `<a class="btn" href="/participants/new-participant">Create participant</a>`)

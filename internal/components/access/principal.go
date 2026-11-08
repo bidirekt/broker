@@ -27,11 +27,20 @@ type principalKey struct{}
 type sessionKey struct{}
 
 func PrincipalOf(user *model.User) (Principal, bool) {
+	return PrincipalCappedBy(user, user.Permission)
+}
+
+func PrincipalCappedBy(user *model.User, ceiling model.Permission) (Principal, bool) {
 	if user.State() != model.UserActive {
 		return Principal{}, false
 	}
 
-	return Principal{UserID: user.ID, Email: user.Email, Permission: user.Permission}, true
+	permission := user.Permission
+	if !ceiling.Includes(permission) {
+		permission = ceiling
+	}
+
+	return Principal{UserID: user.ID, Email: user.Email, Permission: permission}, true
 }
 
 func (this Principal) ManagesUsers() bool {

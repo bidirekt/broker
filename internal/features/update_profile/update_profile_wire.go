@@ -1,6 +1,12 @@
 package update_profile
 
-import "github.com/bidirekt/broker/internal/model"
+import (
+	"time"
+
+	"github.com/bidirekt/broker/internal/components/pages"
+	"github.com/bidirekt/broker/internal/model"
+	"github.com/guregu/null"
+)
 
 const (
 	PasswordChangedMessage        string = "password changed"
@@ -12,6 +18,10 @@ const (
 	newPasswordFormField     = "new_password"
 
 	profilePath = "/profile"
+	pageParam   = "page"
+	firstPage   = 1
+
+	displayPrefixEllipsis = "…"
 
 	updateProfileTemplate = "update_profile.html"
 )
@@ -28,4 +38,40 @@ type UpdateProfilePage struct {
 	PermissionDescription string
 	Field                 string
 	Message               string
+	APIKeys               []APIKeyRow
+	Pager                 pages.Pager
+}
+
+type APIKeyRow struct {
+	ID            int64
+	Name          string
+	DisplayPrefix string
+	Permission    model.Permission
+	ActsAs        model.Permission
+	CreatedAt     time.Time
+	LastUsedAt    null.Time
+	ExpiresAt     null.Time
+	Expired       bool
+}
+
+func newAPIKeyRows(keys []*model.APIKey, ownerPermission model.Permission, now time.Time) []APIKeyRow {
+	rows := make([]APIKeyRow, 0, len(keys))
+	for _, key := range keys {
+		row := APIKeyRow{
+			ID:            key.ID,
+			Name:          key.Name,
+			DisplayPrefix: key.DisplayPrefix + displayPrefixEllipsis,
+			Permission:    key.Permission,
+			CreatedAt:     key.CreatedAt,
+			LastUsedAt:    key.LastUsedAt,
+			ExpiresAt:     key.ExpiresAt,
+			Expired:       key.ExpiresAt.Valid && !now.Before(key.ExpiresAt.Time),
+		}
+		if !ownerPermission.Includes(key.Permission) {
+			row.ActsAs = ownerPermission
+		}
+		rows = append(rows, row)
+	}
+
+	return rows
 }

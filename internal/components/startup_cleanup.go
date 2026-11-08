@@ -24,6 +24,7 @@ func deleteExpiredCredentials(pool *pgxpool.Pool) (err error) {
 
 	repository.NewSessionRepository(pool).DeleteExpired(ctx, sessions.IdleLimit, sessions.AbsoluteLimit)
 	repository.NewOneTimeLinkRepository(pool).DeleteUsedAndExpired(ctx)
+	repository.NewAPIKeyRepository(pool).DeleteExpired(ctx)
 
 	return nil
 }

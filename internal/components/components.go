@@ -31,7 +31,7 @@ func New() (*Components, error) {
 	}
 	users := repository.NewUserRepository(pool)
 	sessionKeeper := sessions.NewKeeper(settings, repository.NewSessionRepository(pool), users)
-	bearerKeeper := bearer.NewKeeper(settings, users)
+	bearerKeeper := bearer.NewKeeper(settings, users, repository.NewAPIKeyRepository(pool))
 	httpServer := server.New(settings, sessionKeeper, bearerKeeper)
 
 	if err := database.Migrate(pool); err != nil {

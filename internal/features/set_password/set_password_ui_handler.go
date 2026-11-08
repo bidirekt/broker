@@ -7,6 +7,7 @@ import (
 	"github.com/bidirekt/broker/internal/components/pages"
 	"github.com/bidirekt/broker/internal/components/respond"
 	"github.com/bidirekt/broker/internal/components/sessions"
+	"github.com/bidirekt/broker/internal/model"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -71,6 +72,7 @@ func (this *SetPasswordUiHandler) render(ctx fiber.Ctx, status int, token string
 		Token:     token,
 		Email:     link.Email,
 		ExpiresAt: link.ExpiresAt,
+		IsReset:   link.Purpose == model.LinkPurposeReset,
 		Field:     field,
 		Message:   message,
 	})

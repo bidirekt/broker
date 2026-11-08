@@ -7,6 +7,7 @@ import (
 	"github.com/bidirekt/broker/internal"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/bidirekt/broker/internal/repository"
+	"github.com/guregu/null"
 )
 
 func (this *IntegrationSuite) TestStartup_DeletesExpiredSessionsAndLinksAndKeepsTheAdminSession() {
@@ -56,6 +57,39 @@ func (this *IntegrationSuite) TestStartup_DeletesExpiredSessionsAndLinksAndKeeps
 
 	this.Equal(1, this.countRows("one_time_links"))
 	_, _, found = links.FindUsable(ctx, []byte("ana-open-link"))
+	this.True(found)
+}
+
+func (this *IntegrationSuite) TestStartup_DeletesExpiredAPIKeysAndKeepsTheOnesThatNeverExpire() {
+	ctx := context.Background()
+	apiKeys := repository.NewAPIKeyRepository(this.Pool)
+	userID := this.createActiveUser("kai@x.com", model.PermissionWrite, "kai-correct-horse-battery")
+
+	for hash, expiresAt := range map[string]null.Time{
+		"kai-expired-key":  null.TimeFrom(time.Now().Add(-time.Minute)),
+		"kai-eternal-key":  {},
+		"kai-upcoming-key": null.TimeFrom(time.Now().Add(time.Hour)),
+	} {
+		this.Require().True(apiKeys.Create(ctx, &model.APIKey{
+			UserID:        userID,
+			KeyHash:       []byte(hash),
+			DisplayPrefix: "bdk_" + hash[:8],
+			Name:          hash,
+			Permission:    model.PermissionRead,
+			ExpiresAt:     expiresAt,
+		}))
+	}
+
+	restarted, err := internal.Run()
+	this.Require().NoError(err)
+	restarted.Pool.Close()
+
+	this.Equal(2, this.countRows("api_keys"))
+	_, _, found := apiKeys.FindByHash(ctx, []byte("kai-expired-key"))
+	this.False(found)
+	_, _, found = apiKeys.FindByHash(ctx, []byte("kai-eternal-key"))
+	this.True(found)
+	_, _, found = apiKeys.FindByHash(ctx, []byte("kai-upcoming-key"))
 	this.True(found)
 }
 
