@@ -29,11 +29,7 @@ func (this *SetPasswordUiHandler) ShowForm(ctx fiber.Ctx) error {
 		return this.respondLinkInvalid(ctx)
 	}
 
-	return pages.Render(ctx, fiber.StatusOK, pageFiles, setPasswordTemplate, SetPasswordPage{
-		Token:     token,
-		Email:     link.Email,
-		ExpiresAt: link.ExpiresAt,
-	})
+	return this.render(ctx, fiber.StatusOK, token, link, "", "")
 }
 
 func (this *SetPasswordUiHandler) SetPassword(ctx fiber.Ctx) error {
@@ -52,13 +48,7 @@ func (this *SetPasswordUiHandler) SetPassword(ctx fiber.Ctx) error {
 
 	switch output.Status {
 	case PasswordInvalid:
-		return pages.Render(ctx, fiber.StatusBadRequest, pageFiles, setPasswordTemplate, SetPasswordPage{
-			Token:     token,
-			Email:     output.Email,
-			ExpiresAt: output.ExpiresAt,
-			Field:     passwordFormField,
-			Message:   PasswordInvalidMessage,
-		})
+		return this.render(ctx, fiber.StatusBadRequest, token, output, passwordFormField, PasswordInvalidMessage)
 	case LinkInvalid:
 		return this.respondLinkInvalid(ctx)
 	}
@@ -73,5 +63,15 @@ func (this *SetPasswordUiHandler) respondForbidden(ctx fiber.Ctx) error {
 func (this *SetPasswordUiHandler) respondLinkInvalid(ctx fiber.Ctx) error {
 	return pages.Render(ctx, fiber.StatusGone, pageFiles, linkInvalidTemplate, LinkInvalidPage{
 		Message: LinkInvalidMessage,
+	})
+}
+
+func (this *SetPasswordUiHandler) render(ctx fiber.Ctx, status int, token string, link FindLinkOutput, field, message string) error {
+	return pages.Render(ctx, status, pageFiles, setPasswordTemplate, SetPasswordPage{
+		Token:     token,
+		Email:     link.Email,
+		ExpiresAt: link.ExpiresAt,
+		Field:     field,
+		Message:   message,
 	})
 }
