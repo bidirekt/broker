@@ -9,6 +9,7 @@ import (
 	"github.com/bidirekt/broker/internal/components/pages"
 	"github.com/bidirekt/broker/internal/components/respond"
 	"github.com/bidirekt/broker/internal/components/tokens"
+	"github.com/bidirekt/broker/internal/model"
 	"github.com/bidirekt/broker/internal/repository"
 	"github.com/gofiber/fiber/v3"
 )
@@ -16,7 +17,6 @@ import (
 const (
 	apiSignInPath          = "/api/sign-in"
 	bearerPrefix           = "Bearer "
-	apiKeyPrefix           = "bdk_"
 	lastUsedResolution     = time.Minute
 	unauthenticatedMessage = "unauthenticated"
 )
@@ -53,7 +53,7 @@ func (this *Keeper) toPrincipal(ctx fiber.Ctx) (access.Principal, bool) {
 		return access.Principal{}, false
 	}
 
-	if strings.HasPrefix(credential, apiKeyPrefix) {
+	if strings.HasPrefix(credential, model.APIKeyPrefix) {
 		return this.apiKeyToPrincipal(ctx, credential)
 	}
 
@@ -62,7 +62,7 @@ func (this *Keeper) toPrincipal(ctx fiber.Ctx) (access.Principal, bool) {
 
 func (this *Keeper) apiKeyToPrincipal(ctx fiber.Ctx, key string) (access.Principal, bool) {
 	apiKey, owner, found := this.apiKeys.FindByHash(ctx.Context(), tokens.Hash(key))
-	if !found || apiKey.ExpiresAt.Valid && !apiKey.ExpiresAt.Time.After(time.Now()) {
+	if !found || apiKey.IsExpiredAt(time.Now()) {
 		return access.Principal{}, false
 	}
 

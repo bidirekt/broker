@@ -185,10 +185,10 @@ func (this *IntegrationSuite) TestApiKeyAuthentication_NeverLogsTheKeyOrItsHash(
 	this.apiKeyAuthenticationWrite(readKey)
 	this.apiKeyAuthenticationRead(expiredKey)
 	this.apiKeyAuthenticationWrite(unknownKey)
-	req := httptest.NewRequest(http.MethodPost, "/api/contracts", strings.NewReader(`{"participant":`))
-	req.Header.Set("Content-Type", "application/json")
-	this.sendApiRequest(req, readKey)
+	status, _, _ := this.sendApiRequest(httptest.NewRequest(http.MethodPut, apiKeyAuthenticationParticipants, nil), readKey)
+	this.Equal(http.StatusMethodNotAllowed, status)
 
+	this.Require().Contains(logged.String(), "failed")
 	for _, key := range []string{readKey, expiredKey, unknownKey} {
 		hash := tokens.Hash(key)
 		for _, secret := range []string{key, strings.TrimPrefix(key, "bdk_"), hex.EncodeToString(hash), base64.StdEncoding.EncodeToString(hash), base64.RawURLEncoding.EncodeToString(hash)} {

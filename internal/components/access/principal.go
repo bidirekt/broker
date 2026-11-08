@@ -35,12 +35,7 @@ func PrincipalCappedBy(user *model.User, ceiling model.Permission) (Principal, b
 		return Principal{}, false
 	}
 
-	permission := user.Permission
-	if !ceiling.Includes(permission) {
-		permission = ceiling
-	}
-
-	return Principal{UserID: user.ID, Email: user.Email, Permission: permission}, true
+	return Principal{UserID: user.ID, Email: user.Email, Permission: user.Permission.CappedBy(ceiling)}, true
 }
 
 func (this Principal) ManagesUsers() bool {

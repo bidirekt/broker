@@ -54,7 +54,7 @@ type APIKeyRow struct {
 	Expired       bool
 }
 
-func newAPIKeyRows(keys []*model.APIKey, ownerPermission model.Permission, now time.Time) []APIKeyRow {
+func toAPIKeyRows(keys []*model.APIKey, ownerPermission model.Permission, now time.Time) []APIKeyRow {
 	rows := make([]APIKeyRow, 0, len(keys))
 	for _, key := range keys {
 		row := APIKeyRow{
@@ -65,10 +65,10 @@ func newAPIKeyRows(keys []*model.APIKey, ownerPermission model.Permission, now t
 			CreatedAt:     key.CreatedAt,
 			LastUsedAt:    key.LastUsedAt,
 			ExpiresAt:     key.ExpiresAt,
-			Expired:       key.ExpiresAt.Valid && !now.Before(key.ExpiresAt.Time),
+			Expired:       key.IsExpiredAt(now),
 		}
-		if !ownerPermission.Includes(key.Permission) {
-			row.ActsAs = ownerPermission
+		if capped := key.Permission.CappedBy(ownerPermission); capped != key.Permission {
+			row.ActsAs = capped
 		}
 		rows = append(rows, row)
 	}

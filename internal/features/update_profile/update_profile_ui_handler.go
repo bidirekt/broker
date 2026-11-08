@@ -75,7 +75,7 @@ func (this *UpdateProfileUiHandler) render(ctx fiber.Ctx, status int, page int64
 		PermissionDescription: permissionDescriptions[principal.Permission],
 		Field:                 field,
 		Message:               message,
-		APIKeys:               newAPIKeyRows(apiKeys.Keys, principal.Permission, time.Now()),
+		APIKeys:               toAPIKeyRows(apiKeys.Keys, principal.Permission, time.Now()),
 		Pager:                 pager,
 	})
 }

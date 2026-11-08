@@ -59,6 +59,13 @@ func apiKeyRepositoryNamesOf(keys []*model.APIKey) (names []string) {
 	return names
 }
 
+func (this *IntegrationSuite) apiKeyRepositoryLastUsedAt(keyID int64) (lastUsedAt null.Time) {
+	err := this.Pool.QueryRow(context.Background(), `SELECT last_used_at FROM api_keys WHERE id = $1`, keyID).Scan(&lastUsedAt)
+	this.Require().NoError(err)
+
+	return lastUsedAt
+}
+
 func (this *IntegrationSuite) TestAPIKeyRepository_Create_StoresTheKeyFoundByItsHashWithItsOwner() {
 	ctx := context.Background()
 	repo := repository.NewAPIKeyRepository(this.Pool)
@@ -307,6 +314,35 @@ func (this *IntegrationSuite) TestAPIKeyRepository_MarkUsed_SetsLastUsedAtOfThat
 	unused, _, found := repo.FindByHash(ctx, []byte("ana-ci-hash"))
 	this.Require().True(found)
 	this.False(unused.LastUsedAt.Valid)
+}
+
+func (this *IntegrationSuite) TestAPIKeyRepository_MarkUsedWithinAMinuteOfTheLastUse_LeavesLastUsedAtUnchanged() {
+	ctx := context.Background()
+	repo := repository.NewAPIKeyRepository(this.Pool)
+	userID := this.apiKeyRepositoryCreateUser("ana@x.com", model.PermissionWrite)
+	key := apiKeyRepositoryKey("ana-laptop", userID, model.PermissionWrite)
+	this.Require().True(repo.Create(ctx, key))
+	_, err := this.Pool.Exec(ctx, `UPDATE api_keys SET last_used_at = now() - interval '30 seconds' WHERE id = $1`, key.ID)
+	this.Require().NoError(err)
+	lastUse := this.apiKeyRepositoryLastUsedAt(key.ID)
+
+	repo.MarkUsed(ctx, key.ID)
+
+	this.True(lastUse.Time.Equal(this.apiKeyRepositoryLastUsedAt(key.ID).Time))
+}
+
+func (this *IntegrationSuite) TestAPIKeyRepository_MarkUsedMoreThanAMinuteAfterTheLastUse_SetsLastUsedAtToNow() {
+	ctx := context.Background()
+	repo := repository.NewAPIKeyRepository(this.Pool)
+	userID := this.apiKeyRepositoryCreateUser("ana@x.com", model.PermissionWrite)
+	key := apiKeyRepositoryKey("ana-laptop", userID, model.PermissionWrite)
+	this.Require().True(repo.Create(ctx, key))
+	_, err := this.Pool.Exec(ctx, `UPDATE api_keys SET last_used_at = now() - interval '2 minutes' WHERE id = $1`, key.ID)
+	this.Require().NoError(err)
+
+	repo.MarkUsed(ctx, key.ID)
+
+	this.WithinDuration(time.Now(), this.apiKeyRepositoryLastUsedAt(key.ID).Time, 5*time.Second)
 }
 
 func (this *IntegrationSuite) TestAPIKeyRepository_DeleteExpired_DeletesKeysPastTheirExpiryAndKeepsTheOthers() {

@@ -12,7 +12,6 @@ import (
 )
 
 const (
-	keyPrefix             = "bdk_"
 	displayedRandomLength = 8
 	maxNameCharacters     = 100
 	day                   = 24 * time.Hour
@@ -84,11 +83,11 @@ func (this *CreateAPIKeyUseCase) Execute(ctx context.Context, input CreateAPIKey
 		return CreateAPIKeyOutput{}, err
 	}
 
-	key := keyPrefix + random
+	key := model.APIKeyPrefix + random
 	if !this.apiKeyRepository.Create(ctx, &model.APIKey{
 		UserID:        input.UserID,
 		KeyHash:       tokens.Hash(key),
-		DisplayPrefix: keyPrefix + random[:displayedRandomLength],
+		DisplayPrefix: model.APIKeyPrefix + random[:displayedRandomLength],
 		Name:          input.Name,
 		Permission:    permission,
 		ExpiresAt:     expiresAt,
