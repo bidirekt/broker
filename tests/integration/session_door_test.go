@@ -71,7 +71,7 @@ func (this *IntegrationSuite) createDoorUser(active bool) (userID int64) {
 func (this *IntegrationSuite) TestSessionDoor_WithoutCookie_RedirectsToSignIn() {
 	status, header, _ := this.sendThroughDoor(doorRequest{method: "GET", path: doorUnknownPage})
 	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/sign-in", header.Get("Location"))
+	this.Equal("/sign-in?next=%2Fno-such-page-behind-the-door", header.Get("Location"))
 }
 
 func (this *IntegrationSuite) TestSessionDoor_HtmxRequestWithoutCookie_AnswersHXRedirect() {
@@ -79,14 +79,14 @@ func (this *IntegrationSuite) TestSessionDoor_HtmxRequestWithoutCookie_AnswersHX
 		method: "GET", path: doorUnknownPage, headers: map[string]string{"HX-Request": "true"},
 	})
 	this.Equal(http.StatusOK, status)
-	this.Equal("/sign-in", header.Get("HX-Redirect"))
+	this.Equal("/sign-in?next=%2Fno-such-page-behind-the-door", header.Get("HX-Redirect"))
 	this.Empty(header.Get("Location"))
 }
 
 func (this *IntegrationSuite) TestSessionDoor_UnknownCookie_RedirectsToSignIn() {
 	status, header, _ := this.sendThroughDoor(doorRequest{method: "GET", path: doorUnknownPage, cookie: "never-issued"})
 	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/sign-in", header.Get("Location"))
+	this.Equal("/sign-in?next=%2Fno-such-page-behind-the-door", header.Get("Location"))
 }
 
 func (this *IntegrationSuite) TestSessionDoor_ActiveUserSession_PassesTheDoorAndBumpsLastSeen() {
@@ -120,7 +120,7 @@ func (this *IntegrationSuite) TestSessionDoor_IdleSession_RedirectsAndIsDeleted(
 
 	status, header, _ := this.sendThroughDoor(doorRequest{method: "GET", path: doorUnknownPage, cookie: doorSessionCookie})
 	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/sign-in", header.Get("Location"))
+	this.Equal("/sign-in?next=%2Fno-such-page-behind-the-door", header.Get("Location"))
 	this.Equal(0, this.countRows("sessions"))
 }
 
@@ -131,7 +131,7 @@ func (this *IntegrationSuite) TestSessionDoor_SessionOlderThanSevenDays_Redirect
 
 	status, header, _ := this.sendThroughDoor(doorRequest{method: "GET", path: doorUnknownPage, cookie: doorSessionCookie})
 	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/sign-in", header.Get("Location"))
+	this.Equal("/sign-in?next=%2Fno-such-page-behind-the-door", header.Get("Location"))
 }
 
 func (this *IntegrationSuite) TestSessionDoor_DeactivatedUserSession_Redirects() {
@@ -139,7 +139,7 @@ func (this *IntegrationSuite) TestSessionDoor_DeactivatedUserSession_Redirects()
 
 	status, header, _ := this.sendThroughDoor(doorRequest{method: "GET", path: doorUnknownPage, cookie: doorSessionCookie})
 	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/sign-in", header.Get("Location"))
+	this.Equal("/sign-in?next=%2Fno-such-page-behind-the-door", header.Get("Location"))
 }
 
 func (this *IntegrationSuite) TestSessionDoor_PostWithoutCSRFToken_Answers403() {
@@ -231,7 +231,7 @@ func (this *IntegrationSuite) TestSessionDoor_SignInAndSetPasswordWithATrailingS
 func (this *IntegrationSuite) TestSessionDoor_LookalikePrefixStaysBehindTheDoor() {
 	status, header, _ := this.sendThroughDoor(doorRequest{method: "GET", path: "/sign-inside"})
 	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/sign-in", header.Get("Location"))
+	this.Equal("/sign-in?next=%2Fsign-inside", header.Get("Location"))
 }
 
 func (this *IntegrationSuite) TestStartSession_SetsCookieThatPassesTheDoor() {

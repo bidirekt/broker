@@ -3,8 +3,8 @@ package deactivate_user
 import "strconv"
 
 const (
-	UserNotFoundMessage    string = "user not found"
-	UserDeactivatedMessage string = "user deactivated: "
+	UserNotFoundMessage          string = "user not found"
+	UserDeactivatedMessageFormat string = "user deactivated: %s — their sessions ended and their API keys were revoked"
 
 	userIDParam = "id"
 	pageParam   = "page"

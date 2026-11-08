@@ -416,7 +416,7 @@ func (this *IntegrationSuite) TestShowCheck_SignedOutIsRedirectedToSignIn() {
 	status, header, _ := this.getPage(checkPath, "")
 
 	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/sign-in", header.Get("Location"))
+	this.Equal("/sign-in?next=%2Fchecks%2F1", header.Get("Location"))
 }
 
 func (this *IntegrationSuite) TestShowCheck_UnknownOrInvalidIdIsNotFound() {

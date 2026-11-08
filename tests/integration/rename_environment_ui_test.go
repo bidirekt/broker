@@ -212,7 +212,7 @@ func (this *IntegrationSuite) TestRenameEnvironmentUi_SignedOutIsRedirectedToSig
 	status, header, _ := this.getPage(renameEnvironmentUiPath(productionID), "")
 
 	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/sign-in", header.Get("Location"))
+	this.Equal("/sign-in?next=%2Fenvironments%2F1%2Frename", header.Get("Location"))
 }
 
 func (this *IntegrationSuite) TestRenameEnvironmentUi_TheEnvironmentPageOffersRenameToAWriter() {

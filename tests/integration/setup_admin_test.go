@@ -171,7 +171,7 @@ func (this *IntegrationSuite) TestSetupAdmin_AnswersNotFoundOnceTheAdminExistsAn
 
 	status, header, _ := this.setupAdminGet(app, "/", "")
 	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/sign-in", header.Get("Location"))
+	this.Equal("/sign-in?next=%2F", header.Get("Location"))
 
 	this.Equal(1, this.setupAdminCount())
 }

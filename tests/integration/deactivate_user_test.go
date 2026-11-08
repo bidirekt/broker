@@ -147,7 +147,7 @@ func (this *IntegrationSuite) TestDeactivateUser_EndsTheSessionsTheSignInAndTheP
 
 	status, header, _ = this.getPage("/profile", userCookie)
 	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/sign-in", header.Get("Location"))
+	this.Equal("/sign-in?next=%2Fprofile", header.Get("Location"))
 
 	status, _, _ = this.postForm("/sign-in", "", "", url.Values{"email": {deactivateUserEmail}, "password": {deactivateUserPassword}})
 	this.Equal(http.StatusUnauthorized, status)
@@ -239,7 +239,7 @@ func (this *IntegrationSuite) TestDeactivateUser_ConfirmsWithASessionMessageOnTh
 
 	_, _, users := this.getPage("/users", cookie)
 	this.Contains(users, deactivateUserNotice)
-	this.Contains(users, "<span>user deactivated: Ana@X.com</span>")
+	this.Contains(users, "<span>user deactivated: Ana@X.com — their sessions ended and their API keys were revoked</span>")
 
 	_, _, reloaded := this.getPage("/users", cookie)
 	this.NotContains(reloaded, deactivateUserNotice)

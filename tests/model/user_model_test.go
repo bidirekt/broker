@@ -42,3 +42,15 @@ func TestPermission_Includes_RefusesAnUnknownPermission(t *testing.T) {
 	assert.False(t, model.Permission("owner").Includes(model.PermissionRead))
 	assert.False(t, model.Permission("").Includes(""))
 }
+
+func TestPermission_CappedBy_DropsToALowerCeiling(t *testing.T) {
+	assert.Equal(t, model.PermissionRead, model.PermissionWrite.CappedBy(model.PermissionRead))
+}
+
+func TestPermission_CappedBy_KeepsItselfUnderAnEqualCeiling(t *testing.T) {
+	assert.Equal(t, model.PermissionWrite, model.PermissionWrite.CappedBy(model.PermissionWrite))
+}
+
+func TestPermission_CappedBy_KeepsItselfUnderAHigherCeiling(t *testing.T) {
+	assert.Equal(t, model.PermissionWrite, model.PermissionWrite.CappedBy(model.PermissionAdmin))
+}

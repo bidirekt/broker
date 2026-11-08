@@ -62,6 +62,8 @@ func (this *IntegrationSuite) TestAdminRoutes_RefuseAWriteOrReadUserSession() {
 			{http.MethodPost, fmt.Sprintf("/users/%d/link", userID), url.Values{}},
 			{http.MethodPost, fmt.Sprintf("/users/%d/deactivate", userID), url.Values{}},
 			{http.MethodPost, fmt.Sprintf("/users/%d/reactivate", userID), url.Values{}},
+			{http.MethodGet, fmt.Sprintf("/users/%d/api-keys", userID), nil},
+			{http.MethodPost, fmt.Sprintf("/users/%d/api-keys/1/revoke", userID), url.Values{}},
 		} {
 			status, body := this.adminRoutesSend(request, cookie, csrfToken)
 
@@ -86,6 +88,8 @@ func (this *IntegrationSuite) TestAdminRoutes_RefuseToChangeTheAdminRow() {
 		{http.MethodPost, fmt.Sprintf("/users/%d/deactivate", this.adminID), url.Values{}},
 		{http.MethodPost, fmt.Sprintf("/users/%d/reactivate", this.adminID), url.Values{}},
 		{http.MethodPost, fmt.Sprintf("/users/%d/link", this.adminID), url.Values{}},
+		{http.MethodGet, fmt.Sprintf("/users/%d/api-keys", this.adminID), nil},
+		{http.MethodPost, fmt.Sprintf("/users/%d/api-keys/1/revoke", this.adminID), url.Values{}},
 	} {
 		status, body := this.adminRoutesSend(request, cookie, csrfToken)
 

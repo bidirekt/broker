@@ -36,7 +36,7 @@ func (this *IntegrationSuite) TestSignOut_DeletesTheSessionAndExpiresTheCookie()
 
 	status, header, _ = this.getPage(signOutPageBehindTheDoor, cookie)
 	this.Equal(http.StatusSeeOther, status)
-	this.Equal("/sign-in", header.Get("Location"))
+	this.Equal("/sign-in?next=%2Fno-such-page-behind-the-sign-out-door", header.Get("Location"))
 }
 
 func (this *IntegrationSuite) TestSignOut_WithoutCSRFToken_Answers403AndKeepsTheSession() {

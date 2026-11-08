@@ -9,6 +9,7 @@ const (
 
 	emailFormField    = "email"
 	passwordFormField = "password"
+	nextField         = "next"
 
 	homePath = "/"
 
@@ -17,6 +18,7 @@ const (
 
 type SignInPage struct {
 	Email   string
+	Next    string
 	Message string
 }
 

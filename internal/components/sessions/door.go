@@ -1,7 +1,7 @@
 package sessions
 
 import (
-	"strings"
+	"net/url"
 	"sync/atomic"
 	"time"
 
@@ -41,7 +41,7 @@ func (this *Keeper) Door(ctx fiber.Ctx) error {
 		return ctx.Next()
 	}
 
-	if !isUnderPath(ctx.Path(), setupPath) && !this.isSetUp(ctx) {
+	if !pages.IsUnderPath(ctx.Path(), setupPath) && !this.isSetUp(ctx) {
 		return pages.Redirect(ctx, setupPath)
 	}
 
@@ -51,7 +51,7 @@ func (this *Keeper) Door(ctx fiber.Ctx) error {
 
 	principal, session, ok := this.admitSession(ctx)
 	if !ok {
-		return pages.Redirect(ctx, signInPath)
+		return pages.Redirect(ctx, signInPathFrom(ctx))
 	}
 
 	access.GrantPrincipal(ctx, principal)
@@ -80,12 +80,20 @@ func (this *Keeper) isSetUp(ctx fiber.Ctx) bool {
 
 func isPageOutsideSessionDoor(path string) bool {
 	for _, prefix := range pagesOutsideSessionDoor {
-		if isUnderPath(path, prefix) {
+		if pages.IsUnderPath(path, prefix) {
 			return true
 		}
 	}
 
 	return false
+}
+
+func signInPathFrom(ctx fiber.Ctx) string {
+	if !isSafeMethod(ctx.Method()) {
+		return signInPath
+	}
+
+	return signInPath + "?next=" + url.QueryEscape(ctx.OriginalURL())
 }
 
 func isSafeMethod(method string) bool {
@@ -128,8 +136,4 @@ func (this *Keeper) admitSession(ctx fiber.Ctx) (access.Principal, access.Sessio
 	}
 
 	return principal, admitted, true
-}
-
-func isUnderPath(path, prefix string) bool {
-	return path == prefix || strings.HasPrefix(path, prefix+"/")
 }

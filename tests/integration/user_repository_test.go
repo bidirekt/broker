@@ -31,6 +31,16 @@ func (this *IntegrationSuite) userRepositoryInsertSession(idHash string, userID 
 	this.Require().NoError(err)
 }
 
+func userRepositoryAPIKey(name string, userID int64) *model.APIKey {
+	return &model.APIKey{
+		UserID:        userID,
+		KeyHash:       []byte(name + "-hash"),
+		DisplayPrefix: "bdk_" + name,
+		Name:          name,
+		Permission:    model.PermissionRead,
+	}
+}
+
 func (this *IntegrationSuite) userRepositoryAwaitLockWaiters(count int) {
 	this.Require().Eventually(func() bool {
 		var waiting int
@@ -186,6 +196,60 @@ func (this *IntegrationSuite) TestUserRepository_Deactivate_WipesSessionsAndOpen
 	this.Equal(model.UserInvited, found.State())
 	_, _, ok = links.FindUsable(ctx, []byte("ana-invite"))
 	this.False(ok)
+}
+
+func (this *IntegrationSuite) TestUserRepository_DeactivateThenReactivate_LeavesTheUserWithoutAPIKeys() {
+	ctx := context.Background()
+	repo := repository.NewUserRepository(this.Pool)
+	keys := repository.NewAPIKeyRepository(this.Pool)
+	userID := this.createActiveUser("ana@x.com", model.PermissionWrite, "ana-password")
+	this.Require().True(keys.Create(ctx, userRepositoryAPIKey("ana-ci", userID)))
+	this.Require().True(keys.Create(ctx, userRepositoryAPIKey("ana-laptop", userID)))
+	this.Require().True(keys.Create(ctx, userRepositoryAPIKey("admin-ci", this.adminID)))
+
+	this.Require().True(repo.Deactivate(ctx, userID))
+	this.Require().True(repo.Reactivate(ctx, userID))
+
+	userKeys, total := keys.ListByUser(ctx, userID, 10, 0)
+	this.Empty(userKeys)
+	this.Equal(0, total)
+	_, total = keys.ListByUser(ctx, this.adminID, 10, 0)
+	this.Equal(1, total)
+}
+
+func (this *IntegrationSuite) TestUserRepository_APIKeyCreateCommittedFirst_IsDeletedByTheDeactivationThatWaitedForIt() {
+	ctx := context.Background()
+	repo := repository.NewUserRepository(this.Pool)
+	keys := repository.NewAPIKeyRepository(this.Pool)
+	userID := this.createActiveUser("ana@x.com", model.PermissionWrite, "ana-password")
+
+	sameKeyHash, err := this.Pool.Begin(ctx)
+	this.Require().NoError(err)
+	defer func() { _ = sameKeyHash.Rollback(ctx) }()
+	_, err = sameKeyHash.Exec(ctx,
+		`INSERT INTO api_keys (user_id, key_hash, display_prefix, name, permission) VALUES ($1, $2, 'bdk_held', 'held', 'read')`,
+		this.adminID, []byte("ana-ci-hash"),
+	)
+	this.Require().NoError(err)
+
+	var created bool
+	createFinished := userRepositoryInBackground(func() {
+		created = keys.Create(ctx, userRepositoryAPIKey("ana-ci", userID))
+	})
+	this.userRepositoryAwaitLockWaiters(1)
+
+	var deactivated bool
+	deactivateFinished := userRepositoryInBackground(func() {
+		deactivated = repo.Deactivate(ctx, userID)
+	})
+	this.userRepositoryAwaitLockWaiters(2)
+
+	this.Require().NoError(sameKeyHash.Rollback(ctx))
+	this.Nil(<-createFinished)
+	this.Nil(<-deactivateFinished)
+	this.True(created)
+	this.True(deactivated)
+	this.Equal(0, this.countRows("api_keys"))
 }
 
 func (this *IntegrationSuite) TestUserRepository_SetPasswordWithLinkTwice_SetsThePasswordOnceAndWipesSessions() {
