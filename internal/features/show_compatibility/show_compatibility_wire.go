@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -16,22 +15,15 @@ import (
 
 const (
 	participantParam = "participant"
-	versionsParam    = "versions"
 	pageParam        = "page"
-
-	allVersions     = "all"
-	defaultVersions = "10"
 
 	showCompatibilityTemplate = "show_compatibility.html"
 
 	maxDetailColumns = 6
 )
 
-var latestVersionsChoices = []int{5, 10, 20, 50}
-
 type ShowCompatibilityPage struct {
 	Participants   []ParticipantOption
-	Versions       []VersionsOption
 	Participant    *model.Participant
 	ParticipantURL string
 	Environments   []model.Environment
@@ -44,12 +36,6 @@ type ShowCompatibilityPage struct {
 
 type ParticipantOption struct {
 	Name     string
-	Selected bool
-}
-
-type VersionsOption struct {
-	Value    string
-	Label    string
 	Selected bool
 }
 
@@ -83,41 +69,8 @@ type cellKey struct {
 	environmentID int64
 }
 
-func versionsFilter(value string, page int64) (filter VersionsFilter, ok bool) {
-	if value == allVersions {
-		return VersionsFilter{All: true, Page: page}, true
-	}
-
-	for _, latest := range latestVersionsChoices {
-		if value == strconv.Itoa(latest) {
-			return VersionsFilter{Latest: latest, Page: page}, page == 1
-		}
-	}
-
-	return VersionsFilter{}, false
-}
-
-func versionsOptions(selected string) []VersionsOption {
-	options := make([]VersionsOption, 0, len(latestVersionsChoices)+1)
-	for _, latest := range latestVersionsChoices {
-		value := strconv.Itoa(latest)
-		options = append(options, VersionsOption{
-			Value:    value,
-			Label:    fmt.Sprintf("last %d versions", latest),
-			Selected: value == selected,
-		})
-	}
-
-	return append(options, VersionsOption{
-		Value:    allVersions,
-		Label:    fmt.Sprintf("all versions, %d per page", allVersionsPageSize),
-		Selected: selected == allVersions,
-	})
-}
-
-func newShowCompatibilityPage(output ShowCompatibilityOutput, versions string, pager pages.Pager) ShowCompatibilityPage {
+func newShowCompatibilityPage(output ShowCompatibilityOutput, pager pages.Pager) ShowCompatibilityPage {
 	page := ShowCompatibilityPage{
-		Versions:      versionsOptions(versions),
 		Participant:   output.Participant,
 		Environments:  output.Environments,
 		Columns:       len(output.Environments) + 1,

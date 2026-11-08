@@ -59,30 +59,6 @@ const (
 		LIMIT $2 OFFSET $3
 	`
 
-	listCompatibilityLatestVersionsQuery = `
-		SELECT
-			cv.version,
-			cv.created_at,
-			COALESCE(array_agg(e.id ORDER BY e.name COLLATE "C") FILTER (WHERE e.id IS NOT NULL), '{}'),
-			COALESCE(array_agg(e.name ORDER BY e.name COLLATE "C") FILTER (WHERE e.id IS NOT NULL), '{}')
-		FROM
-			contract_versions cv
-		LEFT JOIN
-			current_deployments cd ON cd.participant_id = cv.participant_id AND cd.version = cv.version
-		LEFT JOIN
-			environments e ON e.id = cd.environment_id
-		WHERE
-			cv.participant_id = $1
-		GROUP BY
-			cv.id
-		HAVING
-			cv.id IN (SELECT id FROM contract_versions WHERE participant_id = $1 ORDER BY id DESC LIMIT $2)
-		OR
-			count(cd.environment_id) > 0
-		ORDER BY
-			cv.id DESC
-	`
-
 	listCompatibilityLatestChecksQuery = `
 		SELECT DISTINCT ON (c.version, c.environment_id)
 			c.id, c.participant_id, p.name, c.contract_id, c.version, c.environment_id,
@@ -173,15 +149,6 @@ func (this *CompatibilityPageRepository) ListVersions(
 	}
 
 	return collectPublishedVersions(rows), total
-}
-
-func (this *CompatibilityPageRepository) ListLatestVersions(ctx context.Context, participantID int64, latest int) []model.PublishedVersion {
-	rows, err := this.pool.Query(ctx, listCompatibilityLatestVersionsQuery, participantID, latest)
-	if err != nil {
-		panic(fmt.Errorf("error listing compatibility latest versions: %w", err))
-	}
-
-	return collectPublishedVersions(rows)
 }
 
 func collectPublishedVersions(rows pgx.Rows) []model.PublishedVersion {
