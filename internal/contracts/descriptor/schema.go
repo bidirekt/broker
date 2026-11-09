@@ -61,7 +61,7 @@ func refExcludes(key string) Rule {
 	}
 }
 
-func keyBelongsTo(key string, schemaType string) Rule {
+func keyBelongsTo(key string, schemaTypes ...string) Rule {
 	return func(present PresentFields) *violation.Violation {
 		if present[key] == nil {
 			return nil
@@ -72,7 +72,7 @@ func keyBelongsTo(key string, schemaType string) Rule {
 		}
 
 		declaredType, valid := present["type"].(string)
-		if !valid || declaredType == schemaType || !slices.Contains(SchemaType.Allowed, declaredType) {
+		if !valid || slices.Contains(schemaTypes, declaredType) || !slices.Contains(SchemaType.Allowed, declaredType) {
 			return nil
 		}
 
