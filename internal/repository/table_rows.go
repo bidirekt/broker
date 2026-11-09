@@ -1,8 +1,6 @@
 package repository
 
 import (
-	"time"
-
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/guregu/null"
 )
@@ -14,10 +12,8 @@ type tableRow struct {
 	ParticipantName string
 
 	// Contract
-	ContractID        int64
-	ContractVersion   string
-	ContractContent   string
-	ContractCreatedAt time.Time
+	ContractID      int64
+	ContractVersion string
 
 	// Resource
 	ResourceID                 int64
@@ -29,7 +25,6 @@ type tableRow struct {
 	ResourceResponseStatusCode null.String
 	ResourceProviderHash       string
 	ResourceConsumerHash       null.String
-	ResourceCreatedAt          time.Time
 	ResourceVersion            string
 	ResourceVersionChangeType  string
 
@@ -44,7 +39,6 @@ func (this *tableRow) toPersistedContractModel() *model.PersistedContract {
 		ParticipantID:   this.ParticipantID,
 		ParticipantName: this.ParticipantName,
 		Version:         this.ContractVersion,
-		ContractContent: this.ContractContent,
 		Resources:       make(map[string]model.PersistedResource),
 	}
 }

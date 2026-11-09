@@ -97,8 +97,6 @@ const (
 		SELECT
 			c.id,
 			(SELECT version FROM contract_versions WHERE contract_id = c.id ORDER BY id DESC LIMIT 1),
-			(SELECT contract_content FROM contract_versions WHERE contract_id = c.id ORDER BY id DESC LIMIT 1),
-			c.created_at,
 			pa.id,
 			pa.name,
 			r.id,
@@ -110,7 +108,6 @@ const (
 			r.response_status_code,
 			r.provider_hash,
 			r.consumer_hash,
-			r.created_at,
 			rv.change_type,
 			bodies.sources,
 			bodies.schema_names
@@ -142,8 +139,6 @@ const (
 		SELECT
 			c.id,
 			cv.version,
-			cv.contract_content,
-			c.created_at,
 			pa.id,
 			pa.name,
 			r.id,
@@ -155,7 +150,6 @@ const (
 			r.response_status_code,
 			r.provider_hash,
 			r.consumer_hash,
-			r.created_at,
 			rv.change_type,
 			bodies.sources,
 			bodies.schema_names
@@ -205,7 +199,6 @@ const (
 			r.response_status_code,
 			r.provider_hash,
 			r.consumer_hash,
-			r.created_at,
 			bodies.sources,
 			bodies.schema_names,
 			cd.version,
@@ -619,8 +612,6 @@ func scanPersistedContractTree(rows pgx.Rows) *model.PersistedContract {
 		if err := rows.Scan(
 			&row.ContractID,
 			&row.ContractVersion,
-			&row.ContractContent,
-			&row.ContractCreatedAt,
 			&row.ParticipantID,
 			&row.ParticipantName,
 			&row.ResourceID,
@@ -632,7 +623,6 @@ func scanPersistedContractTree(rows pgx.Rows) *model.PersistedContract {
 			&row.ResourceResponseStatusCode,
 			&row.ResourceProviderHash,
 			&row.ResourceConsumerHash,
-			&row.ResourceCreatedAt,
 			&row.ResourceVersionChangeType,
 			&row.BodySources,
 			&row.BodySchemaNames,
@@ -764,7 +754,6 @@ func (this *ContractRepository) loadDeployedResources(
 			&row.ResourceResponseStatusCode,
 			&row.ResourceProviderHash,
 			&row.ResourceConsumerHash,
-			&row.ResourceCreatedAt,
 			&row.BodySources,
 			&row.BodySchemaNames,
 			&row.ResourceVersion,
