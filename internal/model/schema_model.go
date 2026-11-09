@@ -15,6 +15,17 @@ type Field struct {
 type Schema map[string]Field
 
 const (
+	ObjectType  = "object"
+	ArrayType   = "array"
+	MapType     = "map"
+	StringType  = "string"
+	IntegerType = "integer"
+	FloatType   = "float"
+	NumberType  = "number"
+	BooleanType = "boolean"
+)
+
+const (
 	ItemsSegment  = "[]"
 	ValuesSegment = "{}"
 )

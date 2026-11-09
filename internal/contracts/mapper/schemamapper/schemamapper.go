@@ -36,14 +36,14 @@ func schemaModelsReachableFrom(catalog contract.SchemasMap, name string, schemas
 func fieldModelsFromSchema(fields model.Schema, path string, schema contract.Schema) {
 	switch {
 	case schema.IsObject():
-		fields[path] = model.Field{Type: "object", Optional: schema.Optional, Nullable: schema.Nullable}
+		fields[path] = model.Field{Type: model.ObjectType, Optional: schema.Optional, Nullable: schema.Nullable}
 
 		for name, property := range schema.Properties {
 			fieldModelsFromSchema(fields, model.ChildPath(path, name), property)
 		}
 
 	case schema.IsMap():
-		fields[path] = model.Field{Type: "map", Optional: schema.Optional, Nullable: schema.Nullable}
+		fields[path] = model.Field{Type: model.MapType, Optional: schema.Optional, Nullable: schema.Nullable}
 
 		if schema.Values == nil {
 			return
@@ -52,7 +52,7 @@ func fieldModelsFromSchema(fields model.Schema, path string, schema contract.Sch
 		fieldModelsFromSchema(fields, model.ChildPath(path, model.ValuesSegment), *schema.Values)
 
 	case schema.IsArray():
-		fields[path] = model.Field{Type: "array", Optional: schema.Optional, Nullable: schema.Nullable}
+		fields[path] = model.Field{Type: model.ArrayType, Optional: schema.Optional, Nullable: schema.Nullable}
 
 		if schema.Items == nil {
 			return

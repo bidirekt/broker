@@ -57,5 +57,5 @@ func acceptsType(reader, producer string) bool {
 		return true
 	}
 
-	return reader == "number" && (producer == "integer" || producer == "float")
+	return reader == model.NumberType && (producer == model.IntegerType || producer == model.FloatType)
 }

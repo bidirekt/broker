@@ -5,6 +5,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/bidirekt/broker/internal/model"
 	"github.com/bidirekt/broker/internal/validations"
 )
 
@@ -15,7 +16,16 @@ var (
 
 	SchemaType = Enum{
 		ErrorCode: "schema.invalid_type",
-		Allowed:   []string{"object", "array", "map", "string", "integer", "float", "number", "boolean"},
+		Allowed: []string{
+			model.ObjectType,
+			model.ArrayType,
+			model.MapType,
+			model.StringType,
+			model.IntegerType,
+			model.FloatType,
+			model.NumberType,
+			model.BooleanType,
+		},
 	}
 
 	ServiceName  = Key{ErrorCode: "service.name_syntax", Check: validations.ParticipantName}

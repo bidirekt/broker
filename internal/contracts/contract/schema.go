@@ -1,5 +1,7 @@
 package contract
 
+import "github.com/bidirekt/broker/internal/model"
+
 type SchemasMap map[string]Schema
 
 type Schema struct {
@@ -44,15 +46,15 @@ func SchemaFromDocument(document Document) Schema {
 }
 
 func (this *Schema) IsObject() bool {
-	return this.Type == "object"
+	return this.Type == model.ObjectType
 }
 
 func (this *Schema) IsArray() bool {
-	return this.Type == "array"
+	return this.Type == model.ArrayType
 }
 
 func (this *Schema) IsMap() bool {
-	return this.Type == "map"
+	return this.Type == model.MapType
 }
 
 func (this *Schema) IsPrimitive() bool {
@@ -60,11 +62,11 @@ func (this *Schema) IsPrimitive() bool {
 }
 
 func isPrimitiveType(schemaType string) bool {
-	return schemaType == "string" ||
-		schemaType == "integer" ||
-		schemaType == "float" ||
-		schemaType == "number" ||
-		schemaType == "boolean"
+	return schemaType == model.StringType ||
+		schemaType == model.IntegerType ||
+		schemaType == model.FloatType ||
+		schemaType == model.NumberType ||
+		schemaType == model.BooleanType
 }
 
 func (this *Schema) IsRef() bool {

@@ -125,12 +125,12 @@ func typeTokenOf(node schemagraph.Node, rendering map[string]bool) string {
 
 	rendering[shape] = true
 
-	if node.Type() == "array" {
-		return "array<" + typeTokenOf(node.Child(model.ItemsSegment), rendering) + ">"
+	if node.Type() == model.ArrayType {
+		return model.ArrayType + "<" + typeTokenOf(node.Child(model.ItemsSegment), rendering) + ">"
 	}
 
-	if node.Type() == "map" {
-		return "map<" + typeTokenOf(node.Child(model.ValuesSegment), rendering) + ">"
+	if node.Type() == model.MapType {
+		return model.MapType + "<" + typeTokenOf(node.Child(model.ValuesSegment), rendering) + ">"
 	}
 
 	return node.Type()

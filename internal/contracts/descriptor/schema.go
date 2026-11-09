@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/bidirekt/broker/internal/contracts/violation"
+	"github.com/bidirekt/broker/internal/model"
 )
 
 func Property() Node {
@@ -28,9 +29,9 @@ func schema(positionRules ...Rule) Node {
 	}).Rules(append([]Rule{
 		schemaRequiresTypeOrRef,
 		refExcludes("type"),
-		keyBelongsTo("properties", "object"),
-		keyBelongsTo("items", "array"),
-		keyBelongsTo("values", "map"),
+		keyBelongsTo("properties", model.ObjectType),
+		keyBelongsTo("items", model.ArrayType),
+		keyBelongsTo("values", model.MapType),
 		objectRequiresProperties,
 		arrayRequiresItems,
 		mapRequiresValues,
@@ -88,7 +89,7 @@ func keyNotAllowed(key string, schemaType string) *violation.Violation {
 }
 
 func objectRequiresProperties(present PresentFields) *violation.Violation {
-	if present["ref"] != nil || present["type"] != "object" {
+	if present["ref"] != nil || present["type"] != model.ObjectType {
 		return nil
 	}
 
@@ -101,7 +102,7 @@ func objectRequiresProperties(present PresentFields) *violation.Violation {
 }
 
 func arrayRequiresItems(present PresentFields) *violation.Violation {
-	if present["ref"] != nil || present["type"] != "array" || present["items"] != nil {
+	if present["ref"] != nil || present["type"] != model.ArrayType || present["items"] != nil {
 		return nil
 	}
 
@@ -109,7 +110,7 @@ func arrayRequiresItems(present PresentFields) *violation.Violation {
 }
 
 func mapRequiresValues(present PresentFields) *violation.Violation {
-	if present["ref"] != nil || present["type"] != "map" || present["values"] != nil {
+	if present["ref"] != nil || present["type"] != model.MapType || present["values"] != nil {
 		return nil
 	}
 
