@@ -547,7 +547,7 @@ func (this *ContractRepository) GetLatestSnapshotByParticipantID(
 
 func (this *ContractRepository) latestSnapshot(
 	ctx context.Context,
-	q querier,
+	q Querier,
 	participantID int64,
 ) (*model.PersistedContract, bool) {
 	rows, err := q.Query(ctx, getLatestSnapshotByParticipantID, participantID)
@@ -591,7 +591,7 @@ func (this *ContractRepository) GetContractByIDAndVersion(
 
 func (this *ContractRepository) withSchemas(
 	ctx context.Context,
-	q querier,
+	q Querier,
 	contract *model.PersistedContract,
 ) (*model.PersistedContract, bool) {
 	if contract == nil {
