@@ -1,6 +1,11 @@
 package contract
 
-import "github.com/bidirekt/broker/internal/model"
+import (
+	"maps"
+	"slices"
+
+	"github.com/bidirekt/broker/internal/model"
+)
 
 type SchemasMap map[string]Schema
 
@@ -43,6 +48,35 @@ func SchemaFromDocument(document Document) Schema {
 	}
 
 	return schema
+}
+
+// SchemaChild is a schema nested in another: DocumentPath is where it is written below its parent
+// ("properties;city", "items", "values"), Segment where its fields sit below the parent's.
+type SchemaChild struct {
+	DocumentPath string
+	Segment      string
+	Schema       Schema
+}
+
+func (this *Schema) Children() []SchemaChild {
+	switch {
+	case this.IsObject():
+		children := make([]SchemaChild, 0, len(this.Properties))
+		for _, name := range slices.Sorted(maps.Keys(this.Properties)) {
+			children = append(children, SchemaChild{DocumentPath: "properties;" + name, Segment: name, Schema: this.Properties[name]})
+		}
+
+		return children
+
+	case this.IsArray() && this.Items != nil:
+		return []SchemaChild{{DocumentPath: "items", Segment: model.ItemsSegment, Schema: *this.Items}}
+
+	case this.IsMap() && this.Values != nil:
+		return []SchemaChild{{DocumentPath: "values", Segment: model.ValuesSegment, Schema: *this.Values}}
+
+	default:
+		return nil
+	}
 }
 
 func (this *Schema) IsObject() bool {
