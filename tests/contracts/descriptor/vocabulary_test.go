@@ -33,7 +33,7 @@ func TestSchemaType_RejectsATypeOutsideTheSet(t *testing.T) {
 	assert.Equal(t, "schema.invalid_type", violations[0].ErrorCode)
 	assert.Equal(t, map[string]string{
 		"value":   "decimal",
-		"allowed": "object, array, map, string, integer, float, number, boolean",
+		"allowed": "object, array, map, string, integer, float, number, boolean, enum, union",
 	}, violations[0].Details)
 }
 
@@ -47,14 +47,14 @@ func TestFlag_ExigeBooleano(t *testing.T) {
 func TestPropertyName_RejectsAPathCharacterInAnyPosition(t *testing.T) {
 	subject := descriptor.Map(descriptor.PropertyName, descriptor.Object(descriptor.Fields{}))
 
-	for _, name := range []string{".name", "user.name", "name.", "[tags", "tags[]", "a]b", "a{b", "pets}", ";y", "x;y"} {
+	for _, name := range []string{".name", "user.name", "name.", "[tags", "tags[]", "a]b", "a{b", "pets}", ";y", "x;y", "card(x)", "a)b"} {
 		t.Run(name, func(t *testing.T) {
 			violations := descriptor.Validate(subject, map[string]any{name: nil}, "api.yaml")
 
 			require.Len(t, violations, 1)
 			assert.Equal(t, "property.name_syntax", violations[0].ErrorCode)
 			assert.Equal(t, name, violations[0].Path)
-			assert.Equal(t, map[string]string{"key": name, "error": `must not contain ".", "[", "]", "{", "}" or ";"`}, violations[0].Details)
+			assert.Equal(t, map[string]string{"key": name, "error": `must not contain ".", "[", "]", "{", "}", ";", "(" or ")"`}, violations[0].Details)
 		})
 	}
 }
@@ -91,7 +91,7 @@ func TestPropertyName_ReportsAPathCharacterBeforeAControlCharacter(t *testing.T)
 	violations := descriptor.Validate(subject, map[string]any{"user.\tname": nil}, "api.yaml")
 
 	require.Len(t, violations, 1)
-	assert.Equal(t, `must not contain ".", "[", "]", "{", "}" or ";"`, violations[0].Details["error"])
+	assert.Equal(t, `must not contain ".", "[", "]", "{", "}", ";", "(" or ")"`, violations[0].Details["error"])
 }
 
 func TestPropertyName_AcceptsNamesFromRealBodies(t *testing.T) {
@@ -105,14 +105,14 @@ func TestPropertyName_AcceptsNamesFromRealBodies(t *testing.T) {
 func TestSchemaName_RejectsAPathCharacterInAnyPosition(t *testing.T) {
 	subject := descriptor.Map(descriptor.SchemaName, descriptor.Object(descriptor.Fields{}))
 
-	for _, name := range []string{".Pet", "Pet.v2", "Pet.", "[Pets", "Pets[]", "Pet]s", "Pet{s", "Pets}", ";Pet", "Pet;v2"} {
+	for _, name := range []string{".Pet", "Pet.v2", "Pet.", "[Pets", "Pets[]", "Pet]s", "Pet{s", "Pets}", ";Pet", "Pet;v2", "Pet(v2)", "Pet)"} {
 		t.Run(name, func(t *testing.T) {
 			violations := descriptor.Validate(subject, map[string]any{name: nil}, "api.yaml")
 
 			require.Len(t, violations, 1)
 			assert.Equal(t, "schema.name_syntax", violations[0].ErrorCode)
 			assert.Equal(t, name, violations[0].Path)
-			assert.Equal(t, map[string]string{"key": name, "error": `must not contain ".", "[", "]", "{", "}" or ";"`}, violations[0].Details)
+			assert.Equal(t, map[string]string{"key": name, "error": `must not contain ".", "[", "]", "{", "}", ";", "(" or ")"`}, violations[0].Details)
 		})
 	}
 }

@@ -336,3 +336,29 @@ func TestSchemaChildren_NoneForLeavesRefsAndMissingChildren(t *testing.T) {
 		})
 	}
 }
+
+func TestSchemaFromDocument_EnumKeepsItsMembersInTheWrittenOrder(t *testing.T) {
+	schema := contract.SchemaFromDocument(schemaDocument(t, `type: enum
+members: [sold, available, pending]
+`))
+
+	assert.Equal(t, contract.Schema{Type: "enum", Members: []string{"sold", "available", "pending"}}, schema)
+	assert.Empty(t, schema.Children())
+}
+
+func TestSchemaFromDocument_UnionKeepsEachMemberAsARef(t *testing.T) {
+	schema := contract.SchemaFromDocument(schemaDocument(t, `type: union
+members:
+  pix: { ref: PixPayment }
+  card: { ref: CardPayment }
+`))
+
+	assert.Equal(t, contract.Schema{Type: "union", UnionMembers: map[string]contract.Schema{
+		"card": {Ref: "CardPayment"},
+		"pix":  {Ref: "PixPayment"},
+	}}, schema)
+	assert.Equal(t, []contract.SchemaChild{
+		{DocumentPath: "members;card", Segment: "(card)", Schema: contract.Schema{Ref: "CardPayment"}},
+		{DocumentPath: "members;pix", Segment: "(pix)", Schema: contract.Schema{Ref: "PixPayment"}},
+	}, schema.Children())
+}

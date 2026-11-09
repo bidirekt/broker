@@ -1,6 +1,8 @@
 package schemamapper
 
 import (
+	"slices"
+
 	"github.com/bidirekt/broker/internal/contracts/contract"
 	"github.com/bidirekt/broker/internal/model"
 )
@@ -46,5 +48,10 @@ func fieldModelFromSchema(schema contract.Schema) model.Field {
 		return model.Field{Optional: schema.Optional, Nullable: schema.Nullable, Ref: schema.Ref}
 	}
 
-	return model.Field{Type: schema.Type, Optional: schema.Optional, Nullable: schema.Nullable}
+	return model.Field{
+		Type:     schema.Type,
+		Optional: schema.Optional,
+		Nullable: schema.Nullable,
+		Members:  slices.Sorted(slices.Values(schema.Members)),
+	}
 }

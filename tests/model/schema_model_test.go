@@ -22,6 +22,11 @@ var schemaPathSpellings = []struct {
 	{"tags{}", model.ItemsSegment, "tags{}[]"},
 	{"$", "name", "$.name"},
 	{"$", model.ItemsSegment, "$[]"},
+	{"payment", model.MemberSegment("card"), "payment(card)"},
+	{"", model.MemberSegment("card"), "(card)"},
+	{"payment(card)", "number", "payment(card).number"},
+	{"items[]", model.MemberSegment("pix"), "items[](pix)"},
+	{"$.payment", model.MemberSegment("card"), "$.payment(card)"},
 }
 
 func TestChildPath_SpellsPropertiesItemsAndValues(t *testing.T) {
@@ -56,9 +61,16 @@ func TestFieldName_SpellsTheSchemaFollowedByThePathInsideIt(t *testing.T) {
 		{"Tags", "[]", "Tags[]"},
 		{"Pets", "{}.name", "Pets{}.name"},
 		{"PriceTables", "[]{}", "PriceTables[]{}"},
+		{"Order", "payment(card)", "Order.payment(card)"},
+		{"Order", "payment(card).number", "Order.payment(card).number"},
+		{"Payment", "(card)", "Payment(card)"},
 	}
 
 	for _, tc := range fieldNames {
 		assert.Equal(t, tc.field, model.FieldName(tc.schema, tc.path), tc.schema+" + "+tc.path)
 	}
+}
+
+func TestMemberKey_IsTheKeyMemberSegmentWrapped(t *testing.T) {
+	assert.Equal(t, "card", model.MemberKey(model.MemberSegment("card")))
 }

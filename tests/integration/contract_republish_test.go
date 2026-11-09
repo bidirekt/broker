@@ -225,7 +225,7 @@ func (this *IntegrationSuite) TestRepublish_FilesTheCurrentGrammarRefuses_Return
 
 	this.Equal(http.StatusBadRequest, status)
 	this.JSONEq(`{"message":"contract validation failed","violations":[`+
-		`{"code":"schema.name_syntax","path":"schemas;Pet.v2","source":"contracts/api.yaml","details":{"key":"Pet.v2","error":"must not contain \".\", \"[\", \"]\", \"{\", \"}\" or \";\""}}`+
+		`{"code":"schema.name_syntax","path":"schemas;Pet.v2","source":"contracts/api.yaml","details":{"key":"Pet.v2","error":"must not contain \".\", \"[\", \"]\", \"{\", \"}\", \";\", \"(\" or \")\""}}`+
 		`]}`, body)
 }
 

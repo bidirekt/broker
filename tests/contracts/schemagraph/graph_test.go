@@ -197,3 +197,61 @@ func TestField_NamesTheSchemaAndThePathTheNodeWasReachedAt(t *testing.T) {
 	assert.Equal(t, "Tags[]", graphRoot(catalog, "Tags").Child("[]").Field())
 	assert.Empty(t, order.Child("total").Field())
 }
+
+func TestMembers_OfAnEnumReachedThroughARef_AreTheTargetValues(t *testing.T) {
+	catalog := model.Schemas{
+		"Pet": {
+			"":       {Type: "object"},
+			"status": {Ref: "Status"},
+			"name":   {Type: "string"},
+		},
+		"Status": {"": {Type: "enum", Members: []string{"available", "sold"}}},
+	}
+
+	pet := graphRoot(catalog, "Pet")
+
+	assert.Equal(t, "enum", pet.Child("status").Type())
+	assert.Equal(t, []string{"available", "sold"}, pet.Child("status").Members())
+	assert.Equal(t, []schemagraph.Declaration{{Source: "orders.yaml", Type: "enum", Members: []string{"available", "sold"}}}, pet.Child("status").Declarations())
+	assert.Nil(t, pet.Child("name").Members())
+	assert.Nil(t, pet.Child("missing").Members())
+}
+
+func TestUnion_MembersDeclaredInTwoBodies_JoinIntoBothMembers(t *testing.T) {
+	catalog := model.Schemas{
+		"OrderA": {
+			"":              {Type: "object"},
+			"payment":       {Type: "union"},
+			"payment(card)": {Ref: "CardPayment"},
+		},
+		"OrderB": {
+			"":              {Type: "object"},
+			"payment":       {Type: "union"},
+			"payment(card)": {Ref: "CardPayment"},
+			"payment(pix)":  {Ref: "PixPayment"},
+		},
+		"CardPayment": {"": {Type: "object"}, "number": {Type: "string"}},
+		"PixPayment":  {"": {Type: "object"}, "key": {Type: "string"}},
+	}
+
+	payment := schemagraph.New(catalog).Root([]model.ResourceBody{
+		{Source: "a.yaml", SchemaName: null.StringFrom("OrderA")},
+		{Source: "b.yaml", SchemaName: null.StringFrom("OrderB")},
+	}, schemagraph.Senders).Child("payment")
+
+	assert.Equal(t, "union", payment.Type())
+	assert.Equal(t, []string{"(card)", "(pix)"}, payment.Segments())
+	assert.False(t, payment.Child("(pix)").Optional())
+	assert.Equal(t, "OrderA.payment(card)", payment.Child("(card)").Field())
+	assert.Equal(t, "OrderB.payment(pix)", payment.Child("(pix)").Field())
+	assert.Equal(t, "CardPayment.number", payment.Child("(card)").Child("number").Field())
+}
+
+func TestUnion_AtTheRoot_NamesItsMemberRightAfterTheSchema(t *testing.T) {
+	catalog := model.Schemas{
+		"Payment":     {"": {Type: "union"}, "(card)": {Ref: "CardPayment"}},
+		"CardPayment": {"": {Type: "object"}, "number": {Type: "string"}},
+	}
+
+	assert.Equal(t, "Payment(card)", graphRoot(catalog, "Payment").Child("(card)").Field())
+}

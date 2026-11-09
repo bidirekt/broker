@@ -168,6 +168,7 @@ func TestDiff_FieldWhoseAttributeChanged_IsModified(t *testing.T) {
 		{name: "optional", after: model.Field{Type: "string", Optional: true}},
 		{name: "nullable", after: model.Field{Type: "string", Nullable: true}},
 		{name: "ref", after: model.Field{Ref: "PetId"}},
+		{name: "members", after: model.Field{Type: "string", Members: []string{"available"}}},
 	}
 
 	for _, testCase := range cases {
@@ -286,4 +287,31 @@ func TestRemovedSinceDeployed_ResourceAlreadyRemovedInTheDeployedVersion_DoesNot
 	}
 
 	assert.Empty(t, contract_differ.RemovedSinceDeployed(deployed, next))
+}
+
+func TestDiff_EnumWhoseValuesChanged_IsModified(t *testing.T) {
+	current := model.Schemas{"Pet": {"": {Type: "object"}, "status": {Type: "enum", Members: []string{"available", "sold"}}}}
+	next := model.Schemas{"Pet": {"": {Type: "object"}, "status": {Type: "enum", Members: []string{"available", "pending"}}}}
+
+	diff := contract_differ.DiffContracts(persistedPets(current), uploadedPets(next))
+
+	assert.Equal(t, map[string]model.SchemaChange{
+		"Pet": {Kind: model.ChangeModified, Fields: map[string]model.FieldChange{
+			"status": {
+				Kind:   model.ChangeModified,
+				Before: model.Field{Type: "enum", Members: []string{"available", "sold"}},
+				After:  model.Field{Type: "enum", Members: []string{"available", "pending"}},
+			},
+		}},
+	}, diff.Schemas)
+}
+
+func TestDiff_EnumWithTheSameValues_HasNoChanges(t *testing.T) {
+	enumSchemas := func() model.Schemas {
+		return model.Schemas{"Pet": {"": {Type: "object"}, "status": {Type: "enum", Members: []string{"available", "sold"}}}}
+	}
+
+	diff := contract_differ.DiffContracts(persistedPets(enumSchemas()), uploadedPets(enumSchemas()))
+
+	assert.Empty(t, diff.Schemas)
 }

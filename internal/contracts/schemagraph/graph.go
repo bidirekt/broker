@@ -40,7 +40,7 @@ func (this *Graph) Root(bodies []model.ResourceBody, join Join) Node {
 // An undeclared schema or a schema met twice ends the chain on a field without a type.
 func (this *Graph) declaration(source string, site Site) declaration {
 	field, declared := this.catalog[site.Schema][site.Path]
-	resolved := declaration{source: source, site: site, shape: site, fieldType: field.Type, optional: field.Optional, nullable: field.Nullable}
+	resolved := declaration{source: source, site: site, shape: site, fieldType: field.Type, members: field.Members, optional: field.Optional, nullable: field.Nullable}
 	visited := []Site{site}
 
 	for declared && field.Ref != "" {
@@ -54,6 +54,7 @@ func (this *Graph) declaration(source string, site Site) declaration {
 
 		resolved.shape = target
 		resolved.fieldType = field.Type
+		resolved.members = field.Members
 		resolved.optional = resolved.optional || field.Optional
 		resolved.nullable = resolved.nullable || field.Nullable
 	}

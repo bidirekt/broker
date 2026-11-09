@@ -10,14 +10,16 @@ import (
 type SchemasMap map[string]Schema
 
 type Schema struct {
-	Type        string
-	Description string
-	Properties  map[string]Schema
-	Items       *Schema
-	Values      *Schema
-	Ref         string
-	Optional    bool
-	Nullable    bool
+	Type         string
+	Description  string
+	Properties   map[string]Schema
+	Items        *Schema
+	Values       *Schema
+	Members      []string
+	UnionMembers map[string]Schema
+	Ref          string
+	Optional     bool
+	Nullable     bool
 }
 
 func SchemaFromDocument(document Document) Schema {
@@ -47,11 +49,26 @@ func SchemaFromDocument(document Document) Schema {
 		schema.Values = &valuesSchema
 	}
 
+	if members, written := document["members"].(map[string]any); written {
+		schema.UnionMembers = make(map[string]Schema, len(members))
+
+		for key := range members {
+			schema.UnionMembers[key] = SchemaFromDocument(Document(members).Mapping(key))
+		}
+	}
+
+	if members, written := document["members"].([]any); written {
+		for _, member := range members {
+			text, _ := member.(string)
+			schema.Members = append(schema.Members, text)
+		}
+	}
+
 	return schema
 }
 
 // SchemaChild is a schema nested in another: DocumentPath is where it is written below its parent
-// ("properties;city", "items", "values"), Segment where its fields sit below the parent's.
+// ("properties;city", "items", "values", "members;card"), Segment where its fields sit below the parent's.
 type SchemaChild struct {
 	DocumentPath string
 	Segment      string
@@ -64,6 +81,14 @@ func (this *Schema) Children() []SchemaChild {
 		children := make([]SchemaChild, 0, len(this.Properties))
 		for _, name := range slices.Sorted(maps.Keys(this.Properties)) {
 			children = append(children, SchemaChild{DocumentPath: "properties;" + name, Segment: name, Schema: this.Properties[name]})
+		}
+
+		return children
+
+	case this.IsUnion():
+		children := make([]SchemaChild, 0, len(this.UnionMembers))
+		for _, key := range slices.Sorted(maps.Keys(this.UnionMembers)) {
+			children = append(children, SchemaChild{DocumentPath: "members;" + key, Segment: model.MemberSegment(key), Schema: this.UnionMembers[key]})
 		}
 
 		return children
@@ -89,6 +114,10 @@ func (this *Schema) IsArray() bool {
 
 func (this *Schema) IsMap() bool {
 	return this.Type == model.MapType
+}
+
+func (this *Schema) IsUnion() bool {
+	return this.Type == model.UnionType
 }
 
 func (this *Schema) IsPrimitive() bool {

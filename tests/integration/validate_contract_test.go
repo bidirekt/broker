@@ -438,9 +438,9 @@ func (this *IntegrationSuite) TestValidateContract_SchemaWithoutType_Rejected() 
 
 	this.Equal(http.StatusBadRequest, status)
 	this.JSONEq(`{"message":"contract validation failed","violations":[`+
-		`{"code":"schema.invalid_type","path":"schemas;Item;properties;dimensions","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean"}},`+
-		`{"code":"schema.invalid_type","path":"schemas;Item;properties;prices","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean"}},`+
-		`{"code":"schema.invalid_type","path":"schemas;Item;properties;tags","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean"}}`+
+		`{"code":"schema.invalid_type","path":"schemas;Item;properties;dimensions","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean, enum, union"}},`+
+		`{"code":"schema.invalid_type","path":"schemas;Item;properties;prices","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean, enum, union"}},`+
+		`{"code":"schema.invalid_type","path":"schemas;Item;properties;tags","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean, enum, union"}}`+
 		`]}`, body)
 }
 
@@ -492,7 +492,7 @@ func (this *IntegrationSuite) TestValidateContract_SchemaNameWithADot_Rejected()
 
 	this.Equal(http.StatusBadRequest, status)
 	this.JSONEq(`{"message":"contract validation failed","violations":[`+
-		`{"code":"schema.name_syntax","path":"schemas;Pet.v2","source":"api.yaml","details":{"key":"Pet.v2","error":"must not contain \".\", \"[\", \"]\", \"{\", \"}\" or \";\""}}`+
+		`{"code":"schema.name_syntax","path":"schemas;Pet.v2","source":"api.yaml","details":{"key":"Pet.v2","error":"must not contain \".\", \"[\", \"]\", \"{\", \"}\", \";\", \"(\" or \")\""}}`+
 		`]}`, body)
 }
 

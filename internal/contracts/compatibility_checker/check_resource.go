@@ -57,5 +57,6 @@ func acceptsType(reader, producer string) bool {
 		return true
 	}
 
-	return reader == model.NumberType && (producer == model.IntegerType || producer == model.FloatType)
+	return (reader == model.NumberType && (producer == model.IntegerType || producer == model.FloatType)) ||
+		(reader == model.StringType && producer == model.EnumType)
 }

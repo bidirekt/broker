@@ -23,18 +23,24 @@ func schema(positionRules ...Rule) Node {
 		"properties":  Map(PropertyName, Lazy(Property)),
 		"items":       Lazy(func() Node { return SchemaAt("items") }),
 		"values":      Lazy(func() Node { return SchemaAt("values") }),
-		"ref":         SchemaRef,
-		"optional":    Flag,
-		"nullable":    Flag,
+		"members": ByType{
+			model.EnumType:  Members(model.EnumType, EnumValues()),
+			model.UnionType: Members(model.UnionType, UnionMembers()),
+		},
+		"ref":      SchemaRef,
+		"optional": Flag,
+		"nullable": Flag,
 	}).Rules(append([]Rule{
 		schemaRequiresTypeOrRef,
 		refExcludes("type"),
 		keyBelongsTo("properties", model.ObjectType),
 		keyBelongsTo("items", model.ArrayType),
 		keyBelongsTo("values", model.MapType),
+		keyBelongsTo("members", model.EnumType, model.UnionType),
 		objectRequiresProperties,
 		arrayRequiresItems,
 		mapRequiresValues,
+		membersRequired,
 	}, positionRules...)...)
 }
 
@@ -115,6 +121,18 @@ func mapRequiresValues(present PresentFields) *violation.Violation {
 	}
 
 	return &violation.Violation{ErrorCode: "schema.map_without_values"}
+}
+
+func membersRequired(present PresentFields) *violation.Violation {
+	schemaType, _ := present["type"].(string)
+	if present["ref"] != nil || (schemaType != model.EnumType && schemaType != model.UnionType) || present["members"] != nil {
+		return nil
+	}
+
+	return &violation.Violation{
+		ErrorCode: "members.required",
+		Details:   map[string]string{"type": schemaType},
+	}
 }
 
 func optionalNotAllowedAt(position string) Rule {

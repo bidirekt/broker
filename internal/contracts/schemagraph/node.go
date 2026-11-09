@@ -26,13 +26,15 @@ type declaration struct {
 	site      Site
 	shape     Site
 	fieldType string
+	members   []string
 	optional  bool
 	nullable  bool
 }
 
 type Declaration struct {
-	Source string
-	Type   string
+	Source  string
+	Type    string
+	Members []string
 }
 
 func (this Node) Exists() bool {
@@ -46,6 +48,15 @@ func (this Node) Type() string {
 	}
 
 	return this.declarations[0].fieldType
+}
+
+// Members are the first body's enum values, sorted: bodies that disagree are rejected at publish.
+func (this Node) Members() []string {
+	if !this.Exists() {
+		return nil
+	}
+
+	return this.declarations[0].members
 }
 
 func (this Node) Optional() bool {
@@ -67,7 +78,7 @@ func (this Node) Nullable() bool {
 func (this Node) Declarations() []Declaration {
 	declarations := make([]Declaration, 0, len(this.declarations))
 	for _, declaration := range this.declarations {
-		declarations = append(declarations, Declaration{Source: declaration.source, Type: declaration.fieldType})
+		declarations = append(declarations, Declaration{Source: declaration.source, Type: declaration.fieldType, Members: declaration.members})
 	}
 
 	return declarations
@@ -96,13 +107,14 @@ func (this Node) Segments() []string {
 	return slices.Compact(segments)
 }
 
+// A union member some bodies leave out is an alternative they never send, not a field they may omit.
 func (this Node) Child(segment string) Node {
 	child := Node{graph: this.graph, join: this.join}
 
 	for _, parent := range this.declarations {
 		site := Site{Schema: parent.shape.Schema, Path: model.ChildPath(parent.shape.Path, segment)}
 		if !this.graph.declares(site) {
-			child.lacking = true
+			child.lacking = !model.IsMemberSegment(segment)
 
 			continue
 		}

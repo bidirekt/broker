@@ -14,6 +14,7 @@ func TestBreakingReason_IsPropertyBreak_OnlyForPropertyReasons(t *testing.T) {
 		model.ReasonProviderResourceInteractionNotFound,
 		model.ReasonPropertyMissingInProvider,
 		model.ReasonPropertyMissingInConsumer,
+		model.ReasonPropertyMemberMissingInProvider,
 		model.ReasonPropertyTypeMismatch,
 		model.ReasonPropertyOptionalInProviderRequiredInConsumer,
 		model.ReasonPropertyOptionalInConsumerRequiredInProvider,
