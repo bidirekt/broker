@@ -11,12 +11,14 @@ import (
 
 func removedProviderResource() *model.PersistedResource {
 	return &model.PersistedResource{
-		Direction:          model.Provides,
-		Interaction:        model.RestResponse,
-		Endpoint:           "/users",
-		Method:             "get",
-		ResponseStatusCode: null.StringFrom("200"),
-		ParticipantName:    "users",
+		Resource: model.Resource{
+			Direction:          model.Provides,
+			Interaction:        model.RestResponse,
+			Endpoint:           "/users",
+			Method:             "get",
+			ResponseStatusCode: null.StringFrom("200"),
+			ParticipantName:    "users",
+		},
 		ProviderHash:       "provider-hash",
 		ParticipantVersion: null.StringFrom("v2"),
 		Removed:            true,
@@ -25,15 +27,17 @@ func removedProviderResource() *model.PersistedResource {
 
 func stillConsumingResource(participantID int64, participantName, version string) model.PersistedResource {
 	return model.PersistedResource{
+		Resource: model.Resource{
+			ParticipantName:    participantName,
+			Direction:          model.Consumes,
+			Interaction:        model.RestResponse,
+			ConsumedProvider:   null.StringFrom("users"),
+			Endpoint:           "/users",
+			Method:             "get",
+			ResponseStatusCode: null.StringFrom("200"),
+		},
 		ParticipantID:      participantID,
-		ParticipantName:    participantName,
 		ContractID:         participantID * 10,
-		Direction:          model.Consumes,
-		Interaction:        model.RestResponse,
-		ConsumedProvider:   null.StringFrom("users"),
-		Endpoint:           "/users",
-		Method:             "get",
-		ResponseStatusCode: null.StringFrom("200"),
 		ProviderHash:       "provider-hash",
 		ConsumerHash:       null.StringFrom("consumer-hash-" + participantName),
 		ParticipantVersion: null.StringFrom(version),
@@ -138,11 +142,13 @@ func TestRemovedProviderResultKeepsTheRealContractIDInAnyOrder(t *testing.T) {
 
 func liveUsersProviderResource(method string, interaction model.Interaction, status string) model.PersistedResource {
 	resource := model.PersistedResource{
-		Direction:          model.Provides,
-		Interaction:        interaction,
-		Endpoint:           "/users",
-		Method:             method,
-		ParticipantName:    "users",
+		Resource: model.Resource{
+			Direction:       model.Provides,
+			Interaction:     interaction,
+			Endpoint:        "/users",
+			Method:          method,
+			ParticipantName: "users",
+		},
 		ParticipantVersion: null.StringFrom("v2"),
 	}
 

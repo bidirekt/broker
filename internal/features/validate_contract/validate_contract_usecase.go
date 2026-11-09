@@ -129,16 +129,9 @@ func toPersistedContract(
 	resources := make(map[string]model.PersistedResource, len(uploadedContract.Resources)+len(removedResources))
 	for hash, resource := range uploadedContract.Resources {
 		resources[hash] = model.PersistedResource{
-			ParticipantName:    resource.ParticipantName,
-			Direction:          resource.Direction,
-			Interaction:        resource.Interaction,
-			ConsumedProvider:   resource.ConsumedProvider,
-			Endpoint:           resource.Endpoint,
-			Method:             resource.Method,
-			ResponseStatusCode: resource.ResponseStatusCode,
-			Bodies:             resource.Bodies,
-			Schemas:            uploadedContract.Schemas,
-			ProviderHash:       resource.ProviderHash(),
+			Resource:     resource.Resource,
+			Schemas:      uploadedContract.Schemas,
+			ProviderHash: resource.ProviderHash(),
 		}
 	}
 

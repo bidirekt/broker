@@ -13,14 +13,16 @@ import (
 
 func consumerResource() *model.PersistedResource {
 	return &model.PersistedResource{
-		Direction:          model.Consumes,
-		Interaction:        model.RestResponse,
-		ConsumedProvider:   null.StringFrom("api"),
-		Endpoint:           "/things",
-		Method:             "get",
-		ResponseStatusCode: null.StringFrom("200"),
-		ParticipantName:    "front",
-		Bodies:             thingsBodies("FrontThing"),
+		Resource: model.Resource{
+			Direction:          model.Consumes,
+			Interaction:        model.RestResponse,
+			ConsumedProvider:   null.StringFrom("api"),
+			Endpoint:           "/things",
+			Method:             "get",
+			ResponseStatusCode: null.StringFrom("200"),
+			ParticipantName:    "front",
+			Bodies:             thingsBodies("FrontThing"),
+		},
 		Schemas: model.Schemas{"FrontThing": {
 			"":     {Type: "object"},
 			"id":   {Type: "integer"},
@@ -31,13 +33,15 @@ func consumerResource() *model.PersistedResource {
 
 func providerResource() *model.PersistedResource {
 	return &model.PersistedResource{
-		Direction:          model.Provides,
-		Interaction:        model.RestResponse,
-		Endpoint:           "/things",
-		Method:             "get",
-		ResponseStatusCode: null.StringFrom("200"),
-		ParticipantName:    "api",
-		Bodies:             thingsBodies("ApiThing"),
+		Resource: model.Resource{
+			Direction:          model.Provides,
+			Interaction:        model.RestResponse,
+			Endpoint:           "/things",
+			Method:             "get",
+			ResponseStatusCode: null.StringFrom("200"),
+			ParticipantName:    "api",
+			Bodies:             thingsBodies("ApiThing"),
+		},
 		Schemas: model.Schemas{"ApiThing": {
 			"":   {Type: "object"},
 			"id": {Type: "string"},
@@ -80,9 +84,11 @@ func thingsBreak(
 
 func TestProviderResourceNotFound(t *testing.T) {
 	consumer := &model.PersistedResource{
-		Direction:        model.Consumes,
-		ConsumedProvider: null.StringFrom("accounts"),
-		ParticipantName:  "front",
+		Resource: model.Resource{
+			Direction:        model.Consumes,
+			ConsumedProvider: null.StringFrom("accounts"),
+			ParticipantName:  "front",
+		},
 	}
 
 	change := compatibility_checker.NewContractBreakingChange(
@@ -103,25 +109,29 @@ func TestPropertyBreakDetails(t *testing.T) {
 	consumerResponse := consumerResource()
 	providerResponse := providerResource()
 	consumerRequest := &model.PersistedResource{
-		Direction:        model.Consumes,
-		Interaction:      model.RestRequest,
-		ConsumedProvider: null.StringFrom("api"),
-		Endpoint:         "/things",
-		Method:           "post",
-		ParticipantName:  "front",
-		Bodies:           thingsBodies("FrontFlag"),
+		Resource: model.Resource{
+			Direction:        model.Consumes,
+			Interaction:      model.RestRequest,
+			ConsumedProvider: null.StringFrom("api"),
+			Endpoint:         "/things",
+			Method:           "post",
+			ParticipantName:  "front",
+			Bodies:           thingsBodies("FrontFlag"),
+		},
 		Schemas: model.Schemas{"FrontFlag": {
 			"":     {Type: "object"},
 			"flag": {Type: "boolean", Optional: true},
 		}},
 	}
 	providerRequest := &model.PersistedResource{
-		Direction:       model.Provides,
-		Interaction:     model.RestRequest,
-		Endpoint:        "/things",
-		Method:          "post",
-		ParticipantName: "api",
-		Bodies:          thingsBodies("ApiFlag"),
+		Resource: model.Resource{
+			Direction:       model.Provides,
+			Interaction:     model.RestRequest,
+			Endpoint:        "/things",
+			Method:          "post",
+			ParticipantName: "api",
+			Bodies:          thingsBodies("ApiFlag"),
+		},
 		Schemas: model.Schemas{"ApiFlag": {
 			"":     {Type: "object"},
 			"user": {Type: "string"},
@@ -271,9 +281,11 @@ func TestBreakMarshalsOnlyReasonRoleAndDetails(t *testing.T) {
 
 func TestProviderNotDeployedHasNoDetails(t *testing.T) {
 	consumer := &model.PersistedResource{
-		Direction:        model.Consumes,
-		ConsumedProvider: null.StringFrom("accounts"),
-		ParticipantName:  "front",
+		Resource: model.Resource{
+			Direction:        model.Consumes,
+			ConsumedProvider: null.StringFrom("accounts"),
+			ParticipantName:  "front",
+		},
 	}
 
 	notDeployed := compatibility_checker.NewProviderResourceNotDeployed(consumer)
@@ -354,13 +366,15 @@ func TestHierarchicalGroupsBreaksByInteraction(t *testing.T) {
 	consumerResponse := consumerResource()
 	providerResponse := providerResource()
 	consumerRequest := &model.PersistedResource{
-		Direction:          model.Consumes,
-		Interaction:        model.RestRequest,
-		ConsumedProvider:   null.StringFrom("api"),
-		Endpoint:           "/things",
-		Method:             "get",
-		ResponseStatusCode: null.StringFrom("200"),
-		ParticipantName:    "front",
+		Resource: model.Resource{
+			Direction:          model.Consumes,
+			Interaction:        model.RestRequest,
+			ConsumedProvider:   null.StringFrom("api"),
+			Endpoint:           "/things",
+			Method:             "get",
+			ResponseStatusCode: null.StringFrom("200"),
+			ParticipantName:    "front",
+		},
 	}
 
 	requestBreak := thingsBreak(consumerRequest, providerResponse, model.ReasonPropertyMissingInProvider, "user")

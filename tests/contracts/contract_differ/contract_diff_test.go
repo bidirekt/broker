@@ -34,15 +34,17 @@ func persistedPets(schemas model.Schemas, resources ...*model.UploadedResource) 
 	for _, resource := range resources {
 		resource.ParticipantName = participantName
 		contract.Resources[resource.PrimaryHash()] = model.PersistedResource{
-			ParticipantName:    participantName,
-			Direction:          resource.Direction,
-			Interaction:        resource.Interaction,
-			ProviderHash:       resource.ProviderHash(),
-			Endpoint:           resource.Endpoint,
-			Method:             resource.Method,
-			ResponseStatusCode: resource.ResponseStatusCode,
-			Bodies:             resource.Bodies,
-			Schemas:            schemas,
+			Resource: model.Resource{
+				ParticipantName:    participantName,
+				Direction:          resource.Direction,
+				Interaction:        resource.Interaction,
+				Endpoint:           resource.Endpoint,
+				Method:             resource.Method,
+				ResponseStatusCode: resource.ResponseStatusCode,
+				Bodies:             resource.Bodies,
+			},
+			ProviderHash: resource.ProviderHash(),
+			Schemas:      schemas,
 		}
 	}
 
@@ -200,25 +202,35 @@ func TestDiff_RefTargetRenamed_ModifiesTheRefField(t *testing.T) {
 
 func TestRemovedSinceDeployed_ResourceGoneFromTheFiles_Counts(t *testing.T) {
 	gone := model.PersistedResource{
-		ParticipantName:    participantName,
-		Direction:          model.Provides,
-		Interaction:        model.RestResponse,
-		ProviderHash:       "get-pet",
-		Endpoint:           "/pets/*",
-		Method:             "get",
-		ResponseStatusCode: null.StringFrom("200"),
-		Bodies:             petBody(),
+		Resource: model.Resource{
+			ParticipantName:    participantName,
+			Direction:          model.Provides,
+			Interaction:        model.RestResponse,
+			Endpoint:           "/pets/*",
+			Method:             "get",
+			ResponseStatusCode: null.StringFrom("200"),
+			Bodies:             petBody(),
+		},
+		ProviderHash: "get-pet",
 	}
 	deployed := &model.PersistedContract{
 		ParticipantName: participantName,
 		Resources: map[string]model.PersistedResource{
-			"list-pets": {Bodies: petBody()},
-			"get-pet":   gone,
+			"list-pets": {
+				Resource: model.Resource{
+					Bodies: petBody(),
+				},
+			},
+			"get-pet": gone,
 		},
 	}
 	next := &model.UploadedContract{
 		ParticipantName: participantName,
-		Resources:       map[string]model.UploadedResource{"list-pets": {Bodies: petBody()}},
+		Resources: map[string]model.UploadedResource{"list-pets": {
+			Resource: model.Resource{
+				Bodies: petBody(),
+			},
+		}},
 	}
 
 	removed := contract_differ.RemovedSinceDeployed(deployed, next)
@@ -230,13 +242,21 @@ func TestRemovedSinceDeployed_ResourceGoneFromTheFiles_Counts(t *testing.T) {
 func TestRemovedSinceDeployed_ResourceThatOnlyLostFields_DoesNotCount(t *testing.T) {
 	deployed := &model.PersistedContract{
 		ParticipantName: participantName,
-		Resources:       map[string]model.PersistedResource{"list-pets": {Bodies: petBody()}},
-		Schemas:         petSchemas(),
+		Resources: map[string]model.PersistedResource{"list-pets": {
+			Resource: model.Resource{
+				Bodies: petBody(),
+			},
+		}},
+		Schemas: petSchemas(),
 	}
 	next := &model.UploadedContract{
 		ParticipantName: participantName,
-		Resources:       map[string]model.UploadedResource{"list-pets": {Bodies: petBody()}},
-		Schemas:         model.Schemas{"Pet": {"": {Type: "object"}}},
+		Resources: map[string]model.UploadedResource{"list-pets": {
+			Resource: model.Resource{
+				Bodies: petBody(),
+			},
+		}},
+		Schemas: model.Schemas{"Pet": {"": {Type: "object"}}},
 	}
 
 	assert.Empty(t, contract_differ.RemovedSinceDeployed(deployed, next))
@@ -246,13 +266,21 @@ func TestRemovedSinceDeployed_ResourceAlreadyRemovedInTheDeployedVersion_DoesNot
 	deployed := &model.PersistedContract{
 		ParticipantName: participantName,
 		Resources: map[string]model.PersistedResource{
-			"list-pets": {Bodies: petBody()},
-			"get-pet":   {Removed: true},
+			"list-pets": {
+				Resource: model.Resource{
+					Bodies: petBody(),
+				},
+			},
+			"get-pet": {Removed: true},
 		},
 	}
 	next := &model.UploadedContract{
 		ParticipantName: participantName,
-		Resources:       map[string]model.UploadedResource{"list-pets": {Bodies: petBody()}},
+		Resources: map[string]model.UploadedResource{"list-pets": {
+			Resource: model.Resource{
+				Bodies: petBody(),
+			},
+		}},
 	}
 
 	assert.Empty(t, contract_differ.RemovedSinceDeployed(deployed, next))

@@ -51,19 +51,21 @@ func (this *tableRow) toPersistedContractModel() *model.PersistedContract {
 
 func (this *tableRow) toResourceModel() model.PersistedResource {
 	resource := model.PersistedResource{
-		Direction:          model.Direction(this.ResourceDirection),
-		Interaction:        model.Interaction(this.ResourceInteraction),
-		Endpoint:           this.ResourceEndpoint,
-		Method:             this.ResourceMethod,
-		Bodies:             this.toResourceBodies(),
-		ParticipantName:    this.ParticipantName,
-		ParticipantID:      this.ParticipantID,
-		ContractID:         this.ContractID,
-		ProviderHash:       this.ResourceProviderHash,
-		ConsumedProvider:   this.ResourceConsumedProvider,
-		ResponseStatusCode: this.ResourceResponseStatusCode,
-		ConsumerHash:       this.ResourceConsumerHash,
-		Removed:            this.ResourceVersionChangeType == string(model.ChangeRemoved),
+		Resource: model.Resource{
+			Direction:          model.Direction(this.ResourceDirection),
+			Interaction:        model.Interaction(this.ResourceInteraction),
+			Endpoint:           this.ResourceEndpoint,
+			Method:             this.ResourceMethod,
+			Bodies:             this.toResourceBodies(),
+			ParticipantName:    this.ParticipantName,
+			ConsumedProvider:   this.ResourceConsumedProvider,
+			ResponseStatusCode: this.ResourceResponseStatusCode,
+		},
+		ParticipantID: this.ParticipantID,
+		ContractID:    this.ContractID,
+		ProviderHash:  this.ResourceProviderHash,
+		ConsumerHash:  this.ResourceConsumerHash,
+		Removed:       this.ResourceVersionChangeType == string(model.ChangeRemoved),
 	}
 
 	if this.ResourceVersion != "" {

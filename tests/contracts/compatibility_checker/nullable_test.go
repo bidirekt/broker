@@ -51,28 +51,32 @@ func avatarsResources(
 	}
 
 	consumer = model.PersistedResource{
-		ParticipantName:    avatarsConsumerName,
-		Direction:          model.Consumes,
-		Interaction:        kind,
-		ConsumedProvider:   null.StringFrom(avatarsProviderName),
-		ConsumerHash:       null.StringFrom("spa-" + avatarsProviderHash),
-		ProviderHash:       avatarsProviderHash,
-		Endpoint:           avatarsEndpoint,
-		Method:             avatarsMethod,
-		ResponseStatusCode: status,
-		Bodies:             []model.ResourceBody{{Source: "spa.yaml", SchemaName: null.StringFrom("Profile")}},
-		Schemas:            model.Schemas{"Profile": consumerSchema},
+		Resource: model.Resource{
+			ParticipantName:    avatarsConsumerName,
+			Direction:          model.Consumes,
+			Interaction:        kind,
+			ConsumedProvider:   null.StringFrom(avatarsProviderName),
+			Endpoint:           avatarsEndpoint,
+			Method:             avatarsMethod,
+			ResponseStatusCode: status,
+			Bodies:             []model.ResourceBody{{Source: "spa.yaml", SchemaName: null.StringFrom("Profile")}},
+		},
+		ConsumerHash: null.StringFrom("spa-" + avatarsProviderHash),
+		ProviderHash: avatarsProviderHash,
+		Schemas:      model.Schemas{"Profile": consumerSchema},
 	}
 
 	provider = model.PersistedResource{
-		ParticipantName:    avatarsProviderName,
-		Direction:          model.Provides,
-		Interaction:        kind,
+		Resource: model.Resource{
+			ParticipantName:    avatarsProviderName,
+			Direction:          model.Provides,
+			Interaction:        kind,
+			Endpoint:           avatarsEndpoint,
+			Method:             avatarsMethod,
+			ResponseStatusCode: status,
+			Bodies:             []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Profile")}},
+		},
 		ProviderHash:       avatarsProviderHash,
-		Endpoint:           avatarsEndpoint,
-		Method:             avatarsMethod,
-		ResponseStatusCode: status,
-		Bodies:             []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Profile")}},
 		Schemas:            model.Schemas{"Profile": providerSchema},
 		ParticipantVersion: null.StringFrom("1.0.0"),
 	}

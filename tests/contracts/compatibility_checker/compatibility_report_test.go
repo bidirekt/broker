@@ -36,28 +36,32 @@ func postPetsResources(
 	}
 
 	consumer = model.PersistedResource{
-		ParticipantName:    petstoreWeb,
-		Direction:          model.Consumes,
-		Interaction:        kind,
-		ConsumedProvider:   null.StringFrom(petstoreAPI),
-		ConsumerHash:       null.StringFrom("web-" + postPetsHash),
-		ProviderHash:       postPetsHash,
-		Endpoint:           "/pets",
-		Method:             "post",
-		ResponseStatusCode: status,
-		Bodies:             []model.ResourceBody{{Source: "web.yaml", SchemaName: null.StringFrom("Pet")}},
-		Schemas:            model.Schemas{"Pet": consumerSchema},
+		Resource: model.Resource{
+			ParticipantName:    petstoreWeb,
+			Direction:          model.Consumes,
+			Interaction:        kind,
+			ConsumedProvider:   null.StringFrom(petstoreAPI),
+			Endpoint:           "/pets",
+			Method:             "post",
+			ResponseStatusCode: status,
+			Bodies:             []model.ResourceBody{{Source: "web.yaml", SchemaName: null.StringFrom("Pet")}},
+		},
+		ConsumerHash: null.StringFrom("web-" + postPetsHash),
+		ProviderHash: postPetsHash,
+		Schemas:      model.Schemas{"Pet": consumerSchema},
 	}
 
 	provider = model.PersistedResource{
-		ParticipantName:    petstoreAPI,
-		Direction:          model.Provides,
-		Interaction:        kind,
+		Resource: model.Resource{
+			ParticipantName:    petstoreAPI,
+			Direction:          model.Provides,
+			Interaction:        kind,
+			Endpoint:           "/pets",
+			Method:             "post",
+			ResponseStatusCode: status,
+			Bodies:             []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Pet")}},
+		},
 		ProviderHash:       postPetsHash,
-		Endpoint:           "/pets",
-		Method:             "post",
-		ResponseStatusCode: status,
-		Bodies:             []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Pet")}},
 		Schemas:            model.Schemas{"Pet": providerSchema},
 		ParticipantVersion: null.StringFrom("1.0.0"),
 	}

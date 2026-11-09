@@ -31,15 +31,17 @@ func newsletterConsumer(interaction string) model.PersistedResource {
 	}
 
 	return model.PersistedResource{
-		ParticipantName:    newsletterConsumerName,
-		Direction:          model.Consumes,
-		Interaction:        kind,
-		ConsumedProvider:   null.StringFrom(newsletterProviderName),
-		ConsumerHash:       null.StringFrom("site-" + newsletterHash),
-		ProviderHash:       newsletterHash,
-		Endpoint:           "/newsletter/unsubscribe",
-		Method:             "post",
-		ResponseStatusCode: status,
+		Resource: model.Resource{
+			ParticipantName:    newsletterConsumerName,
+			Direction:          model.Consumes,
+			Interaction:        kind,
+			ConsumedProvider:   null.StringFrom(newsletterProviderName),
+			Endpoint:           "/newsletter/unsubscribe",
+			Method:             "post",
+			ResponseStatusCode: status,
+		},
+		ConsumerHash: null.StringFrom("site-" + newsletterHash),
+		ProviderHash: newsletterHash,
 	}
 }
 

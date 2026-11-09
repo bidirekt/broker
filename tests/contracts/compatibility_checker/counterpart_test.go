@@ -25,32 +25,36 @@ func (this rolesWithoutVerdict) GetVerdict(context.Context, int64, int64) (*mode
 
 func rolesProvider(participantID int64, participantName string) model.PersistedResource {
 	return model.PersistedResource{
+		Resource: model.Resource{
+			ParticipantName:    participantName,
+			Direction:          model.Provides,
+			Interaction:        model.RestResponse,
+			Endpoint:           "/orders",
+			Method:             "get",
+			ResponseStatusCode: null.StringFrom("204"),
+		},
 		ParticipantID:      participantID,
-		ParticipantName:    participantName,
 		ContractID:         participantID * 10,
-		Direction:          model.Provides,
-		Interaction:        model.RestResponse,
 		ProviderHash:       rolesHash,
-		Endpoint:           "/orders",
-		Method:             "get",
-		ResponseStatusCode: null.StringFrom("204"),
 		ParticipantVersion: null.StringFrom("v1"),
 	}
 }
 
 func rolesConsumer(participantID int64, participantName, providerName string) model.PersistedResource {
 	return model.PersistedResource{
+		Resource: model.Resource{
+			ParticipantName:    participantName,
+			Direction:          model.Consumes,
+			Interaction:        model.RestResponse,
+			ConsumedProvider:   null.StringFrom(providerName),
+			Endpoint:           "/orders",
+			Method:             "get",
+			ResponseStatusCode: null.StringFrom("204"),
+		},
 		ParticipantID:      participantID,
-		ParticipantName:    participantName,
 		ContractID:         participantID * 10,
-		Direction:          model.Consumes,
-		Interaction:        model.RestResponse,
-		ConsumedProvider:   null.StringFrom(providerName),
 		ConsumerHash:       null.StringFrom(participantName + "-" + rolesHash),
 		ProviderHash:       rolesHash,
-		Endpoint:           "/orders",
-		Method:             "get",
-		ResponseStatusCode: null.StringFrom("204"),
 		ParticipantVersion: null.StringFrom("v1"),
 	}
 }

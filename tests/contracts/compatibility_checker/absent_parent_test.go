@@ -117,28 +117,32 @@ func groupsResources(interaction string, consumerBody, providerBody groupsBody) 
 	}
 
 	consumer = model.PersistedResource{
-		ParticipantName:    groupsConsumerName,
-		Direction:          model.Consumes,
-		Interaction:        kind,
-		ConsumedProvider:   null.StringFrom(groupsProviderName),
-		ConsumerHash:       null.StringFrom("spa-" + groupsProviderHash),
-		ProviderHash:       groupsProviderHash,
-		Endpoint:           "/api/groups",
-		Method:             "post",
-		ResponseStatusCode: status,
-		Bodies:             consumerBody.bodies,
-		Schemas:            consumerBody.schemas,
+		Resource: model.Resource{
+			ParticipantName:    groupsConsumerName,
+			Direction:          model.Consumes,
+			Interaction:        kind,
+			ConsumedProvider:   null.StringFrom(groupsProviderName),
+			Endpoint:           "/api/groups",
+			Method:             "post",
+			ResponseStatusCode: status,
+			Bodies:             consumerBody.bodies,
+		},
+		ConsumerHash: null.StringFrom("spa-" + groupsProviderHash),
+		ProviderHash: groupsProviderHash,
+		Schemas:      consumerBody.schemas,
 	}
 
 	provider = model.PersistedResource{
-		ParticipantName:    groupsProviderName,
-		Direction:          model.Provides,
-		Interaction:        kind,
+		Resource: model.Resource{
+			ParticipantName:    groupsProviderName,
+			Direction:          model.Provides,
+			Interaction:        kind,
+			Endpoint:           "/api/groups",
+			Method:             "post",
+			ResponseStatusCode: status,
+			Bodies:             providerBody.bodies,
+		},
 		ProviderHash:       groupsProviderHash,
-		Endpoint:           "/api/groups",
-		Method:             "post",
-		ResponseStatusCode: status,
-		Bodies:             providerBody.bodies,
 		Schemas:            providerBody.schemas,
 		ParticipantVersion: null.StringFrom("1.0.0"),
 	}

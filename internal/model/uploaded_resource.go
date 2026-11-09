@@ -7,22 +7,7 @@ import (
 )
 
 type UploadedResource struct {
-	ParticipantName    string
-	Direction          Direction
-	Interaction        Interaction
-	ConsumedProvider   null.String
-	Endpoint           string
-	Method             string
-	ResponseStatusCode null.String
-	Bodies             []ResourceBody
-}
-
-func (this *UploadedResource) IsConsumer() bool {
-	return this.Direction == Consumes
-}
-
-func (this *UploadedResource) IsProvider() bool {
-	return this.Direction == Provides
+	Resource
 }
 
 // Describe names the resource the way publish errors quote it: the same parts that
@@ -85,11 +70,13 @@ func NewRestRequestConsumer(
 	bodies []ResourceBody,
 ) *UploadedResource {
 	resource := &UploadedResource{
-		Direction:   Consumes,
-		Interaction: RestRequest,
-		Endpoint:    endpoint,
-		Method:      method,
-		Bodies:      bodies,
+		Resource: Resource{
+			Direction:   Consumes,
+			Interaction: RestRequest,
+			Endpoint:    endpoint,
+			Method:      method,
+			Bodies:      bodies,
+		},
 	}
 
 	if provider != "" {
@@ -104,11 +91,13 @@ func NewRestRequestProvider(
 	bodies []ResourceBody,
 ) *UploadedResource {
 	return &UploadedResource{
-		Direction:   Provides,
-		Interaction: RestRequest,
-		Endpoint:    endpoint,
-		Method:      method,
-		Bodies:      bodies,
+		Resource: Resource{
+			Direction:   Provides,
+			Interaction: RestRequest,
+			Endpoint:    endpoint,
+			Method:      method,
+			Bodies:      bodies,
+		},
 	}
 }
 
@@ -117,11 +106,13 @@ func NewRestResponseConsumer(
 	bodies []ResourceBody,
 ) *UploadedResource {
 	resource := &UploadedResource{
-		Direction:   Consumes,
-		Interaction: RestResponse,
-		Endpoint:    endpoint,
-		Method:      method,
-		Bodies:      bodies,
+		Resource: Resource{
+			Direction:   Consumes,
+			Interaction: RestResponse,
+			Endpoint:    endpoint,
+			Method:      method,
+			Bodies:      bodies,
+		},
 	}
 
 	if provider != "" {
@@ -140,11 +131,13 @@ func NewRestResponseProvider(
 	bodies []ResourceBody,
 ) *UploadedResource {
 	resource := &UploadedResource{
-		Direction:   Provides,
-		Interaction: RestResponse,
-		Endpoint:    endpoint,
-		Method:      method,
-		Bodies:      bodies,
+		Resource: Resource{
+			Direction:   Provides,
+			Interaction: RestResponse,
+			Endpoint:    endpoint,
+			Method:      method,
+			Bodies:      bodies,
+		},
 	}
 
 	if statusCode != "" {
