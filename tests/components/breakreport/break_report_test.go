@@ -5,6 +5,7 @@ import (
 
 	"github.com/bidirekt/broker/internal/components/breakreport"
 	"github.com/bidirekt/broker/internal/model"
+	"github.com/guregu/null"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -59,23 +60,20 @@ const providerSideReport = `{
   }
 }`
 
-func consumerSideCheck() breakreport.StoredCheck {
-	return breakreport.StoredCheck{
-		Participant: checkedParticipant,
-		Environment: checkEnvironment,
-		Report:      []byte(consumerSideReport),
-		Counterparts: []breakreport.StoredCounterpart{
-			{Name: "petstore_users", Role: model.CounterpartProvider, Version: "3.0.0", Registered: true, Deployable: true},
-			{Name: "petstore_reviews", Role: model.CounterpartProvider, Registered: true},
-			{Name: "petstore_api", Role: model.CounterpartBoth, Version: "1.4.0", Registered: true},
-		},
+func consumerSideCheck() (model.CompatibilityCheck, []model.CompatibilityCheckResult) {
+	return model.CompatibilityCheck{
+		ParticipantName: checkedParticipant,
+		EnvironmentName: checkEnvironment,
+		Report:          []byte(consumerSideReport),
+	}, []model.CompatibilityCheckResult{
+		{CounterpartName: "petstore_users", Role: model.CounterpartProvider, CounterpartVersion: null.StringFrom("3.0.0"), CounterpartParticipantID: null.IntFrom(1), Deployable: true},
+		{CounterpartName: "petstore_reviews", Role: model.CounterpartProvider, CounterpartParticipantID: null.IntFrom(1)},
+		{CounterpartName: "petstore_api", Role: model.CounterpartBoth, CounterpartVersion: null.StringFrom("1.4.0"), CounterpartParticipantID: null.IntFrom(1)},
 	}
 }
 
-func fromStoredCheck(t *testing.T, check breakreport.StoredCheck) breakreport.Report {
-	report, err := breakreport.FromStoredCheck(check)
-	require.NoError(t, err)
-	return report
+func fromStoredCheck(check model.CompatibilityCheck, results []model.CompatibilityCheckResult) breakreport.Report {
+	return breakreport.NewReader().FromStoredCheck(check, results)
 }
 
 func counterpartNamed(t *testing.T, report breakreport.Report, name string) breakreport.Counterpart {
@@ -89,7 +87,7 @@ func counterpartNamed(t *testing.T, report breakreport.Report, name string) brea
 }
 
 func TestCountsOneBreakPerFieldBlockAndPerEndpointBreak(t *testing.T) {
-	report := fromStoredCheck(t, consumerSideCheck())
+	report := fromStoredCheck(consumerSideCheck())
 
 	assert.True(t, report.Stored)
 	assert.Equal(t, 3, report.Breaks)
@@ -105,7 +103,7 @@ func TestCountsOneBreakPerFieldBlockAndPerEndpointBreak(t *testing.T) {
 }
 
 func TestSortsCounterpartsByName(t *testing.T) {
-	report := fromStoredCheck(t, consumerSideCheck())
+	report := fromStoredCheck(consumerSideCheck())
 
 	names := make([]string, 0, len(report.Counterparts))
 	for _, counterpart := range report.Counterparts {
@@ -115,7 +113,7 @@ func TestSortsCounterpartsByName(t *testing.T) {
 }
 
 func TestKeepsTheStoredRoleVersionAndRegistration(t *testing.T) {
-	api := counterpartNamed(t, fromStoredCheck(t, consumerSideCheck()), "petstore_api")
+	api := counterpartNamed(t, fromStoredCheck(consumerSideCheck()), "petstore_api")
 
 	assert.Equal(t, model.CounterpartBoth, api.Role)
 	assert.Equal(t, "1.4.0", api.Version)
@@ -124,7 +122,7 @@ func TestKeepsTheStoredRoleVersionAndRegistration(t *testing.T) {
 }
 
 func TestFieldBlockMergesPlacesAndNamesTheCounterpartField(t *testing.T) {
-	field := counterpartNamed(t, fromStoredCheck(t, consumerSideCheck()), "petstore_api").Fields[0]
+	field := counterpartNamed(t, fromStoredCheck(consumerSideCheck()), "petstore_api").Fields[0]
 
 	assert.Equal(t, "Pet.weight", field.Field)
 	assert.Equal(t, model.ReasonPropertyTypeMismatch, field.Reason)
@@ -140,7 +138,7 @@ func TestFieldBlockMergesPlacesAndNamesTheCounterpartField(t *testing.T) {
 }
 
 func TestEndpointBreakCarriesItsInteractionSentenceReasonAndFixes(t *testing.T) {
-	api := counterpartNamed(t, fromStoredCheck(t, consumerSideCheck()), "petstore_api")
+	api := counterpartNamed(t, fromStoredCheck(consumerSideCheck()), "petstore_api")
 
 	require.Len(t, api.Endpoints, 1)
 	endpoint := api.Endpoints[0]
@@ -159,7 +157,7 @@ func TestEndpointBreakCarriesItsInteractionSentenceReasonAndFixes(t *testing.T) 
 }
 
 func TestNotDeployedBreakHasOnlyTheCounterpartFix(t *testing.T) {
-	reviews := counterpartNamed(t, fromStoredCheck(t, consumerSideCheck()), "petstore_reviews")
+	reviews := counterpartNamed(t, fromStoredCheck(consumerSideCheck()), "petstore_reviews")
 
 	broken := reviews.Endpoints[0].Breaks[0]
 	assert.Equal(t, "petstore_web calls GET /reviews, but petstore_reviews is not deployed in production", broken.Sentence.String())
@@ -168,7 +166,7 @@ func TestNotDeployedBreakHasOnlyTheCounterpartFix(t *testing.T) {
 }
 
 func TestSentenceMarksTheNamesAndTheResource(t *testing.T) {
-	sentence := counterpartNamed(t, fromStoredCheck(t, consumerSideCheck()), "petstore_reviews").Endpoints[0].Breaks[0].Sentence
+	sentence := counterpartNamed(t, fromStoredCheck(consumerSideCheck()), "petstore_reviews").Endpoints[0].Breaks[0].Sentence
 
 	var names, codes []string
 	for _, segment := range sentence {
@@ -184,12 +182,11 @@ func TestSentenceMarksTheNamesAndTheResource(t *testing.T) {
 }
 
 func TestRemovedCountsOncePerEndpointAndMethodAndInteractionRemovedOncePerInteraction(t *testing.T) {
-	report := fromStoredCheck(t, breakreport.StoredCheck{
-		Participant:  "petstore_api",
-		Environment:  checkEnvironment,
-		Report:       []byte(providerSideReport),
-		Counterparts: []breakreport.StoredCounterpart{{Name: "petstore_web", Role: model.CounterpartConsumer, Version: "2.2.0", Registered: true}},
-	})
+	report := fromStoredCheck(model.CompatibilityCheck{
+		ParticipantName: "petstore_api",
+		EnvironmentName: checkEnvironment,
+		Report:          []byte(providerSideReport),
+	}, []model.CompatibilityCheckResult{{CounterpartName: "petstore_web", Role: model.CounterpartConsumer, CounterpartVersion: null.StringFrom("2.2.0"), CounterpartParticipantID: null.IntFrom(1)}})
 
 	assert.Equal(t, 3, report.Breaks)
 	assert.Equal(t, 0, report.Places)
@@ -218,14 +215,13 @@ func TestRemovedCountsOncePerEndpointAndMethodAndInteractionRemovedOncePerIntera
 }
 
 func TestProviderSideFieldBreakPutsTheCheckedProviderFixFirst(t *testing.T) {
-	report := fromStoredCheck(t, breakreport.StoredCheck{
-		Participant: "petstore_api",
-		Environment: checkEnvironment,
+	report := fromStoredCheck(model.CompatibilityCheck{
+		ParticipantName: "petstore_api",
+		EnvironmentName: checkEnvironment,
 		Report: []byte(`{"petstore_web": {"deployable": false, "participantVersion": "2.2.0", "endpoints": {
 			"/pets": {"get": {"200": [{"reason": "property_type_mismatch", "role": "provider", "details": {"property": "$", "consumerField": "Pets", "consumerPropertyType": "array<object>", "providerPropertyType": "object"}}]}}
 		}}}`),
-		Counterparts: []breakreport.StoredCounterpart{{Name: "petstore_web", Role: model.CounterpartConsumer, Version: "2.2.0", Registered: true}},
-	})
+	}, []model.CompatibilityCheckResult{{CounterpartName: "petstore_web", Role: model.CounterpartConsumer, CounterpartVersion: null.StringFrom("2.2.0"), CounterpartParticipantID: null.IntFrom(1)}})
 
 	field := report.Counterparts[0].Fields[0]
 	assert.Equal(t, "Pets", field.Field)
@@ -238,17 +234,16 @@ func TestProviderSideFieldBreakPutsTheCheckedProviderFixFirst(t *testing.T) {
 }
 
 func TestDistinctFieldBreaksCountSeparately(t *testing.T) {
-	report := fromStoredCheck(t, breakreport.StoredCheck{
-		Participant: checkedParticipant,
-		Environment: checkEnvironment,
+	report := fromStoredCheck(model.CompatibilityCheck{
+		ParticipantName: checkedParticipant,
+		EnvironmentName: checkEnvironment,
 		Report: []byte(`{"petstore_api": {"deployable": false, "participantVersion": "1.4.0", "endpoints": {
 			"/pets": {"get": {"200": [
 				{"reason": "property_missing_in_provider", "role": "consumer", "details": {"property": "$[].status", "consumerField": "Pet.status", "propertyType": "string"}},
 				{"reason": "property_missing_in_provider", "role": "consumer", "details": {"property": "$[].tag", "consumerField": "Pet.tag", "propertyType": "string"}}
 			]}}
 		}}}`),
-		Counterparts: []breakreport.StoredCounterpart{{Name: "petstore_api", Role: model.CounterpartProvider, Version: "1.4.0", Registered: true}},
-	})
+	}, []model.CompatibilityCheckResult{{CounterpartName: "petstore_api", Role: model.CounterpartProvider, CounterpartVersion: null.StringFrom("1.4.0"), CounterpartParticipantID: null.IntFrom(1)}})
 
 	assert.Equal(t, 2, report.Breaks)
 	assert.Equal(t, 2, report.Places)
@@ -258,14 +253,13 @@ func TestDistinctFieldBreaksCountSeparately(t *testing.T) {
 }
 
 func TestNotFoundReasonNamesTheDeployedVersion(t *testing.T) {
-	report := fromStoredCheck(t, breakreport.StoredCheck{
-		Participant: checkedParticipant,
-		Environment: checkEnvironment,
+	report := fromStoredCheck(model.CompatibilityCheck{
+		ParticipantName: checkedParticipant,
+		EnvironmentName: checkEnvironment,
 		Report: []byte(`{"petstore_api": {"deployable": false, "participantVersion": "1.4.0", "endpoints": {
 			"/pets": {"get": {"200": [{"reason": "provider_resource_not_found", "role": "consumer"}]}}
 		}}}`),
-		Counterparts: []breakreport.StoredCounterpart{{Name: "petstore_api", Role: model.CounterpartProvider, Version: "1.4.0", Registered: true}},
-	})
+	}, []model.CompatibilityCheckResult{{CounterpartName: "petstore_api", Role: model.CounterpartProvider, CounterpartVersion: null.StringFrom("1.4.0"), CounterpartParticipantID: null.IntFrom(1)}})
 
 	assert.Equal(t, "petstore_api 1.4.0, deployed in production, doesn't provide this endpoint",
 		report.Counterparts[0].Endpoints[0].Breaks[0].ReasonLine)
@@ -276,12 +270,11 @@ func TestNotDeployedReasonIsTheSameWhetherTheCounterpartIsAParticipantOrNot(t *t
 		"/pets": {"get": {"200": [{"reason": "provider_resource_not_deployed_in_environment", "role": "consumer"}]}}
 	}}}`
 	reasonFor := func(registered bool) string {
-		report := fromStoredCheck(t, breakreport.StoredCheck{
-			Participant:  checkedParticipant,
-			Environment:  checkEnvironment,
-			Report:       []byte(notDeployed),
-			Counterparts: []breakreport.StoredCounterpart{{Name: "petstore_api", Role: model.CounterpartProvider, Registered: registered}},
-		})
+		report := fromStoredCheck(model.CompatibilityCheck{
+			ParticipantName: checkedParticipant,
+			EnvironmentName: checkEnvironment,
+			Report:          []byte(notDeployed),
+		}, []model.CompatibilityCheckResult{{CounterpartName: "petstore_api", Role: model.CounterpartProvider, CounterpartParticipantID: null.NewInt(1, registered)}})
 		return report.Counterparts[0].Endpoints[0].Breaks[0].ReasonLine
 	}
 
@@ -290,14 +283,13 @@ func TestNotDeployedReasonIsTheSameWhetherTheCounterpartIsAParticipantOrNot(t *t
 }
 
 func TestUnknownBreakFallsBackToItsReasonAndDetails(t *testing.T) {
-	report := fromStoredCheck(t, breakreport.StoredCheck{
-		Participant: checkedParticipant,
-		Environment: checkEnvironment,
+	report := fromStoredCheck(model.CompatibilityCheck{
+		ParticipantName: checkedParticipant,
+		EnvironmentName: checkEnvironment,
 		Report: []byte(`{"petstore_api": {"deployable": false, "participantVersion": "1.4.0", "endpoints": {
 			"/pets": {"get": {"200": [{"reason": "property_missing_in_provider", "role": "consumer", "details": {"propertyType": "string"}}]}}
 		}}}`),
-		Counterparts: []breakreport.StoredCounterpart{{Name: "petstore_api", Version: "1.4.0", Registered: true}},
-	})
+	}, []model.CompatibilityCheckResult{{CounterpartName: "petstore_api", CounterpartVersion: null.StringFrom("1.4.0"), CounterpartParticipantID: null.IntFrom(1)}})
 
 	assert.Equal(t, 1, report.Breaks)
 	broken := report.Counterparts[0].Endpoints[0].Breaks[0]
@@ -306,13 +298,12 @@ func TestUnknownBreakFallsBackToItsReasonAndDetails(t *testing.T) {
 }
 
 func TestCheckWithoutAStoredReportListsTheCounterpartsWithoutCounts(t *testing.T) {
-	report := fromStoredCheck(t, breakreport.StoredCheck{
-		Participant: checkedParticipant,
-		Environment: checkEnvironment,
-		Counterparts: []breakreport.StoredCounterpart{
-			{Name: "petstore_reviews", Deployable: true},
-			{Name: "petstore_api", Version: "1.4.0", Registered: true},
-		},
+	report := fromStoredCheck(model.CompatibilityCheck{
+		ParticipantName: checkedParticipant,
+		EnvironmentName: checkEnvironment,
+	}, []model.CompatibilityCheckResult{
+		{CounterpartName: "petstore_reviews", Deployable: true},
+		{CounterpartName: "petstore_api", CounterpartVersion: null.StringFrom("1.4.0"), CounterpartParticipantID: null.IntFrom(1)},
 	})
 
 	assert.False(t, report.Stored)
@@ -323,8 +314,8 @@ func TestCheckWithoutAStoredReportListsTheCounterpartsWithoutCounts(t *testing.T
 	}, report.Counterparts)
 }
 
-func TestUndecodableReportIsAnError(t *testing.T) {
-	_, err := breakreport.FromStoredCheck(breakreport.StoredCheck{Report: []byte(`[`)})
-
-	assert.Error(t, err)
+func TestUndecodableReportPanics(t *testing.T) {
+	assert.Panics(t, func() {
+		breakreport.NewReader().FromStoredCheck(model.CompatibilityCheck{Report: []byte(`[`)}, nil)
+	})
 }

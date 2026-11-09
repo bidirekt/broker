@@ -15,21 +15,6 @@ const (
 	bodyPropertyPath   = "$"
 )
 
-type StoredCheck struct {
-	Participant  string
-	Environment  string
-	Report       []byte
-	Counterparts []StoredCounterpart
-}
-
-type StoredCounterpart struct {
-	Name       string
-	Role       model.CounterpartRole
-	Version    string
-	Registered bool
-	Deployable bool
-}
-
 type Report struct {
 	Stored               bool
 	Breaks               int
@@ -95,32 +80,42 @@ type storedBreak struct {
 	Details map[string]string    `json:"details"`
 }
 
-func FromStoredCheck(check StoredCheck) (Report, error) {
-	counterparts := slices.SortedFunc(slices.Values(check.Counterparts), func(a, b StoredCounterpart) int {
+type Reader struct{}
+
+func NewReader() *Reader {
+	return &Reader{}
+}
+
+func (this *Reader) FromStoredCheck(check model.CompatibilityCheck, results []model.CompatibilityCheckResult) Report {
+	counterparts := make([]Counterpart, 0, len(results))
+	for _, result := range results {
+		counterpart := Counterpart{
+			Name:       result.CounterpartName,
+			Version:    result.CounterpartVersion.String,
+			Registered: result.CounterpartParticipantID.Valid,
+			Deployable: result.Deployable,
+		}
+		if check.Report != nil {
+			counterpart.Role = result.Role
+		}
+		counterparts = append(counterparts, counterpart)
+	}
+	slices.SortFunc(counterparts, func(a, b Counterpart) int {
 		return strings.Compare(a.Name, b.Name)
 	})
 
 	if check.Report == nil {
-		report := Report{Counterparts: make([]Counterpart, 0, len(counterparts))}
-		for _, counterpart := range counterparts {
-			report.Counterparts = append(report.Counterparts, Counterpart{
-				Name:       counterpart.Name,
-				Version:    counterpart.Version,
-				Registered: counterpart.Registered,
-				Deployable: counterpart.Deployable,
-			})
-		}
-		return report, nil
+		return Report{Counterparts: counterparts}
 	}
 
-	var results map[string]storedResult
-	if err := json.Unmarshal(check.Report, &results); err != nil {
-		return Report{}, fmt.Errorf("error decoding stored check report: %w", err)
+	var stored map[string]storedResult
+	if err := json.Unmarshal(check.Report, &stored); err != nil {
+		panic(fmt.Errorf("error decoding stored check report: %w", err))
 	}
 
 	report := Report{Stored: true, Counterparts: make([]Counterpart, 0, len(counterparts))}
-	for _, stored := range counterparts {
-		counterpart := toCounterpart(check, stored, results[stored.Name])
+	for _, counterpart := range counterparts {
+		counterpart = toCounterpart(check, counterpart, stored[counterpart.Name])
 
 		report.Breaks += counterpart.Breaks
 		if counterpart.Breaks > 0 {
@@ -133,26 +128,18 @@ func FromStoredCheck(check StoredCheck) (Report, error) {
 		report.Counterparts = append(report.Counterparts, counterpart)
 	}
 
-	return report, nil
+	return report
 }
 
-func toCounterpart(check StoredCheck, stored StoredCounterpart, result storedResult) Counterpart {
-	counterpart := Counterpart{
-		Name:       stored.Name,
-		Role:       stored.Role,
-		Version:    stored.Version,
-		Registered: stored.Registered,
-		Deployable: stored.Deployable,
-	}
-
+func toCounterpart(check model.CompatibilityCheck, counterpart Counterpart, result storedResult) Counterpart {
 	var blocks []fieldBlock
 	for _, path := range slices.Sorted(maps.Keys(result.Endpoints)) {
 		methods := result.Endpoints[path]
 		for _, method := range slices.Sorted(maps.Keys(methods)) {
 			checked := checkedInteraction{
-				participant: check.Participant,
-				counterpart: stored,
-				environment: check.Environment,
+				participant: check.ParticipantName,
+				counterpart: counterpart,
+				environment: check.EnvironmentName,
 				method:      strings.ToUpper(method),
 				endpoint:    path,
 			}
@@ -193,7 +180,7 @@ func toCounterpart(check StoredCheck, stored StoredCounterpart, result storedRes
 
 type checkedInteraction struct {
 	participant string
-	counterpart StoredCounterpart
+	counterpart Counterpart
 	environment string
 	method      string
 	endpoint    string
