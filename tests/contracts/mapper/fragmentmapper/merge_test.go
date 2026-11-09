@@ -198,7 +198,7 @@ func mergeContract(t *testing.T, files ...mergedFile) *model.UploadedContract {
 
 	declarations := mergeDeclarations(t, files...)
 
-	uploaded := model.NewUploadedContract(0, "front_app", "1", "")
+	uploaded := model.NewUploadedContract(0, "front_app", "1", nil)
 	uploaded.Schemas = fragmentmapper.ToSchemaModels(declarations)
 
 	for _, resource := range fragmentmapper.ToResourceModels(declarations) {

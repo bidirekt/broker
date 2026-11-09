@@ -421,7 +421,7 @@ func (this *ContractRepository) aliasVersionToSnapshot(
 		contract.ParticipantID,
 		contract.Version,
 		contract.Checksum(),
-		contract.ContractContent,
+		toContractContent(contract.Files),
 	)
 	if err != nil {
 		panic(fmt.Errorf("error aliasing version to snapshot: %w", err))
@@ -441,7 +441,7 @@ func (this *ContractRepository) insertContractVersion(
 		contract.ParticipantID,
 		contract.Version,
 		contract.ID,
-		contract.ContractContent,
+		toContractContent(contract.Files),
 	); err != nil {
 		panic(fmt.Errorf("error inserting contract version: %w", err))
 	}

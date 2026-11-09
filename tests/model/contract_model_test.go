@@ -10,7 +10,7 @@ import (
 )
 
 func newContractWithOnePetsResource(participantName string) *model.UploadedContract {
-	contract := model.NewUploadedContract(0, participantName, "1", "raw")
+	contract := model.NewUploadedContract(0, participantName, "1", nil)
 	_ = contract.AddResource(model.NewRestResponseProvider("/pets", "get", "200", []model.ResourceBody{
 		{Source: "pets.yaml", SchemaName: null.StringFrom("PetList")},
 	}))
@@ -43,11 +43,11 @@ func TestContract_Checksum_IsOrderIndependent(t *testing.T) {
 		{Source: "pets.yaml", SchemaName: null.StringFrom("Pet")},
 	})
 
-	a := model.NewUploadedContract(0, "pets-service", "1", "raw")
+	a := model.NewUploadedContract(0, "pets-service", "1", nil)
 	require.NoError(t, a.AddResource(first))
 	require.NoError(t, a.AddResource(second))
 
-	b := model.NewUploadedContract(0, "pets-service", "1", "raw")
+	b := model.NewUploadedContract(0, "pets-service", "1", nil)
 	require.NoError(t, b.AddResource(second))
 	require.NoError(t, b.AddResource(first))
 
@@ -55,7 +55,7 @@ func TestContract_Checksum_IsOrderIndependent(t *testing.T) {
 }
 
 func newOrdersContract(version string, schemaName string, bodies []model.ResourceBody) *model.UploadedContract {
-	contract := model.NewUploadedContract(0, "orders-service", version, "raw "+version)
+	contract := model.NewUploadedContract(0, "orders-service", version, []model.ContractFile{{Source: "orders.yaml", Content: "raw " + version}})
 	contract.Schemas = model.Schemas{
 		schemaName: {
 			"":     {Type: "object"},
@@ -203,7 +203,7 @@ func TestContract_AddResource_DescribesEachResourceShapeInTheInvariant(t *testin
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			contract := model.NewUploadedContract(0, "pets-service", "1", "raw")
+			contract := model.NewUploadedContract(0, "pets-service", "1", nil)
 			require.NoError(t, contract.AddResource(testCase.resource))
 
 			require.EqualError(t, contract.AddResource(testCase.resource), testCase.want)

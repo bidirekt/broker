@@ -24,7 +24,7 @@ const (
 type ValidateContractInput struct {
 	ParticipantName string
 	EnvironmentName string
-	Contracts       []contractfiles.File
+	Contracts       []model.ContractFile
 }
 
 type ValidateContractOutput struct {
@@ -81,7 +81,7 @@ func (this *ValidateContractUseCase) Execute(ctx context.Context, input Validate
 		return ValidateContractOutput{Status: ContractValidationFailed, Violations: shapeViolations}, nil
 	}
 
-	uploadedContract, violations, err := contractfiles.ToUploadedContract(fragments, participant, "", "")
+	uploadedContract, violations, err := contractfiles.ToUploadedContract(fragments, participant, "", nil)
 	if len(violations) > 0 {
 		return ValidateContractOutput{Status: ContractValidationFailed, Violations: violations}, nil
 	}

@@ -1,8 +1,8 @@
 package publish_contract
 
 import (
-	"github.com/bidirekt/broker/internal/contracts/contractfiles"
 	"github.com/bidirekt/broker/internal/contracts/violation"
+	"github.com/bidirekt/broker/internal/model"
 )
 
 const (
@@ -16,7 +16,7 @@ const (
 type PublishContractRequestBody struct {
 	ServiceName string               `json:"participant"`
 	Version     string               `json:"version"`
-	Contracts   []contractfiles.File `json:"contracts"`
+	Contracts   []model.ContractFile `json:"contracts"`
 }
 
 type PublishContractResponseBody struct {

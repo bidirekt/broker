@@ -2,7 +2,6 @@ package publish_contract
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/bidirekt/broker/internal/contracts/contract_differ"
 	"github.com/bidirekt/broker/internal/contracts/contractfiles"
@@ -24,7 +23,7 @@ const (
 type PublishContractInput struct {
 	ServiceName string
 	Version     string
-	Contracts   []contractfiles.File
+	Contracts   []model.ContractFile
 }
 
 type PublishContractOutput struct {
@@ -63,9 +62,7 @@ func (this *PublishContractUseCase) Execute(ctx context.Context, input PublishCo
 		return PublishContractOutput{Status: ContractValidationFailed, Violations: shapeViolations}, nil
 	}
 
-	contractContent, _ := json.Marshal(input.Contracts)
-
-	uploadedContract, violations, err := contractfiles.ToUploadedContract(fragments, participant, input.Version, string(contractContent))
+	uploadedContract, violations, err := contractfiles.ToUploadedContract(fragments, participant, input.Version, input.Contracts)
 	if len(violations) > 0 {
 		return PublishContractOutput{Status: ContractValidationFailed, Violations: violations}, nil
 	}

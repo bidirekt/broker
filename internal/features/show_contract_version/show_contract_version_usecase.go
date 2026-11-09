@@ -2,8 +2,6 @@ package show_contract_version
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 
 	"github.com/bidirekt/broker/internal/components/breakreport"
 	"github.com/bidirekt/broker/internal/components/pages"
@@ -25,11 +23,6 @@ type ShowContractVersionInput struct {
 	ChecksPage      int64
 }
 
-type ContractFile struct {
-	Source  string `json:"source"`
-	Content string `json:"content"`
-}
-
 type ReportedCheck struct {
 	Check  model.CompatibilityCheck
 	Report breakreport.Report
@@ -38,7 +31,6 @@ type ReportedCheck struct {
 type ShowContractVersionOutput struct {
 	Status             ShowContractVersionStatus
 	ContractVersion    *model.ContractVersion
-	Files              []ContractFile
 	CurrentDeployments []model.Deployment
 	LatestChecks       []ReportedCheck
 	Deployments        []model.Deployment
@@ -71,11 +63,6 @@ func (this *ShowContractVersionUseCase) Execute(ctx context.Context, input ShowC
 		return ShowContractVersionOutput{Status: ContractVersionNotFound}
 	}
 
-	var files []ContractFile
-	if err := json.Unmarshal([]byte(contractVersion.ContractContent), &files); err != nil {
-		panic(fmt.Errorf("error decoding contract content: %w", err))
-	}
-
 	latestChecks := this.compatibilityRepository.ListLatestChecksOfVersion(ctx, contractVersion.ParticipantID, contractVersion.Version)
 	deployments, deploymentsTotal := this.deploymentRepository.ListDeploymentsOfVersion(
 		ctx, contractVersion.ParticipantID, contractVersion.Version, pages.PageSize, pages.Offset(input.DeploymentsPage),
@@ -88,7 +75,6 @@ func (this *ShowContractVersionUseCase) Execute(ctx context.Context, input ShowC
 	return ShowContractVersionOutput{
 		Status:             ContractVersionFound,
 		ContractVersion:    contractVersion,
-		Files:              files,
 		CurrentDeployments: this.deploymentRepository.ListCurrentDeploymentsOfVersion(ctx, contractVersion.ParticipantID, contractVersion.Version),
 		LatestChecks:       toReportedChecks(latestChecks, results),
 		Deployments:        deployments,
