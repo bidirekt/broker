@@ -33,11 +33,9 @@ func (this *ContractBreakingChange) IsPropertyBreak() bool {
 }
 
 func (this *ContractBreakingChange) ConsumerResource() *model.PersistedResource {
-	if this.CheckedResource.IsConsumer() {
-		return this.CheckedResource
-	}
+	consumer, _ := consumerAndProvider(this.CheckedResource, this.CounterpartResource)
 
-	return this.CounterpartResource
+	return consumer
 }
 
 func (this *ContractBreakingChange) ConsumerName() string {
@@ -126,10 +124,7 @@ func NewPropertyBreakChange(
 	propertyPath string,
 	consumerNode, providerNode schemagraph.Node,
 ) ContractBreakingChange {
-	consumerResource := checkedResource
-	if !checkedResource.IsConsumer() {
-		consumerResource = counterpartResource
-	}
+	consumerResource, _ := consumerAndProvider(checkedResource, counterpartResource)
 
 	details := map[string]string{
 		"property":     propertyPath,
