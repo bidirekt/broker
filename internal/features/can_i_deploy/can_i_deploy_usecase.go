@@ -135,26 +135,12 @@ func (this *CanIDeployUseCase) recordCheck(
 
 			// A cached verdict is already stored: only the pairs compared in this call become facts.
 			if !item.VerdictCached {
-				breaks, exists := breaksByPair[pair]
-				if !exists {
-					breaks = make([]model.VerdictBreak, 0, len(item.Breaks))
+				verdictBreaks := compatibility_checker.ToVerdictBreaks(item)
+				if breaks, exists := breaksByPair[pair]; exists {
+					verdictBreaks = append(breaks, verdictBreaks...)
 				}
 
-				for _, breakChange := range item.Breaks {
-					if !breakChange.IsPropertyBreak() {
-						continue
-					}
-
-					breaks = append(breaks, model.VerdictBreak{
-						Endpoint:    breakChange.CheckedResource.Endpoint,
-						Method:      breakChange.CheckedResource.Method,
-						Interaction: breakChange.InteractionKey(),
-						Reason:      breakChange.Reason,
-						Details:     breakChange.Details,
-					})
-				}
-
-				breaksByPair[pair] = breaks
+				breaksByPair[pair] = verdictBreaks
 			}
 		}
 

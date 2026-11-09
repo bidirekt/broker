@@ -156,6 +156,26 @@ func (this *ContractCompatibilityReport) AppendResult(counterpartName string, re
 	this.Results[counterpartName] = existing
 }
 
+func ToVerdictBreaks(result CounterpartResult) []model.VerdictBreak {
+	verdictBreaks := make([]model.VerdictBreak, 0, len(result.Breaks))
+
+	for _, breakChange := range result.Breaks {
+		if !breakChange.IsPropertyBreak() {
+			continue
+		}
+
+		verdictBreaks = append(verdictBreaks, model.VerdictBreak{
+			Endpoint:    breakChange.CheckedResource.Endpoint,
+			Method:      breakChange.CheckedResource.Method,
+			Interaction: breakChange.InteractionKey(),
+			Reason:      breakChange.Reason,
+			Details:     breakChange.Details,
+		})
+	}
+
+	return verdictBreaks
+}
+
 func (this *ContractCompatibilityReport) Deployable() bool {
 	for _, result := range this.Results {
 		if !result.Deployable {
