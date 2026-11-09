@@ -1,10 +1,6 @@
 package model
 
-import (
-	"strings"
-
-	"github.com/guregu/null"
-)
+import "strings"
 
 type UploadedResource struct {
 	Resource
@@ -19,13 +15,7 @@ func (this *UploadedResource) Describe() string {
 		parts = append(parts, this.ConsumedProvider.String)
 	}
 
-	parts = append(parts, strings.ToUpper(this.Method), this.Endpoint)
-
-	if this.Interaction == RestResponse {
-		parts = append(parts, this.ResponseStatusCode.String)
-	} else {
-		parts = append(parts, "request")
-	}
+	parts = append(parts, this.Identity.Describe())
 
 	return strings.Join(parts, " ")
 }
@@ -36,12 +26,7 @@ func (this *UploadedResource) ProviderHash() string {
 		providerName = this.ConsumedProvider.String
 	}
 
-	parts := []string{providerName, this.Endpoint, this.Method}
-	if this.Interaction == RestResponse {
-		parts = append(parts, this.ResponseStatusCode.String)
-	}
-
-	return Hash(parts...)
+	return Hash(append([]string{providerName}, this.Identity.HashParts()...)...)
 }
 
 func (this *UploadedResource) ConsumerHash() string {
@@ -49,12 +34,7 @@ func (this *UploadedResource) ConsumerHash() string {
 		return ""
 	}
 
-	parts := []string{this.ParticipantName, this.ConsumedProvider.String, this.Endpoint, this.Method}
-	if this.Interaction == RestResponse {
-		parts = append(parts, this.ResponseStatusCode.String)
-	}
-
-	return Hash(parts...)
+	return Hash(append([]string{this.ParticipantName, this.ConsumedProvider.String}, this.Identity.HashParts()...)...)
 }
 
 func (this *UploadedResource) PrimaryHash() string {
@@ -63,86 +43,4 @@ func (this *UploadedResource) PrimaryHash() string {
 	}
 
 	return this.ConsumerHash()
-}
-
-func NewRestRequestConsumer(
-	provider, endpoint, method string,
-	bodies []ResourceBody,
-) *UploadedResource {
-	resource := &UploadedResource{
-		Resource: Resource{
-			Direction:   Consumes,
-			Interaction: RestRequest,
-			Endpoint:    endpoint,
-			Method:      method,
-			Bodies:      bodies,
-		},
-	}
-
-	if provider != "" {
-		resource.ConsumedProvider = null.StringFrom(provider)
-	}
-
-	return resource
-}
-
-func NewRestRequestProvider(
-	endpoint, method string,
-	bodies []ResourceBody,
-) *UploadedResource {
-	return &UploadedResource{
-		Resource: Resource{
-			Direction:   Provides,
-			Interaction: RestRequest,
-			Endpoint:    endpoint,
-			Method:      method,
-			Bodies:      bodies,
-		},
-	}
-}
-
-func NewRestResponseConsumer(
-	provider, endpoint, method, statusCode string,
-	bodies []ResourceBody,
-) *UploadedResource {
-	resource := &UploadedResource{
-		Resource: Resource{
-			Direction:   Consumes,
-			Interaction: RestResponse,
-			Endpoint:    endpoint,
-			Method:      method,
-			Bodies:      bodies,
-		},
-	}
-
-	if provider != "" {
-		resource.ConsumedProvider = null.StringFrom(provider)
-	}
-
-	if statusCode != "" {
-		resource.ResponseStatusCode = null.StringFrom(statusCode)
-	}
-
-	return resource
-}
-
-func NewRestResponseProvider(
-	endpoint, method, statusCode string,
-	bodies []ResourceBody,
-) *UploadedResource {
-	resource := &UploadedResource{
-		Resource: Resource{
-			Direction:   Provides,
-			Interaction: RestResponse,
-			Endpoint:    endpoint,
-			Method:      method,
-			Bodies:      bodies,
-		},
-	}
-
-	if statusCode != "" {
-		resource.ResponseStatusCode = null.StringFrom(statusCode)
-	}
-
-	return resource
 }

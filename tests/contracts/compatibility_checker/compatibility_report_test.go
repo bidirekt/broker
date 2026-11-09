@@ -6,7 +6,9 @@ import (
 	"testing"
 
 	"github.com/bidirekt/broker/internal/contracts/compatibility_checker"
+	restcontracts "github.com/bidirekt/broker/internal/contracts/protocols/rest"
 	"github.com/bidirekt/broker/internal/model"
+	restmodel "github.com/bidirekt/broker/internal/model/protocols/rest"
 	"github.com/guregu/null"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,21 +32,20 @@ func postPetsResources(
 	interaction string,
 	consumerSchema, providerSchema model.Schema,
 ) (consumer, provider model.PersistedResource) {
-	kind, status := model.RestResponse, null.StringFrom(interaction)
+	body, status := model.Output, interaction
 	if interaction == "request" {
-		kind, status = model.RestRequest, null.String{}
+		body, status = model.Input, ""
 	}
 
 	consumer = model.PersistedResource{
 		Resource: model.Resource{
-			ParticipantName:    petstoreWeb,
-			Direction:          model.Consumes,
-			Interaction:        kind,
-			ConsumedProvider:   null.StringFrom(petstoreAPI),
-			Endpoint:           "/pets",
-			Method:             "post",
-			ResponseStatusCode: status,
-			Bodies:             []model.ResourceBody{{Source: "web.yaml", SchemaName: null.StringFrom("Pet")}},
+			ParticipantName:  petstoreWeb,
+			Direction:        model.Consumes,
+			Protocol:         restmodel.Protocol,
+			Body:             body,
+			Identity:         restmodel.Identity{Endpoint: "/pets", Method: "post", Status: status},
+			ConsumedProvider: null.StringFrom(petstoreAPI),
+			Bodies:           []model.ResourceBody{{Source: "web.yaml", SchemaName: null.StringFrom("Pet")}},
 		},
 		ConsumerHash: null.StringFrom("web-" + postPetsHash),
 		ProviderHash: postPetsHash,
@@ -53,13 +54,12 @@ func postPetsResources(
 
 	provider = model.PersistedResource{
 		Resource: model.Resource{
-			ParticipantName:    petstoreAPI,
-			Direction:          model.Provides,
-			Interaction:        kind,
-			Endpoint:           "/pets",
-			Method:             "post",
-			ResponseStatusCode: status,
-			Bodies:             []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Pet")}},
+			ParticipantName: petstoreAPI,
+			Direction:       model.Provides,
+			Protocol:        restmodel.Protocol,
+			Body:            body,
+			Identity:        restmodel.Identity{Endpoint: "/pets", Method: "post", Status: status},
+			Bodies:          []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Pet")}},
 		},
 		ProviderHash:       postPetsHash,
 		Schemas:            model.Schemas{"Pet": providerSchema},
@@ -79,7 +79,7 @@ func checkFrom(
 		Resources:       map[string]model.PersistedResource{checked.PrimaryHash(): checked},
 	}
 
-	return compatibility_checker.NewCompatibilityChecker(noStoredVerdicts{}).Check(
+	return compatibility_checker.NewCompatibilityChecker(noStoredVerdicts{}, []compatibility_checker.ProtocolHooks{restcontracts.New()}).Check(
 		context.Background(),
 		contract,
 		model.NewEnvironment(production),
@@ -116,7 +116,7 @@ func TestFreshPropertyBreaksCarryTheRoleOfTheCheckedSide(t *testing.T) {
 				RegisteredProviders: map[string]model.RegisteredProvider{petstoreAPI: {DeployedVersion: null.StringFrom("1.0.0")}},
 			})
 
-			leaves := report.Hierarchical[petstoreAPI].Endpoints["/pets"]["post"][tc.interaction]
+			leaves := report.Hierarchical[petstoreAPI].Trees[restmodel.Protocol].(restmodel.ReportTree)["/pets"]["post"][tc.interaction]
 			require.Len(t, leaves, 1)
 			assert.Equal(t, tc.reason, leaves[0].Reason)
 			assert.Equal(t, model.RoleConsumer, leaves[0].Role)
@@ -127,7 +127,7 @@ func TestFreshPropertyBreaksCarryTheRoleOfTheCheckedSide(t *testing.T) {
 				Consumers: map[string][]model.PersistedResource{postPetsHash: {consumer}},
 			})
 
-			leaves := report.Hierarchical[petstoreWeb].Endpoints["/pets"]["post"][tc.interaction]
+			leaves := report.Hierarchical[petstoreWeb].Trees[restmodel.Protocol].(restmodel.ReportTree)["/pets"]["post"][tc.interaction]
 			require.Len(t, leaves, 1)
 			assert.Equal(t, tc.reason, leaves[0].Reason)
 			assert.Equal(t, model.RoleProvider, leaves[0].Role)
@@ -180,7 +180,7 @@ func TestFreshResourceBreaksCarryTheirFixedRole(t *testing.T) {
 		t.Run(string(tc.reason), func(t *testing.T) {
 			report := checkFrom(tc.checked, tc.counterparts)
 
-			leaves := report.Hierarchical[tc.counterpart].Endpoints["/pets"]["post"]["201"]
+			leaves := report.Hierarchical[tc.counterpart].Trees[restmodel.Protocol].(restmodel.ReportTree)["/pets"]["post"]["201"]
 			require.Len(t, leaves, 1)
 			assert.Equal(t, tc.reason, leaves[0].Reason)
 			assert.Equal(t, tc.role, leaves[0].Role)
@@ -207,39 +207,38 @@ func TestCachedPropertyBreaksCarryTheRoleOfTheCurrentCheck(t *testing.T) {
 		maps.Copy(details, tc.types)
 
 		stored := model.VerdictBreak{
-			Endpoint:    "/pets",
-			Method:      "post",
-			Interaction: tc.interaction,
-			Reason:      tc.reason,
-			Details:     details,
+			Protocol: restmodel.Protocol,
+			Location: map[string]string{restmodel.EndpointKey: "/pets", restmodel.MethodKey: "post", restmodel.InteractionKey: tc.interaction},
+			Reason:   tc.reason,
+			Details:  details,
 		}
 
 		t.Run(string(tc.reason)+" in "+tc.interaction+" replayed to the consumer", func(t *testing.T) {
 			item := compatibility_checker.NewCounterpartResult()
 			item.AppendCachedBreakChange(stored)
 
-			report := compatibility_checker.NewContractCompatibilityReport(petstoreWeb, "2.0.0", production)
+			report := compatibility_checker.NewContractCompatibilityReport(petstoreWeb, "2.0.0", production, []compatibility_checker.ProtocolHooks{restcontracts.New()})
 			report.AppendResult(petstoreAPI, item)
 
-			assert.Equal(t, []compatibility_checker.ContractBreakingChange{{
+			assert.Equal(t, []model.ReportBreak{{
 				Reason:  tc.reason,
 				Role:    model.RoleConsumer,
 				Details: details,
-			}}, report.Hierarchical[petstoreAPI].Endpoints["/pets"]["post"][tc.interaction])
+			}}, report.Hierarchical[petstoreAPI].Trees[restmodel.Protocol].(restmodel.ReportTree)["/pets"]["post"][tc.interaction])
 		})
 
 		t.Run(string(tc.reason)+" in "+tc.interaction+" replayed to the provider", func(t *testing.T) {
 			item := compatibility_checker.NewCounterpartResult()
 			item.AppendCachedBreakChange(stored)
 
-			report := compatibility_checker.NewContractCompatibilityReport(petstoreAPI, "4.0.0", production)
+			report := compatibility_checker.NewContractCompatibilityReport(petstoreAPI, "4.0.0", production, []compatibility_checker.ProtocolHooks{restcontracts.New()})
 			report.AppendResult(petstoreWeb, item)
 
-			assert.Equal(t, []compatibility_checker.ContractBreakingChange{{
+			assert.Equal(t, []model.ReportBreak{{
 				Reason:  tc.reason,
 				Role:    model.RoleProvider,
 				Details: details,
-			}}, report.Hierarchical[petstoreWeb].Endpoints["/pets"]["post"][tc.interaction])
+			}}, report.Hierarchical[petstoreWeb].Trees[restmodel.Protocol].(restmodel.ReportTree)["/pets"]["post"][tc.interaction])
 		})
 	}
 }
@@ -258,7 +257,7 @@ func TestFreshBreaksOfAnInteractionAreSortedByProperty(t *testing.T) {
 	})
 
 	var properties []string
-	for _, leaf := range report.Hierarchical[petstoreAPI].Endpoints["/pets"]["post"]["201"] {
+	for _, leaf := range report.Hierarchical[petstoreAPI].Trees[restmodel.Protocol].(restmodel.ReportTree)["/pets"]["post"]["201"] {
 		properties = append(properties, leaf.Details["property"])
 	}
 
@@ -269,18 +268,17 @@ func TestCachedBreaksOfAnInteractionAreSortedByProperty(t *testing.T) {
 	item := compatibility_checker.NewCounterpartResult()
 	for _, property := range []string{"$.weight", "$.photoUrl"} {
 		item.AppendCachedBreakChange(model.VerdictBreak{
-			Endpoint:    "/pets",
-			Method:      "post",
-			Interaction: "201",
-			Reason:      model.ReasonPropertyMissingInProvider,
-			Details:     map[string]string{"property": property, "consumerName": petstoreWeb, "providerName": petstoreAPI},
+			Protocol: restmodel.Protocol,
+			Location: map[string]string{restmodel.EndpointKey: "/pets", restmodel.MethodKey: "post", restmodel.InteractionKey: "201"},
+			Reason:   model.ReasonPropertyMissingInProvider,
+			Details:  map[string]string{"property": property, "consumerName": petstoreWeb, "providerName": petstoreAPI},
 		})
 	}
 
-	report := compatibility_checker.NewContractCompatibilityReport(petstoreWeb, "2.0.0", production)
+	report := compatibility_checker.NewContractCompatibilityReport(petstoreWeb, "2.0.0", production, []compatibility_checker.ProtocolHooks{restcontracts.New()})
 	report.AppendResult(petstoreAPI, item)
 
-	leaves := report.Hierarchical[petstoreAPI].Endpoints["/pets"]["post"]["201"]
+	leaves := report.Hierarchical[petstoreAPI].Trees[restmodel.Protocol].(restmodel.ReportTree)["/pets"]["post"]["201"]
 	require.Len(t, leaves, 2)
 	assert.Equal(t, "$.photoUrl", leaves[0].Details["property"])
 	assert.Equal(t, "$.weight", leaves[1].Details["property"])
@@ -288,13 +286,13 @@ func TestCachedBreaksOfAnInteractionAreSortedByProperty(t *testing.T) {
 
 func TestReportIsDeployableOnlyWhenEveryResultIs(t *testing.T) {
 	t.Run("without results", func(t *testing.T) {
-		report := compatibility_checker.NewContractCompatibilityReport(petstoreAPI, "4.0.0", production)
+		report := compatibility_checker.NewContractCompatibilityReport(petstoreAPI, "4.0.0", production, []compatibility_checker.ProtocolHooks{restcontracts.New()})
 
 		assert.True(t, report.Deployable())
 	})
 
 	t.Run("with every result deployable", func(t *testing.T) {
-		report := compatibility_checker.NewContractCompatibilityReport(petstoreAPI, "4.0.0", production)
+		report := compatibility_checker.NewContractCompatibilityReport(petstoreAPI, "4.0.0", production, []compatibility_checker.ProtocolHooks{restcontracts.New()})
 		report.AppendResult(petstoreWeb, compatibility_checker.NewCounterpartResult())
 		report.AppendResult(petstoreMobile, compatibility_checker.NewCounterpartResult())
 
@@ -304,17 +302,30 @@ func TestReportIsDeployableOnlyWhenEveryResultIs(t *testing.T) {
 	t.Run("with one result not deployable", func(t *testing.T) {
 		broken := compatibility_checker.NewCounterpartResult()
 		broken.AppendCachedBreakChange(model.VerdictBreak{
-			Endpoint:    "/pets",
-			Method:      "post",
-			Interaction: "201",
-			Reason:      model.ReasonPropertyMissingInProvider,
-			Details:     map[string]string{"property": "$.name", "consumerName": petstoreMobile, "providerName": petstoreAPI},
+			Protocol: restmodel.Protocol,
+			Location: map[string]string{restmodel.EndpointKey: "/pets", restmodel.MethodKey: "post", restmodel.InteractionKey: "201"},
+			Reason:   model.ReasonPropertyMissingInProvider,
+			Details:  map[string]string{"property": "$.name", "consumerName": petstoreMobile, "providerName": petstoreAPI},
 		})
 
-		report := compatibility_checker.NewContractCompatibilityReport(petstoreAPI, "4.0.0", production)
+		report := compatibility_checker.NewContractCompatibilityReport(petstoreAPI, "4.0.0", production, []compatibility_checker.ProtocolHooks{restcontracts.New()})
 		report.AppendResult(petstoreWeb, compatibility_checker.NewCounterpartResult())
 		report.AppendResult(petstoreMobile, broken)
 
 		assert.False(t, report.Deployable())
 	})
+}
+
+func TestVerdictBreaksKeepOnlyPropertyBreaksUnderTheirProtocolLocation(t *testing.T) {
+	consumer, provider := postPetsResources("201", model.Schema{"": {Type: "object"}, "name": {Type: "string"}}, model.Schema{"": {Type: "object"}})
+
+	item := compatibility_checker.NewCounterpartResult()
+	item.AppendContractBreakChange(compatibility_checker.NewProviderResourceNotFound(&consumer))
+	item.AppendContractBreakChange(compatibility_checker.NewContractBreakingChange(&consumer, &provider, model.ReasonPropertyMissingInProvider))
+
+	assert.Equal(t, []model.VerdictBreak{{
+		Protocol: restmodel.Protocol,
+		Location: map[string]string{restmodel.EndpointKey: "/pets", restmodel.MethodKey: "post", restmodel.InteractionKey: "201"},
+		Reason:   model.ReasonPropertyMissingInProvider,
+	}}, compatibility_checker.ToVerdictBreaks(*item))
 }

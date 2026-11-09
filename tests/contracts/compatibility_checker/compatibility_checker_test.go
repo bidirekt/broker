@@ -5,23 +5,26 @@ import (
 	"testing"
 
 	"github.com/bidirekt/broker/internal/contracts/compatibility_checker"
+	restcontracts "github.com/bidirekt/broker/internal/contracts/protocols/rest"
 	"github.com/bidirekt/broker/internal/contracts/schemagraph"
 	"github.com/bidirekt/broker/internal/model"
+	restmodel "github.com/bidirekt/broker/internal/model/protocols/rest"
 	"github.com/guregu/null"
 	"github.com/stretchr/testify/assert"
 )
 
+var thingsHooks = []compatibility_checker.ProtocolHooks{restcontracts.New()}
+
 func consumerResource() *model.PersistedResource {
 	return &model.PersistedResource{
 		Resource: model.Resource{
-			Direction:          model.Consumes,
-			Interaction:        model.RestResponse,
-			ConsumedProvider:   null.StringFrom("api"),
-			Endpoint:           "/things",
-			Method:             "get",
-			ResponseStatusCode: null.StringFrom("200"),
-			ParticipantName:    "front",
-			Bodies:             thingsBodies("FrontThing"),
+			Direction:        model.Consumes,
+			Protocol:         restmodel.Protocol,
+			Body:             model.Output,
+			Identity:         restmodel.Identity{Endpoint: "/things", Method: "get", Status: "200"},
+			ConsumedProvider: null.StringFrom("api"),
+			ParticipantName:  "front",
+			Bodies:           thingsBodies("FrontThing"),
 		},
 		Schemas: model.Schemas{"FrontThing": {
 			"":     {Type: "object"},
@@ -34,13 +37,12 @@ func consumerResource() *model.PersistedResource {
 func providerResource() *model.PersistedResource {
 	return &model.PersistedResource{
 		Resource: model.Resource{
-			Direction:          model.Provides,
-			Interaction:        model.RestResponse,
-			Endpoint:           "/things",
-			Method:             "get",
-			ResponseStatusCode: null.StringFrom("200"),
-			ParticipantName:    "api",
-			Bodies:             thingsBodies("ApiThing"),
+			Direction:       model.Provides,
+			Protocol:        restmodel.Protocol,
+			Body:            model.Output,
+			Identity:        restmodel.Identity{Endpoint: "/things", Method: "get", Status: "200"},
+			ParticipantName: "api",
+			Bodies:          thingsBodies("ApiThing"),
 		},
 		Schemas: model.Schemas{"ApiThing": {
 			"":   {Type: "object"},
@@ -55,7 +57,7 @@ func thingsBodies(schemaName string) []model.ResourceBody {
 
 func thingsNode(resource *model.PersistedResource, segments ...string) schemagraph.Node {
 	join := schemagraph.Readers
-	if resource.Interaction == model.RestRequest {
+	if resource.Body == model.Input {
 		join = schemagraph.Senders
 	}
 
@@ -111,10 +113,10 @@ func TestPropertyBreakDetails(t *testing.T) {
 	consumerRequest := &model.PersistedResource{
 		Resource: model.Resource{
 			Direction:        model.Consumes,
-			Interaction:      model.RestRequest,
+			Protocol:         restmodel.Protocol,
+			Body:             model.Input,
+			Identity:         restmodel.Identity{Endpoint: "/things", Method: "post"},
 			ConsumedProvider: null.StringFrom("api"),
-			Endpoint:         "/things",
-			Method:           "post",
 			ParticipantName:  "front",
 			Bodies:           thingsBodies("FrontFlag"),
 		},
@@ -126,9 +128,9 @@ func TestPropertyBreakDetails(t *testing.T) {
 	providerRequest := &model.PersistedResource{
 		Resource: model.Resource{
 			Direction:       model.Provides,
-			Interaction:     model.RestRequest,
-			Endpoint:        "/things",
-			Method:          "post",
+			Protocol:        restmodel.Protocol,
+			Body:            model.Input,
+			Identity:        restmodel.Identity{Endpoint: "/things", Method: "post"},
 			ParticipantName: "api",
 			Bodies:          thingsBodies("ApiFlag"),
 		},
@@ -263,9 +265,13 @@ func TestTypeMismatchTypesResolvedByRole(t *testing.T) {
 }
 
 func TestBreakMarshalsOnlyReasonRoleAndDetails(t *testing.T) {
-	change := thingsBreak(consumerResource(), providerResource(), model.ReasonPropertyTypeMismatch, "id")
+	item := compatibility_checker.NewCounterpartResult()
+	item.AppendContractBreakChange(thingsBreak(consumerResource(), providerResource(), model.ReasonPropertyTypeMismatch, "id"))
 
-	data, err := json.Marshal(change)
+	report := compatibility_checker.NewContractCompatibilityReport("front", "v1", "production", thingsHooks)
+	report.AppendResult("api", item)
+
+	data, err := json.Marshal(report.Hierarchical["api"].Trees[restmodel.Protocol].(restmodel.ReportTree)["/things"]["get"]["200"][0])
 	assert.NoError(t, err)
 
 	decoded := map[string]json.RawMessage{}
@@ -303,7 +309,7 @@ func TestReportAppendMergesResultsPerCounterpart(t *testing.T) {
 	consumerChecked := thingsBreak(consumerRes, providerRes, model.ReasonPropertyTypeMismatch, "id")
 	providerChecked := thingsBreak(providerRes, consumerRes, model.ReasonPropertyTypeMismatch, "id")
 
-	report := compatibility_checker.NewContractCompatibilityReport("unknown", "unknown", "unknwonw")
+	report := compatibility_checker.NewContractCompatibilityReport("unknown", "unknown", "unknwonw", thingsHooks)
 
 	withoutIdentity := compatibility_checker.NewCounterpartResult()
 	withoutIdentity.AppendContractBreakChange(consumerChecked)
@@ -345,7 +351,7 @@ func TestHierarchicalNodeWireKeys(t *testing.T) {
 	node := compatibility_checker.Hierarchical{
 		Deployable: true,
 		Version:    null.StringFrom("v1"),
-		Endpoints:  make(compatibility_checker.HierarchicalEndpoint),
+		Trees:      map[model.Protocol]compatibility_checker.ReportTree{restmodel.Protocol: restmodel.ReportTree{}},
 	}
 
 	data, err := json.Marshal(node)
@@ -362,18 +368,38 @@ func TestHierarchicalNodeWireKeys(t *testing.T) {
 	assert.ElementsMatch(t, []string{"deployable", "participantVersion", "endpoints"}, keys)
 }
 
+func TestHierarchicalMarshalsFieldsInWireOrder(t *testing.T) {
+	compatible := compatibility_checker.Hierarchical{
+		Deployable: true,
+		Trees:      map[model.Protocol]compatibility_checker.ReportTree{restmodel.Protocol: restmodel.ReportTree{}},
+	}
+	broken := compatibility_checker.Hierarchical{
+		Version: null.StringFrom("v1"),
+		Trees: map[model.Protocol]compatibility_checker.ReportTree{restmodel.Protocol: restmodel.ReportTree{
+			"/things": {"get": {"200": {{Reason: model.ReasonPropertyMissingInProvider, Role: model.RoleConsumer}}}},
+		}},
+	}
+
+	compatibleData, err := json.Marshal(compatible)
+	assert.NoError(t, err)
+	brokenData, err := json.Marshal(broken)
+	assert.NoError(t, err)
+
+	assert.Equal(t, `{"deployable":true,"participantVersion":null,"endpoints":{}}`, string(compatibleData))
+	assert.Equal(t, `{"deployable":false,"participantVersion":"v1","endpoints":{"/things":{"get":{"200":[{"reason":"property_missing_in_provider","role":"consumer"}]}}}}`, string(brokenData))
+}
+
 func TestHierarchicalGroupsBreaksByInteraction(t *testing.T) {
 	consumerResponse := consumerResource()
 	providerResponse := providerResource()
 	consumerRequest := &model.PersistedResource{
 		Resource: model.Resource{
-			Direction:          model.Consumes,
-			Interaction:        model.RestRequest,
-			ConsumedProvider:   null.StringFrom("api"),
-			Endpoint:           "/things",
-			Method:             "get",
-			ResponseStatusCode: null.StringFrom("200"),
-			ParticipantName:    "front",
+			Direction:        model.Consumes,
+			Protocol:         restmodel.Protocol,
+			Body:             model.Input,
+			Identity:         restmodel.Identity{Endpoint: "/things", Method: "get"},
+			ConsumedProvider: null.StringFrom("api"),
+			ParticipantName:  "front",
 		},
 	}
 
@@ -384,10 +410,10 @@ func TestHierarchicalGroupsBreaksByInteraction(t *testing.T) {
 	item.AppendContractBreakChange(requestBreak)
 	item.AppendContractBreakChange(responseBreak)
 
-	report := compatibility_checker.NewContractCompatibilityReport("front", "v1", "production")
+	report := compatibility_checker.NewContractCompatibilityReport("front", "v1", "production", thingsHooks)
 	report.AppendResult("api", item)
 
-	methods := report.Hierarchical["api"].Endpoints["/things"]["get"]
+	methods := report.Hierarchical["api"].Trees[restmodel.Protocol].(restmodel.ReportTree)["/things"]["get"]
 	assert.Len(t, methods["request"], 1)
 	assert.Equal(t, model.ReasonPropertyMissingInProvider, methods["request"][0].Reason)
 	assert.Len(t, methods["200"], 1)
@@ -399,7 +425,7 @@ func TestHierarchicalAccumulatesAcrossAppends(t *testing.T) {
 	providerResponse := providerResource()
 
 	first := compatibility_checker.NewCounterpartResult()
-	report := compatibility_checker.NewContractCompatibilityReport("front", "v1", "production")
+	report := compatibility_checker.NewContractCompatibilityReport("front", "v1", "production", thingsHooks)
 	report.AppendResult("api", first)
 
 	assert.True(t, report.Hierarchical["api"].Deployable)

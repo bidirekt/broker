@@ -13,11 +13,9 @@ const resourceColumns = `
 			pa.name,
 			r.id,
 			r.direction,
-			r.interaction,
+			r.protocol,
+			r.body_role,
 			r.consumed_provider,
-			r.endpoint,
-			r.method,
-			r.response_status_code,
 			r.provider_hash,
 			r.consumer_hash,
 			rv.change_type,
@@ -35,16 +33,14 @@ type tableRow struct {
 	ContractVersion string
 
 	// Resource
-	ResourceID                 int64
-	ResourceDirection          string
-	ResourceInteraction        string
-	ResourceConsumedProvider   null.String
-	ResourceEndpoint           string
-	ResourceMethod             string
-	ResourceResponseStatusCode null.String
-	ResourceProviderHash       string
-	ResourceConsumerHash       null.String
-	ResourceVersionChangeType  string
+	ResourceID                int64
+	ResourceDirection         string
+	ResourceProtocol          string
+	ResourceBodyRole          string
+	ResourceConsumedProvider  null.String
+	ResourceProviderHash      string
+	ResourceConsumerHash      null.String
+	ResourceVersionChangeType string
 
 	// Bodies, aligned by index
 	BodySources     []string
@@ -61,17 +57,16 @@ func (this *tableRow) toPersistedContractModel() *model.PersistedContract {
 	}
 }
 
-func (this *tableRow) toResourceModel() model.PersistedResource {
+func (this *tableRow) toResourceModel(identity model.ResourceIdentity) model.PersistedResource {
 	return model.PersistedResource{
 		Resource: model.Resource{
-			Direction:          model.Direction(this.ResourceDirection),
-			Interaction:        model.Interaction(this.ResourceInteraction),
-			Endpoint:           this.ResourceEndpoint,
-			Method:             this.ResourceMethod,
-			Bodies:             this.toResourceBodies(),
-			ParticipantName:    this.ParticipantName,
-			ConsumedProvider:   this.ResourceConsumedProvider,
-			ResponseStatusCode: this.ResourceResponseStatusCode,
+			ParticipantName:  this.ParticipantName,
+			Direction:        model.Direction(this.ResourceDirection),
+			Protocol:         model.Protocol(this.ResourceProtocol),
+			Body:             model.BodyRole(this.ResourceBodyRole),
+			Identity:         identity,
+			ConsumedProvider: this.ResourceConsumedProvider,
+			Bodies:           this.toResourceBodies(),
 		},
 		ParticipantID: this.ParticipantID,
 		ContractID:    this.ContractID,
@@ -105,11 +100,9 @@ func scanTableRows(rows pgx.Rows) []tableRow {
 			&row.ParticipantName,
 			&row.ResourceID,
 			&row.ResourceDirection,
-			&row.ResourceInteraction,
+			&row.ResourceProtocol,
+			&row.ResourceBodyRole,
 			&row.ResourceConsumedProvider,
-			&row.ResourceEndpoint,
-			&row.ResourceMethod,
-			&row.ResourceResponseStatusCode,
 			&row.ResourceProviderHash,
 			&row.ResourceConsumerHash,
 			&row.ResourceVersionChangeType,

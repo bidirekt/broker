@@ -24,14 +24,14 @@ var outputRules = readingRules{
 	nullable:         model.ReasonPropertyNullableInProviderNotNullableInConsumer,
 }
 
-var bodyReadings = map[model.Interaction]bodyReading{
-	model.RestRequest:  {rules: inputRules, join: schemagraph.Senders},
-	model.RestResponse: {rules: outputRules, join: schemagraph.Readers},
+var bodyReadings = map[model.BodyRole]bodyReading{
+	model.Input:  {rules: inputRules, join: schemagraph.Senders},
+	model.Output: {rules: outputRules, join: schemagraph.Readers},
 }
 
 func checkResources(checked *model.PersistedResource, counterpart *model.PersistedResource) []ContractBreakingChange {
 	consumer, provider := consumerAndProvider(checked, counterpart)
-	reading := bodyReadings[consumer.Interaction]
+	reading := bodyReadings[consumer.Body]
 
 	consumerBody := schemagraph.New(consumer.Schemas).Root(consumer.Bodies, reading.join)
 	providerBody := schemagraph.New(provider.Schemas).Root(provider.Bodies, reading.join)

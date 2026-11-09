@@ -8,7 +8,10 @@ import (
 	"github.com/bidirekt/broker/internal/contracts/compatibility_checker"
 	"github.com/bidirekt/broker/internal/contracts/contract"
 	"github.com/bidirekt/broker/internal/contracts/mapper/fragmentmapper"
+	"github.com/bidirekt/broker/internal/contracts/protocol"
+	restcontracts "github.com/bidirekt/broker/internal/contracts/protocols/rest"
 	"github.com/bidirekt/broker/internal/model"
+	restmodel "github.com/bidirekt/broker/internal/model/protocols/rest"
 	"github.com/guregu/null"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -103,7 +106,7 @@ func groupRequestMergedFrom(t *testing.T, modules ...string) groupsBody {
 		fragments = append(fragments, fragment)
 	}
 
-	declarations := fragmentmapper.ToDeclarations(fragments)
+	declarations := fragmentmapper.ToDeclarations(fragments, protocol.NewRegistry([]protocol.Protocol{restcontracts.New()}))
 	resources := fragmentmapper.ToResourceModels(declarations)
 	require.Len(t, resources, 1)
 
@@ -111,21 +114,20 @@ func groupRequestMergedFrom(t *testing.T, modules ...string) groupsBody {
 }
 
 func groupsResources(interaction string, consumerBody, providerBody groupsBody) (consumer, provider model.PersistedResource) {
-	kind, status := model.RestResponse, null.StringFrom(interaction)
+	body, status := model.Output, interaction
 	if interaction == "request" {
-		kind, status = model.RestRequest, null.String{}
+		body, status = model.Input, ""
 	}
 
 	consumer = model.PersistedResource{
 		Resource: model.Resource{
-			ParticipantName:    groupsConsumerName,
-			Direction:          model.Consumes,
-			Interaction:        kind,
-			ConsumedProvider:   null.StringFrom(groupsProviderName),
-			Endpoint:           "/api/groups",
-			Method:             "post",
-			ResponseStatusCode: status,
-			Bodies:             consumerBody.bodies,
+			ParticipantName:  groupsConsumerName,
+			Direction:        model.Consumes,
+			Protocol:         restmodel.Protocol,
+			Body:             body,
+			Identity:         restmodel.Identity{Endpoint: "/api/groups", Method: "post", Status: status},
+			ConsumedProvider: null.StringFrom(groupsProviderName),
+			Bodies:           consumerBody.bodies,
 		},
 		ConsumerHash: null.StringFrom("spa-" + groupsProviderHash),
 		ProviderHash: groupsProviderHash,
@@ -134,13 +136,12 @@ func groupsResources(interaction string, consumerBody, providerBody groupsBody) 
 
 	provider = model.PersistedResource{
 		Resource: model.Resource{
-			ParticipantName:    groupsProviderName,
-			Direction:          model.Provides,
-			Interaction:        kind,
-			Endpoint:           "/api/groups",
-			Method:             "post",
-			ResponseStatusCode: status,
-			Bodies:             providerBody.bodies,
+			ParticipantName: groupsProviderName,
+			Direction:       model.Provides,
+			Protocol:        restmodel.Protocol,
+			Body:            body,
+			Identity:        restmodel.Identity{Endpoint: "/api/groups", Method: "post", Status: status},
+			Bodies:          providerBody.bodies,
 		},
 		ProviderHash:       groupsProviderHash,
 		Schemas:            providerBody.schemas,
@@ -161,7 +162,7 @@ func groupsBreaksCheckedFrom(
 		Resources:       map[string]model.PersistedResource{checked.PrimaryHash(): checked},
 	}
 
-	report := compatibility_checker.NewCompatibilityChecker(groupsWithoutVerdict{}).Check(
+	report := compatibility_checker.NewCompatibilityChecker(groupsWithoutVerdict{}, []compatibility_checker.ProtocolHooks{restcontracts.New()}).Check(
 		context.Background(),
 		checkedContract,
 		model.NewEnvironment(groupsEnvironment),
@@ -169,7 +170,7 @@ func groupsBreaksCheckedFrom(
 	)
 
 	var breaks []groupsBreak
-	for _, leaf := range report.Hierarchical[counterpartName].Endpoints["/api/groups"]["post"][interaction] {
+	for _, leaf := range report.Hierarchical[counterpartName].Trees[restmodel.Protocol].(restmodel.ReportTree)["/api/groups"]["post"][interaction] {
 		breaks = append(breaks, groupsBreak{leaf.Reason, leaf.Details["property"]})
 	}
 

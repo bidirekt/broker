@@ -9,6 +9,8 @@ import (
 
 	"github.com/bidirekt/broker/internal/contracts/contract"
 	"github.com/bidirekt/broker/internal/contracts/mapper/fragmentmapper"
+	"github.com/bidirekt/broker/internal/contracts/protocol"
+	restcontracts "github.com/bidirekt/broker/internal/contracts/protocols/rest"
 	"github.com/bidirekt/broker/internal/contracts/validator"
 	"github.com/bidirekt/broker/internal/contracts/violation"
 )
@@ -129,7 +131,7 @@ func validatorFragment(t *testing.T, source, raw string) contract.Fragment {
 }
 
 func validateFragments(fragments ...contract.Fragment) []violation.Violation {
-	return validator.Validate(fragmentmapper.ToDeclarations(fragments))
+	return validator.Validate(fragmentmapper.ToDeclarations(fragments, protocol.NewRegistry([]protocol.Protocol{restcontracts.New()})))
 }
 
 func TestValidator_NoFragments_ReportsNothing(t *testing.T) {

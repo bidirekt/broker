@@ -2,12 +2,9 @@ package descriptor
 
 import (
 	"errors"
-	"fmt"
-	"strconv"
 	"strings"
 	"unicode"
 
-	"github.com/bidirekt/broker/internal/contracts/contract"
 	"github.com/bidirekt/broker/internal/validations"
 )
 
@@ -21,30 +18,10 @@ var (
 		Allowed:   []string{"object", "array", "map", "string", "integer", "float", "number", "boolean"},
 	}
 
-	Endpoint     = Key{ErrorCode: "endpoint.syntax", Check: endpointSyntax}
 	ServiceName  = Key{ErrorCode: "service.name_syntax", Check: validations.ParticipantName}
-	StatusCode   = Key{ErrorCode: "status.out_of_range", Check: statusCodeInRange}
 	SchemaName   = Key{ErrorCode: "schema.name_syntax", Check: pathSafeName}
 	PropertyName = Key{ErrorCode: "property.name_syntax", Check: pathSafeName}
 )
-
-func endpointSyntax(key string) error {
-	return validations.Endpoint(contract.NormalizeEndpoint(key))
-}
-
-const (
-	minStatusCode = 100
-	maxStatusCode = 599
-)
-
-func statusCodeInRange(key string) error {
-	status, err := strconv.ParseUint(key, 10, 0)
-	if err != nil || status < minStatusCode || status > maxStatusCode {
-		return fmt.Errorf("must be between %d and %d", minStatusCode, maxStatusCode)
-	}
-
-	return nil
-}
 
 func pathSafeName(key string) error {
 	switch {

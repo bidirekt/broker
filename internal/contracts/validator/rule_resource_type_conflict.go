@@ -3,13 +3,14 @@ package validator
 import (
 	"github.com/bidirekt/broker/internal/contracts/contract"
 	"github.com/bidirekt/broker/internal/contracts/mapper/fragmentmapper"
+	"github.com/bidirekt/broker/internal/contracts/protocol"
 	"github.com/bidirekt/broker/internal/contracts/schemagraph"
 	"github.com/bidirekt/broker/internal/contracts/violation"
 	"github.com/bidirekt/broker/internal/model"
 )
 
 // Only consumed resources merge, so only they can disagree with themselves.
-func conflictingPropertyTypes(declarations fragmentmapper.Declarations) []violation.Violation {
+func conflictingPropertyTypes(declarations protocol.Declarations) []violation.Violation {
 	graph := schemagraph.New(fragmentmapper.ToSchemaModels(declarations))
 
 	var violations []violation.Violation

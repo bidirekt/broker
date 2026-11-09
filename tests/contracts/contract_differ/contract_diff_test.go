@@ -5,9 +5,20 @@ import (
 
 	"github.com/bidirekt/broker/internal/contracts/contract_differ"
 	"github.com/bidirekt/broker/internal/model"
+	restmodel "github.com/bidirekt/broker/internal/model/protocols/rest"
 	"github.com/guregu/null"
 	"github.com/stretchr/testify/assert"
 )
+
+func restResponseProvider(endpoint, method, status string, bodies []model.ResourceBody) *model.UploadedResource {
+	return &model.UploadedResource{Resource: model.Resource{
+		Direction: model.Provides,
+		Protocol:  restmodel.Protocol,
+		Body:      model.Output,
+		Identity:  restmodel.Identity{Endpoint: endpoint, Method: method, Status: status},
+		Bodies:    bodies,
+	}}
+}
 
 const participantName = "pets-service"
 
@@ -34,15 +45,7 @@ func persistedPets(schemas model.Schemas, resources ...*model.UploadedResource) 
 	for _, resource := range resources {
 		resource.ParticipantName = participantName
 		contract.Resources[resource.PrimaryHash()] = model.PersistedResource{
-			Resource: model.Resource{
-				ParticipantName:    participantName,
-				Direction:          resource.Direction,
-				Interaction:        resource.Interaction,
-				Endpoint:           resource.Endpoint,
-				Method:             resource.Method,
-				ResponseStatusCode: resource.ResponseStatusCode,
-				Bodies:             resource.Bodies,
-			},
+			Resource:     resource.Resource,
 			ProviderHash: resource.ProviderHash(),
 			Schemas:      schemas,
 		}
@@ -63,11 +66,11 @@ func uploadedPets(schemas model.Schemas, resources ...*model.UploadedResource) *
 }
 
 func listPets() *model.UploadedResource {
-	return model.NewRestResponseProvider("/pets", "get", "200", petBody())
+	return restResponseProvider("/pets", "get", "200", petBody())
 }
 
 func getPet() *model.UploadedResource {
-	return model.NewRestResponseProvider("/pets/*", "get", "200", petBody())
+	return restResponseProvider("/pets/*", "get", "200", petBody())
 }
 
 func TestDiff_EquivalentContracts_HaveNoChanges(t *testing.T) {
@@ -96,7 +99,7 @@ func TestDiff_RemovedResource_IsRemoved(t *testing.T) {
 }
 
 func TestDiff_ResourceWhoseBodyChanged_IsNotAResourceChange(t *testing.T) {
-	undescribed := model.NewRestResponseProvider("/pets", "get", "200", []model.ResourceBody{{Source: "pets.yaml"}})
+	undescribed := restResponseProvider("/pets", "get", "200", []model.ResourceBody{{Source: "pets.yaml"}})
 
 	diff := contract_differ.DiffContracts(persistedPets(petSchemas(), listPets()), uploadedPets(model.Schemas{}, undescribed))
 
@@ -203,13 +206,12 @@ func TestDiff_RefTargetRenamed_ModifiesTheRefField(t *testing.T) {
 func TestRemovedSinceDeployed_ResourceGoneFromTheFiles_Counts(t *testing.T) {
 	gone := model.PersistedResource{
 		Resource: model.Resource{
-			ParticipantName:    participantName,
-			Direction:          model.Provides,
-			Interaction:        model.RestResponse,
-			Endpoint:           "/pets/*",
-			Method:             "get",
-			ResponseStatusCode: null.StringFrom("200"),
-			Bodies:             petBody(),
+			ParticipantName: participantName,
+			Direction:       model.Provides,
+			Protocol:        restmodel.Protocol,
+			Body:            model.Output,
+			Identity:        restmodel.Identity{Endpoint: "/pets/*", Method: "get", Status: "200"},
+			Bodies:          petBody(),
 		},
 		ProviderHash: "get-pet",
 	}

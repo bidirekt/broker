@@ -5,7 +5,10 @@ import (
 
 	"github.com/bidirekt/broker/internal/contracts/contract"
 	"github.com/bidirekt/broker/internal/contracts/mapper/fragmentmapper"
+	"github.com/bidirekt/broker/internal/contracts/protocol"
+	restcontracts "github.com/bidirekt/broker/internal/contracts/protocols/rest"
 	"github.com/bidirekt/broker/internal/model"
+	restmodel "github.com/bidirekt/broker/internal/model/protocols/rest"
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -35,7 +38,7 @@ func singleEndpointResource(t *testing.T, raw string) model.UploadedResource {
 	var document any
 	require.NoError(t, yaml.Unmarshal([]byte(raw), &document))
 
-	declarations := fragmentmapper.ToDeclarations([]contract.Fragment{{Source: "things.yaml", Document: document}})
+	declarations := fragmentmapper.ToDeclarations([]contract.Fragment{{Source: "things.yaml", Document: document}}, protocol.NewRegistry([]protocol.Protocol{restcontracts.New()}))
 	resources := fragmentmapper.ToResourceModels(declarations)
 	require.Len(t, resources, 1)
 
@@ -47,7 +50,7 @@ func TestEndpointRules_Accepts(t *testing.T) {
 		t.Run(endpoint, func(t *testing.T) {
 			resource := singleEndpointResource(t, endpointProvidesJSON(endpoint))
 
-			assert.Equal(t, endpoint, resource.Endpoint)
+			assert.Equal(t, endpoint, resource.Identity.(restmodel.Identity).Endpoint)
 		})
 	}
 }
@@ -56,6 +59,6 @@ func TestEndpointRules_TrailingSlash_NormalizesToSameResource(t *testing.T) {
 	slashed := singleEndpointResource(t, endpointProvidesJSON("/users/"))
 	plain := singleEndpointResource(t, endpointProvidesJSON("/users"))
 
-	assert.Equal(t, "/users", slashed.Endpoint)
+	assert.Equal(t, "/users", slashed.Identity.(restmodel.Identity).Endpoint)
 	assert.Equal(t, plain.ProviderHash(), slashed.ProviderHash())
 }

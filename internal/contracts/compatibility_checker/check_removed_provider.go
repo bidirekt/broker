@@ -1,10 +1,6 @@
 package compatibility_checker
 
-import (
-	"slices"
-
-	"github.com/bidirekt/broker/internal/model"
-)
+import "github.com/bidirekt/broker/internal/model"
 
 // checkRemovedProvider runs outside the pair cache: the pair verdict may have been stored by
 // the consumer's own check, which never sees the removal, so it is always resolved live.
@@ -16,18 +12,18 @@ func (this *CompatibilityChecker) checkRemovedProvider(
 ) {
 	consumers := counterparts.Consumers[removedResource.ProviderHash]
 
-	for _, result := range CheckRemovedProviderResource(&removedResource, checkedResources, consumers) {
+	for _, result := range this.CheckRemovedProviderResource(&removedResource, checkedResources, consumers) {
 		report.AppendResult(result.Counterpart.ParticipantName, result)
 	}
 }
 
-func CheckRemovedProviderResource(
+func (this *CompatibilityChecker) CheckRemovedProviderResource(
 	removedResource *model.PersistedResource,
 	checkedResources map[string]model.PersistedResource,
 	consumers []model.PersistedResource,
 ) []*CounterpartResult {
 	results := make([]*CounterpartResult, 0, len(consumers))
-	providerStatuses, methodRemains := remainingProviderStatuses(removedResource, checkedResources)
+	reason, details, refined := this.hooksOf(removedResource.Protocol).RefineRemoved(removedResource, checkedResources)
 
 	for _, consumerResource := range consumers {
 		// ContractID is left zeroed so this break alone never persists a verdict for the pair.
@@ -38,13 +34,7 @@ func CheckRemovedProviderResource(
 		result.Counterpart.Role = model.CounterpartConsumer
 
 		removal := NewProviderResourceRemovedButStillConsumed(removedResource, &consumerResource)
-		if methodRemains {
-			removal = NewProviderResourceInteractionRemovedButStillConsumed(
-				removedResource,
-				&consumerResource,
-				providerStatuses,
-			)
-		}
+		removal.refine(reason, details, refined)
 
 		result.AppendContractBreakChange(removal)
 
@@ -52,32 +42,4 @@ func CheckRemovedProviderResource(
 	}
 
 	return results
-}
-
-// A removed request keeps no statuses: its endpoint and method only remain through responses.
-func remainingProviderStatuses(
-	removedResource *model.PersistedResource,
-	checkedResources map[string]model.PersistedResource,
-) ([]string, bool) {
-	var statuses []string
-	methodRemains := false
-
-	for _, resource := range checkedResources {
-		if resource.Removed ||
-			!resource.IsProvider() ||
-			resource.Endpoint != removedResource.Endpoint ||
-			resource.Method != removedResource.Method {
-			continue
-		}
-
-		methodRemains = true
-
-		if removedResource.Interaction == model.RestResponse && resource.Interaction == model.RestResponse {
-			statuses = append(statuses, resource.ResponseStatusCode.String)
-		}
-	}
-
-	slices.Sort(statuses)
-
-	return statuses, methodRemains
 }

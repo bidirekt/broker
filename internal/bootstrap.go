@@ -3,6 +3,9 @@ package internal
 import (
 	"github.com/bidirekt/broker/internal/components"
 	"github.com/bidirekt/broker/internal/components/config"
+	"github.com/bidirekt/broker/internal/contracts/compatibility_checker"
+	"github.com/bidirekt/broker/internal/contracts/protocol"
+	restcontracts "github.com/bidirekt/broker/internal/contracts/protocols/rest"
 	"github.com/bidirekt/broker/internal/features/can_i_deploy"
 	"github.com/bidirekt/broker/internal/features/create_api_key"
 	"github.com/bidirekt/broker/internal/features/create_environment"
@@ -39,6 +42,8 @@ import (
 	"github.com/bidirekt/broker/internal/features/sign_out"
 	"github.com/bidirekt/broker/internal/features/update_profile"
 	"github.com/bidirekt/broker/internal/features/validate_contract"
+	"github.com/bidirekt/broker/internal/repository"
+	restrepository "github.com/bidirekt/broker/internal/repository/protocols/rest"
 )
 
 func Run() (*components.Components, error) {
@@ -47,13 +52,18 @@ func Run() (*components.Components, error) {
 		return nil, err
 	}
 
+	restContracts := restcontracts.New()
+	protocols := protocol.NewRegistry([]protocol.Protocol{restContracts})
+	hooks := []compatibility_checker.ProtocolHooks{restContracts}
+	tables := []repository.ProtocolTable{restrepository.New()}
+
 	// registers /participants/new-participant, which must precede show_participant_versions' /participants/:name
 	create_participant.Register(kernel)
 	// registers /environments/new-environment, which must precede show_environment's /environments/:id
 	create_environment.Register(kernel)
-	publish_contract.Register(kernel)
-	validate_contract.Register(kernel)
-	can_i_deploy.Register(kernel)
+	publish_contract.Register(kernel, protocols, tables)
+	validate_contract.Register(kernel, protocols, tables, hooks)
+	can_i_deploy.Register(kernel, tables, hooks)
 	record_deployment.Register(kernel)
 	rename_environment.Register(kernel)
 	health.Register(kernel)

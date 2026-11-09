@@ -83,7 +83,7 @@ func (this *IntegrationSuite) TestPublishContract_RootAndTrailingSlashEndpoints_
 
 	var endpoints []string
 	this.Require().NoError(this.Pool.QueryRow(context.Background(),
-		`SELECT array_agg(endpoint ORDER BY endpoint COLLATE "C") FROM resources`,
+		`SELECT array_agg(endpoint ORDER BY endpoint COLLATE "C") FROM rest_resources`,
 	).Scan(&endpoints))
 	this.Equal([]string{"/", "/pets"}, endpoints)
 }

@@ -33,8 +33,8 @@ func (this *CompatibilityChecker) checkConsumer(
 		result.Counterpart.ParticipantVersion = registered.DeployedVersion
 
 		notFound := NewProviderResourceNotFound(&consumerResource)
-		if providerStatuses, declaresMethod := counterparts.ProviderStatuses[consumerResource.ProviderHash]; declaresMethod {
-			notFound = NewProviderResourceInteractionNotFound(&consumerResource, providerStatuses)
+		if hint, declaresAround := counterparts.ProviderHints[consumerResource.ProviderHash]; declaresAround {
+			notFound.refine(this.hooksOf(consumerResource.Protocol).RefineNotFound(&consumerResource, hint))
 		}
 
 		result.AppendContractBreakChange(notFound)

@@ -4,20 +4,27 @@ import (
 	"testing"
 
 	"github.com/bidirekt/broker/internal/contracts/compatibility_checker"
+	restcontracts "github.com/bidirekt/broker/internal/contracts/protocols/rest"
 	"github.com/bidirekt/broker/internal/model"
+	restmodel "github.com/bidirekt/broker/internal/model/protocols/rest"
 	"github.com/guregu/null"
 	"github.com/stretchr/testify/assert"
 )
 
+var removedProviderHooks = []compatibility_checker.ProtocolHooks{restcontracts.New()}
+
+func removedProviderChecker() *compatibility_checker.CompatibilityChecker {
+	return compatibility_checker.NewCompatibilityChecker(nil, removedProviderHooks)
+}
+
 func removedProviderResource() *model.PersistedResource {
 	return &model.PersistedResource{
 		Resource: model.Resource{
-			Direction:          model.Provides,
-			Interaction:        model.RestResponse,
-			Endpoint:           "/users",
-			Method:             "get",
-			ResponseStatusCode: null.StringFrom("200"),
-			ParticipantName:    "users",
+			Direction:       model.Provides,
+			Protocol:        restmodel.Protocol,
+			Body:            model.Output,
+			Identity:        restmodel.Identity{Endpoint: "/users", Method: "get", Status: "200"},
+			ParticipantName: "users",
 		},
 		ProviderHash:       "provider-hash",
 		ParticipantVersion: null.StringFrom("v2"),
@@ -28,13 +35,12 @@ func removedProviderResource() *model.PersistedResource {
 func stillConsumingResource(participantID int64, participantName, version string) model.PersistedResource {
 	return model.PersistedResource{
 		Resource: model.Resource{
-			ParticipantName:    participantName,
-			Direction:          model.Consumes,
-			Interaction:        model.RestResponse,
-			ConsumedProvider:   null.StringFrom("users"),
-			Endpoint:           "/users",
-			Method:             "get",
-			ResponseStatusCode: null.StringFrom("200"),
+			ParticipantName:  participantName,
+			Direction:        model.Consumes,
+			Protocol:         restmodel.Protocol,
+			Body:             model.Output,
+			Identity:         restmodel.Identity{Endpoint: "/users", Method: "get", Status: "200"},
+			ConsumedProvider: null.StringFrom("users"),
 		},
 		ParticipantID:      participantID,
 		ContractID:         participantID * 10,
@@ -51,7 +57,7 @@ func TestRemovedProviderBreaksOncePerConsumer(t *testing.T) {
 		stillConsumingResource(5, "mobile", "v2"),
 	}
 
-	results := compatibility_checker.CheckRemovedProviderResource(removed, nil, consumers)
+	results := removedProviderChecker().CheckRemovedProviderResource(removed, nil, consumers)
 
 	assert.Len(t, results, 2)
 
@@ -78,7 +84,7 @@ func TestRemovedProviderBreaksOncePerConsumer(t *testing.T) {
 	assert.Equal(t, "web", web.Breaks[0].CounterpartResource.ParticipantName)
 	assert.Equal(t, "web", web.Breaks[0].ConsumerName())
 	assert.Equal(t, "users", web.Breaks[0].ProviderName())
-	assert.Equal(t, "200", web.Breaks[0].InteractionKey())
+	assert.Equal(t, "200", web.Breaks[0].CheckedResource.Identity.(restmodel.Identity).Interaction())
 
 	mobile := byConsumer["mobile"]
 	assert.Equal(t, int64(5), mobile.Counterpart.ParticipantID)
@@ -89,7 +95,7 @@ func TestRemovedProviderBreaksOncePerConsumer(t *testing.T) {
 }
 
 func TestRemovedProviderWithoutConsumersHasNoBreak(t *testing.T) {
-	results := compatibility_checker.CheckRemovedProviderResource(
+	results := removedProviderChecker().CheckRemovedProviderResource(
 		removedProviderResource(),
 		nil,
 		nil,
@@ -100,7 +106,7 @@ func TestRemovedProviderWithoutConsumersHasNoBreak(t *testing.T) {
 
 func TestRemovedProviderResultKeepsTheRealContractIDInAnyOrder(t *testing.T) {
 	removal := func() *compatibility_checker.CounterpartResult {
-		results := compatibility_checker.CheckRemovedProviderResource(
+		results := removedProviderChecker().CheckRemovedProviderResource(
 			removedProviderResource(),
 			nil,
 			[]model.PersistedResource{stillConsumingResource(3, "web", "v7")},
@@ -121,11 +127,11 @@ func TestRemovedProviderResultKeepsTheRealContractIDInAnyOrder(t *testing.T) {
 		return item
 	}
 
-	removalFirst := compatibility_checker.NewContractCompatibilityReport("users", "v2", "production")
+	removalFirst := compatibility_checker.NewContractCompatibilityReport("users", "v2", "production", removedProviderHooks)
 	removalFirst.AppendResult("web", removal())
 	removalFirst.AppendResult("web", matched())
 
-	matchedFirst := compatibility_checker.NewContractCompatibilityReport("users", "v2", "production")
+	matchedFirst := compatibility_checker.NewContractCompatibilityReport("users", "v2", "production", removedProviderHooks)
 	matchedFirst.AppendResult("web", matched())
 	matchedFirst.AppendResult("web", removal())
 
@@ -140,43 +146,37 @@ func TestRemovedProviderResultKeepsTheRealContractIDInAnyOrder(t *testing.T) {
 	}
 }
 
-func liveUsersProviderResource(method string, interaction model.Interaction, status string) model.PersistedResource {
-	resource := model.PersistedResource{
+func liveUsersProviderResource(method string, body model.BodyRole, status string) model.PersistedResource {
+	return model.PersistedResource{
 		Resource: model.Resource{
 			Direction:       model.Provides,
-			Interaction:     interaction,
-			Endpoint:        "/users",
-			Method:          method,
+			Protocol:        restmodel.Protocol,
+			Body:            body,
+			Identity:        restmodel.Identity{Endpoint: "/users", Method: method, Status: status},
 			ParticipantName: "users",
 		},
 		ParticipantVersion: null.StringFrom("v2"),
 	}
-
-	if status != "" {
-		resource.ResponseStatusCode = null.StringFrom(status)
-	}
-
-	return resource
 }
 
 func TestRemovedProvider_StatusChangeOnSurvivingMethod_BreaksAsInteractionRemovedWithSortedStatuses(t *testing.T) {
 	removed := removedProviderResource()
-	removedSibling := liveUsersProviderResource("get", model.RestResponse, "500")
+	removedSibling := liveUsersProviderResource("get", model.Output, "500")
 	removedSibling.Removed = true
 	consumedSameMethod := stillConsumingResource(3, "web", "v7")
-	consumedSameMethod.ResponseStatusCode = null.StringFrom("201")
+	consumedSameMethod.Identity = restmodel.Identity{Endpoint: "/users", Method: "get", Status: "201"}
 	checkedResources := map[string]model.PersistedResource{
 		"removed":      *removed,
-		"404":          liveUsersProviderResource("get", model.RestResponse, "404"),
-		"204":          liveUsersProviderResource("get", model.RestResponse, "204"),
-		"2XX":          liveUsersProviderResource("get", model.RestResponse, "2XX"),
-		"request":      liveUsersProviderResource("get", model.RestRequest, ""),
-		"other method": liveUsersProviderResource("post", model.RestResponse, "201"),
+		"404":          liveUsersProviderResource("get", model.Output, "404"),
+		"204":          liveUsersProviderResource("get", model.Output, "204"),
+		"2XX":          liveUsersProviderResource("get", model.Output, "2XX"),
+		"request":      liveUsersProviderResource("get", model.Input, ""),
+		"other method": liveUsersProviderResource("post", model.Output, "201"),
 		"removed 500":  removedSibling,
 		"consumed 201": consumedSameMethod,
 	}
 
-	results := compatibility_checker.CheckRemovedProviderResource(
+	results := removedProviderChecker().CheckRemovedProviderResource(
 		removed,
 		checkedResources,
 		[]model.PersistedResource{stillConsumingResource(3, "web", "v7")},
@@ -196,22 +196,22 @@ func TestRemovedProvider_StatusChangeOnSurvivingMethod_BreaksAsInteractionRemove
 	assert.False(t, web.Breaks[0].IsPropertyBreak())
 	assert.Same(t, removed, web.Breaks[0].CheckedResource)
 	assert.Equal(t, "web", web.Breaks[0].ConsumerName())
-	assert.Equal(t, "200", web.Breaks[0].InteractionKey())
+	assert.Equal(t, "200", web.Breaks[0].CheckedResource.Identity.(restmodel.Identity).Interaction())
 }
 
 func TestRemovedProvider_RequestDroppedOnSurvivingMethod_BreaksAsInteractionRemovedWithoutDetails(t *testing.T) {
 	removed := removedProviderResource()
-	removed.Interaction = model.RestRequest
-	removed.ResponseStatusCode = null.String{}
+	removed.Body = model.Input
+	removed.Identity = restmodel.Identity{Endpoint: "/users", Method: "get"}
 	consumer := stillConsumingResource(3, "web", "v7")
-	consumer.Interaction = model.RestRequest
-	consumer.ResponseStatusCode = null.String{}
+	consumer.Body = model.Input
+	consumer.Identity = restmodel.Identity{Endpoint: "/users", Method: "get"}
 	checkedResources := map[string]model.PersistedResource{
 		"removed": *removed,
-		"201":     liveUsersProviderResource("get", model.RestResponse, "201"),
+		"201":     liveUsersProviderResource("get", model.Output, "201"),
 	}
 
-	results := compatibility_checker.CheckRemovedProviderResource(
+	results := removedProviderChecker().CheckRemovedProviderResource(
 		removed,
 		checkedResources,
 		[]model.PersistedResource{consumer},
@@ -225,7 +225,7 @@ func TestRemovedProvider_RequestDroppedOnSurvivingMethod_BreaksAsInteractionRemo
 		results[0].Breaks[0].Reason,
 	)
 	assert.Nil(t, results[0].Breaks[0].Details)
-	assert.Equal(t, "request", results[0].Breaks[0].InteractionKey())
+	assert.Equal(t, "request", results[0].Breaks[0].CheckedResource.Identity.(restmodel.Identity).Interaction())
 	assert.False(t, results[0].Breaks[0].IsPropertyBreak())
 }
 
@@ -233,10 +233,10 @@ func TestRemovedProvider_ResponseDroppedWhereOnlyARequestRemains_BreaksAsInterac
 	removed := removedProviderResource()
 	checkedResources := map[string]model.PersistedResource{
 		"removed": *removed,
-		"request": liveUsersProviderResource("get", model.RestRequest, ""),
+		"request": liveUsersProviderResource("get", model.Input, ""),
 	}
 
-	results := compatibility_checker.CheckRemovedProviderResource(
+	results := removedProviderChecker().CheckRemovedProviderResource(
 		removed,
 		checkedResources,
 		[]model.PersistedResource{stillConsumingResource(3, "web", "v7")},
@@ -255,17 +255,17 @@ func TestRemovedProvider_ResponseDroppedWhereOnlyARequestRemains_BreaksAsInterac
 func TestRemovedProvider_MethodGoneWhileEndpointRemains_KeepsTheRemovedReason(t *testing.T) {
 	removed := removedProviderResource()
 	consumedSameMethod := stillConsumingResource(3, "web", "v7")
-	consumedSameMethod.ResponseStatusCode = null.StringFrom("204")
-	removedSibling := liveUsersProviderResource("get", model.RestResponse, "204")
+	consumedSameMethod.Identity = restmodel.Identity{Endpoint: "/users", Method: "get", Status: "204"}
+	removedSibling := liveUsersProviderResource("get", model.Output, "204")
 	removedSibling.Removed = true
 	checkedResources := map[string]model.PersistedResource{
 		"removed":      *removed,
 		"removed 204":  removedSibling,
-		"other method": liveUsersProviderResource("post", model.RestResponse, "201"),
+		"other method": liveUsersProviderResource("post", model.Output, "201"),
 		"consumed 204": consumedSameMethod,
 	}
 
-	results := compatibility_checker.CheckRemovedProviderResource(
+	results := removedProviderChecker().CheckRemovedProviderResource(
 		removed,
 		checkedResources,
 		[]model.PersistedResource{stillConsumingResource(3, "web", "v7")},

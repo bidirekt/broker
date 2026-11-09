@@ -56,37 +56,6 @@ const (
 		WHERE
 			pa.name = $1
 	`
-
-	deployedProviderStatusesQuery = `
-		SELECT
-			COUNT(*) > 0,
-			array_agg(r.response_status_code ORDER BY r.response_status_code COLLATE "C")
-				FILTER (WHERE r.response_status_code IS NOT NULL)
-		FROM
-			participants pa
-		JOIN
-			current_deployments cd ON cd.participant_id = pa.id AND cd.environment_id = $5
-		JOIN
-			resources r ON r.participant_id = pa.id
-		JOIN LATERAL (
-			SELECT change_type
-			FROM resource_versions
-			WHERE resource_id = r.id
-			  AND contract_id <= cd.contract_id
-			ORDER BY contract_id DESC
-			LIMIT 1
-		) rv ON true
-		WHERE
-			r.direction = $1
-		AND
-			pa.name = $2
-		AND
-			r.endpoint = $3
-		AND
-			r.method = $4
-		AND
-			rv.change_type = 'added'
-	`
 )
 
 // LoadCounterparts loads the deployed counterparts of the contract's resources in the environment, once per hash and side.
@@ -98,7 +67,7 @@ func (this *ContractRepository) LoadCounterparts(
 	counterparts := model.ResourceCounterparts{
 		Providers:           make(map[string]model.PersistedResource),
 		Consumers:           make(map[string][]model.PersistedResource),
-		ProviderStatuses:    make(map[string][]string),
+		ProviderHints:       make(map[string]any),
 		RegisteredProviders: make(map[string]model.RegisteredProvider),
 	}
 
@@ -134,8 +103,8 @@ func (this *ContractRepository) LoadCounterparts(
 				continue
 			}
 
-			if statuses, declaresMethod := this.loadDeployedProviderStatuses(ctx, resource, environmentID); declaresMethod {
-				counterparts.ProviderStatuses[resource.ProviderHash] = statuses
+			if hint, found := this.tables[resource.Protocol].LoadProviderHint(ctx, this.pool, resource, environmentID); found {
+				counterparts.ProviderHints[resource.ProviderHash] = hint
 			}
 		case model.Provides:
 			if _, queried := counterparts.Consumers[resource.ProviderHash]; queried {
@@ -198,29 +167,6 @@ func (this *ContractRepository) loadRegisteredProvider(
 	return registered, true
 }
 
-func (this *ContractRepository) loadDeployedProviderStatuses(
-	ctx context.Context,
-	consumerResource model.PersistedResource,
-	environmentID int64,
-) ([]string, bool) {
-	var declaresMethod bool
-	var statuses []string
-
-	if err := this.pool.QueryRow(
-		ctx,
-		deployedProviderStatusesQuery,
-		string(model.Provides),
-		consumerResource.ConsumedProvider.String,
-		consumerResource.Endpoint,
-		consumerResource.Method,
-		environmentID,
-	).Scan(&declaresMethod, &statuses); err != nil {
-		panic(fmt.Errorf("error loading statuses of deployed provider: %w", err))
-	}
-
-	return statuses, declaresMethod
-}
-
 func (this *ContractRepository) loadDeployedResources(
 	ctx context.Context,
 	catalogs schemaCatalogs,
@@ -240,10 +186,11 @@ func (this *ContractRepository) loadDeployedResources(
 	}
 
 	tableRows := scanTableRows(rows)
+	identities := this.identitiesOf(ctx, this.pool, tableRows)
 	resources := make([]model.PersistedResource, len(tableRows))
 
 	for index, row := range tableRows {
-		resources[index] = row.toResourceModel()
+		resources[index] = row.toResourceModel(identities[row.ResourceID])
 		resources[index].ParticipantVersion = null.StringFrom(row.ContractVersion)
 	}
 

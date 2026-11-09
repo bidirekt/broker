@@ -1,12 +1,12 @@
 package validator
 
 import (
-	"github.com/bidirekt/broker/internal/contracts/mapper/fragmentmapper"
+	"github.com/bidirekt/broker/internal/contracts/protocol"
 	"github.com/bidirekt/broker/internal/contracts/violation"
 )
 
 // Only a provider redeclaration is a violation: each consumer declaration is a body, joined when compared.
-func duplicateResources(declarations fragmentmapper.Declarations) []violation.Violation {
+func duplicateResources(declarations protocol.Declarations) []violation.Violation {
 	var violations []violation.Violation
 
 	declaredIn := map[string]string{}

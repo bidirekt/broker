@@ -11,6 +11,8 @@ import (
 
 	"github.com/bidirekt/broker/internal/contracts/contract"
 	"github.com/bidirekt/broker/internal/contracts/mapper/fragmentmapper"
+	"github.com/bidirekt/broker/internal/contracts/protocol"
+	restcontracts "github.com/bidirekt/broker/internal/contracts/protocols/rest"
 	"github.com/bidirekt/broker/internal/contracts/validator"
 	"github.com/bidirekt/broker/internal/contracts/violation"
 )
@@ -320,7 +322,7 @@ func validateFiles(t *testing.T, files ...validatedFile) []violation.Violation {
 		fragments = append(fragments, contract.Fragment{Source: file.source, Document: document})
 	}
 
-	return validator.Validate(fragmentmapper.ToDeclarations(fragments))
+	return validator.Validate(fragmentmapper.ToDeclarations(fragments, protocol.NewRegistry([]protocol.Protocol{restcontracts.New()})))
 }
 
 func deepInlinePetYAML(levels int) string {

@@ -1,7 +1,10 @@
 package compatibility_checker
 
 import (
-	"cmp"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -43,16 +46,10 @@ func (this *CounterpartResult) AppendCachedBreakChange(b model.VerdictBreak) {
 	this.Deployable = false
 }
 
-type HierarchicalInteraction map[string][]ContractBreakingChange
-
-type HierarchicalMethod map[string]HierarchicalInteraction
-
-type HierarchicalEndpoint map[string]HierarchicalMethod
-
 type Hierarchical struct {
-	Deployable bool                 `json:"deployable"`
-	Version    null.String          `json:"participantVersion"`
-	Endpoints  HierarchicalEndpoint `json:"endpoints"`
+	Deployable bool
+	Version    null.String
+	Trees      map[model.Protocol]ReportTree
 }
 
 type ContractCompatibilityReport struct {
@@ -61,10 +58,12 @@ type ContractCompatibilityReport struct {
 	Environment     string
 	Results         map[string]CounterpartResult
 	Hierarchical    map[string]Hierarchical
+	protocols       []ProtocolHooks
 }
 
 func NewContractCompatibilityReport(
 	participantName, version, environment string,
+	protocols []ProtocolHooks,
 ) *ContractCompatibilityReport {
 	return &ContractCompatibilityReport{
 		ParticipantName: participantName,
@@ -72,16 +71,20 @@ func NewContractCompatibilityReport(
 		Environment:     environment,
 		Results:         make(map[string]CounterpartResult),
 		Hierarchical:    make(map[string]Hierarchical),
+		protocols:       protocols,
 	}
 }
 
 func (this *ContractCompatibilityReport) AppendResult(counterpartName string, result *CounterpartResult) {
-
 	hierarchical, exists := this.Hierarchical[counterpartName]
 	if !exists {
 		hierarchical = Hierarchical{
 			Deployable: true,
-			Endpoints:  make(HierarchicalEndpoint),
+			Trees:      make(map[model.Protocol]ReportTree, len(this.protocols)),
+		}
+
+		for _, hooks := range this.protocols {
+			hierarchical.Trees[hooks.Protocol()] = hooks.NewReportTree()
 		}
 	}
 
@@ -90,16 +93,15 @@ func (this *ContractCompatibilityReport) AppendResult(counterpartName string, re
 	}
 
 	for _, breakChange := range result.Breaks {
-		breakChange.Role = model.RoleProvider
+		role := model.RoleProvider
 		if breakChange.CheckedResource.IsConsumer() {
-			breakChange.Role = model.RoleConsumer
+			role = model.RoleConsumer
 		}
 
 		hierarchical.appendBreak(
-			breakChange.CheckedResource.Endpoint,
-			breakChange.CheckedResource.Method,
-			breakChange.InteractionKey(),
-			breakChange,
+			breakChange.CheckedResource.Protocol,
+			breakChange.CheckedResource.Identity.Location(),
+			model.ReportBreak{Reason: breakChange.Reason, Role: role, Details: breakChange.Details},
 		)
 	}
 
@@ -110,14 +112,9 @@ func (this *ContractCompatibilityReport) AppendResult(counterpartName string, re
 		}
 
 		hierarchical.appendBreak(
-			cachedBreak.Endpoint,
-			cachedBreak.Method,
-			cachedBreak.Interaction,
-			ContractBreakingChange{
-				Reason:  cachedBreak.Reason,
-				Role:    role,
-				Details: cachedBreak.Details,
-			},
+			cachedBreak.Protocol,
+			cachedBreak.Location,
+			model.ReportBreak{Reason: cachedBreak.Reason, Role: role, Details: cachedBreak.Details},
 		)
 	}
 
@@ -165,11 +162,10 @@ func ToVerdictBreaks(result CounterpartResult) []model.VerdictBreak {
 		}
 
 		verdictBreaks = append(verdictBreaks, model.VerdictBreak{
-			Endpoint:    breakChange.CheckedResource.Endpoint,
-			Method:      breakChange.CheckedResource.Method,
-			Interaction: breakChange.InteractionKey(),
-			Reason:      breakChange.Reason,
-			Details:     breakChange.Details,
+			Protocol: breakChange.CheckedResource.Protocol,
+			Location: breakChange.CheckedResource.Identity.Location(),
+			Reason:   breakChange.Reason,
+			Details:  breakChange.Details,
 		})
 	}
 
@@ -186,26 +182,62 @@ func (this *ContractCompatibilityReport) Deployable() bool {
 	return true
 }
 
-func (this *Hierarchical) appendBreak(
-	endpoint, method, interaction string,
-	breakChange ContractBreakingChange,
-) {
-	if _, ok := this.Endpoints[endpoint]; !ok {
-		this.Endpoints[endpoint] = make(HierarchicalMethod)
+func (this *Hierarchical) appendBreak(protocol model.Protocol, location map[string]string, reportBreak model.ReportBreak) {
+	tree, registered := this.Trees[protocol]
+	if !registered {
+		panic(fmt.Errorf("protocol %q has no report tree", protocol))
 	}
 
-	if _, ok := this.Endpoints[endpoint][method]; !ok {
-		this.Endpoints[endpoint][method] = make(HierarchicalInteraction)
-	}
-
-	breaks := append(this.Endpoints[endpoint][method][interaction], breakChange)
-	slices.SortStableFunc(breaks, func(a, b ContractBreakingChange) int {
-		return cmp.Or(
-			strings.Compare(a.Details["property"], b.Details["property"]),
-			strings.Compare(string(a.Reason), string(b.Reason)),
-		)
-	})
-	this.Endpoints[endpoint][method][interaction] = breaks
+	tree.Append(location, reportBreak)
 
 	this.Deployable = false
+}
+
+type hierarchicalField struct {
+	key   string
+	value any
+}
+
+// MarshalJSON writes the fields in a fixed order, the trees last and sorted by their key, so
+// the bytes of a stored report never depend on map order.
+func (this Hierarchical) MarshalJSON() ([]byte, error) {
+	fields := []hierarchicalField{
+		{"deployable", this.Deployable},
+		{"participantVersion", this.Version},
+	}
+
+	trees := slices.SortedFunc(maps.Values(this.Trees), func(a, b ReportTree) int {
+		return strings.Compare(a.ReportKey(), b.ReportKey())
+	})
+	for _, tree := range trees {
+		fields = append(fields, hierarchicalField{tree.ReportKey(), tree})
+	}
+
+	var buffer bytes.Buffer
+
+	buffer.WriteByte('{')
+
+	for i, field := range fields {
+		if i > 0 {
+			buffer.WriteByte(',')
+		}
+
+		key, err := json.Marshal(field.key)
+		if err != nil {
+			return nil, err
+		}
+
+		value, err := json.Marshal(field.value)
+		if err != nil {
+			return nil, err
+		}
+
+		buffer.Write(key)
+		buffer.WriteByte(':')
+		buffer.Write(value)
+	}
+
+	buffer.WriteByte('}')
+
+	return buffer.Bytes(), nil
 }

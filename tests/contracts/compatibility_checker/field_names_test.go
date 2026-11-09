@@ -5,7 +5,9 @@ import (
 	"testing"
 
 	"github.com/bidirekt/broker/internal/contracts/compatibility_checker"
+	restcontracts "github.com/bidirekt/broker/internal/contracts/protocols/rest"
 	"github.com/bidirekt/broker/internal/model"
+	restmodel "github.com/bidirekt/broker/internal/model/protocols/rest"
 	"github.com/guregu/null"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -49,7 +51,7 @@ func billingFieldsCheckedFrom(
 		Resources:       map[string]model.PersistedResource{checked.PrimaryHash(): checked},
 	}
 
-	report := compatibility_checker.NewCompatibilityChecker(billingWithoutVerdict{}).Check(
+	report := compatibility_checker.NewCompatibilityChecker(billingWithoutVerdict{}, []compatibility_checker.ProtocolHooks{restcontracts.New()}).Check(
 		context.Background(),
 		checkedContract,
 		model.NewEnvironment(billingEnvironment),
@@ -57,7 +59,7 @@ func billingFieldsCheckedFrom(
 	)
 
 	var fields []map[string]string
-	for _, leaf := range report.Hierarchical[counterpartName].Endpoints[billingEndpoint][billingMethod][interaction] {
+	for _, leaf := range report.Hierarchical[counterpartName].Trees[restmodel.Protocol].(restmodel.ReportTree)[billingEndpoint][billingMethod][interaction] {
 		named := map[string]string{"property": leaf.Details["property"]}
 		for _, key := range []string{"consumerField", "providerField"} {
 			if field, present := leaf.Details[key]; present {
@@ -74,21 +76,20 @@ func billingFieldsCheckedFrom(
 func billingFields(t *testing.T, interaction string, consumerSide, providerSide billingSide) []map[string]string {
 	t.Helper()
 
-	kind, status := model.RestResponse, null.StringFrom(interaction)
+	body, status := model.Output, interaction
 	if interaction == "request" {
-		kind, status = model.RestRequest, null.String{}
+		body, status = model.Input, ""
 	}
 
 	consumer := model.PersistedResource{
 		Resource: model.Resource{
-			ParticipantName:    billingConsumerName,
-			Direction:          model.Consumes,
-			Interaction:        kind,
-			ConsumedProvider:   null.StringFrom(billingProviderName),
-			Endpoint:           billingEndpoint,
-			Method:             billingMethod,
-			ResponseStatusCode: status,
-			Bodies:             consumerSide.bodies,
+			ParticipantName:  billingConsumerName,
+			Direction:        model.Consumes,
+			Protocol:         restmodel.Protocol,
+			Body:             body,
+			Identity:         restmodel.Identity{Endpoint: billingEndpoint, Method: billingMethod, Status: status},
+			ConsumedProvider: null.StringFrom(billingProviderName),
+			Bodies:           consumerSide.bodies,
 		},
 		ConsumerHash: null.StringFrom("spa-" + billingProviderHash),
 		ProviderHash: billingProviderHash,
@@ -96,13 +97,12 @@ func billingFields(t *testing.T, interaction string, consumerSide, providerSide 
 	}
 	provider := model.PersistedResource{
 		Resource: model.Resource{
-			ParticipantName:    billingProviderName,
-			Direction:          model.Provides,
-			Interaction:        kind,
-			Endpoint:           billingEndpoint,
-			Method:             billingMethod,
-			ResponseStatusCode: status,
-			Bodies:             providerSide.bodies,
+			ParticipantName: billingProviderName,
+			Direction:       model.Provides,
+			Protocol:        restmodel.Protocol,
+			Body:            body,
+			Identity:        restmodel.Identity{Endpoint: billingEndpoint, Method: billingMethod, Status: status},
+			Bodies:          providerSide.bodies,
 		},
 		ProviderHash:       billingProviderHash,
 		Schemas:            providerSide.schemas,

@@ -54,16 +54,14 @@ const (
 			(
 				participant_id,
 				direction,
-				interaction,
+				protocol,
+				body_role,
 				consumed_provider,
-				endpoint,
-				method,
-				response_status_code,
 				provider_hash,
 				consumer_hash
 			)
 		VALUES
-			($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id
 	`
 
@@ -156,11 +154,12 @@ const (
 )
 
 type ContractRepository struct {
-	pool *pgxpool.Pool
+	pool   *pgxpool.Pool
+	tables map[model.Protocol]ProtocolTable
 }
 
-func NewContractRepository(pool *pgxpool.Pool) *ContractRepository {
-	return &ContractRepository{pool: pool}
+func NewContractRepository(pool *pgxpool.Pool, protocols []ProtocolTable) *ContractRepository {
+	return &ContractRepository{pool: pool, tables: toProtocolTables(protocols)}
 }
 
 func (this *ContractRepository) loadFilesForVersion(ctx context.Context, tx pgx.Tx, participantID int64, version string) ([]model.ContractFile, bool) {
@@ -339,16 +338,16 @@ func (this *ContractRepository) insertResource(
 		insertResourceQuery,
 		participantID,
 		resource.Direction.String(),
-		resource.Interaction.String(),
+		resource.Protocol.String(),
+		resource.Body.String(),
 		resource.ConsumedProvider,
-		resource.Endpoint,
-		resource.Method,
-		resource.ResponseStatusCode,
 		resource.ProviderHash(),
 		null.NewString(resource.ConsumerHash(), resource.IsConsumer()),
 	).Scan(&id); err != nil {
 		panic(fmt.Errorf("error inserting resource: %w", err))
 	}
+
+	this.tableOf(id, resource.Protocol).Insert(ctx, tx, id, resource.Identity)
 
 	return id
 }
@@ -416,7 +415,7 @@ func (this *ContractRepository) latestSnapshot(
 		panic(fmt.Errorf("error loading contract tree: %w", err))
 	}
 
-	return this.withSchemas(ctx, q, scanPersistedContractTree(rows))
+	return this.withSchemas(ctx, q, this.toPersistedContractTree(ctx, q, rows))
 }
 
 func (this *ContractRepository) GetContractByNameAndVersion(
@@ -429,7 +428,7 @@ func (this *ContractRepository) GetContractByNameAndVersion(
 		panic(fmt.Errorf("error loading contract tree by name and version: %w", err))
 	}
 
-	return this.withSchemas(ctx, this.pool, scanPersistedContractTree(rows))
+	return this.withSchemas(ctx, this.pool, this.toPersistedContractTree(ctx, this.pool, rows))
 }
 
 func (this *ContractRepository) GetContractByIDAndVersion(
@@ -442,7 +441,7 @@ func (this *ContractRepository) GetContractByIDAndVersion(
 		panic(fmt.Errorf("error loading contract tree by id and version: %w", err))
 	}
 
-	contract, found := this.withSchemas(ctx, this.pool, scanPersistedContractTree(rows))
+	contract, found := this.withSchemas(ctx, this.pool, this.toPersistedContractTree(ctx, this.pool, rows))
 	if !found {
 		panic(fmt.Errorf("contract %d has no version %q", contractID, version))
 	}
@@ -469,15 +468,18 @@ func (this *ContractRepository) withSchemas(
 	return contract, true
 }
 
-func scanPersistedContractTree(rows pgx.Rows) *model.PersistedContract {
+func (this *ContractRepository) toPersistedContractTree(ctx context.Context, q Querier, rows pgx.Rows) *model.PersistedContract {
 	var contract *model.PersistedContract
 
-	for _, row := range scanTableRows(rows) {
+	tableRows := scanTableRows(rows)
+	identities := this.identitiesOf(ctx, q, tableRows)
+
+	for _, row := range tableRows {
 		if contract == nil {
 			contract = row.toPersistedContractModel()
 		}
 
-		resource := row.toResourceModel()
+		resource := row.toResourceModel(identities[row.ResourceID])
 		contract.Resources[resource.PrimaryHash()] = resource
 	}
 

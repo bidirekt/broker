@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/bidirekt/broker/internal/model"
+	restmodel "github.com/bidirekt/broker/internal/model/protocols/rest"
 	"github.com/bidirekt/broker/internal/repository"
+	restrepository "github.com/bidirekt/broker/internal/repository/protocols/rest"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -139,13 +141,14 @@ func (this *IntegrationSuite) concurrentPublish(bodies ...string) (statuses []in
 }
 
 func (this *IntegrationSuite) assertConcurrentPublishRebuilds(version string, content concurrentPublishContent) {
-	contract, found := repository.NewContractRepository(this.Pool).GetContractByNameAndVersion(context.Background(), "orders_api", version)
+	contract, found := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()}).GetContractByNameAndVersion(context.Background(), "orders_api", version)
 	this.Require().True(found, "version %s", version)
 
 	var resources []string
 	for _, resource := range contract.Resources {
 		if !resource.Removed {
-			resources = append(resources, resource.Method+" "+resource.Endpoint+" "+resource.ResponseStatusCode.String)
+			identity := resource.Identity.(restmodel.Identity)
+			resources = append(resources, identity.Method+" "+identity.Endpoint+" "+identity.Status)
 		}
 	}
 	slices.Sort(resources)

@@ -6,7 +6,9 @@ import (
 	"testing"
 
 	"github.com/bidirekt/broker/internal/contracts/compatibility_checker"
+	restcontracts "github.com/bidirekt/broker/internal/contracts/protocols/rest"
 	"github.com/bidirekt/broker/internal/model"
+	restmodel "github.com/bidirekt/broker/internal/model/protocols/rest"
 	"github.com/guregu/null"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,20 +27,19 @@ func (this newsletterWithoutVerdict) GetVerdict(context.Context, int64, int64) (
 }
 
 func newsletterConsumer(interaction string) model.PersistedResource {
-	kind, status := model.RestResponse, null.StringFrom(interaction)
+	body, status := model.Output, interaction
 	if interaction == "request" {
-		kind, status = model.RestRequest, null.String{}
+		body, status = model.Input, ""
 	}
 
 	return model.PersistedResource{
 		Resource: model.Resource{
-			ParticipantName:    newsletterConsumerName,
-			Direction:          model.Consumes,
-			Interaction:        kind,
-			ConsumedProvider:   null.StringFrom(newsletterProviderName),
-			Endpoint:           "/newsletter/unsubscribe",
-			Method:             "post",
-			ResponseStatusCode: status,
+			ParticipantName:  newsletterConsumerName,
+			Direction:        model.Consumes,
+			Protocol:         restmodel.Protocol,
+			Body:             body,
+			Identity:         restmodel.Identity{Endpoint: "/newsletter/unsubscribe", Method: "post", Status: status},
+			ConsumedProvider: null.StringFrom(newsletterProviderName),
 		},
 		ConsumerHash: null.StringFrom("site-" + newsletterHash),
 		ProviderHash: newsletterHash,
@@ -47,7 +48,7 @@ func newsletterConsumer(interaction string) model.PersistedResource {
 
 func newsletterReportCheckedFrom(
 	consumer model.PersistedResource,
-	providerStatuses map[string][]string,
+	providerHints map[string]any,
 ) *compatibility_checker.ContractCompatibilityReport {
 	contract := &model.PersistedContract{
 		ParticipantName: newsletterConsumerName,
@@ -55,12 +56,12 @@ func newsletterReportCheckedFrom(
 		Resources:       map[string]model.PersistedResource{consumer.PrimaryHash(): consumer},
 	}
 
-	return compatibility_checker.NewCompatibilityChecker(newsletterWithoutVerdict{}).Check(
+	return compatibility_checker.NewCompatibilityChecker(newsletterWithoutVerdict{}, []compatibility_checker.ProtocolHooks{restcontracts.New()}).Check(
 		context.Background(),
 		contract,
 		model.NewEnvironment("production"),
 		model.ResourceCounterparts{
-			ProviderStatuses:    providerStatuses,
+			ProviderHints:       providerHints,
 			RegisteredProviders: map[string]model.RegisteredProvider{newsletterProviderName: {ParticipantID: 2, DeployedVersion: null.StringFrom("1.0.0")}},
 		},
 	)
@@ -68,40 +69,40 @@ func newsletterReportCheckedFrom(
 
 func TestConsumerResourceMissingFromTheDeployedProvider(t *testing.T) {
 	cases := []struct {
-		name             string
-		interaction      string
-		providerStatuses map[string][]string
-		leaf             string
+		name          string
+		interaction   string
+		providerHints map[string]any
+		leaf          string
 	}{
 		{
-			name:             "status the provider does not answer on that method",
-			interaction:      "200",
-			providerStatuses: map[string][]string{newsletterHash: {"204"}},
-			leaf:             `{"reason":"provider_resource_interaction_not_found","role":"consumer","details":{"providerStatuses":"204"}}`,
+			name:          "status the provider does not answer on that method",
+			interaction:   "200",
+			providerHints: map[string]any{newsletterHash: restmodel.DeployedStatuses{"204"}},
+			leaf:          `{"reason":"provider_resource_interaction_not_found","role":"consumer","details":{"providerStatuses":"204"}}`,
 		},
 		{
-			name:             "request the provider does not declare on that method",
-			interaction:      "request",
-			providerStatuses: map[string][]string{newsletterHash: {"200", "204"}},
-			leaf:             `{"reason":"provider_resource_interaction_not_found","role":"consumer","details":{"providerStatuses":"200, 204"}}`,
+			name:          "request the provider does not declare on that method",
+			interaction:   "request",
+			providerHints: map[string]any{newsletterHash: restmodel.DeployedStatuses{"200", "204"}},
+			leaf:          `{"reason":"provider_resource_interaction_not_found","role":"consumer","details":{"providerStatuses":"200, 204"}}`,
 		},
 		{
-			name:             "status on a method the provider declares with a request only",
-			interaction:      "200",
-			providerStatuses: map[string][]string{newsletterHash: nil},
-			leaf:             `{"reason":"provider_resource_interaction_not_found","role":"consumer"}`,
+			name:          "status on a method the provider declares with a request only",
+			interaction:   "200",
+			providerHints: map[string]any{newsletterHash: restmodel.DeployedStatuses(nil)},
+			leaf:          `{"reason":"provider_resource_interaction_not_found","role":"consumer"}`,
 		},
 		{
-			name:             "endpoint or method the provider does not declare",
-			interaction:      "200",
-			providerStatuses: map[string][]string{},
-			leaf:             `{"reason":"provider_resource_not_found","role":"consumer"}`,
+			name:          "endpoint or method the provider does not declare",
+			interaction:   "200",
+			providerHints: map[string]any{},
+			leaf:          `{"reason":"provider_resource_not_found","role":"consumer"}`,
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			report := newsletterReportCheckedFrom(newsletterConsumer(tc.interaction), tc.providerStatuses)
+			report := newsletterReportCheckedFrom(newsletterConsumer(tc.interaction), tc.providerHints)
 
 			result, err := json.Marshal(report.Hierarchical[newsletterProviderName])
 			require.NoError(t, err)
@@ -116,9 +117,16 @@ func TestConsumerResourceMissingFromTheDeployedProvider(t *testing.T) {
 }
 
 func TestProviderResourceInteractionNotFound_IsNeverAStoredVerdict(t *testing.T) {
-	consumer := newsletterConsumer("200")
+	report := newsletterReportCheckedFrom(
+		newsletterConsumer("200"),
+		map[string]any{newsletterHash: restmodel.DeployedStatuses{"204"}},
+	)
 
-	interactionNotFound := compatibility_checker.NewProviderResourceInteractionNotFound(&consumer, []string{"204"})
+	result := report.Results[newsletterProviderName]
+	require.Len(t, result.Breaks, 1)
+	interactionNotFound := result.Breaks[0]
 
+	assert.Equal(t, model.ReasonProviderResourceInteractionNotFound, interactionNotFound.Reason)
 	assert.False(t, interactionNotFound.IsPropertyBreak())
+	assert.Empty(t, compatibility_checker.ToVerdictBreaks(result))
 }

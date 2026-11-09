@@ -9,7 +9,9 @@ import (
 	"strings"
 
 	"github.com/bidirekt/broker/internal/model"
+	restmodel "github.com/bidirekt/broker/internal/model/protocols/rest"
 	"github.com/bidirekt/broker/internal/repository"
+	restrepository "github.com/bidirekt/broker/internal/repository/protocols/rest"
 	"github.com/guregu/null"
 )
 
@@ -46,7 +48,7 @@ func (this *IntegrationSuite) publishOrdersContract() {
 }
 
 func (this *IntegrationSuite) loadOrdersResource() model.PersistedResource {
-	repo := repository.NewContractRepository(this.Pool)
+	repo := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()})
 
 	contract, found := repo.GetContractByNameAndVersion(context.Background(), "orders_service", "1")
 	this.Require().True(found)
@@ -83,8 +85,7 @@ func (this *IntegrationSuite) TestLoadContract_PopulatedOptionalFieldsArePreserv
 
 	this.True(resource.ConsumedProvider.Valid)
 	this.Equal("pets", resource.ConsumedProvider.String)
-	this.True(resource.ResponseStatusCode.Valid)
-	this.Equal("200", resource.ResponseStatusCode.String)
+	this.Equal("200", resource.Identity.(restmodel.Identity).Status)
 }
 
 const nullableAccountsProviderContract = `provides:
@@ -139,7 +140,7 @@ func onlyNullableRoundTripResource(contract *model.PersistedContract) model.Pers
 
 func (this *IntegrationSuite) TestContractRepository_NullableFieldRoundTripsThroughEveryRead() {
 	ctx := context.Background()
-	repo := repository.NewContractRepository(this.Pool)
+	repo := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()})
 
 	this.mustPostForNullableRoundTrip("/api/environments", `{"environment":"production"}`)
 	this.mustPostForNullableRoundTrip("/api/participants", `{"participant":"accounts_api"}`)
@@ -178,7 +179,7 @@ func (this *IntegrationSuite) TestContractRepository_NullableFieldRoundTripsThro
 
 func (this *IntegrationSuite) TestContractRepository_OnlyNullabilityChanged_WritesAModifiedFieldVersion() {
 	ctx := context.Background()
-	repo := repository.NewContractRepository(this.Pool)
+	repo := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()})
 
 	this.mustPostForNullableRoundTrip("/api/participants", `{"participant":"accounts_api"}`)
 	this.publishNullableAccountsProvider("1", false)
@@ -311,7 +312,7 @@ func onlyUndescribedBodyResource(contract *model.PersistedContract) model.Persis
 
 func (this *IntegrationSuite) assertEveryReadReturnsTheFileResourceWithAnUndescribedBody(providerVersion string) {
 	ctx := context.Background()
-	repo := repository.NewContractRepository(this.Pool)
+	repo := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()})
 	environmentID := this.undescribedBodyProductionID()
 	undescribed := []model.ResourceBody{{Source: "api.yaml"}}
 
@@ -319,7 +320,7 @@ func (this *IntegrationSuite) assertEveryReadReturnsTheFileResourceWithAnUndescr
 	this.Require().True(found, "contract by version")
 	this.Require().Len(byVersion.Resources, 1, "contract by version")
 	providerResource := onlyUndescribedBodyResource(byVersion)
-	this.Equal("/files/*", providerResource.Endpoint, "contract by version")
+	this.Equal("/files/*", providerResource.Identity.(restmodel.Identity).Endpoint, "contract by version")
 	this.Equal(undescribed, providerResource.Bodies, "contract by version")
 	this.Equal(model.Schemas{}, byVersion.Schemas, "contract by version")
 
@@ -330,7 +331,7 @@ func (this *IntegrationSuite) assertEveryReadReturnsTheFileResourceWithAnUndescr
 
 	provider, found := repo.GetProviderResourceByProviderHashAndEnvironmentID(ctx, providerResource.ProviderHash, environmentID)
 	this.Require().True(found, "provider resource of a consumer")
-	this.Equal("/files/*", provider.Endpoint, "provider resource of a consumer")
+	this.Equal("/files/*", provider.Identity.(restmodel.Identity).Endpoint, "provider resource of a consumer")
 	this.Equal(undescribed, provider.Bodies, "provider resource of a consumer")
 	this.Equal(null.StringFrom(providerVersion), provider.ParticipantVersion, "provider resource of a consumer")
 
@@ -366,7 +367,7 @@ func (this *IntegrationSuite) TestContractRepository_ResourceWhoseBodyBecameUnde
 
 	this.assertEveryReadReturnsTheFileResourceWithAnUndescribedBody("2")
 
-	first, found := repository.NewContractRepository(this.Pool).GetContractByNameAndVersion(context.Background(), "files_api", "1")
+	first, found := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()}).GetContractByNameAndVersion(context.Background(), "files_api", "1")
 	this.Require().True(found)
 	this.Equal([]model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Pet")}}, onlyUndescribedBodyResource(first).Bodies)
 	this.Equal(model.Schemas{"Pet": {"": {Type: "object"}, "name": {Type: "string"}}}, first.Schemas)
@@ -380,8 +381,8 @@ func (this *IntegrationSuite) TestContractRepository_NewSnapshot_DoesNotAddTheUn
 	rows, err := this.Pool.Query(context.Background(), `
 		SELECT rv.change_type
 		FROM resource_versions rv
-		JOIN resources r ON r.id = rv.resource_id
-		WHERE r.endpoint = '/files/*'
+		JOIN rest_resources rr ON rr.resource_id = rv.resource_id
+		WHERE rr.endpoint = '/files/*'
 		ORDER BY rv.contract_id`)
 	this.Require().NoError(err)
 	defer rows.Close()
@@ -400,7 +401,7 @@ func (this *IntegrationSuite) TestContractRepository_NewSnapshot_DoesNotAddTheUn
 
 func (this *IntegrationSuite) TestContractRepository_RemovedResource_ComesBackRemovedWithoutBodyInItsVersion() {
 	ctx := context.Background()
-	repo := repository.NewContractRepository(this.Pool)
+	repo := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()})
 
 	this.mustPostForUndescribedBody("/api/participants", `{"participant":"files_api"}`)
 	this.publishUndescribedBodyContract("files_api", "1", undescribedBodyProviderWithHealthContract)
@@ -415,7 +416,7 @@ func (this *IntegrationSuite) TestContractRepository_RemovedResource_ComesBackRe
 	this.Require().True(found)
 	this.Require().Len(second.Resources, 2)
 	for _, resource := range second.Resources {
-		if resource.Endpoint == "/health" {
+		if resource.Identity.(restmodel.Identity).Endpoint == "/health" {
 			this.True(resource.Removed)
 			this.Empty(resource.Bodies)
 			continue
@@ -580,7 +581,7 @@ func (this *IntegrationSuite) TestContractRepository_SchemaAddedBack_DoesNotBrin
 	this.publishSchemaRowsOrders("3", strings.Replace(schemaRowsOrdersContract,
 		"      city:\n        type: string\n", "      line:\n        type: string\n", 1))
 
-	third, found := repository.NewContractRepository(this.Pool).GetContractByNameAndVersion(ctx, "orders_api", "3")
+	third, found := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()}).GetContractByNameAndVersion(ctx, "orders_api", "3")
 	this.Require().True(found)
 	this.Equal(model.Schema{"": {Type: "object"}, "line": {Type: "string"}}, third.Schemas["Address"])
 	this.NotContains(third.Schemas, "PostalAddress")
@@ -589,7 +590,7 @@ func (this *IntegrationSuite) TestContractRepository_SchemaAddedBack_DoesNotBrin
 
 func (this *IntegrationSuite) TestContractRepository_ReadsByVersion_ReturnEachVersionsFields() {
 	ctx := context.Background()
-	repo := repository.NewContractRepository(this.Pool)
+	repo := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()})
 
 	this.mustPostForSchemaRows("/api/participants", `{"participant":"orders_api"}`)
 	this.publishSchemaRowsOrders("1", schemaRowsOrdersContract)
@@ -640,7 +641,7 @@ func (this *IntegrationSuite) TestContractRepository_ExponentialSchema_WritesOnl
 	this.Equal(67, this.countRows("fields"))
 	this.Equal(67, this.countRows("field_versions"))
 
-	contract, found := repository.NewContractRepository(this.Pool).GetContractByNameAndVersion(context.Background(), "orders_api", "1")
+	contract, found := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()}).GetContractByNameAndVersion(context.Background(), "orders_api", "1")
 	this.Require().True(found)
 	this.Len(contract.Schemas, 23)
 	this.Equal(model.Schema{"": {Type: "object"}, "left": {Ref: "S1"}, "right": {Ref: "S1"}}, contract.Schemas["S0"])
@@ -693,7 +694,7 @@ schemas:
 
 func (this *IntegrationSuite) TestContractRepository_CounterpartReads_CarryTheCatalogAtTheDeployedVersion() {
 	ctx := context.Background()
-	repo := repository.NewContractRepository(this.Pool)
+	repo := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()})
 
 	this.mustPostForSchemaRows("/api/environments", `{"environment":"production"}`)
 	this.mustPostForSchemaRows("/api/participants", `{"participant":"accounts_api"}`)
@@ -787,7 +788,7 @@ const registeredNamesFrontContract = `consumes:
 
 func (this *IntegrationSuite) TestContractRepository_LoadCounterparts_CarriesEachRegisteredNameAndLoadsOnlyDeployedProviders() {
 	ctx := context.Background()
-	repo := repository.NewContractRepository(this.Pool)
+	repo := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()})
 	mustPost := func(path, body string) {
 		status, response := this.post(path, body)
 		this.Require().Equalf(http.StatusOK, status, "POST %s: %s", path, response)
@@ -812,7 +813,7 @@ func (this *IntegrationSuite) TestContractRepository_LoadCounterparts_CarriesEac
 	this.Require().Len(front.Resources, 4)
 	providerHashes := make(map[string]string)
 	for _, resource := range front.Resources {
-		providerHashes[resource.ConsumedProvider.String+" "+resource.Endpoint] = resource.ProviderHash
+		providerHashes[resource.ConsumedProvider.String+" "+resource.Identity.(restmodel.Identity).Endpoint] = resource.ProviderHash
 	}
 
 	counterparts := repo.LoadCounterparts(ctx, front, environmentID)
@@ -826,7 +827,7 @@ func (this *IntegrationSuite) TestContractRepository_LoadCounterparts_CarriesEac
 	this.Require().True(found)
 	this.Equal(ordersID, orders.ParticipantID)
 	this.Equal(null.StringFrom("1"), orders.ParticipantVersion)
-	this.Empty(counterparts.ProviderStatuses)
+	this.Empty(counterparts.ProviderHints)
 
 	_, found = repo.GetProviderResourceByProviderHashAndEnvironmentID(ctx, providerHashes["billing /invoices"], environmentID)
 	this.False(found)
