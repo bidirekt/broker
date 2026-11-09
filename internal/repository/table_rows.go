@@ -1,9 +1,28 @@
 package repository
 
 import (
+	"fmt"
+
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/guregu/null"
+	"github.com/jackc/pgx/v5"
 )
+
+const resourceColumns = `
+			pa.id,
+			pa.name,
+			r.id,
+			r.direction,
+			r.interaction,
+			r.consumed_provider,
+			r.endpoint,
+			r.method,
+			r.response_status_code,
+			r.provider_hash,
+			r.consumer_hash,
+			rv.change_type,
+			bodies.sources,
+			bodies.schema_names`
 
 // This struct is used to build the entire contract avoiding N+1 problem
 type tableRow struct {
@@ -25,7 +44,6 @@ type tableRow struct {
 	ResourceResponseStatusCode null.String
 	ResourceProviderHash       string
 	ResourceConsumerHash       null.String
-	ResourceVersion            string
 	ResourceVersionChangeType  string
 
 	// Bodies, aligned by index
@@ -44,7 +62,7 @@ func (this *tableRow) toPersistedContractModel() *model.PersistedContract {
 }
 
 func (this *tableRow) toResourceModel() model.PersistedResource {
-	resource := model.PersistedResource{
+	return model.PersistedResource{
 		Resource: model.Resource{
 			Direction:          model.Direction(this.ResourceDirection),
 			Interaction:        model.Interaction(this.ResourceInteraction),
@@ -61,12 +79,6 @@ func (this *tableRow) toResourceModel() model.PersistedResource {
 		ConsumerHash:  this.ResourceConsumerHash,
 		Removed:       this.ResourceVersionChangeType == string(model.ChangeRemoved),
 	}
-
-	if this.ResourceVersion != "" {
-		resource.ParticipantVersion = null.StringFrom(this.ResourceVersion)
-	}
-
-	return resource
 }
 
 func (this *tableRow) toResourceBodies() []model.ResourceBody {
@@ -76,4 +88,43 @@ func (this *tableRow) toResourceBodies() []model.ResourceBody {
 	}
 
 	return bodies
+}
+
+func scanTableRows(rows pgx.Rows) []tableRow {
+	defer rows.Close()
+
+	var tableRows []tableRow
+
+	for rows.Next() {
+		var row tableRow
+
+		if err := rows.Scan(
+			&row.ContractID,
+			&row.ContractVersion,
+			&row.ParticipantID,
+			&row.ParticipantName,
+			&row.ResourceID,
+			&row.ResourceDirection,
+			&row.ResourceInteraction,
+			&row.ResourceConsumedProvider,
+			&row.ResourceEndpoint,
+			&row.ResourceMethod,
+			&row.ResourceResponseStatusCode,
+			&row.ResourceProviderHash,
+			&row.ResourceConsumerHash,
+			&row.ResourceVersionChangeType,
+			&row.BodySources,
+			&row.BodySchemaNames,
+		); err != nil {
+			panic(fmt.Errorf("error scanning resource row: %w", err))
+		}
+
+		tableRows = append(tableRows, row)
+	}
+
+	if err := rows.Err(); err != nil {
+		panic(fmt.Errorf("error reading resource rows: %w", err))
+	}
+
+	return tableRows
 }
