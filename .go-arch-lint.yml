@@ -58,6 +58,7 @@ components:
   components_sessions:      { in: internal/components/sessions }
   components_database:      { in: internal/components/database }
   components_server:        { in: internal/components/server }
+  components_versions:      { in: internal/components/versions }
   contracts:
     in:
       - internal/contracts/compatibility_checker
@@ -89,6 +90,7 @@ vendors:
   testify:        { in: [github.com/stretchr/testify, github.com/stretchr/testify/**] }
   testcontainers: { in: [github.com/testcontainers/testcontainers-go, github.com/testcontainers/testcontainers-go/**] }
   x_crypto:       { in: [golang.org/x/crypto/**] }
+  x_mod:          { in: [golang.org/x/mod/**] }
   golang_jwt:     { in: [github.com/golang-jwt/jwt/v5, github.com/golang-jwt/jwt/v5/**] }
   fasthttp:       { in: [github.com/valyala/fasthttp, github.com/valyala/fasthttp/**] }
 
@@ -166,7 +168,7 @@ deps:
     mayDependOn: [components, components_access, components_pages, components_respond, components_tokens, repository, model]
     canUse: [fiber]
   feature_health:
-    mayDependOn: [components]
+    mayDependOn: [components, components_versions]
     canUse: [fiber]
   feature_invite_user:
     mayDependOn: [components, components_access, components_pages, components_respond, components_tokens, repository, model, validations]
@@ -282,11 +284,14 @@ deps:
     mayDependOn: [components_pages]
     canUse: [fiber]
   components_server:
-    mayDependOn: [components_bearer, components_config, components_input, components_pages, components_respond, components_sessions]
+    mayDependOn: [components_bearer, components_config, components_input, components_pages, components_respond, components_sessions, components_versions]
     canUse: [fiber]
   components_sessions:
     mayDependOn: [components_access, components_config, components_pages, components_respond, components_tokens, repository, model]
     canUse: [fiber]
+  components_versions:
+    mayDependOn: [components_pages, components_respond]
+    canUse: [fiber, x_mod]
   contracts:
     mayDependOn: [contracts, model, validations]
     canUse: [yaml, guregu_null]
@@ -319,6 +324,7 @@ deps:
       - components_pages
       - components_passwords
       - components_tokens
+      - components_versions
       - contracts
       - contracts_protocols
       - feature_health
