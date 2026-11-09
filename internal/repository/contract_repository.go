@@ -16,11 +16,10 @@ const (
 		SELECT EXISTS(SELECT 1 FROM contract_versions WHERE participant_id = $1 AND version = $2)
 	`
 
-	loadChecksumForVersionQuery = `
-		SELECT c.checksum
-		FROM contract_versions cv
-		JOIN contracts c ON c.id = cv.contract_id
-		WHERE cv.participant_id = $1 AND cv.version = $2
+	loadContractContentForVersionQuery = `
+		SELECT contract_content
+		FROM contract_versions
+		WHERE participant_id = $1 AND version = $2
 	`
 
 	lockContractParticipantQuery = `
@@ -303,23 +302,24 @@ func (this *ContractRepository) HasContractForVersion(ctx context.Context, parti
 	return exists
 }
 
-func (this *ContractRepository) loadChecksumForVersion(ctx context.Context, tx pgx.Tx, participantID int64, version string) (string, bool) {
-	var checksum string
+func (this *ContractRepository) loadFilesForVersion(ctx context.Context, tx pgx.Tx, participantID int64, version string) ([]model.ContractFile, bool) {
+	var contractContent string
 
-	err := tx.QueryRow(ctx, loadChecksumForVersionQuery, participantID, version).Scan(&checksum)
+	err := tx.QueryRow(ctx, loadContractContentForVersionQuery, participantID, version).Scan(&contractContent)
 	if err == nil {
-		return checksum, true
+		return toContractFiles(contractContent), true
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", false
+		return nil, false
 	}
-	panic(fmt.Errorf("error loading checksum for version: %w", err))
+	panic(fmt.Errorf("error loading contract content for version: %w", err))
 }
 
 func (this *ContractRepository) Publish(
 	ctx context.Context,
 	contract *model.UploadedContract,
 	diff func(*model.PersistedContract) model.ContractDiff,
+	sameContent func(stored []model.ContractFile) bool,
 ) (conflict bool) {
 	tx, err := this.pool.Begin(ctx)
 	if err != nil {
@@ -332,8 +332,8 @@ func (this *ContractRepository) Publish(
 		panic(fmt.Errorf("error locking contract participant: %w", err))
 	}
 
-	if checksum, exists := this.loadChecksumForVersion(ctx, tx, contract.ParticipantID, contract.Version); exists {
-		return checksum != contract.Checksum()
+	if stored, exists := this.loadFilesForVersion(ctx, tx, contract.ParticipantID, contract.Version); exists {
+		return !sameContent(stored)
 	}
 
 	if !this.aliasVersionToSnapshot(ctx, tx, contract) {
