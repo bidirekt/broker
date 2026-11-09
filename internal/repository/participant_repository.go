@@ -29,6 +29,10 @@ const (
 		RETURNING id
 	`
 
+	hasContractForVersionQuery = `
+		SELECT EXISTS(SELECT 1 FROM contract_versions WHERE participant_id = $1 AND version = $2)
+	`
+
 	listParticipantNamesQuery = `
 		SELECT
 			name
@@ -84,4 +88,14 @@ func (this *ParticipantRepository) ListNames(ctx context.Context) []string {
 	}
 
 	return names
+}
+
+func (this *ParticipantRepository) HasContractForVersion(ctx context.Context, participantID int64, version string) bool {
+	var exists bool
+
+	if err := this.pool.QueryRow(ctx, hasContractForVersionQuery, participantID, version).Scan(&exists); err != nil {
+		panic(fmt.Errorf("error checking contract version: %w", err))
+	}
+
+	return exists
 }

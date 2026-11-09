@@ -30,20 +30,17 @@ type RecordDeploymentOutput struct {
 type RecordDeploymentUseCase struct {
 	deploymentRepository  *repository.DeploymentRepository
 	participantRepository *repository.ParticipantRepository
-	contractRepository    *repository.ContractRepository
 	environmentRepository *repository.EnvironmentRepository
 }
 
 func NewRecordDeploymentUseCase(
 	deploymentRepository *repository.DeploymentRepository,
 	participantRepository *repository.ParticipantRepository,
-	contractRepository *repository.ContractRepository,
 	environmentRepository *repository.EnvironmentRepository,
 ) *RecordDeploymentUseCase {
 	return &RecordDeploymentUseCase{
 		deploymentRepository:  deploymentRepository,
 		participantRepository: participantRepository,
-		contractRepository:    contractRepository,
 		environmentRepository: environmentRepository,
 	}
 }
@@ -54,7 +51,7 @@ func (this *RecordDeploymentUseCase) Execute(ctx context.Context, input RecordDe
 		return RecordDeploymentOutput{Status: ParticipantNotFound}
 	}
 
-	if !this.contractRepository.HasContractForVersion(ctx, participant.ID, input.Version) {
+	if !this.participantRepository.HasContractForVersion(ctx, participant.ID, input.Version) {
 		return RecordDeploymentOutput{Status: VersionNotFound}
 	}
 

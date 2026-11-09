@@ -12,10 +12,6 @@ import (
 )
 
 const (
-	hasContractForVersionQuery = `
-		SELECT EXISTS(SELECT 1 FROM contract_versions WHERE participant_id = $1 AND version = $2)
-	`
-
 	loadContractContentForVersionQuery = `
 		SELECT contract_content
 		FROM contract_versions
@@ -165,16 +161,6 @@ type ContractRepository struct {
 
 func NewContractRepository(pool *pgxpool.Pool) *ContractRepository {
 	return &ContractRepository{pool: pool}
-}
-
-func (this *ContractRepository) HasContractForVersion(ctx context.Context, participantID int64, version string) bool {
-	var exists bool
-
-	if err := this.pool.QueryRow(ctx, hasContractForVersionQuery, participantID, version).Scan(&exists); err != nil {
-		panic(fmt.Errorf("error checking contract version: %w", err))
-	}
-
-	return exists
 }
 
 func (this *ContractRepository) loadFilesForVersion(ctx context.Context, tx pgx.Tx, participantID int64, version string) ([]model.ContractFile, bool) {

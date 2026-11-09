@@ -40,42 +40,32 @@ type ShowContractVersionOutput struct {
 }
 
 type ShowContractVersionUseCase struct {
-	contractRepository      *repository.ContractRepository
-	deploymentRepository    *repository.DeploymentRepository
-	compatibilityRepository *repository.CompatibilityRepository
+	contractVersionPageRepository *repository.ContractVersionPageRepository
 }
 
-func NewShowContractVersionUseCase(
-	contractRepository *repository.ContractRepository,
-	deploymentRepository *repository.DeploymentRepository,
-	compatibilityRepository *repository.CompatibilityRepository,
-) *ShowContractVersionUseCase {
-	return &ShowContractVersionUseCase{
-		contractRepository:      contractRepository,
-		deploymentRepository:    deploymentRepository,
-		compatibilityRepository: compatibilityRepository,
-	}
+func NewShowContractVersionUseCase(contractVersionPageRepository *repository.ContractVersionPageRepository) *ShowContractVersionUseCase {
+	return &ShowContractVersionUseCase{contractVersionPageRepository: contractVersionPageRepository}
 }
 
 func (this *ShowContractVersionUseCase) Execute(ctx context.Context, input ShowContractVersionInput) ShowContractVersionOutput {
-	contractVersion, found := this.contractRepository.FindContractVersion(ctx, input.ParticipantName, input.Version)
+	contractVersion, found := this.contractVersionPageRepository.FindContractVersion(ctx, input.ParticipantName, input.Version)
 	if !found {
 		return ShowContractVersionOutput{Status: ContractVersionNotFound}
 	}
 
-	latestChecks := this.compatibilityRepository.ListLatestChecksOfVersion(ctx, contractVersion.ParticipantID, contractVersion.Version)
-	deployments, deploymentsTotal := this.deploymentRepository.ListDeploymentsOfVersion(
+	latestChecks := this.contractVersionPageRepository.ListLatestChecksOfVersion(ctx, contractVersion.ParticipantID, contractVersion.Version)
+	deployments, deploymentsTotal := this.contractVersionPageRepository.ListDeploymentsOfVersion(
 		ctx, contractVersion.ParticipantID, contractVersion.Version, pages.PageSize, pages.Offset(input.DeploymentsPage),
 	)
-	checks, checksTotal := this.compatibilityRepository.ListChecksOfVersion(
+	checks, checksTotal := this.contractVersionPageRepository.ListChecksOfVersion(
 		ctx, contractVersion.ParticipantID, contractVersion.Version, pages.PageSize, pages.Offset(input.ChecksPage),
 	)
-	results := this.compatibilityRepository.ListResultsOfChecks(ctx, checkIDs(latestChecks, checks))
+	results := this.contractVersionPageRepository.ListResultsOfChecks(ctx, checkIDs(latestChecks, checks))
 
 	return ShowContractVersionOutput{
 		Status:             ContractVersionFound,
 		ContractVersion:    contractVersion,
-		CurrentDeployments: this.deploymentRepository.ListCurrentDeploymentsOfVersion(ctx, contractVersion.ParticipantID, contractVersion.Version),
+		CurrentDeployments: this.contractVersionPageRepository.ListCurrentDeploymentsOfVersion(ctx, contractVersion.ParticipantID, contractVersion.Version),
 		LatestChecks:       toReportedChecks(latestChecks, results),
 		Deployments:        deployments,
 		DeploymentsTotal:   deploymentsTotal,
