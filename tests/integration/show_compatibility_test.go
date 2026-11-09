@@ -238,7 +238,7 @@ func (this *IntegrationSuite) TestShowCompatibility_DetailsSayWhenThereIsNothing
 	this.Contains(newestDetails, `<p class="muted small">not checked yet</p>`)
 
 	oldestDetails := body[strings.Index(body, `compared with · <span class="ver">1.4.0</span>`):]
-	this.Contains(oldestDetails, `<p class="muted small">nothing deployed in staging shares an endpoint</p>`)
+	this.Contains(oldestDetails, `<p class="muted small">nothing deployed in staging shares a resource</p>`)
 	this.NotContains(oldestDetails, `not checked yet`)
 }
 

@@ -3,16 +3,10 @@ package breakreport
 import (
 	"encoding/json"
 	"fmt"
-	"maps"
 	"slices"
 	"strings"
 
 	"github.com/bidirekt/broker/internal/model"
-)
-
-const (
-	requestInteraction = "request"
-	bodyPropertyPath   = "$"
 )
 
 type Report struct {
@@ -30,38 +24,7 @@ type Counterpart struct {
 	Registered bool
 	Deployable bool
 	Breaks     int
-	Endpoints  []Endpoint
-	Fields     []FieldBlock
-}
-
-type Endpoint struct {
-	Method string
-	Path   string
-	Breaks []EndpointBreak
-}
-
-type EndpointBreak struct {
-	Reason      model.BreakingReason
-	Interaction string
-	Sentence    Phrase
-	ReasonLine  string
-	Fixes       []Fix
-}
-
-type FieldBlock struct {
-	Field    string
-	Reason   model.BreakingReason
-	Sentence Phrase
-	Fixes    []Fix
-	Places   []Place
-}
-
-type Place struct {
-	Method           string
-	Endpoint         string
-	Interaction      string
-	Property         string
-	CounterpartField string
+	Protocols  map[string]any
 }
 
 type Fix struct {
@@ -70,20 +33,12 @@ type Fix struct {
 	Checked     bool
 }
 
-type storedResult struct {
-	Endpoints map[string]map[string]map[string][]storedBreak `json:"endpoints"`
+type Reader struct {
+	sections []ProtocolSection
 }
 
-type storedBreak struct {
-	Reason  model.BreakingReason `json:"reason"`
-	Role    model.BreakRole      `json:"role"`
-	Details map[string]string    `json:"details"`
-}
-
-type Reader struct{}
-
-func NewReader() *Reader {
-	return &Reader{}
+func NewReader(sections []ProtocolSection) *Reader {
+	return &Reader{sections: sections}
 }
 
 func (this *Reader) FromStoredCheck(check model.CompatibilityCheck, results []model.CompatibilityCheckResult) Report {
@@ -108,157 +63,33 @@ func (this *Reader) FromStoredCheck(check model.CompatibilityCheck, results []mo
 		return Report{Counterparts: counterparts}
 	}
 
-	var stored map[string]storedResult
+	var stored map[string]map[string]json.RawMessage
 	if err := json.Unmarshal(check.Report, &stored); err != nil {
 		panic(fmt.Errorf("error decoding stored check report: %w", err))
 	}
 
 	report := Report{Stored: true, Counterparts: make([]Counterpart, 0, len(counterparts))}
 	for _, counterpart := range counterparts {
-		counterpart = toCounterpart(check, counterpart, stored[counterpart.Name])
+		checked := CheckedCounterpart{Participant: check.ParticipantName, Environment: check.EnvironmentName, Counterpart: counterpart}
+		counterpart.Protocols = make(map[string]any, len(this.sections))
+		for _, section := range this.sections {
+			reported, err := section.ToSection(checked, stored[counterpart.Name][section.ReportKey()])
+			if err != nil {
+				panic(fmt.Errorf("error decoding the %s section of a stored check report: %w", section.Protocol(), err))
+			}
+
+			counterpart.Breaks += reported.Breaks
+			report.Places += reported.Places
+			counterpart.Protocols[string(section.Protocol())] = reported.Display
+		}
 
 		report.Breaks += counterpart.Breaks
 		if counterpart.Breaks > 0 {
 			report.CounterpartsBreaking++
-		}
-		for _, field := range counterpart.Fields {
-			report.Places += len(field.Places)
 		}
 
 		report.Counterparts = append(report.Counterparts, counterpart)
 	}
 
 	return report
-}
-
-func toCounterpart(check model.CompatibilityCheck, counterpart Counterpart, result storedResult) Counterpart {
-	var blocks []fieldBlock
-	for _, path := range slices.Sorted(maps.Keys(result.Endpoints)) {
-		methods := result.Endpoints[path]
-		for _, method := range slices.Sorted(maps.Keys(methods)) {
-			checked := checkedInteraction{
-				participant: check.ParticipantName,
-				counterpart: counterpart,
-				environment: check.EnvironmentName,
-				method:      strings.ToUpper(method),
-				endpoint:    path,
-			}
-
-			removed, interactions := splitRemovedBreak(methods[method])
-			methodBlocks, interactions := splitFieldBlocks(checked, interactions)
-			blocks = append(blocks, methodBlocks...)
-			if removed == nil && len(interactions) == 0 {
-				continue
-			}
-
-			endpoint := Endpoint{Method: checked.method, Path: path}
-			if removed != nil {
-				endpoint.Breaks = append(endpoint.Breaks, toEndpointBreak(checked, *removed))
-			}
-
-			for _, interaction := range sortedInteractions(interactions) {
-				checked.interaction = interaction
-				for _, contractBreak := range interactions[interaction] {
-					broken := toEndpointBreak(checked, contractBreak)
-					broken.Interaction = interactionPhrase(interaction)
-					endpoint.Breaks = append(endpoint.Breaks, broken)
-				}
-			}
-
-			counterpart.Breaks += len(endpoint.Breaks)
-			counterpart.Endpoints = append(counterpart.Endpoints, endpoint)
-		}
-	}
-
-	for _, block := range mergeFieldBlocks(blocks) {
-		counterpart.Fields = append(counterpart.Fields, block.toFieldBlock())
-	}
-	counterpart.Breaks += len(counterpart.Fields)
-
-	return counterpart
-}
-
-type checkedInteraction struct {
-	participant string
-	counterpart Counterpart
-	environment string
-	method      string
-	endpoint    string
-	interaction string
-}
-
-func (this checkedInteraction) isRequest() bool {
-	return this.interaction == requestInteraction
-}
-
-func (this checkedInteraction) resource() string {
-	return this.method + " " + this.endpoint
-}
-
-// The broker sends the removed-endpoint break once per consumed interaction, but it is about
-// the whole endpoint. Interactions left without breaks are dropped.
-func splitRemovedBreak(interactions map[string][]storedBreak) (*storedBreak, map[string][]storedBreak) {
-	var removed *storedBreak
-	remaining := make(map[string][]storedBreak, len(interactions))
-	for _, interaction := range sortedInteractions(interactions) {
-		var kept []storedBreak
-		for _, contractBreak := range interactions[interaction] {
-			if contractBreak.Reason != model.ReasonProviderResourceRemovedButStillConsumed {
-				kept = append(kept, contractBreak)
-			} else if removed == nil {
-				removed = &contractBreak
-			}
-		}
-		if len(kept) > 0 {
-			remaining[interaction] = kept
-		}
-	}
-	return removed, remaining
-}
-
-func splitFieldBlocks(checked checkedInteraction, interactions map[string][]storedBreak) ([]fieldBlock, map[string][]storedBreak) {
-	var blocks []fieldBlock
-	remaining := make(map[string][]storedBreak, len(interactions))
-	for _, interaction := range sortedInteractions(interactions) {
-		checked.interaction = interaction
-		for _, contractBreak := range interactions[interaction] {
-			if block, named := toFieldBlock(checked, contractBreak); named {
-				blocks = append(blocks, block)
-			} else {
-				remaining[interaction] = append(remaining[interaction], contractBreak)
-			}
-		}
-	}
-	return blocks, remaining
-}
-
-func sortedInteractions(interactions map[string][]storedBreak) []string {
-	return slices.SortedFunc(maps.Keys(interactions), compareInteractions)
-}
-
-func compareInteractions(a, b string) int {
-	switch {
-	case a == b:
-		return 0
-	case a == requestInteraction:
-		return -1
-	case b == requestInteraction:
-		return 1
-	default:
-		return strings.Compare(a, b)
-	}
-}
-
-func interactionPhrase(interaction string) string {
-	if interaction == requestInteraction {
-		return requestInteraction
-	}
-	return "response " + interaction
-}
-
-func propertyPathPhrase(path string) string {
-	if path == bodyPropertyPath {
-		return "the body"
-	}
-	return fmt.Sprintf("%q", path)
 }

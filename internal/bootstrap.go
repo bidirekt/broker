@@ -3,6 +3,7 @@ package internal
 import (
 	"github.com/bidirekt/broker/internal/components"
 	"github.com/bidirekt/broker/internal/components/breakreport"
+	restbreakreport "github.com/bidirekt/broker/internal/components/breakreport/protocols/rest"
 	"github.com/bidirekt/broker/internal/components/config"
 	"github.com/bidirekt/broker/internal/contracts/compatibility_checker"
 	"github.com/bidirekt/broker/internal/contracts/protocol"
@@ -57,7 +58,7 @@ func Run() (*components.Components, error) {
 	protocols := protocol.NewRegistry([]protocol.Protocol{restContracts})
 	hooks := []compatibility_checker.ProtocolHooks{restContracts}
 	tables := []repository.ProtocolTable{restrepository.New()}
-	reportReader := breakreport.NewReader()
+	reportReader := breakreport.NewReader([]breakreport.ProtocolSection{restbreakreport.New()})
 
 	// registers /participants/new-participant, which must precede show_participant_versions' /participants/:name
 	create_participant.Register(kernel)

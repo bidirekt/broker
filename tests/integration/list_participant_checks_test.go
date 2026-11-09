@@ -240,7 +240,7 @@ func (this *IntegrationSuite) TestListParticipantChecks_YesWithNothingToCompareS
 
 	_, _, body := this.getPage("/participants/petstore_reviews/checks", this.signInAsAdmin())
 
-	this.Contains(body, `<span class="muted">nothing deployed shares an endpoint</span>`)
+	this.Contains(body, `<span class="muted">nothing deployed shares a resource</span>`)
 	this.Contains(body, `<span class="badge quiet">not deployed</span>`)
 }
 
@@ -258,7 +258,7 @@ func (this *IntegrationSuite) TestListParticipantChecks_CheckWithoutAStoredRepor
 	this.Contains(body, `no</span>`)
 	this.NotContains(body, ` break`)
 	this.NotContains(body, `class="role"`)
-	this.NotContains(body, `nothing deployed shares an endpoint`)
+	this.NotContains(body, `nothing deployed shares a resource`)
 	this.Contains(body, `<span class="badge cpb">petstore_api <span class="v">1.4.0</span></span>`)
 	this.Contains(body, `<span class="badge cpb quiet">ghost <span class="v">no version</span></span>`)
 }

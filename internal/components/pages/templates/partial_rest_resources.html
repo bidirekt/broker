@@ -1,0 +1,33 @@
+{{define "rest_resources"}}
+  {{if .Endpoints}}
+  <p class="group-label">Endpoints</p>
+  {{range .Endpoints}}
+  <div class="ep">
+    <div class="ep-title"><span class="meth">{{.Method}}</span><span>{{.Path}}</span></div>
+    {{range .Breaks}}
+    <div class="ix">
+      {{with .Interaction}}<p class="ix-name">{{.}}</p>{{end}}
+      <p class="brk">{{template "icon_x" 14}}<span>{{template "phrase" .Sentence}}</span></p>
+      {{with .ReasonLine}}<p class="muted">{{.}}</p>{{end}}
+      {{template "fixes" .Fixes}}
+    </div>
+    {{end}}
+  </div>
+  {{end}}
+  {{end}}
+  {{if .Fields}}
+  <p class="group-label">Fields</p>
+  {{range .Fields}}
+  <div class="ep">
+    <div class="ep-title"><span class="prop">FIELD</span><span>{{.Field}}</span><span class="badge">{{len .Places}} {{if eq (len .Places) 1}}place{{else}}places{{end}}</span></div>
+    <p class="brk">{{template "icon_x" 14}}<span>{{template "phrase" .Sentence}}</span></p>
+    {{template "fixes" .Fixes}}
+    <ul class="places">
+      {{range .Places}}
+      <li><span class="meth">{{.Method}}</span><span>{{.Endpoint}}</span><span class="at">{{.Interaction}}</span><span>at {{.Property}}</span>{{with .CounterpartField}}<span class="cf">({{$.Counterpart}}: {{.}})</span>{{end}}</li>
+      {{end}}
+    </ul>
+  </div>
+  {{end}}
+  {{end}}
+{{end}}

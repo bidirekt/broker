@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/bidirekt/broker/internal/components/breakreport"
+	restbreakreport "github.com/bidirekt/broker/internal/components/breakreport/protocols/rest"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/guregu/null"
 	"github.com/stretchr/testify/assert"
@@ -73,7 +74,7 @@ func consumerSideCheck() (model.CompatibilityCheck, []model.CompatibilityCheckRe
 }
 
 func fromStoredCheck(check model.CompatibilityCheck, results []model.CompatibilityCheckResult) breakreport.Report {
-	return breakreport.NewReader().FromStoredCheck(check, results)
+	return breakreport.NewReader([]breakreport.ProtocolSection{restbreakreport.New()}).FromStoredCheck(check, results)
 }
 
 func counterpartNamed(t *testing.T, report breakreport.Report, name string) breakreport.Counterpart {
@@ -86,6 +87,12 @@ func counterpartNamed(t *testing.T, report breakreport.Report, name string) brea
 	return breakreport.Counterpart{}
 }
 
+func restResources(t *testing.T, counterpart breakreport.Counterpart) restbreakreport.Resources {
+	resources, ok := counterpart.Protocols["rest"].(restbreakreport.Resources)
+	require.True(t, ok, "counterpart without REST resources", counterpart.Name)
+	return resources
+}
+
 func TestCountsOneBreakPerFieldBlockAndPerEndpointBreak(t *testing.T) {
 	report := fromStoredCheck(consumerSideCheck())
 
@@ -96,8 +103,8 @@ func TestCountsOneBreakPerFieldBlockAndPerEndpointBreak(t *testing.T) {
 
 	api := counterpartNamed(t, report, "petstore_api")
 	assert.Equal(t, 2, api.Breaks)
-	require.Len(t, api.Fields, 1)
-	assert.Len(t, api.Fields[0].Places, 2)
+	require.Len(t, restResources(t, api).Fields, 1)
+	assert.Len(t, restResources(t, api).Fields[0].Places, 2)
 	assert.Equal(t, 1, counterpartNamed(t, report, "petstore_reviews").Breaks)
 	assert.Equal(t, 0, counterpartNamed(t, report, "petstore_users").Breaks)
 }
@@ -122,7 +129,7 @@ func TestKeepsTheStoredRoleVersionAndRegistration(t *testing.T) {
 }
 
 func TestFieldBlockMergesPlacesAndNamesTheCounterpartField(t *testing.T) {
-	field := counterpartNamed(t, fromStoredCheck(consumerSideCheck()), "petstore_api").Fields[0]
+	field := restResources(t, counterpartNamed(t, fromStoredCheck(consumerSideCheck()), "petstore_api")).Fields[0]
 
 	assert.Equal(t, "Pet.weight", field.Field)
 	assert.Equal(t, model.ReasonPropertyTypeMismatch, field.Reason)
@@ -131,7 +138,7 @@ func TestFieldBlockMergesPlacesAndNamesTheCounterpartField(t *testing.T) {
 		{Participant: "petstore_web", Action: "read it as float", Checked: true},
 		{Participant: "petstore_api", Action: "provide it as string there"},
 	}, field.Fixes)
-	assert.Equal(t, []breakreport.Place{
+	assert.Equal(t, []restbreakreport.Place{
 		{Method: "GET", Endpoint: "/pets", Interaction: "response 200", Property: `"$[].weight"`, CounterpartField: "Animal.weight"},
 		{Method: "GET", Endpoint: "/pets/*", Interaction: "response 200", Property: `"$.weight"`},
 	}, field.Places)
@@ -140,8 +147,8 @@ func TestFieldBlockMergesPlacesAndNamesTheCounterpartField(t *testing.T) {
 func TestEndpointBreakCarriesItsInteractionSentenceReasonAndFixes(t *testing.T) {
 	api := counterpartNamed(t, fromStoredCheck(consumerSideCheck()), "petstore_api")
 
-	require.Len(t, api.Endpoints, 1)
-	endpoint := api.Endpoints[0]
+	require.Len(t, restResources(t, api).Endpoints, 1)
+	endpoint := restResources(t, api).Endpoints[0]
 	assert.Equal(t, "POST", endpoint.Method)
 	assert.Equal(t, "/pets/*/adopt", endpoint.Path)
 	require.Len(t, endpoint.Breaks, 1)
@@ -159,14 +166,14 @@ func TestEndpointBreakCarriesItsInteractionSentenceReasonAndFixes(t *testing.T) 
 func TestNotDeployedBreakHasOnlyTheCounterpartFix(t *testing.T) {
 	reviews := counterpartNamed(t, fromStoredCheck(consumerSideCheck()), "petstore_reviews")
 
-	broken := reviews.Endpoints[0].Breaks[0]
+	broken := restResources(t, reviews).Endpoints[0].Breaks[0]
 	assert.Equal(t, "petstore_web calls GET /reviews, but petstore_reviews is not deployed in production", broken.Sentence.String())
 	assert.Equal(t, "not deployed in production", broken.ReasonLine)
 	assert.Equal(t, []breakreport.Fix{{Participant: "petstore_reviews", Action: "deploy it to production first"}}, broken.Fixes)
 }
 
 func TestSentenceMarksTheNamesAndTheResource(t *testing.T) {
-	sentence := counterpartNamed(t, fromStoredCheck(consumerSideCheck()), "petstore_reviews").Endpoints[0].Breaks[0].Sentence
+	sentence := restResources(t, counterpartNamed(t, fromStoredCheck(consumerSideCheck()), "petstore_reviews")).Endpoints[0].Breaks[0].Sentence
 
 	var names, codes []string
 	for _, segment := range sentence {
@@ -192,9 +199,9 @@ func TestRemovedCountsOncePerEndpointAndMethodAndInteractionRemovedOncePerIntera
 	assert.Equal(t, 0, report.Places)
 
 	web := report.Counterparts[0]
-	require.Len(t, web.Endpoints, 2)
+	require.Len(t, restResources(t, web).Endpoints, 2)
 
-	interactionRemoved := web.Endpoints[0]
+	interactionRemoved := restResources(t, web).Endpoints[0]
 	assert.Equal(t, "/pets", interactionRemoved.Path)
 	require.Len(t, interactionRemoved.Breaks, 2)
 	assert.Equal(t, "response 200", interactionRemoved.Breaks[0].Interaction)
@@ -203,7 +210,7 @@ func TestRemovedCountsOncePerEndpointAndMethodAndInteractionRemovedOncePerIntera
 	assert.Equal(t, "petstore_api now answers GET /pets only with 204, but petstore_web still reads response 200", interactionRemoved.Breaks[0].Sentence.String())
 	assert.Empty(t, interactionRemoved.Breaks[0].ReasonLine)
 
-	removed := web.Endpoints[1]
+	removed := restResources(t, web).Endpoints[1]
 	assert.Equal(t, "/pets/*/adopt", removed.Path)
 	require.Len(t, removed.Breaks, 1)
 	assert.Empty(t, removed.Breaks[0].Interaction)
@@ -223,14 +230,14 @@ func TestProviderSideFieldBreakPutsTheCheckedProviderFixFirst(t *testing.T) {
 		}}}`),
 	}, []model.CompatibilityCheckResult{{CounterpartName: "petstore_web", Role: model.CounterpartConsumer, CounterpartVersion: null.StringFrom("2.2.0"), CounterpartParticipantID: null.IntFrom(1)}})
 
-	field := report.Counterparts[0].Fields[0]
+	field := restResources(t, report.Counterparts[0]).Fields[0]
 	assert.Equal(t, "Pets", field.Field)
 	assert.Equal(t, "petstore_api provides it as object, but petstore_web reads array<object>", field.Sentence.String())
 	assert.Equal(t, []breakreport.Fix{
 		{Participant: "petstore_api", Action: "provide it as array<object>", Checked: true},
 		{Participant: "petstore_web", Action: "read it as object there"},
 	}, field.Fixes)
-	assert.Equal(t, []breakreport.Place{{Method: "GET", Endpoint: "/pets", Interaction: "response 200", Property: "the body", CounterpartField: "Pets"}}, field.Places)
+	assert.Equal(t, []restbreakreport.Place{{Method: "GET", Endpoint: "/pets", Interaction: "response 200", Property: "the body", CounterpartField: "Pets"}}, field.Places)
 }
 
 func TestDistinctFieldBreaksCountSeparately(t *testing.T) {
@@ -247,9 +254,9 @@ func TestDistinctFieldBreaksCountSeparately(t *testing.T) {
 
 	assert.Equal(t, 2, report.Breaks)
 	assert.Equal(t, 2, report.Places)
-	assert.Empty(t, report.Counterparts[0].Endpoints)
-	assert.Equal(t, "Pet.status", report.Counterparts[0].Fields[0].Field)
-	assert.Equal(t, "provide it", report.Counterparts[0].Fields[0].Fixes[1].Action)
+	assert.Empty(t, restResources(t, report.Counterparts[0]).Endpoints)
+	assert.Equal(t, "Pet.status", restResources(t, report.Counterparts[0]).Fields[0].Field)
+	assert.Equal(t, "provide it", restResources(t, report.Counterparts[0]).Fields[0].Fixes[1].Action)
 }
 
 func TestNotFoundReasonNamesTheDeployedVersion(t *testing.T) {
@@ -262,7 +269,7 @@ func TestNotFoundReasonNamesTheDeployedVersion(t *testing.T) {
 	}, []model.CompatibilityCheckResult{{CounterpartName: "petstore_api", Role: model.CounterpartProvider, CounterpartVersion: null.StringFrom("1.4.0"), CounterpartParticipantID: null.IntFrom(1)}})
 
 	assert.Equal(t, "petstore_api 1.4.0, deployed in production, doesn't provide this endpoint",
-		report.Counterparts[0].Endpoints[0].Breaks[0].ReasonLine)
+		restResources(t, report.Counterparts[0]).Endpoints[0].Breaks[0].ReasonLine)
 }
 
 func TestNotDeployedReasonIsTheSameWhetherTheCounterpartIsAParticipantOrNot(t *testing.T) {
@@ -275,7 +282,7 @@ func TestNotDeployedReasonIsTheSameWhetherTheCounterpartIsAParticipantOrNot(t *t
 			EnvironmentName: checkEnvironment,
 			Report:          []byte(notDeployed),
 		}, []model.CompatibilityCheckResult{{CounterpartName: "petstore_api", Role: model.CounterpartProvider, CounterpartParticipantID: null.NewInt(1, registered)}})
-		return report.Counterparts[0].Endpoints[0].Breaks[0].ReasonLine
+		return restResources(t, report.Counterparts[0]).Endpoints[0].Breaks[0].ReasonLine
 	}
 
 	assert.Equal(t, "not deployed in production", reasonFor(true))
@@ -292,7 +299,7 @@ func TestUnknownBreakFallsBackToItsReasonAndDetails(t *testing.T) {
 	}, []model.CompatibilityCheckResult{{CounterpartName: "petstore_api", CounterpartVersion: null.StringFrom("1.4.0"), CounterpartParticipantID: null.IntFrom(1)}})
 
 	assert.Equal(t, 1, report.Breaks)
-	broken := report.Counterparts[0].Endpoints[0].Breaks[0]
+	broken := restResources(t, report.Counterparts[0]).Endpoints[0].Breaks[0]
 	assert.Equal(t, "property_missing_in_provider (propertyType: string)", broken.Sentence.String())
 	assert.Empty(t, broken.Fixes)
 }
@@ -316,6 +323,6 @@ func TestCheckWithoutAStoredReportListsTheCounterpartsWithoutCounts(t *testing.T
 
 func TestUndecodableReportPanics(t *testing.T) {
 	assert.Panics(t, func() {
-		breakreport.NewReader().FromStoredCheck(model.CompatibilityCheck{Report: []byte(`[`)}, nil)
+		breakreport.NewReader([]breakreport.ProtocolSection{restbreakreport.New()}).FromStoredCheck(model.CompatibilityCheck{Report: []byte(`[`)}, nil)
 	})
 }

@@ -42,41 +42,10 @@
 <p class="legend"><span><span class="sw"></span>Fix in the participant under check</span><span><span class="sw o"></span>Or fix in the counterpart</span><span><span class="role">PROVIDER</span> it consumes from</span><span><span class="role">CONSUMER</span> consumes it</span></p>
 {{$check := .Check}}
 {{range .Breaking}}
-{{$counterpart := .Name}}
 <details class="cp" open>
   <summary><span class="chev">{{template "icon_chevron" 14}}</span>{{template "role" .Role}}<span class="who-cp">{{.Name}}</span>{{if .Version}}<span class="ver">{{.Version}}</span><span class="badge env">{{$check.EnvironmentName}}</span>{{else}}<span class="muted">no version</span>{{end}}<span class="badge no nb">{{template "icon_x" 12}}no · {{.Breaks}} {{if eq .Breaks 1}}break{{else}}breaks{{end}}</span></summary>
   {{if .ParticipantURL}}<div class="cp-links"><a href="{{.ParticipantURL}}">{{.Name}}</a>{{if .VersionURL}}<span aria-hidden="true">·</span><a href="{{.VersionURL}}">version {{.Version}}</a>{{end}}</div>{{end}}
-  {{if .Endpoints}}
-  <p class="group-label">Endpoints</p>
-  {{range .Endpoints}}
-  <div class="ep">
-    <div class="ep-title"><span class="meth">{{.Method}}</span><span>{{.Path}}</span></div>
-    {{range .Breaks}}
-    <div class="ix">
-      {{with .Interaction}}<p class="ix-name">{{.}}</p>{{end}}
-      <p class="brk">{{template "icon_x" 14}}<span>{{template "phrase" .Sentence}}</span></p>
-      {{with .ReasonLine}}<p class="muted">{{.}}</p>{{end}}
-      {{template "fixes" .Fixes}}
-    </div>
-    {{end}}
-  </div>
-  {{end}}
-  {{end}}
-  {{if .Fields}}
-  <p class="group-label">Fields</p>
-  {{range .Fields}}
-  <div class="ep">
-    <div class="ep-title"><span class="prop">FIELD</span><span>{{.Field}}</span><span class="badge">{{len .Places}} {{if eq (len .Places) 1}}place{{else}}places{{end}}</span></div>
-    <p class="brk">{{template "icon_x" 14}}<span>{{template "phrase" .Sentence}}</span></p>
-    {{template "fixes" .Fixes}}
-    <ul class="places">
-      {{range .Places}}
-      <li><span class="meth">{{.Method}}</span><span>{{.Endpoint}}</span><span class="at">{{.Interaction}}</span><span>at {{.Property}}</span>{{with .CounterpartField}}<span class="cf">({{$counterpart}}: {{.}})</span>{{end}}</li>
-      {{end}}
-    </ul>
-  </div>
-  {{end}}
-  {{end}}
+  {{with index .Protocols "rest"}}{{template "rest_resources" .}}{{end}}
 </details>
 {{end}}
 {{if .Compatible}}
@@ -96,7 +65,7 @@
     {{end}}
   </ul>
   {{else}}
-  <p class="pad muted">nothing deployed in <span class="name">{{.Check.EnvironmentName}}</span> shares an endpoint with <span class="name">{{.Check.ParticipantName}}</span></p>
+  <p class="pad muted">nothing deployed in <span class="name">{{.Check.EnvironmentName}}</span> shares a resource with <span class="name">{{.Check.ParticipantName}}</span></p>
   {{end}}
 </section>
 {{end}}
@@ -112,7 +81,3 @@
 {{define "version"}}{{if .}}<span class="ver">{{.}}</span>{{else}}<span class="muted">no version</span>{{end}}{{end}}
 
 {{define "answer"}}{{if .}}<span class="badge yes">{{template "icon_check" 12}}yes</span>{{else}}<span class="badge no">{{template "icon_x" 12}}no</span>{{end}}{{end}}
-
-{{define "phrase"}}{{range .}}{{if .IsName}}<b class="name">{{.Text}}</b>{{else if .IsCode}}<code>{{.Text}}</code>{{else}}{{.Text}}{{end}}{{end}}{{end}}
-
-{{define "fixes"}}{{if .}}<div class="fixes">{{range $index, $fix := .}}<div class="fix {{if .Checked}}self{{else}}other{{end}}{{if eq (len $) 1}} only{{end}}"><span class="side">{{if eq $index 0}}Fix in{{else}}or fix in{{end}} <b>{{.Participant}}</b></span><span>{{.Action}}</span></div>{{end}}</div>{{end}}{{end}}

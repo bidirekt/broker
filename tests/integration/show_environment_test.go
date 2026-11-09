@@ -284,7 +284,7 @@ func (this *IntegrationSuite) TestShowEnvironment_ChecksWithNothingDeployedShowT
 	_, _, body := this.getPage(this.environmentPathForShowEnvironment("qa"), this.signInAsAdmin())
 
 	this.Contains(body, `<p class="sub">Nothing deployed yet</p>`)
-	this.Contains(body, `<span class="muted">nothing deployed shares an endpoint</span>`)
+	this.Contains(body, `<span class="muted">nothing deployed shares a resource</span>`)
 	this.NotContains(body, `No checks yet`)
 }
 
@@ -302,7 +302,7 @@ func (this *IntegrationSuite) TestShowEnvironment_CheckWithoutAStoredReportShows
 	this.Contains(body, `no</span>`)
 	this.NotContains(body, ` break`)
 	this.NotContains(body, `class="role"`)
-	this.NotContains(body, `nothing deployed shares an endpoint`)
+	this.NotContains(body, `nothing deployed shares a resource`)
 	this.Contains(body, `<a class="badge cpb" href="/participants/petstore_api">petstore_api <span class="v">1.4.0</span></a>`)
 	this.Contains(body, `<span class="badge cpb quiet">ghost <span class="v">no version</span></span>`)
 }
