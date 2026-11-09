@@ -31,16 +31,16 @@ func (this *Graph) Root(bodies []model.ResourceBody, join Join) Node {
 			continue
 		}
 
-		root.members = append(root.members, this.member(body.Source, Site{Schema: body.SchemaName.String}))
+		root.declarations = append(root.declarations, this.declaration(body.Source, Site{Schema: body.SchemaName.String}))
 	}
 
 	return root
 }
 
 // An undeclared schema or a schema met twice ends the chain on a field without a type.
-func (this *Graph) member(source string, site Site) member {
+func (this *Graph) declaration(source string, site Site) declaration {
 	field, declared := this.catalog[site.Schema][site.Path]
-	resolved := member{source: source, site: site, shape: site, fieldType: field.Type, optional: field.Optional, nullable: field.Nullable}
+	resolved := declaration{source: source, site: site, shape: site, fieldType: field.Type, optional: field.Optional, nullable: field.Nullable}
 	visited := []Site{site}
 
 	for declared && field.Ref != "" {

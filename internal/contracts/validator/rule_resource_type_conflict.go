@@ -66,22 +66,22 @@ func (this *typeConflicts) compare(node schemagraph.Node, property string) {
 
 	this.compared[shapes] = true
 
-	members := node.Members()
-	for _, member := range members[1:] {
-		if member.Type == members[0].Type {
+	declarations := node.Declarations()
+	for _, declaration := range declarations[1:] {
+		if declaration.Type == declarations[0].Type {
 			continue
 		}
 
 		this.violations = append(this.violations, violation.Violation{
 			ErrorCode: "resource.type_conflict",
 			Path:      this.path,
-			Source:    member.Source,
+			Source:    declaration.Source,
 			Details: map[string]string{
 				"resource":     this.resource,
 				"property":     property,
-				"type":         member.Type,
-				"declaredIn":   members[0].Source,
-				"declaredType": members[0].Type,
+				"type":         declaration.Type,
+				"declaredIn":   declarations[0].Source,
+				"declaredType": declarations[0].Type,
 			},
 		})
 	}

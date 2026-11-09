@@ -15,13 +15,13 @@ const (
 )
 
 type Node struct {
-	graph   *Graph
-	join    Join
-	members []member
-	lacking bool
+	graph        *Graph
+	join         Join
+	declarations []declaration
+	lacking      bool
 }
 
-type member struct {
+type declaration struct {
 	source    string
 	site      Site
 	shape     Site
@@ -30,13 +30,13 @@ type member struct {
 	nullable  bool
 }
 
-type Member struct {
+type Declaration struct {
 	Source string
 	Type   string
 }
 
 func (this Node) Exists() bool {
-	return len(this.members) > 0
+	return len(this.declarations) > 0
 }
 
 // Type is the first body's: bodies that disagree are rejected at publish.
@@ -45,32 +45,32 @@ func (this Node) Type() string {
 		return ""
 	}
 
-	return this.members[0].fieldType
+	return this.declarations[0].fieldType
 }
 
 func (this Node) Optional() bool {
 	if this.join == Senders {
-		return this.lacking || slices.ContainsFunc(this.members, func(member member) bool { return member.optional })
+		return this.lacking || slices.ContainsFunc(this.declarations, func(declaration declaration) bool { return declaration.optional })
 	}
 
-	return !slices.ContainsFunc(this.members, func(member member) bool { return !member.optional })
+	return !slices.ContainsFunc(this.declarations, func(declaration declaration) bool { return !declaration.optional })
 }
 
 func (this Node) Nullable() bool {
 	if this.join == Senders {
-		return slices.ContainsFunc(this.members, func(member member) bool { return member.nullable })
+		return slices.ContainsFunc(this.declarations, func(declaration declaration) bool { return declaration.nullable })
 	}
 
-	return !slices.ContainsFunc(this.members, func(member member) bool { return !member.nullable })
+	return !slices.ContainsFunc(this.declarations, func(declaration declaration) bool { return !declaration.nullable })
 }
 
-func (this Node) Members() []Member {
-	members := make([]Member, 0, len(this.members))
-	for _, member := range this.members {
-		members = append(members, Member{Source: member.source, Type: member.fieldType})
+func (this Node) Declarations() []Declaration {
+	declarations := make([]Declaration, 0, len(this.declarations))
+	for _, declaration := range this.declarations {
+		declarations = append(declarations, Declaration{Source: declaration.source, Type: declaration.fieldType})
 	}
 
-	return members
+	return declarations
 }
 
 // Field names the first body's field the node was reached at: "Address.city", "Order.items[].sku",
@@ -80,15 +80,15 @@ func (this Node) Field() string {
 		return ""
 	}
 
-	site := this.members[0].site
+	site := this.declarations[0].site
 
 	return model.FieldName(site.Schema, site.Path)
 }
 
 func (this Node) Segments() []string {
 	var segments []string
-	for _, member := range this.members {
-		segments = append(segments, this.graph.childSegments(member.shape)...)
+	for _, declaration := range this.declarations {
+		segments = append(segments, this.graph.childSegments(declaration.shape)...)
 	}
 
 	slices.Sort(segments)
@@ -99,7 +99,7 @@ func (this Node) Segments() []string {
 func (this Node) Child(segment string) Node {
 	child := Node{graph: this.graph, join: this.join}
 
-	for _, parent := range this.members {
+	for _, parent := range this.declarations {
 		site := Site{Schema: parent.shape.Schema, Path: model.ChildPath(parent.shape.Path, segment)}
 		if !this.graph.declares(site) {
 			child.lacking = true
@@ -107,7 +107,7 @@ func (this Node) Child(segment string) Node {
 			continue
 		}
 
-		child.members = append(child.members, this.graph.member(parent.source, site))
+		child.declarations = append(child.declarations, this.graph.declaration(parent.source, site))
 	}
 
 	return child
@@ -120,8 +120,8 @@ func (this Node) SiteKey() string {
 		key.WriteString("lacking")
 	}
 
-	for _, member := range this.members {
-		key.WriteString("\x00" + member.source + "\x00" + member.site.Schema + "\x00" + member.site.Path)
+	for _, declaration := range this.declarations {
+		key.WriteString("\x00" + declaration.source + "\x00" + declaration.site.Schema + "\x00" + declaration.site.Path)
 	}
 
 	return key.String()
@@ -130,8 +130,8 @@ func (this Node) SiteKey() string {
 // ShapeKey identifies the node by the fields its refs lead to, which carry its type and children.
 func (this Node) ShapeKey() string {
 	var key strings.Builder
-	for _, member := range this.members {
-		key.WriteString("\x00" + member.source + "\x00" + member.shape.Schema + "\x00" + member.shape.Path)
+	for _, declaration := range this.declarations {
+		key.WriteString("\x00" + declaration.source + "\x00" + declaration.shape.Schema + "\x00" + declaration.shape.Path)
 	}
 
 	return key.String()
