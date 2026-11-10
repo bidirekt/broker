@@ -20,7 +20,7 @@ func (this *IntegrationSuite) cliVersionDoorListParticipants(cliVersion string) 
 }
 
 func (this *IntegrationSuite) cliVersionDoorBrokerVersion() string {
-	status, body := this.health(http.MethodGet)
+	status, _, body := this.sendApiRequest(httptest.NewRequest(http.MethodGet, "/health", nil), "")
 	this.Require().Equal(http.StatusOK, status)
 
 	var health struct {
