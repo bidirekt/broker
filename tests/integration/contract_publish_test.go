@@ -966,6 +966,35 @@ func (this *IntegrationSuite) TestPublishContract_StatusCodeOutOfRange_Rejected(
 	this.Equal(0, this.countRows("contracts"))
 }
 
+const unquotedLeadingZeroStatusYAML = `provides:
+  rest:
+    /pets:
+      get:
+        responses:
+          0404: Pet
+schemas:
+  Pet:
+    type: object
+    properties:
+      id:
+        type: string
+`
+
+func (this *IntegrationSuite) TestPublishContract_UnquotedStatusWithLeadingZero_Rejected() {
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
+	this.Require().Equal(http.StatusOK, status)
+
+	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1",
+		contractFragment{"api.yaml", unquotedLeadingZeroStatusYAML},
+	))
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"status.out_of_range","path":"provides;rest;/pets;get;responses;0404","source":"api.yaml","details":{"key":"0404","error":"must be between 100 and 599"}}`+
+		`]}`, body)
+
+	this.Equal(0, this.countRows("contracts"))
+}
+
 func (this *IntegrationSuite) TestPublishContract_ArrayWithoutItems_RejectedBrokerStaysUp() {
 	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)

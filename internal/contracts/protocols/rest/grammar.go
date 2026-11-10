@@ -53,7 +53,7 @@ func (this Plugin) Grammar() descriptor.Node {
 
 func statusCodeInRange(key string) error {
 	status, err := strconv.ParseUint(key, 10, 0)
-	if err != nil || status < minStatusCode || status > maxStatusCode {
+	if err != nil || status < minStatusCode || status > maxStatusCode || strconv.FormatUint(status, 10) != key {
 		return fmt.Errorf("must be between %d and %d", minStatusCode, maxStatusCode)
 	}
 

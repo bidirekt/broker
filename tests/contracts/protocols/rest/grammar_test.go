@@ -82,6 +82,16 @@ func TestStatusCode_RejectsASignEvenWithinRange(t *testing.T) {
 	assert.Equal(t, "-1", violations[1].Details["key"])
 }
 
+func TestStatusCode_RejectsLeadingZeros(t *testing.T) {
+	subject := descriptor.Map(restcontracts.StatusCode, descriptor.String())
+
+	violations := descriptor.Validate(subject, map[string]any{"0200": "Pet"}, "api.yaml")
+
+	require.Len(t, violations, 1)
+	assert.Equal(t, "status.out_of_range", violations[0].ErrorCode)
+	assert.Equal(t, "0200", violations[0].Details["key"])
+}
+
 func TestEndpoint_DoubleSlashAtTheEndStaysMalformed(t *testing.T) {
 	subject := descriptor.Map(restcontracts.Endpoint, descriptor.Object(descriptor.Fields{}))
 
