@@ -31,11 +31,15 @@ type canIDeployResponse struct {
 }
 
 type verdictBreakJSON struct {
-	Endpoint    string            `json:"endpoint"`
-	Method      string            `json:"method"`
-	Interaction string            `json:"interaction"`
-	Reason      string            `json:"reason"`
-	Details     map[string]string `json:"details"`
+	Rest    verdictLocationJSON `json:"rest"`
+	Reason  string              `json:"reason"`
+	Details map[string]string   `json:"details"`
+}
+
+type verdictLocationJSON struct {
+	Endpoint    string `json:"endpoint"`
+	Method      string `json:"method"`
+	Interaction string `json:"interaction"`
 }
 
 // breaksByReason indexes an interaction's breaks by their reason (the scenarios below have
@@ -248,9 +252,7 @@ func (this *IntegrationSuite) TestCanIDeploy_HappyPath() {
 
 	storedByReason := map[string]verdictBreakJSON{}
 	for _, stored := range storedBreaks {
-		this.Equal("/things", stored.Endpoint)
-		this.Equal("get", stored.Method)
-		this.Equal("200", stored.Interaction)
+		this.Equal(verdictLocationJSON{Endpoint: "/things", Method: "get", Interaction: "200"}, stored.Rest)
 		storedByReason[stored.Reason] = stored
 	}
 

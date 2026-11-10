@@ -5,13 +5,13 @@ import (
 	"slices"
 
 	"github.com/bidirekt/broker/internal/contracts/contract"
-	"github.com/bidirekt/broker/internal/contracts/mapper/fragmentmapper"
+	"github.com/bidirekt/broker/internal/contracts/protocol"
 	"github.com/bidirekt/broker/internal/contracts/violation"
 	"github.com/bidirekt/broker/internal/model"
 )
 
 // Each schema is inspected in its own definition only, so a broken ref is reported once, where it is written.
-func unresolvedSchemaRefs(declarations fragmentmapper.Declarations) []violation.Violation {
+func unresolvedSchemaRefs(declarations protocol.Declarations) []violation.Violation {
 	var violations []violation.Violation
 
 	for _, declaration := range declarations.Schemas {
@@ -30,7 +30,7 @@ func unresolvedSchemaRefs(declarations fragmentmapper.Declarations) []violation.
 func unresolvedRefsIn(
 	schema contract.Schema,
 	catalog contract.SchemasMap,
-	declaration fragmentmapper.SchemaDeclaration,
+	declaration protocol.SchemaDeclaration,
 	documentPath string,
 	path string,
 ) []violation.Violation {

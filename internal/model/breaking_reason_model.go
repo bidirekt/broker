@@ -1,5 +1,7 @@
 package model
 
+import "strings"
+
 type BreakingReason string
 
 const (
@@ -24,12 +26,6 @@ const (
 	RoleProvider BreakRole = "provider"
 )
 
-// IsPropertyBreak reports whether the break comes from a property diff, as opposed to the
-// environment checks that depend on deployments and never become a stored verdict.
 func (this BreakingReason) IsPropertyBreak() bool {
-	return this != ReasonProviderResourceNotFound &&
-		this != ReasonProviderResourceInteractionNotFound &&
-		this != ReasonProviderResourceNotDeployedInEnvironment &&
-		this != ReasonProviderResourceRemovedButStillConsumed &&
-		this != ReasonProviderResourceInteractionRemovedButStillConsumed
+	return strings.HasPrefix(string(this), "property_")
 }

@@ -245,7 +245,7 @@ func (this *IntegrationSuite) TestPublishContract_BothConsumedSpellingsInOneFile
 	}, this.mergedModuleFields())
 
 	var endpoint string
-	err := this.Pool.QueryRow(context.Background(), "SELECT endpoint FROM resources").Scan(&endpoint)
+	err := this.Pool.QueryRow(context.Background(), "SELECT endpoint FROM rest_resources").Scan(&endpoint)
 	this.Require().NoError(err)
 	this.Equal("/invoices", endpoint)
 }

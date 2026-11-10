@@ -36,6 +36,7 @@ var validateTables = []string{
 	"contracts",
 	"contract_versions",
 	"resources",
+	"rest_resources",
 	"resource_versions",
 	"schemas",
 	"schema_versions",

@@ -6,11 +6,7 @@ import (
 )
 
 func Register(kernel *components.Components) {
-	useCase := NewShowContractVersionUseCase(
-		repository.NewContractRepository(kernel.Pool),
-		repository.NewDeploymentRepository(kernel.Pool),
-		repository.NewCompatibilityRepository(kernel.Pool),
-	)
+	useCase := NewShowContractVersionUseCase(repository.NewContractVersionPageRepository(kernel.Pool))
 	uiHandler := NewShowContractVersionUiHandler(useCase)
 	kernel.Server.Get("/participants/:name/versions/:version", uiHandler.Handle)
 }

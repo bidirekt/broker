@@ -5,7 +5,10 @@ import (
 
 	"github.com/bidirekt/broker/internal/contracts/contract"
 	"github.com/bidirekt/broker/internal/contracts/mapper/fragmentmapper"
+	"github.com/bidirekt/broker/internal/contracts/protocol"
+	restcontracts "github.com/bidirekt/broker/internal/contracts/protocols/rest"
 	"github.com/bidirekt/broker/internal/model"
+	restmodel "github.com/bidirekt/broker/internal/model/protocols/rest"
 	"github.com/goccy/go-yaml"
 	"github.com/guregu/null"
 	"github.com/stretchr/testify/assert"
@@ -223,7 +226,7 @@ type declaredFile struct {
 	raw    string
 }
 
-func declarationsOf(t *testing.T, files ...declaredFile) fragmentmapper.Declarations {
+func declarationsOf(t *testing.T, files ...declaredFile) protocol.Declarations {
 	t.Helper()
 
 	fragments := make([]contract.Fragment, 0, len(files))
@@ -234,10 +237,30 @@ func declarationsOf(t *testing.T, files ...declaredFile) fragmentmapper.Declarat
 		fragments = append(fragments, contract.Fragment{Source: file.source, Document: document})
 	}
 
-	return fragmentmapper.ToDeclarations(fragments)
+	return fragmentmapper.ToDeclarations(fragments, protocol.NewRegistry([]protocol.Protocol{restcontracts.New()}))
 }
 
-func resourcePaths(declarations fragmentmapper.Declarations) []string {
+func declaredRestResource(
+	direction model.Direction,
+	provider, endpoint, method, status string,
+	bodies []model.ResourceBody,
+) model.UploadedResource {
+	body := model.Output
+	if status == "" {
+		body = model.Input
+	}
+
+	return model.UploadedResource{Resource: model.Resource{
+		Direction:        direction,
+		Protocol:         restmodel.Protocol,
+		Body:             body,
+		Identity:         restmodel.Identity{Endpoint: endpoint, Method: method, Status: status},
+		ConsumedProvider: null.NewString(provider, provider != ""),
+		Bodies:           bodies,
+	}}
+}
+
+func resourcePaths(declarations protocol.Declarations) []string {
 	paths := make([]string, 0, len(declarations.Resources))
 	for _, declaration := range declarations.Resources {
 		paths = append(paths, declaration.Path.String())
@@ -282,7 +305,7 @@ func TestToDeclarations_SortsSchemasBySourceAndName(t *testing.T) {
 		declaredFile{"a.yaml", petByIdYAML},
 	)
 
-	assert.Equal(t, []fragmentmapper.SchemaDeclaration{
+	assert.Equal(t, []protocol.SchemaDeclaration{
 		{Source: "a.yaml", Name: "Pet", Schema: contract.Schema{Type: "object", Properties: map[string]contract.Schema{"id": {Type: "string"}}}},
 		{Source: "a.yaml", Name: "Problem", Schema: contract.Schema{Type: "object", Properties: map[string]contract.Schema{"title": {Type: "string"}}}},
 		{Source: "b.yaml", Name: "Pet", Schema: contract.Schema{Type: "object", Properties: map[string]contract.Schema{"name": {Type: "string"}}}},
@@ -314,17 +337,17 @@ func TestToDeclarations_CapturesTheSchemaNameOfTheRequestAndOfEachResponse(t *te
 
 	request := declarations.Resources[0]
 	assert.Equal(t, "PetCreate", request.SchemaName)
-	assert.Equal(t, model.RestRequest, request.Resource.Interaction)
+	assert.Equal(t, model.Input, request.Resource.Body)
 	assert.Equal(t, []model.ResourceBody{{Source: "pets.yaml", SchemaName: null.StringFrom("PetCreate")}}, request.Resource.Bodies)
 
 	created := declarations.Resources[1]
 	assert.Equal(t, "Pet", created.SchemaName)
-	assert.Equal(t, "201", created.Resource.ResponseStatusCode.String)
+	assert.Equal(t, "201", created.Resource.Identity.(restmodel.Identity).Status)
 	assert.Equal(t, []model.ResourceBody{{Source: "pets.yaml", SchemaName: null.StringFrom("Pet")}}, created.Resource.Bodies)
 
 	rejected := declarations.Resources[2]
 	assert.Equal(t, "Problem", rejected.SchemaName)
-	assert.Equal(t, "422", rejected.Resource.ResponseStatusCode.String)
+	assert.Equal(t, "422", rejected.Resource.Identity.(restmodel.Identity).Status)
 	assert.Equal(t, []model.ResourceBody{{Source: "pets.yaml", SchemaName: null.StringFrom("Problem")}}, rejected.Resource.Bodies)
 }
 
@@ -337,8 +360,8 @@ func TestToDeclarations_NormalizesTheEndpointInThePath(t *testing.T) {
 	}, resourcePaths(declarations))
 
 	require.Len(t, declarations.Resources, 2)
-	assert.Equal(t, "/", declarations.Resources[0].Resource.Endpoint)
-	assert.Equal(t, "/users", declarations.Resources[1].Resource.Endpoint)
+	assert.Equal(t, "/", declarations.Resources[0].Resource.Identity.(restmodel.Identity).Endpoint)
+	assert.Equal(t, "/users", declarations.Resources[1].Resource.Identity.(restmodel.Identity).Endpoint)
 }
 
 func TestToDeclarations_UnresolvedSchemaName_StaysInTheBody(t *testing.T) {
@@ -376,10 +399,10 @@ func TestToDeclarations_NullBody_DeclaresTheResourceWithABodyWithoutSchema(t *te
 
 	undescribed := []model.ResourceBody{{Source: "files.yaml"}}
 
-	assert.Equal(t, *model.NewRestRequestProvider("/files", "post", undescribed), declarations.Resources[0].Resource)
+	assert.Equal(t, declaredRestResource(model.Provides, "", "/files", "post", "", undescribed), declarations.Resources[0].Resource)
 	assert.Empty(t, declarations.Resources[0].SchemaName)
-	assert.Equal(t, *model.NewRestResponseProvider("/files/*", "get", "200", undescribed), declarations.Resources[3].Resource)
-	assert.Equal(t, *model.NewRestResponseProvider("/files/*", "delete", "204", undescribed), declarations.Resources[4].Resource)
+	assert.Equal(t, declaredRestResource(model.Provides, "", "/files/*", "get", "200", undescribed), declarations.Resources[3].Resource)
+	assert.Equal(t, declaredRestResource(model.Provides, "", "/files/*", "delete", "204", undescribed), declarations.Resources[4].Resource)
 }
 
 func TestToDeclarations_EmptyStringBodyIsAnUnresolvedSchemaName(t *testing.T) {
@@ -418,10 +441,10 @@ func TestToDeclarations_PatchRoute_DeclaresRequestAndResponseInProvidesAndConsum
 	}
 
 	assert.Equal(t, []model.UploadedResource{
-		*model.NewRestRequestConsumer("pets_api", "/pets/*", "patch", requestBodies),
-		*model.NewRestResponseConsumer("pets_api", "/pets/*", "patch", "200", responseBodies),
-		*model.NewRestRequestProvider("/pets/*", "patch", requestBodies),
-		*model.NewRestResponseProvider("/pets/*", "patch", "200", responseBodies),
+		declaredRestResource(model.Consumes, "pets_api", "/pets/*", "patch", "", requestBodies),
+		declaredRestResource(model.Consumes, "pets_api", "/pets/*", "patch", "200", responseBodies),
+		declaredRestResource(model.Provides, "", "/pets/*", "patch", "", requestBodies),
+		declaredRestResource(model.Provides, "", "/pets/*", "patch", "200", responseBodies),
 	}, resources)
 }
 
@@ -438,7 +461,7 @@ func TestToDeclarations_PatchSortsBetweenPutAndDelete(t *testing.T) {
 }
 
 func TestToDeclarations_FragmentWithoutDocument_DeclaresNothing(t *testing.T) {
-	declarations := fragmentmapper.ToDeclarations([]contract.Fragment{{Source: "empty.yaml"}})
+	declarations := fragmentmapper.ToDeclarations([]contract.Fragment{{Source: "empty.yaml"}}, protocol.NewRegistry([]protocol.Protocol{restcontracts.New()}))
 
 	assert.Empty(t, declarations.Resources)
 	assert.Empty(t, declarations.Schemas)

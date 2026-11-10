@@ -7,10 +7,9 @@ import (
 
 func Register(kernel *components.Components) {
 	participantRepository := repository.NewParticipantRepository(kernel.Pool)
-	contractRepository := repository.NewContractRepository(kernel.Pool)
 	environmentRepository := repository.NewEnvironmentRepository(kernel.Pool)
 	deploymentRepository := repository.NewDeploymentRepository(kernel.Pool)
-	useCase := NewRecordDeploymentUseCase(deploymentRepository, participantRepository, contractRepository, environmentRepository)
+	useCase := NewRecordDeploymentUseCase(deploymentRepository, participantRepository, environmentRepository)
 	apiHandler := NewRecordDeploymentApiHandler(useCase)
 	kernel.Server.Post("/api/deployments", apiHandler.Handle)
 }

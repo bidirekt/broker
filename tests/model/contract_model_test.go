@@ -4,14 +4,57 @@ import (
 	"testing"
 
 	"github.com/bidirekt/broker/internal/model"
+	restmodel "github.com/bidirekt/broker/internal/model/protocols/rest"
 	"github.com/guregu/null"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+func restResponseProvider(endpoint, method, status string, bodies []model.ResourceBody) *model.UploadedResource {
+	return &model.UploadedResource{Resource: model.Resource{
+		Direction: model.Provides,
+		Protocol:  restmodel.Protocol,
+		Body:      model.Output,
+		Identity:  restmodel.Identity{Endpoint: endpoint, Method: method, Status: status},
+		Bodies:    bodies,
+	}}
+}
+
+func restRequestProvider(endpoint, method string, bodies []model.ResourceBody) *model.UploadedResource {
+	return &model.UploadedResource{Resource: model.Resource{
+		Direction: model.Provides,
+		Protocol:  restmodel.Protocol,
+		Body:      model.Input,
+		Identity:  restmodel.Identity{Endpoint: endpoint, Method: method},
+		Bodies:    bodies,
+	}}
+}
+
+func restResponseConsumer(provider, endpoint, method, status string, bodies []model.ResourceBody) *model.UploadedResource {
+	return &model.UploadedResource{Resource: model.Resource{
+		Direction:        model.Consumes,
+		Protocol:         restmodel.Protocol,
+		Body:             model.Output,
+		Identity:         restmodel.Identity{Endpoint: endpoint, Method: method, Status: status},
+		ConsumedProvider: null.StringFrom(provider),
+		Bodies:           bodies,
+	}}
+}
+
+func restRequestConsumer(provider, endpoint, method string, bodies []model.ResourceBody) *model.UploadedResource {
+	return &model.UploadedResource{Resource: model.Resource{
+		Direction:        model.Consumes,
+		Protocol:         restmodel.Protocol,
+		Body:             model.Input,
+		Identity:         restmodel.Identity{Endpoint: endpoint, Method: method},
+		ConsumedProvider: null.StringFrom(provider),
+		Bodies:           bodies,
+	}}
+}
+
 func newContractWithOnePetsResource(participantName string) *model.UploadedContract {
 	contract := model.NewUploadedContract(0, participantName, "1", nil)
-	_ = contract.AddResource(model.NewRestResponseProvider("/pets", "get", "200", []model.ResourceBody{
+	_ = contract.AddResource(restResponseProvider("/pets", "get", "200", []model.ResourceBody{
 		{Source: "pets.yaml", SchemaName: null.StringFrom("PetList")},
 	}))
 	return contract
@@ -28,7 +71,7 @@ func TestContract_Checksum_DiffersWhenResourceAdded(t *testing.T) {
 	a := newContractWithOnePetsResource("pets-service")
 
 	b := newContractWithOnePetsResource("pets-service")
-	require.NoError(t, b.AddResource(model.NewRestResponseProvider("/pets/*", "get", "200", []model.ResourceBody{
+	require.NoError(t, b.AddResource(restResponseProvider("/pets/*", "get", "200", []model.ResourceBody{
 		{Source: "pets.yaml", SchemaName: null.StringFrom("Pet")},
 	})))
 
@@ -36,10 +79,10 @@ func TestContract_Checksum_DiffersWhenResourceAdded(t *testing.T) {
 }
 
 func TestContract_Checksum_IsOrderIndependent(t *testing.T) {
-	first := model.NewRestResponseProvider("/pets", "get", "200", []model.ResourceBody{
+	first := restResponseProvider("/pets", "get", "200", []model.ResourceBody{
 		{Source: "pets.yaml", SchemaName: null.StringFrom("PetList")},
 	})
-	second := model.NewRestResponseProvider("/pets/*", "get", "200", []model.ResourceBody{
+	second := restResponseProvider("/pets/*", "get", "200", []model.ResourceBody{
 		{Source: "pets.yaml", SchemaName: null.StringFrom("Pet")},
 	})
 
@@ -62,7 +105,7 @@ func newOrdersContract(version string, schemaName string, bodies []model.Resourc
 			"city": {Type: "string", Optional: true},
 		},
 	}
-	_ = contract.AddResource(model.NewRestRequestConsumer("addresses-service", "/addresses", "post", bodies))
+	_ = contract.AddResource(restRequestConsumer("addresses-service", "/addresses", "post", bodies))
 	return contract
 }
 
@@ -161,7 +204,7 @@ func TestContract_Checksum_DiffersWhenAFieldIsAdded(t *testing.T) {
 func TestContract_AddResource_RejectsAlreadyAddedHash(t *testing.T) {
 	contract := newContractWithOnePetsResource("pets-service")
 
-	err := contract.AddResource(model.NewRestResponseProvider("/pets", "get", "200", []model.ResourceBody{
+	err := contract.AddResource(restResponseProvider("/pets", "get", "200", []model.ResourceBody{
 		{Source: "pets.yaml", SchemaName: null.StringFrom("Pet")},
 	}))
 
@@ -181,22 +224,22 @@ func TestContract_AddResource_DescribesEachResourceShapeInTheInvariant(t *testin
 	}{
 		{
 			name:     "provides response",
-			resource: model.NewRestResponseProvider("/pets", "get", "200", nil),
+			resource: restResponseProvider("/pets", "get", "200", nil),
 			want:     "resource already added: provides GET /pets 200",
 		},
 		{
 			name:     "provides request",
-			resource: model.NewRestRequestProvider("/pets", "post", nil),
+			resource: restRequestProvider("/pets", "post", nil),
 			want:     "resource already added: provides POST /pets request",
 		},
 		{
 			name:     "consumes response",
-			resource: model.NewRestResponseConsumer("payments", "/invoices", "get", "200", nil),
+			resource: restResponseConsumer("payments", "/invoices", "get", "200", nil),
 			want:     "resource already added: consumes payments GET /invoices 200",
 		},
 		{
 			name:     "consumes request",
-			resource: model.NewRestRequestConsumer("payments", "/invoices", "post", nil),
+			resource: restRequestConsumer("payments", "/invoices", "post", nil),
 			want:     "resource already added: consumes payments POST /invoices request",
 		},
 	}

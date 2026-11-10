@@ -38,6 +38,7 @@ type ValidateContractOutput struct {
 }
 
 type ValidateContractUseCase struct {
+	interpreter           *contractfiles.Interpreter
 	contractRepository    *repository.ContractRepository
 	deploymentRepository  *repository.DeploymentRepository
 	environmentRepository *repository.EnvironmentRepository
@@ -46,6 +47,7 @@ type ValidateContractUseCase struct {
 }
 
 func NewValidateContractUseCase(
+	interpreter *contractfiles.Interpreter,
 	contractRepository *repository.ContractRepository,
 	deploymentRepository *repository.DeploymentRepository,
 	environmentRepository *repository.EnvironmentRepository,
@@ -53,6 +55,7 @@ func NewValidateContractUseCase(
 	compatibilityChecker *compatibility_checker.CompatibilityChecker,
 ) *ValidateContractUseCase {
 	return &ValidateContractUseCase{
+		interpreter:           interpreter,
 		contractRepository:    contractRepository,
 		deploymentRepository:  deploymentRepository,
 		environmentRepository: environmentRepository,
@@ -72,7 +75,7 @@ func (this *ValidateContractUseCase) Execute(ctx context.Context, input Validate
 		return ValidateContractOutput{Status: EnvironmentNotFound}, nil
 	}
 
-	fragments, shapeViolations, err := contractfiles.ToFragments(input.Contracts)
+	fragments, shapeViolations, err := this.interpreter.ToFragments(input.Contracts)
 	if err != nil {
 		return ValidateContractOutput{Status: ContractFilesUnreadable, ReadError: err.Error()}, nil
 	}
@@ -81,7 +84,7 @@ func (this *ValidateContractUseCase) Execute(ctx context.Context, input Validate
 		return ValidateContractOutput{Status: ContractValidationFailed, Violations: shapeViolations}, nil
 	}
 
-	uploadedContract, violations, err := contractfiles.ToUploadedContract(fragments, participant, "", nil)
+	uploadedContract, violations, err := this.interpreter.ToUploadedContract(fragments, participant, "", nil)
 	if len(violations) > 0 {
 		return ValidateContractOutput{Status: ContractValidationFailed, Violations: violations}, nil
 	}
@@ -129,16 +132,9 @@ func toPersistedContract(
 	resources := make(map[string]model.PersistedResource, len(uploadedContract.Resources)+len(removedResources))
 	for hash, resource := range uploadedContract.Resources {
 		resources[hash] = model.PersistedResource{
-			ParticipantName:    resource.ParticipantName,
-			Direction:          resource.Direction,
-			Interaction:        resource.Interaction,
-			ConsumedProvider:   resource.ConsumedProvider,
-			Endpoint:           resource.Endpoint,
-			Method:             resource.Method,
-			ResponseStatusCode: resource.ResponseStatusCode,
-			Bodies:             resource.Bodies,
-			Schemas:            uploadedContract.Schemas,
-			ProviderHash:       resource.ProviderHash(),
+			Resource:     resource.Resource,
+			Schemas:      uploadedContract.Schemas,
+			ProviderHash: resource.ProviderHash(),
 		}
 	}
 

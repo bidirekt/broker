@@ -2,6 +2,7 @@ package compatibility_checker
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/bidirekt/broker/internal/model"
 )
@@ -11,11 +12,18 @@ type VerdictReader interface {
 }
 
 type CompatibilityChecker struct {
-	verdicts VerdictReader
+	verdicts        VerdictReader
+	protocols       []ProtocolHooks
+	hooksByProtocol map[model.Protocol]ProtocolHooks
 }
 
-func NewCompatibilityChecker(verdicts VerdictReader) *CompatibilityChecker {
-	return &CompatibilityChecker{verdicts: verdicts}
+func NewCompatibilityChecker(verdicts VerdictReader, protocols []ProtocolHooks) *CompatibilityChecker {
+	hooksByProtocol := make(map[model.Protocol]ProtocolHooks, len(protocols))
+	for _, hooks := range protocols {
+		hooksByProtocol[hooks.Protocol()] = hooks
+	}
+
+	return &CompatibilityChecker{verdicts: verdicts, protocols: protocols, hooksByProtocol: hooksByProtocol}
 }
 
 func (this *CompatibilityChecker) Check(
@@ -28,6 +36,7 @@ func (this *CompatibilityChecker) Check(
 		contract.ParticipantName,
 		contract.Version,
 		environment.Name,
+		this.protocols,
 	)
 
 	pairs := &checkedPairs{
@@ -54,6 +63,15 @@ func (this *CompatibilityChecker) Check(
 	}
 
 	return report
+}
+
+func (this *CompatibilityChecker) hooksOf(protocol model.Protocol) ProtocolHooks {
+	hooks, registered := this.hooksByProtocol[protocol]
+	if !registered {
+		panic(fmt.Errorf("protocol %q has no checker hooks", protocol))
+	}
+
+	return hooks
 }
 
 // checkedPairs is the per-call memoization state: one entry per canonical snapshot pair,

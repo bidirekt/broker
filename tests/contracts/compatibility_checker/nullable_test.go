@@ -6,7 +6,9 @@ import (
 	"testing"
 
 	"github.com/bidirekt/broker/internal/contracts/compatibility_checker"
+	restcontracts "github.com/bidirekt/broker/internal/contracts/protocols/rest"
 	"github.com/bidirekt/broker/internal/model"
+	restmodel "github.com/bidirekt/broker/internal/model/protocols/rest"
 	"github.com/guregu/null"
 	"github.com/stretchr/testify/assert"
 )
@@ -45,34 +47,36 @@ func avatarsResources(
 	interaction string,
 	consumerSchema, providerSchema model.Schema,
 ) (consumer, provider model.PersistedResource) {
-	kind, status := model.RestResponse, null.StringFrom(interaction)
+	body, status := model.Output, interaction
 	if interaction == "request" {
-		kind, status = model.RestRequest, null.String{}
+		body, status = model.Input, ""
 	}
 
 	consumer = model.PersistedResource{
-		ParticipantName:    avatarsConsumerName,
-		Direction:          model.Consumes,
-		Interaction:        kind,
-		ConsumedProvider:   null.StringFrom(avatarsProviderName),
-		ConsumerHash:       null.StringFrom("spa-" + avatarsProviderHash),
-		ProviderHash:       avatarsProviderHash,
-		Endpoint:           avatarsEndpoint,
-		Method:             avatarsMethod,
-		ResponseStatusCode: status,
-		Bodies:             []model.ResourceBody{{Source: "spa.yaml", SchemaName: null.StringFrom("Profile")}},
-		Schemas:            model.Schemas{"Profile": consumerSchema},
+		Resource: model.Resource{
+			ParticipantName:  avatarsConsumerName,
+			Direction:        model.Consumes,
+			Protocol:         restmodel.Protocol,
+			Body:             body,
+			Identity:         restmodel.Identity{Endpoint: avatarsEndpoint, Method: avatarsMethod, Status: status},
+			ConsumedProvider: null.StringFrom(avatarsProviderName),
+			Bodies:           []model.ResourceBody{{Source: "spa.yaml", SchemaName: null.StringFrom("Profile")}},
+		},
+		ConsumerHash: null.StringFrom("spa-" + avatarsProviderHash),
+		ProviderHash: avatarsProviderHash,
+		Schemas:      model.Schemas{"Profile": consumerSchema},
 	}
 
 	provider = model.PersistedResource{
-		ParticipantName:    avatarsProviderName,
-		Direction:          model.Provides,
-		Interaction:        kind,
+		Resource: model.Resource{
+			ParticipantName: avatarsProviderName,
+			Direction:       model.Provides,
+			Protocol:        restmodel.Protocol,
+			Body:            body,
+			Identity:        restmodel.Identity{Endpoint: avatarsEndpoint, Method: avatarsMethod, Status: status},
+			Bodies:          []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Profile")}},
+		},
 		ProviderHash:       avatarsProviderHash,
-		Endpoint:           avatarsEndpoint,
-		Method:             avatarsMethod,
-		ResponseStatusCode: status,
-		Bodies:             []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Profile")}},
 		Schemas:            model.Schemas{"Profile": providerSchema},
 		ParticipantVersion: null.StringFrom("1.0.0"),
 	}
@@ -91,7 +95,7 @@ func avatarsBreaksCheckedFrom(
 		Resources:       map[string]model.PersistedResource{checked.PrimaryHash(): checked},
 	}
 
-	report := compatibility_checker.NewCompatibilityChecker(avatarsWithoutVerdict{}).Check(
+	report := compatibility_checker.NewCompatibilityChecker(avatarsWithoutVerdict{}, []compatibility_checker.ProtocolHooks{restcontracts.New()}).Check(
 		context.Background(),
 		checkedContract,
 		model.NewEnvironment(avatarsEnvironment),
@@ -99,7 +103,7 @@ func avatarsBreaksCheckedFrom(
 	)
 
 	var breaks []avatarsBreak
-	for _, leaf := range report.Hierarchical[counterpartName].Endpoints[avatarsEndpoint][avatarsMethod][interaction] {
+	for _, leaf := range report.Hierarchical[counterpartName].Trees[restmodel.Protocol].(restmodel.ReportTree)[avatarsEndpoint][avatarsMethod][interaction] {
 		breaks = append(breaks, avatarsBreak{leaf.Reason, leaf.Role, leaf.Details})
 	}
 

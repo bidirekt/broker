@@ -11,11 +11,15 @@ import (
 )
 
 type persistedVerdictBreak struct {
-	Endpoint    string            `json:"endpoint"`
-	Method      string            `json:"method"`
-	Interaction string            `json:"interaction"`
-	Reason      string            `json:"reason"`
-	Details     map[string]string `json:"details"`
+	Rest    persistedVerdictLocation `json:"rest"`
+	Reason  string                   `json:"reason"`
+	Details map[string]string        `json:"details"`
+}
+
+type persistedVerdictLocation struct {
+	Endpoint    string `json:"endpoint"`
+	Method      string `json:"method"`
+	Interaction string `json:"interaction"`
 }
 
 type persistedCheckResult struct {
@@ -303,10 +307,8 @@ func (this *IntegrationSuite) TestCompatibilityPersistence_IncompatiblePairStore
 	}
 
 	this.Equal(persistedVerdictBreak{
-		Endpoint:    "/widgets",
-		Method:      "get",
-		Interaction: "200",
-		Reason:      "property_type_mismatch",
+		Rest:   persistedVerdictLocation{Endpoint: "/widgets", Method: "get", Interaction: "200"},
+		Reason: "property_type_mismatch",
 		Details: map[string]string{
 			"property":             "$.id",
 			"consumerField":        "Widget.id",
@@ -319,10 +321,8 @@ func (this *IntegrationSuite) TestCompatibilityPersistence_IncompatiblePairStore
 	}, byReason["property_type_mismatch"])
 
 	this.Equal(persistedVerdictBreak{
-		Endpoint:    "/widgets",
-		Method:      "get",
-		Interaction: "200",
-		Reason:      "property_missing_in_provider",
+		Rest:   persistedVerdictLocation{Endpoint: "/widgets", Method: "get", Interaction: "200"},
+		Reason: "property_missing_in_provider",
 		Details: map[string]string{
 			"property":      "$.label",
 			"consumerField": "Widget.label",

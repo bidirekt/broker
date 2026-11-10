@@ -7,6 +7,7 @@ import (
 
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 const (
@@ -109,7 +110,15 @@ const (
 	`
 )
 
-func (this *ContractRepository) FindContractVersion(ctx context.Context, participantName, version string) (*model.ContractVersion, bool) {
+type ContractVersionPageRepository struct {
+	pool *pgxpool.Pool
+}
+
+func NewContractVersionPageRepository(pool *pgxpool.Pool) *ContractVersionPageRepository {
+	return &ContractVersionPageRepository{pool: pool}
+}
+
+func (this *ContractVersionPageRepository) FindContractVersion(ctx context.Context, participantName, version string) (*model.ContractVersion, bool) {
 	contractVersion := &model.ContractVersion{}
 	var contractContent string
 
@@ -133,7 +142,7 @@ func (this *ContractRepository) FindContractVersion(ctx context.Context, partici
 	return contractVersion, true
 }
 
-func (this *DeploymentRepository) ListCurrentDeploymentsOfVersion(ctx context.Context, participantID int64, version string) []model.Deployment {
+func (this *ContractVersionPageRepository) ListCurrentDeploymentsOfVersion(ctx context.Context, participantID int64, version string) []model.Deployment {
 	rows, err := this.pool.Query(ctx, listCurrentDeploymentsOfVersionQuery, participantID, version)
 	if err != nil {
 		panic(fmt.Errorf("error listing current deployments of version: %w", err))
@@ -152,7 +161,7 @@ func (this *DeploymentRepository) ListCurrentDeploymentsOfVersion(ctx context.Co
 	return deployments
 }
 
-func (this *DeploymentRepository) ListDeploymentsOfVersion(
+func (this *ContractVersionPageRepository) ListDeploymentsOfVersion(
 	ctx context.Context,
 	participantID int64,
 	version string,
@@ -187,7 +196,7 @@ func (this *DeploymentRepository) ListDeploymentsOfVersion(
 	return deployments, total
 }
 
-func (this *CompatibilityRepository) ListLatestChecksOfVersion(ctx context.Context, participantID int64, version string) []model.CompatibilityCheck {
+func (this *ContractVersionPageRepository) ListLatestChecksOfVersion(ctx context.Context, participantID int64, version string) []model.CompatibilityCheck {
 	rows, err := this.pool.Query(ctx, listLatestChecksOfVersionQuery, participantID, version)
 	if err != nil {
 		panic(fmt.Errorf("error listing latest checks of version: %w", err))
@@ -196,7 +205,7 @@ func (this *CompatibilityRepository) ListLatestChecksOfVersion(ctx context.Conte
 	return collectCompatibilityChecks(rows)
 }
 
-func (this *CompatibilityRepository) ListChecksOfVersion(
+func (this *ContractVersionPageRepository) ListChecksOfVersion(
 	ctx context.Context,
 	participantID int64,
 	version string,
@@ -221,7 +230,7 @@ func (this *CompatibilityRepository) ListChecksOfVersion(
 	return collectCompatibilityChecks(rows), total
 }
 
-func (this *CompatibilityRepository) ListResultsOfChecks(ctx context.Context, checkIDs []int64) map[int64][]model.CompatibilityCheckResult {
+func (this *ContractVersionPageRepository) ListResultsOfChecks(ctx context.Context, checkIDs []int64) map[int64][]model.CompatibilityCheckResult {
 	rows, err := this.pool.Query(ctx, listResultsOfChecksQuery, checkIDs)
 	if err != nil {
 		panic(fmt.Errorf("error listing results of checks: %w", err))

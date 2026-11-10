@@ -5,6 +5,8 @@ import (
 
 	"github.com/bidirekt/broker/internal/contracts/contract"
 	"github.com/bidirekt/broker/internal/contracts/mapper/fragmentmapper"
+	"github.com/bidirekt/broker/internal/contracts/protocol"
+	restcontracts "github.com/bidirekt/broker/internal/contracts/protocols/rest"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
@@ -191,7 +193,7 @@ func schemaModelsOf(t *testing.T, files ...schemaFile) model.Schemas {
 		fragments = append(fragments, contract.Fragment{Source: file.source, Document: document})
 	}
 
-	return fragmentmapper.ToSchemaModels(fragmentmapper.ToDeclarations(fragments))
+	return fragmentmapper.ToSchemaModels(fragmentmapper.ToDeclarations(fragments, protocol.NewRegistry([]protocol.Protocol{restcontracts.New()})))
 }
 
 func TestToSchemaModels_PrimitiveBody_IsASchemaWithItsOwnFieldOnly(t *testing.T) {

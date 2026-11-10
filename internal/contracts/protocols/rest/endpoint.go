@@ -1,4 +1,4 @@
-package validations
+package rest
 
 import (
 	"errors"
@@ -9,7 +9,18 @@ import (
 
 var literalSegment = regexp.MustCompile(`^[A-Za-z0-9._~-]+$`)
 
-func Endpoint(value string) error {
+func NormalizeEndpoint(endpoint string) string {
+	path, hasTrailingSlash := strings.CutSuffix(endpoint, "/")
+	closesSegment := path != "" && !strings.HasSuffix(path, "/")
+
+	if hasTrailingSlash && closesSegment {
+		return path
+	}
+
+	return endpoint
+}
+
+func CheckEndpoint(value string) error {
 	if !strings.HasPrefix(value, "/") || strings.ContainsFunc(value, unicode.IsControl) {
 		return errors.New("malformed path")
 	}

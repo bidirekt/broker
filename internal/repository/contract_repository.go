@@ -12,10 +12,6 @@ import (
 )
 
 const (
-	hasContractForVersionQuery = `
-		SELECT EXISTS(SELECT 1 FROM contract_versions WHERE participant_id = $1 AND version = $2)
-	`
-
 	loadContractContentForVersionQuery = `
 		SELECT contract_content
 		FROM contract_versions
@@ -58,16 +54,14 @@ const (
 			(
 				participant_id,
 				direction,
-				interaction,
+				protocol,
+				body_role,
 				consumed_provider,
-				endpoint,
-				method,
-				response_status_code,
 				provider_hash,
 				consumer_hash
 			)
 		VALUES
-			($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id
 	`
 
@@ -96,24 +90,7 @@ const (
 	getLatestSnapshotByParticipantID = `
 		SELECT
 			c.id,
-			(SELECT version FROM contract_versions WHERE contract_id = c.id ORDER BY id DESC LIMIT 1),
-			(SELECT contract_content FROM contract_versions WHERE contract_id = c.id ORDER BY id DESC LIMIT 1),
-			c.created_at,
-			pa.id,
-			pa.name,
-			r.id,
-			r.direction,
-			r.interaction,
-			r.consumed_provider,
-			r.endpoint,
-			r.method,
-			r.response_status_code,
-			r.provider_hash,
-			r.consumer_hash,
-			r.created_at,
-			rv.change_type,
-			bodies.sources,
-			bodies.schema_names
+			(SELECT version FROM contract_versions WHERE contract_id = c.id ORDER BY id DESC LIMIT 1),` + resourceColumns + `
 		FROM contracts c
 		JOIN participants pa ON pa.id = c.participant_id
 		JOIN resources r ON r.participant_id = c.participant_id
@@ -141,24 +118,7 @@ const (
 	contractVersionTreeQuery = `
 		SELECT
 			c.id,
-			cv.version,
-			cv.contract_content,
-			c.created_at,
-			pa.id,
-			pa.name,
-			r.id,
-			r.direction,
-			r.interaction,
-			r.consumed_provider,
-			r.endpoint,
-			r.method,
-			r.response_status_code,
-			r.provider_hash,
-			r.consumer_hash,
-			r.created_at,
-			rv.change_type,
-			bodies.sources,
-			bodies.schema_names
+			cv.version,` + resourceColumns + `
 		FROM contract_versions cv
 		JOIN contracts c ON c.id = cv.contract_id
 		JOIN participants pa ON pa.id = cv.participant_id
@@ -191,115 +151,15 @@ const (
 		  AND cv.version = $2
 		ORDER BY r.id
 	`
-
-	deployedResourcesByProviderHashAndEnvironmentQuery = `
-		SELECT
-			pa.id,
-			pa.name,
-			r.id,
-			r.direction,
-			r.interaction,
-			r.consumed_provider,
-			r.endpoint,
-			r.method,
-			r.response_status_code,
-			r.provider_hash,
-			r.consumer_hash,
-			r.created_at,
-			bodies.sources,
-			bodies.schema_names,
-			cd.version,
-			cd.contract_id
-		FROM
-			resources r
-		JOIN
-			participants pa ON pa.id = r.participant_id
-		JOIN
-			current_deployments cd ON cd.participant_id = r.participant_id AND cd.environment_id = $3
-		JOIN LATERAL (
-			SELECT change_type
-			FROM resource_versions
-			WHERE resource_id = r.id
-			  AND contract_id <= cd.contract_id
-			ORDER BY contract_id DESC
-			LIMIT 1
-		) rv ON true
-		JOIN LATERAL (
-			SELECT
-				array_agg(rb.source ORDER BY rb.source COLLATE "C", rb.id) AS sources,
-				array_agg(s.name ORDER BY rb.source COLLATE "C", rb.id) AS schema_names
-			FROM resource_bodies rb
-			LEFT JOIN schemas s ON s.id = rb.schema_id
-			WHERE rb.resource_id = r.id AND rb.contract_id = cd.contract_id
-		) bodies ON true
-		WHERE
-			r.direction = $1
-		AND
-			r.provider_hash = $2
-		AND
-			rv.change_type = 'added'
-	`
-
-	registeredProviderQuery = `
-		SELECT
-			pa.id,
-			cd.version
-		FROM
-			participants pa
-		LEFT JOIN
-			current_deployments cd ON cd.participant_id = pa.id AND cd.environment_id = $2
-		WHERE
-			pa.name = $1
-	`
-
-	deployedProviderStatusesQuery = `
-		SELECT
-			COUNT(*) > 0,
-			array_agg(r.response_status_code ORDER BY r.response_status_code COLLATE "C")
-				FILTER (WHERE r.response_status_code IS NOT NULL)
-		FROM
-			participants pa
-		JOIN
-			current_deployments cd ON cd.participant_id = pa.id AND cd.environment_id = $5
-		JOIN
-			resources r ON r.participant_id = pa.id
-		JOIN LATERAL (
-			SELECT change_type
-			FROM resource_versions
-			WHERE resource_id = r.id
-			  AND contract_id <= cd.contract_id
-			ORDER BY contract_id DESC
-			LIMIT 1
-		) rv ON true
-		WHERE
-			r.direction = $1
-		AND
-			pa.name = $2
-		AND
-			r.endpoint = $3
-		AND
-			r.method = $4
-		AND
-			rv.change_type = 'added'
-	`
 )
 
 type ContractRepository struct {
-	pool *pgxpool.Pool
+	pool   *pgxpool.Pool
+	tables map[model.Protocol]ProtocolTable
 }
 
-func NewContractRepository(pool *pgxpool.Pool) *ContractRepository {
-	return &ContractRepository{pool: pool}
-}
-
-func (this *ContractRepository) HasContractForVersion(ctx context.Context, participantID int64, version string) bool {
-	var exists bool
-
-	if err := this.pool.QueryRow(ctx, hasContractForVersionQuery, participantID, version).Scan(&exists); err != nil {
-		panic(fmt.Errorf("error checking contract version: %w", err))
-	}
-
-	return exists
+func NewContractRepository(pool *pgxpool.Pool, protocols []ProtocolTable) *ContractRepository {
+	return &ContractRepository{pool: pool, tables: toProtocolTables(protocols)}
 }
 
 func (this *ContractRepository) loadFilesForVersion(ctx context.Context, tx pgx.Tx, participantID int64, version string) ([]model.ContractFile, bool) {
@@ -478,16 +338,16 @@ func (this *ContractRepository) insertResource(
 		insertResourceQuery,
 		participantID,
 		resource.Direction.String(),
-		resource.Interaction.String(),
+		resource.Protocol.String(),
+		resource.Body.String(),
 		resource.ConsumedProvider,
-		resource.Endpoint,
-		resource.Method,
-		resource.ResponseStatusCode,
 		resource.ProviderHash(),
 		null.NewString(resource.ConsumerHash(), resource.IsConsumer()),
 	).Scan(&id); err != nil {
 		panic(fmt.Errorf("error inserting resource: %w", err))
 	}
+
+	this.tableOf(id, resource.Protocol).Insert(ctx, tx, id, resource.Identity)
 
 	return id
 }
@@ -547,7 +407,7 @@ func (this *ContractRepository) GetLatestSnapshotByParticipantID(
 
 func (this *ContractRepository) latestSnapshot(
 	ctx context.Context,
-	q querier,
+	q Querier,
 	participantID int64,
 ) (*model.PersistedContract, bool) {
 	rows, err := q.Query(ctx, getLatestSnapshotByParticipantID, participantID)
@@ -555,7 +415,7 @@ func (this *ContractRepository) latestSnapshot(
 		panic(fmt.Errorf("error loading contract tree: %w", err))
 	}
 
-	return this.withSchemas(ctx, q, scanPersistedContractTree(rows))
+	return this.withSchemas(ctx, q, this.toPersistedContractTree(ctx, q, rows))
 }
 
 func (this *ContractRepository) GetContractByNameAndVersion(
@@ -568,7 +428,7 @@ func (this *ContractRepository) GetContractByNameAndVersion(
 		panic(fmt.Errorf("error loading contract tree by name and version: %w", err))
 	}
 
-	return this.withSchemas(ctx, this.pool, scanPersistedContractTree(rows))
+	return this.withSchemas(ctx, this.pool, this.toPersistedContractTree(ctx, this.pool, rows))
 }
 
 func (this *ContractRepository) GetContractByIDAndVersion(
@@ -581,7 +441,7 @@ func (this *ContractRepository) GetContractByIDAndVersion(
 		panic(fmt.Errorf("error loading contract tree by id and version: %w", err))
 	}
 
-	contract, found := this.withSchemas(ctx, this.pool, scanPersistedContractTree(rows))
+	contract, found := this.withSchemas(ctx, this.pool, this.toPersistedContractTree(ctx, this.pool, rows))
 	if !found {
 		panic(fmt.Errorf("contract %d has no version %q", contractID, version))
 	}
@@ -591,7 +451,7 @@ func (this *ContractRepository) GetContractByIDAndVersion(
 
 func (this *ContractRepository) withSchemas(
 	ctx context.Context,
-	q querier,
+	q Querier,
 	contract *model.PersistedContract,
 ) (*model.PersistedContract, bool) {
 	if contract == nil {
@@ -608,183 +468,20 @@ func (this *ContractRepository) withSchemas(
 	return contract, true
 }
 
-func scanPersistedContractTree(rows pgx.Rows) *model.PersistedContract {
-	defer rows.Close()
-
+func (this *ContractRepository) toPersistedContractTree(ctx context.Context, q Querier, rows pgx.Rows) *model.PersistedContract {
 	var contract *model.PersistedContract
 
-	for rows.Next() {
-		var row tableRow
+	tableRows := scanTableRows(rows)
+	identities := this.identitiesOf(ctx, q, tableRows)
 
-		if err := rows.Scan(
-			&row.ContractID,
-			&row.ContractVersion,
-			&row.ContractContent,
-			&row.ContractCreatedAt,
-			&row.ParticipantID,
-			&row.ParticipantName,
-			&row.ResourceID,
-			&row.ResourceDirection,
-			&row.ResourceInteraction,
-			&row.ResourceConsumedProvider,
-			&row.ResourceEndpoint,
-			&row.ResourceMethod,
-			&row.ResourceResponseStatusCode,
-			&row.ResourceProviderHash,
-			&row.ResourceConsumerHash,
-			&row.ResourceCreatedAt,
-			&row.ResourceVersionChangeType,
-			&row.BodySources,
-			&row.BodySchemaNames,
-		); err != nil {
-			panic(fmt.Errorf("error scanning contract tree row: %w", err))
-		}
-
+	for _, row := range tableRows {
 		if contract == nil {
 			contract = row.toPersistedContractModel()
 		}
 
-		resource := row.toResourceModel()
+		resource := row.toResourceModel(identities[row.ResourceID])
 		contract.Resources[resource.PrimaryHash()] = resource
 	}
 
-	if err := rows.Err(); err != nil {
-		panic(fmt.Errorf("error reading contract tree: %w", err))
-	}
-
 	return contract
-}
-
-func (this *ContractRepository) GetProviderResourceByProviderHashAndEnvironmentID(
-	ctx context.Context,
-	providerHash string,
-	environmentID int64,
-) (model.PersistedResource, bool) {
-	return this.loadProviderResource(ctx, schemaCatalogs{}, providerHash, environmentID)
-}
-
-func (this *ContractRepository) GetConsumersResourcesByProviderHashAndEnvironmentID(
-	ctx context.Context,
-	providerHash string,
-	environmentID int64,
-) []model.PersistedResource {
-	return this.loadDeployedResources(ctx, schemaCatalogs{}, model.Consumes, providerHash, environmentID)
-}
-
-func (this *ContractRepository) loadProviderResource(
-	ctx context.Context,
-	catalogs schemaCatalogs,
-	providerHash string,
-	environmentID int64,
-) (model.PersistedResource, bool) {
-	providers := this.loadDeployedResources(ctx, catalogs, model.Provides, providerHash, environmentID)
-	if len(providers) == 0 {
-		return model.PersistedResource{}, false
-	}
-
-	return providers[0], true
-}
-
-func (this *ContractRepository) loadRegisteredProvider(
-	ctx context.Context,
-	participantName string,
-	environmentID int64,
-) (model.RegisteredProvider, bool) {
-	var registered model.RegisteredProvider
-
-	err := this.pool.QueryRow(ctx, registeredProviderQuery, participantName, environmentID).
-		Scan(&registered.ParticipantID, &registered.DeployedVersion)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return model.RegisteredProvider{}, false
-	}
-	if err != nil {
-		panic(fmt.Errorf("error loading registered provider: %w", err))
-	}
-
-	return registered, true
-}
-
-func (this *ContractRepository) loadDeployedProviderStatuses(
-	ctx context.Context,
-	consumerResource model.PersistedResource,
-	environmentID int64,
-) ([]string, bool) {
-	var declaresMethod bool
-	var statuses []string
-
-	if err := this.pool.QueryRow(
-		ctx,
-		deployedProviderStatusesQuery,
-		string(model.Provides),
-		consumerResource.ConsumedProvider.String,
-		consumerResource.Endpoint,
-		consumerResource.Method,
-		environmentID,
-	).Scan(&declaresMethod, &statuses); err != nil {
-		panic(fmt.Errorf("error loading statuses of deployed provider: %w", err))
-	}
-
-	return statuses, declaresMethod
-}
-
-func (this *ContractRepository) loadDeployedResources(
-	ctx context.Context,
-	catalogs schemaCatalogs,
-	direction model.Direction,
-	providerHash string,
-	environmentID int64,
-) []model.PersistedResource {
-	rows, err := this.pool.Query(
-		ctx,
-		deployedResourcesByProviderHashAndEnvironmentQuery,
-		string(direction),
-		providerHash,
-		environmentID,
-	)
-	if err != nil {
-		panic(fmt.Errorf("error loading deployed resources by provider hash: %w", err))
-	}
-
-	defer rows.Close()
-
-	resources := make([]model.PersistedResource, 0)
-
-	for rows.Next() {
-		var row tableRow
-
-		if err := rows.Scan(
-			&row.ParticipantID,
-			&row.ParticipantName,
-			&row.ResourceID,
-			&row.ResourceDirection,
-			&row.ResourceInteraction,
-			&row.ResourceConsumedProvider,
-			&row.ResourceEndpoint,
-			&row.ResourceMethod,
-			&row.ResourceResponseStatusCode,
-			&row.ResourceProviderHash,
-			&row.ResourceConsumerHash,
-			&row.ResourceCreatedAt,
-			&row.BodySources,
-			&row.BodySchemaNames,
-			&row.ResourceVersion,
-			&row.ContractID,
-		); err != nil {
-			panic(fmt.Errorf("error scanning deployed resource: %w", err))
-		}
-
-		resources = append(resources, row.toResourceModel())
-	}
-
-	if err := rows.Err(); err != nil {
-		panic(fmt.Errorf("error reading deployed resources by provider hash: %w", err))
-	}
-
-	rows.Close()
-
-	for index := range resources {
-		resources[index].Schemas = this.loadSchemasAt(ctx, this.pool, catalogs, resources[index].ContractID)
-	}
-
-	return resources
 }

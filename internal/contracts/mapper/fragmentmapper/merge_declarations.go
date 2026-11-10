@@ -1,8 +1,10 @@
 package fragmentmapper
 
+import "github.com/bidirekt/broker/internal/contracts/protocol"
+
 // A provider declared twice is a violation the validator reports before this runs, so the first one wins here.
-func ToMergedResourceDeclarations(declarations Declarations) []ResourceDeclaration {
-	merged := make([]ResourceDeclaration, 0, len(declarations.Resources))
+func ToMergedResourceDeclarations(declarations protocol.Declarations) []protocol.ResourceDeclaration {
+	merged := make([]protocol.ResourceDeclaration, 0, len(declarations.Resources))
 	indexByPath := make(map[string]int, len(declarations.Resources))
 
 	for _, declaration := range declarations.Resources {

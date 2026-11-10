@@ -81,7 +81,7 @@ type schemaCatalogs map[int64]model.Schemas
 
 func (this *ContractRepository) loadSchemasAt(
 	ctx context.Context,
-	q querier,
+	q Querier,
 	catalogs schemaCatalogs,
 	contractID int64,
 ) model.Schemas {
