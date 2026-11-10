@@ -328,3 +328,13 @@ func TestUndecodableReportPanics(t *testing.T) {
 		breakreport.NewReader([]breakreport.ProtocolSection{restbreakreport.New()}).FromStoredCheck(model.CompatibilityCheck{Report: []byte(`[`)}, nil)
 	})
 }
+
+func TestUndecodableProtocolSectionPanics(t *testing.T) {
+	assert.Panics(t, func() {
+		fromStoredCheck(model.CompatibilityCheck{
+			ParticipantName: checkedParticipant,
+			EnvironmentName: checkEnvironment,
+			Report:          []byte(`{"petstore_api": {"endpoints": "not a tree"}}`),
+		}, []model.CompatibilityCheckResult{{CounterpartName: "petstore_api", Role: model.CounterpartProvider}})
+	})
+}
