@@ -111,13 +111,14 @@ const (
 
 func (this *ContractRepository) FindContractVersion(ctx context.Context, participantName, version string) (*model.ContractVersion, bool) {
 	contractVersion := &model.ContractVersion{}
+	var contractContent string
 
 	err := this.pool.QueryRow(ctx, findContractVersionQuery, participantName, version).Scan(
 		&contractVersion.ID,
 		&contractVersion.ParticipantID,
 		&contractVersion.ParticipantName,
 		&contractVersion.Version,
-		&contractVersion.ContractContent,
+		&contractContent,
 		&contractVersion.CreatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -126,6 +127,8 @@ func (this *ContractRepository) FindContractVersion(ctx context.Context, partici
 	if err != nil {
 		panic(fmt.Errorf("error finding contract version: %w", err))
 	}
+
+	contractVersion.Files = toContractFiles(contractContent)
 
 	return contractVersion, true
 }

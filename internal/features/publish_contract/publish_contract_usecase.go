@@ -2,7 +2,7 @@ package publish_contract
 
 import (
 	"context"
-	"encoding/json"
+	"slices"
 
 	"github.com/bidirekt/broker/internal/contracts/contract_differ"
 	"github.com/bidirekt/broker/internal/contracts/contractfiles"
@@ -24,7 +24,7 @@ const (
 type PublishContractInput struct {
 	ServiceName string
 	Version     string
-	Contracts   []contractfiles.File
+	Contracts   []model.ContractFile
 }
 
 type PublishContractOutput struct {
@@ -63,9 +63,7 @@ func (this *PublishContractUseCase) Execute(ctx context.Context, input PublishCo
 		return PublishContractOutput{Status: ContractValidationFailed, Violations: shapeViolations}, nil
 	}
 
-	contractContent, _ := json.Marshal(input.Contracts)
-
-	uploadedContract, violations, err := contractfiles.ToUploadedContract(fragments, participant, input.Version, string(contractContent))
+	uploadedContract, violations, err := contractfiles.ToUploadedContract(fragments, participant, input.Version, input.Contracts)
 	if len(violations) > 0 {
 		return PublishContractOutput{Status: ContractValidationFailed, Violations: violations}, nil
 	}
@@ -74,12 +72,32 @@ func (this *PublishContractUseCase) Execute(ctx context.Context, input PublishCo
 		return PublishContractOutput{}, err
 	}
 
-	conflict := this.contractRepository.Publish(ctx, uploadedContract, func(current *model.PersistedContract) model.ContractDiff {
-		return contract_differ.DiffContracts(current, uploadedContract)
-	})
+	conflict := this.contractRepository.Publish(ctx, uploadedContract,
+		func(current *model.PersistedContract) model.ContractDiff {
+			return contract_differ.DiffContracts(current, uploadedContract)
+		},
+		func(stored []model.ContractFile) bool {
+			return hasSameContent(stored, participant, uploadedContract)
+		},
+	)
 	if conflict {
 		return PublishContractOutput{Status: ContractVersionConflict}, nil
 	}
 
 	return PublishContractOutput{Status: ContractPublishSuccessful}, nil
+}
+
+func hasSameContent(stored []model.ContractFile, participant *model.Participant, uploadedContract *model.UploadedContract) bool {
+	if slices.Equal(stored, uploadedContract.Files) {
+		return true
+	}
+
+	fragments, shapeViolations, err := contractfiles.ToFragments(stored)
+	if err != nil || len(shapeViolations) > 0 {
+		return false
+	}
+
+	storedContract, violations, err := contractfiles.ToUploadedContract(fragments, participant, uploadedContract.Version, stored)
+
+	return err == nil && len(violations) == 0 && storedContract.Checksum() == uploadedContract.Checksum()
 }

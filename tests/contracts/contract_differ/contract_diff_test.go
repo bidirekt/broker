@@ -50,7 +50,7 @@ func persistedPets(schemas model.Schemas, resources ...*model.UploadedResource) 
 }
 
 func uploadedPets(schemas model.Schemas, resources ...*model.UploadedResource) *model.UploadedContract {
-	contract := model.NewUploadedContract(0, participantName, "1", "raw")
+	contract := model.NewUploadedContract(0, participantName, "1", nil)
 	contract.Schemas = schemas
 
 	for _, resource := range resources {

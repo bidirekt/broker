@@ -12,18 +12,13 @@ import (
 	"github.com/bidirekt/broker/internal/model"
 )
 
-type File struct {
-	Source  string `json:"source"`
-	Content string `json:"content"`
-}
-
-func HasBlankSource(files []File) bool {
-	return slices.ContainsFunc(files, func(file File) bool {
+func HasBlankSource(files []model.ContractFile) bool {
+	return slices.ContainsFunc(files, func(file model.ContractFile) bool {
 		return strings.TrimSpace(file.Source) == ""
 	})
 }
 
-func ToFragments(files []File) ([]contract.Fragment, []violation.Violation, error) {
+func ToFragments(files []model.ContractFile) ([]contract.Fragment, []violation.Violation, error) {
 	fragments := make([]contract.Fragment, 0, len(files))
 	for _, file := range files {
 		fragment, err := contract.DecodeFragment(file.Source, file.Content)
@@ -50,7 +45,7 @@ func ToUploadedContract(
 	fragments []contract.Fragment,
 	participant *model.Participant,
 	version string,
-	contractContent string,
+	files []model.ContractFile,
 ) (*model.UploadedContract, []violation.Violation, error) {
 	declarations := fragmentmapper.ToDeclarations(fragments)
 
@@ -60,7 +55,7 @@ func ToUploadedContract(
 
 	resources := fragmentmapper.ToResourceModels(declarations)
 
-	uploadedContract := model.NewUploadedContract(participant.ID, participant.Name, version, contractContent)
+	uploadedContract := model.NewUploadedContract(participant.ID, participant.Name, version, files)
 	uploadedContract.Schemas = fragmentmapper.ToSchemaModels(declarations)
 
 	for _, resource := range resources {

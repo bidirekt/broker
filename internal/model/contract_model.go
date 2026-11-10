@@ -14,7 +14,7 @@ import (
 type UploadedContract struct {
 	ID              int64
 	Version         string
-	ContractContent string
+	Files           []ContractFile
 	Resources       map[string]UploadedResource
 	Schemas         Schemas
 	ParticipantID   int64
@@ -25,13 +25,13 @@ func NewUploadedContract(
 	participantID int64,
 	participantName string,
 	version string,
-	contractContent string,
+	files []ContractFile,
 ) *UploadedContract {
 	return &UploadedContract{
 		ParticipantID:   participantID,
 		ParticipantName: participantName,
 		Version:         version,
-		ContractContent: contractContent,
+		Files:           files,
 	}
 }
 
