@@ -62,15 +62,17 @@ const providerSideReport = `{
 }`
 
 func consumerSideCheck() (model.CompatibilityCheck, []model.CompatibilityCheckResult) {
-	return model.CompatibilityCheck{
+	check := model.CompatibilityCheck{
 		ParticipantName: checkedParticipant,
 		EnvironmentName: checkEnvironment,
 		Report:          []byte(consumerSideReport),
-	}, []model.CompatibilityCheckResult{
+	}
+	results := []model.CompatibilityCheckResult{
 		{CounterpartName: "petstore_users", Role: model.CounterpartProvider, CounterpartVersion: null.StringFrom("3.0.0"), CounterpartParticipantID: null.IntFrom(1), Deployable: true},
 		{CounterpartName: "petstore_reviews", Role: model.CounterpartProvider, CounterpartParticipantID: null.IntFrom(1)},
 		{CounterpartName: "petstore_api", Role: model.CounterpartBoth, CounterpartVersion: null.StringFrom("1.4.0"), CounterpartParticipantID: null.IntFrom(1)},
 	}
+	return check, results
 }
 
 func fromStoredCheck(check model.CompatibilityCheck, results []model.CompatibilityCheckResult) breakreport.Report {
