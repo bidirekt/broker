@@ -6,7 +6,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build \
-      -ldflags "-X github.com/bidirekt/broker/internal/features/health.brokerVersion=${VERSION}" \
+      -ldflags "-X github.com/bidirekt/broker/internal/components/versions.brokerVersion=${VERSION}" \
       -o /out/broker ./cmd/server
 
 FROM gcr.io/distroless/static:nonroot

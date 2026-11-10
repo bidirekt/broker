@@ -13,6 +13,7 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.44.0
 	github.com/valyala/fasthttp v1.77.0
 	golang.org/x/crypto v0.58.0
+	golang.org/x/mod v0.41.0
 )
 
 require (
