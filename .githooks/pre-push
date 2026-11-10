@@ -2,7 +2,8 @@
 set -e
 export GOWORK=off
 
-unformatted=$(gofmt -l .)
+gofmt="$(GOTOOLCHAIN=go$(go list -m -f '{{.GoVersion}}') go env GOROOT)/bin/gofmt"
+unformatted=$("$gofmt" -l .)
 if [ -n "$unformatted" ]; then
   echo "gofmt: unformatted files:" >&2
   echo "$unformatted" >&2
