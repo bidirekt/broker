@@ -55,6 +55,10 @@ func (this ObjectNode) validateFields(mapping map[string]any, path string) []vio
 			continue
 		}
 
+		if byType, dependent := field.(ByType); dependent {
+			field = byType.chosenBy(mapping)
+		}
+
 		violations = append(violations, field.validate(mapping[key], joinPath(path, key))...)
 	}
 

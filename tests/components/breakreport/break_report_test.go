@@ -338,3 +338,94 @@ func TestUndecodableProtocolSectionPanics(t *testing.T) {
 		}, []model.CompatibilityCheckResult{{CounterpartName: "petstore_api", Role: model.CounterpartProvider}})
 	})
 }
+
+func memberMissingCheck(checked string, counterpart model.CompatibilityCheckResult, report string) breakreport.Report {
+	return fromStoredCheck(model.CompatibilityCheck{
+		ParticipantName: checked,
+		EnvironmentName: checkEnvironment,
+		Report:          []byte(report),
+	}, []model.CompatibilityCheckResult{counterpart})
+}
+
+var petstoreAPIAsProvider = model.CompatibilityCheckResult{CounterpartName: "petstore_api", Role: model.CounterpartProvider, CounterpartVersion: null.StringFrom("1.4.0"), CounterpartParticipantID: null.IntFrom(1)}
+
+var petstoreWebAsConsumer = model.CompatibilityCheckResult{CounterpartName: "petstore_web", Role: model.CounterpartConsumer, CounterpartVersion: null.StringFrom("2.2.0"), CounterpartParticipantID: null.IntFrom(1)}
+
+func TestMissingResponseValueFromTheConsumerMergesItsPlaces(t *testing.T) {
+	report := memberMissingCheck(checkedParticipant, petstoreAPIAsProvider, `{"petstore_api": {"deployable": false, "participantVersion": "1.4.0", "endpoints": {
+		"/pets": {"get": {"200": [{"reason": "property_member_missing_in_provider", "role": "consumer", "details": {"property": "$[].status", "consumerField": "Pet.status", "providerField": "PetRecord.status", "member": "adopted"}}]}},
+		"/pets/*": {"get": {"200": [{"reason": "property_member_missing_in_provider", "role": "consumer", "details": {"property": "$.status", "consumerField": "Pet.status", "providerField": "PetRecord.status", "member": "adopted"}}]}}
+	}}}`)
+
+	require.Len(t, restResources(t, report.Counterparts[0]).Fields, 1)
+	field := restResources(t, report.Counterparts[0]).Fields[0]
+	assert.Equal(t, "Pet.status", field.Field)
+	assert.Equal(t, model.ReasonPropertyMemberMissingInProvider, field.Reason)
+	assert.Equal(t, `petstore_web reads "adopted", but petstore_api doesn't provide it`, field.Sentence.String())
+	assert.Equal(t, []breakreport.Fix{
+		{Participant: "petstore_web", Action: `stop reading "adopted"`, Checked: true},
+		{Participant: "petstore_api", Action: `provide "adopted" there`},
+	}, field.Fixes)
+	assert.Equal(t, []restbreakreport.Place{
+		{Method: "GET", Endpoint: "/pets", Interaction: "response 200", Property: `"$[].status"`, CounterpartField: "PetRecord.status"},
+		{Method: "GET", Endpoint: "/pets/*", Interaction: "response 200", Property: `"$.status"`, CounterpartField: "PetRecord.status"},
+	}, field.Places)
+	assert.Equal(t, 1, report.Breaks)
+	assert.Equal(t, 2, report.Places)
+}
+
+func TestTwoMissingValuesOfOneFieldStayInSeparateBlocks(t *testing.T) {
+	report := memberMissingCheck(checkedParticipant, petstoreAPIAsProvider, `{"petstore_api": {"deployable": false, "participantVersion": "1.4.0", "endpoints": {
+		"/pets": {"get": {"200": [
+			{"reason": "property_member_missing_in_provider", "role": "consumer", "details": {"property": "$[].status", "consumerField": "Pet.status", "providerField": "PetRecord.status", "member": "lost"}},
+			{"reason": "property_member_missing_in_provider", "role": "consumer", "details": {"property": "$[].status", "consumerField": "Pet.status", "providerField": "PetRecord.status", "member": "adopted"}}
+		]}},
+		"/pets/*": {"get": {"200": [{"reason": "property_member_missing_in_provider", "role": "consumer", "details": {"property": "$.status", "consumerField": "Pet.status", "providerField": "PetRecord.status", "member": "lost"}}]}}
+	}}}`)
+
+	fields := restResources(t, report.Counterparts[0]).Fields
+	require.Len(t, fields, 2)
+	assert.Equal(t, `petstore_web reads "adopted", but petstore_api doesn't provide it`, fields[0].Sentence.String())
+	assert.Len(t, fields[0].Places, 1)
+	assert.Equal(t, `petstore_web reads "lost", but petstore_api doesn't provide it`, fields[1].Sentence.String())
+	assert.Len(t, fields[1].Places, 2)
+	assert.Equal(t, 2, report.Breaks)
+}
+
+func TestMissingRequestValueFromTheConsumer(t *testing.T) {
+	report := memberMissingCheck(checkedParticipant, petstoreAPIAsProvider, `{"petstore_api": {"deployable": false, "participantVersion": "1.4.0", "endpoints": {
+		"/pets": {"post": {"request": [{"reason": "property_member_missing_in_provider", "role": "consumer", "details": {"property": "$.status", "consumerField": "Pet.status", "providerField": "Pet.status", "member": "sold"}}]}}
+	}}}`)
+
+	field := restResources(t, report.Counterparts[0]).Fields[0]
+	assert.Equal(t, `petstore_web sends "sold", but petstore_api doesn't accept it`, field.Sentence.String())
+	assert.Equal(t, []breakreport.Fix{
+		{Participant: "petstore_web", Action: `stop sending "sold"`, Checked: true},
+		{Participant: "petstore_api", Action: `accept "sold" there`},
+	}, field.Fixes)
+	assert.Equal(t, []restbreakreport.Place{{Method: "POST", Endpoint: "/pets", Interaction: "request", Property: `"$.status"`, CounterpartField: "Pet.status"}}, field.Places)
+}
+
+func TestMissingValuesFromTheProviderUnderCheck(t *testing.T) {
+	report := memberMissingCheck("petstore_api", petstoreWebAsConsumer, `{"petstore_web": {"deployable": false, "participantVersion": "2.2.0", "endpoints": {
+		"/pets": {"post": {"request": [{"reason": "property_member_missing_in_provider", "role": "provider", "details": {"property": "$.status", "consumerField": "NewPet.status", "providerField": "NewPetRecord.status", "member": "sold"}}]}},
+		"/pets/*": {"get": {"200": [{"reason": "property_member_missing_in_provider", "role": "provider", "details": {"property": "$.status", "consumerField": "Pet.status", "providerField": "PetRecord.status", "member": "adopted"}}]}}
+	}}}`)
+
+	fields := restResources(t, report.Counterparts[0]).Fields
+	require.Len(t, fields, 2)
+	assert.Equal(t, "NewPetRecord.status", fields[0].Field)
+	assert.Equal(t, `petstore_api doesn't accept "sold", but petstore_web sends it`, fields[0].Sentence.String())
+	assert.Equal(t, []breakreport.Fix{
+		{Participant: "petstore_api", Action: `accept "sold"`, Checked: true},
+		{Participant: "petstore_web", Action: `stop sending "sold" there`},
+	}, fields[0].Fixes)
+	assert.Equal(t, []restbreakreport.Place{{Method: "POST", Endpoint: "/pets", Interaction: "request", Property: `"$.status"`, CounterpartField: "NewPet.status"}}, fields[0].Places)
+	assert.Equal(t, "PetRecord.status", fields[1].Field)
+	assert.Equal(t, `petstore_api doesn't provide "adopted", but petstore_web reads it`, fields[1].Sentence.String())
+	assert.Equal(t, []breakreport.Fix{
+		{Participant: "petstore_api", Action: `provide "adopted"`, Checked: true},
+		{Participant: "petstore_web", Action: `stop reading "adopted" there`},
+	}, fields[1].Fixes)
+	assert.Equal(t, []restbreakreport.Place{{Method: "GET", Endpoint: "/pets/*", Interaction: "response 200", Property: `"$.status"`, CounterpartField: "Pet.status"}}, fields[1].Places)
+}

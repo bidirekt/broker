@@ -3,6 +3,7 @@ package rest
 import (
 	"cmp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/bidirekt/broker/internal/components/breakreport"
@@ -16,6 +17,7 @@ type fieldBlockKey struct {
 	field                                    string
 	reason                                   model.BreakingReason
 	consumerType, providerType, propertyType string
+	member                                   string
 	direction                                string
 	role                                     model.BreakRole
 }
@@ -86,6 +88,7 @@ func toFieldBlock(checked checkedInteraction, contractBreak model.ReportBreak) (
 		path:              details["property"],
 		consumerIsChecked: asConsumer,
 	}
+	member := strconv.Quote(details["member"])
 	onRequest, onResponse := checked.isRequest(), !checked.isRequest()
 
 	if !asConsumer && !asProvider || property.path == "" {
@@ -122,6 +125,13 @@ func toFieldBlock(checked checkedInteraction, contractBreak model.ReportBreak) (
 			consumerFix:     "handle null in the code, then mark it nullable",
 			providerFix:     "stop providing null",
 		}
+	case reason == model.ReasonPropertyMemberMissingInProvider && onResponse:
+		phrases = propertyBreakPhrases{
+			consumerChecked: breakreport.Phrase{breakreport.Name(consumer), breakreport.Plain(" reads " + member + ", but "), breakreport.Name(provider), breakreport.Plain(" doesn't provide it")},
+			providerChecked: breakreport.Phrase{breakreport.Name(provider), breakreport.Plain(" doesn't provide " + member + ", but "), breakreport.Name(consumer), breakreport.Plain(" reads it")},
+			consumerFix:     "stop reading " + member,
+			providerFix:     "provide " + member,
+		}
 	case reason == model.ReasonPropertyMissingInConsumer && onRequest:
 		phrases = propertyBreakPhrases{
 			consumerChecked: breakreport.Phrase{breakreport.Name(consumer), breakreport.Plain(" doesn't send it, but "), breakreport.Name(provider), breakreport.Plain(" requires it")},
@@ -150,6 +160,13 @@ func toFieldBlock(checked checkedInteraction, contractBreak model.ReportBreak) (
 			consumerFix:     "stop sending null",
 			providerFix:     "handle null in the code, then mark it nullable",
 		}
+	case reason == model.ReasonPropertyMemberMissingInProvider && onRequest:
+		phrases = propertyBreakPhrases{
+			consumerChecked: breakreport.Phrase{breakreport.Name(consumer), breakreport.Plain(" sends " + member + ", but "), breakreport.Name(provider), breakreport.Plain(" doesn't accept it")},
+			providerChecked: breakreport.Phrase{breakreport.Name(provider), breakreport.Plain(" doesn't accept " + member + ", but "), breakreport.Name(consumer), breakreport.Plain(" sends it")},
+			consumerFix:     "stop sending " + member,
+			providerFix:     "accept " + member,
+		}
 	default:
 		return fieldBlock{}, false
 	}
@@ -167,6 +184,7 @@ func toFieldBlock(checked checkedInteraction, contractBreak model.ReportBreak) (
 			consumerType: consumerType,
 			providerType: providerType,
 			propertyType: details["propertyType"],
+			member:       details["member"],
 			direction:    direction,
 			role:         contractBreak.Role,
 		},
@@ -226,6 +244,7 @@ func compareFieldBlockKeys(a, b fieldBlockKey) int {
 		strings.Compare(a.consumerType, b.consumerType),
 		strings.Compare(a.providerType, b.providerType),
 		strings.Compare(a.propertyType, b.propertyType),
+		strings.Compare(a.member, b.member),
 		strings.Compare(a.direction, b.direction),
 		strings.Compare(string(a.role), string(b.role)),
 	)

@@ -9,6 +9,7 @@ const (
 	ReasonProviderResourceInteractionNotFound                BreakingReason = "provider_resource_interaction_not_found"
 	ReasonPropertyMissingInProvider                          BreakingReason = "property_missing_in_provider"
 	ReasonPropertyMissingInConsumer                          BreakingReason = "property_missing_in_consumer"
+	ReasonPropertyMemberMissingInProvider                    BreakingReason = "property_member_missing_in_provider"
 	ReasonPropertyTypeMismatch                               BreakingReason = "property_type_mismatch"
 	ReasonPropertyOptionalInProviderRequiredInConsumer       BreakingReason = "property_optional_in_provider_required_in_consumer"
 	ReasonPropertyOptionalInConsumerRequiredInProvider       BreakingReason = "property_optional_in_consumer_required_in_provider"

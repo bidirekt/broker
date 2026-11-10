@@ -183,7 +183,7 @@ func TestContract_EmptySchemaIsAnInvalidType(t *testing.T) {
 	assert.Equal(t, "schema.invalid_type", violations[0].ErrorCode)
 	assert.Equal(t, "schemas;Pet", violations[0].Path)
 	assert.Equal(t, "", violations[0].Details["value"])
-	assert.Equal(t, "object, array, map, string, integer, float, number, boolean", violations[0].Details["allowed"])
+	assert.Equal(t, "object, array, map, string, integer, float, number, boolean, enum, union", violations[0].Details["allowed"])
 }
 
 func TestContract_SchemaNuloEhTipoInvalido(t *testing.T) {
@@ -315,6 +315,7 @@ func TestContract_PropertyNameWithAPathCharacterIsRejected(t *testing.T) {
 		"tags[]":    "schemas;Pet;properties;tags[]",
 		"a{b":       "schemas;Pet;properties;a{b",
 		"x;y":       "schemas;Pet;properties;x;y",
+		"card(x)":   "schemas;Pet;properties;card(x)",
 	} {
 		t.Run(name, func(t *testing.T) {
 			source := "schemas:\n  Pet:\n    type: object\n    properties:\n      \"" + name + "\":\n        type: string\n"
@@ -325,7 +326,7 @@ func TestContract_PropertyNameWithAPathCharacterIsRejected(t *testing.T) {
 			assert.Equal(t, "property.name_syntax", violations[0].ErrorCode)
 			assert.Equal(t, path, violations[0].Path)
 			assert.Equal(t, "api.yaml", violations[0].Source)
-			assert.Equal(t, map[string]string{"key": name, "error": `must not contain ".", "[", "]", "{", "}" or ";"`}, violations[0].Details)
+			assert.Equal(t, map[string]string{"key": name, "error": `must not contain ".", "[", "]", "{", "}", ";", "(" or ")"`}, violations[0].Details)
 		})
 	}
 }
@@ -382,7 +383,7 @@ func TestContract_SchemaNameWithAPathCharacterIsRejected(t *testing.T) {
 	assert.Equal(t, "schema.name_syntax", violations[0].ErrorCode)
 	assert.Equal(t, "schemas;Pet.v2", violations[0].Path)
 	assert.Equal(t, "api.yaml", violations[0].Source)
-	assert.Equal(t, map[string]string{"key": "Pet.v2", "error": `must not contain ".", "[", "]", "{", "}" or ";"`}, violations[0].Details)
+	assert.Equal(t, map[string]string{"key": "Pet.v2", "error": `must not contain ".", "[", "]", "{", "}", ";", "(" or ")"`}, violations[0].Details)
 }
 
 func TestContract_EmptySchemaNameIsRejected(t *testing.T) {

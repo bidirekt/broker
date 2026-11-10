@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/bidirekt/broker/internal/contracts/violation"
+	"github.com/bidirekt/broker/internal/model"
 )
 
 func Property() Node {
@@ -22,18 +23,24 @@ func schema(positionRules ...Rule) Node {
 		"properties":  Map(PropertyName, Lazy(Property)),
 		"items":       Lazy(func() Node { return SchemaAt("items") }),
 		"values":      Lazy(func() Node { return SchemaAt("values") }),
-		"ref":         SchemaRef,
-		"optional":    Flag,
-		"nullable":    Flag,
+		"members": ByType{
+			model.EnumType:  Members(model.EnumType, EnumValues()),
+			model.UnionType: Members(model.UnionType, UnionMembers()),
+		},
+		"ref":      SchemaRef,
+		"optional": Flag,
+		"nullable": Flag,
 	}).Rules(append([]Rule{
 		schemaRequiresTypeOrRef,
 		refExcludes("type"),
-		keyBelongsTo("properties", "object"),
-		keyBelongsTo("items", "array"),
-		keyBelongsTo("values", "map"),
+		keyBelongsTo("properties", model.ObjectType),
+		keyBelongsTo("items", model.ArrayType),
+		keyBelongsTo("values", model.MapType),
+		keyBelongsTo("members", model.EnumType, model.UnionType),
 		objectRequiresProperties,
 		arrayRequiresItems,
 		mapRequiresValues,
+		membersRequired,
 	}, positionRules...)...)
 }
 
@@ -61,7 +68,7 @@ func refExcludes(key string) Rule {
 	}
 }
 
-func keyBelongsTo(key string, schemaType string) Rule {
+func keyBelongsTo(key string, schemaTypes ...string) Rule {
 	return func(present PresentFields) *violation.Violation {
 		if present[key] == nil {
 			return nil
@@ -72,7 +79,7 @@ func keyBelongsTo(key string, schemaType string) Rule {
 		}
 
 		declaredType, valid := present["type"].(string)
-		if !valid || declaredType == schemaType || !slices.Contains(SchemaType.Allowed, declaredType) {
+		if !valid || slices.Contains(schemaTypes, declaredType) || !slices.Contains(SchemaType.Allowed, declaredType) {
 			return nil
 		}
 
@@ -88,7 +95,7 @@ func keyNotAllowed(key string, schemaType string) *violation.Violation {
 }
 
 func objectRequiresProperties(present PresentFields) *violation.Violation {
-	if present["ref"] != nil || present["type"] != "object" {
+	if present["ref"] != nil || present["type"] != model.ObjectType {
 		return nil
 	}
 
@@ -101,7 +108,7 @@ func objectRequiresProperties(present PresentFields) *violation.Violation {
 }
 
 func arrayRequiresItems(present PresentFields) *violation.Violation {
-	if present["ref"] != nil || present["type"] != "array" || present["items"] != nil {
+	if present["ref"] != nil || present["type"] != model.ArrayType || present["items"] != nil {
 		return nil
 	}
 
@@ -109,11 +116,23 @@ func arrayRequiresItems(present PresentFields) *violation.Violation {
 }
 
 func mapRequiresValues(present PresentFields) *violation.Violation {
-	if present["ref"] != nil || present["type"] != "map" || present["values"] != nil {
+	if present["ref"] != nil || present["type"] != model.MapType || present["values"] != nil {
 		return nil
 	}
 
 	return &violation.Violation{ErrorCode: "schema.map_without_values"}
+}
+
+func membersRequired(present PresentFields) *violation.Violation {
+	schemaType, _ := present["type"].(string)
+	if present["ref"] != nil || (schemaType != model.EnumType && schemaType != model.UnionType) || present["members"] != nil {
+		return nil
+	}
+
+	return &violation.Violation{
+		ErrorCode: "members.required",
+		Details:   map[string]string{"type": schemaType},
+	}
 }
 
 func optionalNotAllowedAt(position string) Rule {

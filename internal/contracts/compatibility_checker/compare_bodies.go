@@ -1,6 +1,8 @@
 package compatibility_checker
 
 import (
+	"slices"
+
 	"github.com/bidirekt/broker/internal/contracts/schemagraph"
 	"github.com/bidirekt/broker/internal/model"
 )
@@ -88,16 +90,58 @@ func (this *bodyComparison) compareRead(reader, producer schemagraph.Node, path 
 
 	this.comparedShapes[shapes] = true
 
+	if reader.Type() == model.UnionType {
+		this.compareUnionMembers(reader, producer, path)
+
+		return
+	}
+
+	this.compareEnumValues(reader, producer, path)
+
 	for _, segment := range reader.Segments() {
 		this.compareRead(reader.Child(segment), producer.Child(segment), model.ChildPath(path, segment))
 	}
 }
 
-func (this *bodyComparison) breakAt(reason model.BreakingReason, path string, reader, producer schemagraph.Node) {
-	consumer, provider := producer, reader
-	if this.rules.readerIsConsumer {
-		consumer, provider = reader, producer
+// The provider owns how a property is provided, so whichever side reads, every consumer value must be among the provider's.
+func (this *bodyComparison) compareEnumValues(reader, producer schemagraph.Node, path string) {
+	if reader.Type() != model.EnumType || producer.Type() != model.EnumType {
+		return
 	}
 
+	consumer, provider := this.consumerAndProvider(reader, producer)
+	for _, member := range consumer.Members() {
+		if !slices.Contains(provider.Members(), member) {
+			this.breaks = append(this.breaks, NewMemberBreakChange(this.checked, this.counterpart, member, path, consumer, provider))
+		}
+	}
+}
+
+// Like enum values, every consumer member must be among the provider's; the members both declare are read like any schema.
+func (this *bodyComparison) compareUnionMembers(reader, producer schemagraph.Node, path string) {
+	consumer, provider := this.consumerAndProvider(reader, producer)
+
+	for _, segment := range consumer.Segments() {
+		if !provider.Child(segment).Exists() {
+			this.breaks = append(this.breaks, NewMemberBreakChange(this.checked, this.counterpart, model.MemberKey(segment), path, consumer.Declaring(segment), provider))
+
+			continue
+		}
+
+		this.compareRead(reader.Child(segment), producer.Child(segment), model.ChildPath(path, segment))
+	}
+}
+
+func (this *bodyComparison) breakAt(reason model.BreakingReason, path string, reader, producer schemagraph.Node) {
+	consumer, provider := this.consumerAndProvider(reader, producer)
+
 	this.breaks = append(this.breaks, NewPropertyBreakChange(this.checked, this.counterpart, reason, path, consumer, provider))
+}
+
+func (this *bodyComparison) consumerAndProvider(reader, producer schemagraph.Node) (consumer, provider schemagraph.Node) {
+	if this.rules.readerIsConsumer {
+		return reader, producer
+	}
+
+	return producer, reader
 }

@@ -527,8 +527,8 @@ schemas:
 	response := joinedRoot(t, model.Output, joinedFile{"a.yaml", stringID}, joinedFile{"b.yaml", integerID})
 
 	assert.Equal(t, "string", response.Child("id").Type())
-	assert.Equal(t, []schemagraph.Member{
+	assert.Equal(t, []schemagraph.Declaration{
 		{Source: "a.yaml", Type: "string"},
 		{Source: "b.yaml", Type: "integer"},
-	}, response.Child("id").Members())
+	}, response.Child("id").Declarations())
 }

@@ -77,21 +77,7 @@ func NewPropertyBreakChange(
 	propertyPath string,
 	consumerNode, providerNode schemagraph.Node,
 ) ContractBreakingChange {
-	consumerResource, _ := consumerAndProvider(checkedResource, counterpartResource)
-
-	details := map[string]string{
-		"property":     propertyPath,
-		"consumerName": consumerResource.ParticipantName,
-		"providerName": consumerResource.ConsumedProvider.String,
-	}
-
-	if consumerNode.Exists() {
-		details["consumerField"] = consumerNode.Field()
-	}
-
-	if providerNode.Exists() {
-		details["providerField"] = providerNode.Field()
-	}
+	details := propertyDetails(checkedResource, counterpartResource, propertyPath, consumerNode, providerNode)
 
 	if reason == model.ReasonPropertyTypeMismatch {
 		details["consumerPropertyType"] = typeToken(consumerNode)
@@ -112,6 +98,49 @@ func NewPropertyBreakChange(
 	}
 }
 
+func NewMemberBreakChange(
+	checkedResource *model.PersistedResource,
+	counterpartResource *model.PersistedResource,
+	member string,
+	propertyPath string,
+	consumerNode, providerNode schemagraph.Node,
+) ContractBreakingChange {
+	details := propertyDetails(checkedResource, counterpartResource, propertyPath, consumerNode, providerNode)
+	details["member"] = member
+
+	return ContractBreakingChange{
+		CheckedResource:     checkedResource,
+		CounterpartResource: counterpartResource,
+		Reason:              model.ReasonPropertyMemberMissingInProvider,
+		Details:             details,
+	}
+}
+
+func propertyDetails(
+	checkedResource *model.PersistedResource,
+	counterpartResource *model.PersistedResource,
+	propertyPath string,
+	consumerNode, providerNode schemagraph.Node,
+) map[string]string {
+	consumerResource, _ := consumerAndProvider(checkedResource, counterpartResource)
+
+	details := map[string]string{
+		"property":     propertyPath,
+		"consumerName": consumerResource.ParticipantName,
+		"providerName": consumerResource.ConsumedProvider.String,
+	}
+
+	if consumerNode.Exists() {
+		details["consumerField"] = consumerNode.Field()
+	}
+
+	if providerNode.Exists() {
+		details["providerField"] = providerNode.Field()
+	}
+
+	return details
+}
+
 // A shape met again while rendering renders as its bare type, so a self-referencing array ends.
 func typeToken(node schemagraph.Node) string {
 	return typeTokenOf(node, map[string]bool{})
@@ -125,12 +154,12 @@ func typeTokenOf(node schemagraph.Node, rendering map[string]bool) string {
 
 	rendering[shape] = true
 
-	if node.Type() == "array" {
-		return "array<" + typeTokenOf(node.Child(model.ItemsSegment), rendering) + ">"
+	if node.Type() == model.ArrayType {
+		return model.ArrayType + "<" + typeTokenOf(node.Child(model.ItemsSegment), rendering) + ">"
 	}
 
-	if node.Type() == "map" {
-		return "map<" + typeTokenOf(node.Child(model.ValuesSegment), rendering) + ">"
+	if node.Type() == model.MapType {
+		return model.MapType + "<" + typeTokenOf(node.Child(model.ValuesSegment), rendering) + ">"
 	}
 
 	return node.Type()

@@ -450,7 +450,7 @@ func (this *IntegrationSuite) TestPublishContract_PropertyNameWithADot_RejectedN
 	))
 	this.Equal(http.StatusBadRequest, status)
 	this.JSONEq(`{"message":"contract validation failed","violations":[`+
-		`{"code":"property.name_syntax","path":"schemas;Pet;properties;user.name","source":"api.yaml","details":{"key":"user.name","error":"must not contain \".\", \"[\", \"]\", \"{\", \"}\" or \";\""}}`+
+		`{"code":"property.name_syntax","path":"schemas;Pet;properties;user.name","source":"api.yaml","details":{"key":"user.name","error":"must not contain \".\", \"[\", \"]\", \"{\", \"}\", \";\", \"(\" or \")\""}}`+
 		`]}`, body)
 
 	this.Equal(0, this.countRows("contracts"))
@@ -771,8 +771,8 @@ func (this *IntegrationSuite) TestPublishContract_InvalidSchemaType_Rejected() {
 	))
 	this.Equal(http.StatusBadRequest, status)
 	this.JSONEq(`{"message":"contract validation failed","violations":[`+
-		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;id;type","source":"api.yaml","details":{"value":"strng","allowed":"object, array, map, string, integer, float, number, boolean"}},`+
-		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;tags;items","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean"}}`+
+		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;id;type","source":"api.yaml","details":{"value":"strng","allowed":"object, array, map, string, integer, float, number, boolean, enum, union"}},`+
+		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;tags;items","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean, enum, union"}}`+
 		`]}`, body)
 
 	this.Equal(0, this.countRows("contracts"))
@@ -787,9 +787,9 @@ func (this *IntegrationSuite) TestPublishContract_SchemaWithoutType_Rejected() {
 	))
 	this.Equal(http.StatusBadRequest, status)
 	this.JSONEq(`{"message":"contract validation failed","violations":[`+
-		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;owner","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean"}},`+
-		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;tags","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean"}},`+
-		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;vaccinations","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean"}}`+
+		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;owner","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean, enum, union"}},`+
+		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;tags","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean, enum, union"}},`+
+		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;vaccinations","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean, enum, union"}}`+
 		`]}`, body)
 
 	this.Equal(0, this.countRows("contracts"))

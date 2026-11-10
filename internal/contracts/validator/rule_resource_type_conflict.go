@@ -1,6 +1,9 @@
 package validator
 
 import (
+	"slices"
+	"strings"
+
 	"github.com/bidirekt/broker/internal/contracts/contract"
 	"github.com/bidirekt/broker/internal/contracts/mapper/fragmentmapper"
 	"github.com/bidirekt/broker/internal/contracts/protocol"
@@ -66,27 +69,38 @@ func (this *typeConflicts) compare(node schemagraph.Node, property string) {
 
 	this.compared[shapes] = true
 
-	members := node.Members()
-	for _, member := range members[1:] {
-		if member.Type == members[0].Type {
-			continue
-		}
-
-		this.violations = append(this.violations, violation.Violation{
-			ErrorCode: "resource.type_conflict",
-			Path:      this.path,
-			Source:    member.Source,
-			Details: map[string]string{
-				"resource":     this.resource,
-				"property":     property,
-				"type":         member.Type,
-				"declaredIn":   members[0].Source,
-				"declaredType": members[0].Type,
-			},
-		})
+	declarations := node.Declarations()
+	for _, declaration := range declarations[1:] {
+		this.compareDeclarations(declarations[0], declaration, property)
 	}
 
 	for _, segment := range node.Segments() {
 		this.compare(node.Child(segment), model.ChildPath(property, segment))
 	}
+}
+
+func (this *typeConflicts) compareDeclarations(first, other schemagraph.Declaration, property string) {
+	if other.Type == first.Type && slices.Equal(other.Members, first.Members) {
+		return
+	}
+
+	details := map[string]string{
+		"resource":     this.resource,
+		"property":     property,
+		"type":         other.Type,
+		"declaredIn":   first.Source,
+		"declaredType": first.Type,
+	}
+
+	if other.Type == first.Type {
+		details["values"] = strings.Join(other.Members, ", ")
+		details["declaredValues"] = strings.Join(first.Members, ", ")
+	}
+
+	this.violations = append(this.violations, violation.Violation{
+		ErrorCode: "resource.type_conflict",
+		Path:      this.path,
+		Source:    other.Source,
+		Details:   details,
+	})
 }
