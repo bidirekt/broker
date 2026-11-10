@@ -1,8 +1,6 @@
 package descriptor
 
 import (
-	"maps"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -94,37 +92,19 @@ type unionMembersNode struct{}
 var unionMember = Object(Fields{"ref": SchemaRef})
 
 func (unionMembersNode) validate(value any, path string) []violation.Violation {
-	if value == nil {
-		return nil
-	}
+	return validateMapping(value, path, MemberKey, func(key string, member any, memberPath string) []violation.Violation {
+		violations := unionMember.validate(member, memberPath)
 
-	mapping, isMapping := value.(map[string]any)
-	if !isMapping {
-		return []violation.Violation{invalidKind(value, path, "mapping")}
-	}
-
-	var violations []violation.Violation
-
-	for _, key := range slices.Sorted(maps.Keys(mapping)) {
-		memberPath := joinPath(path, key)
-		if rejected := MemberKey.reject(key, memberPath); rejected != nil {
-			violations = append(violations, *rejected)
-
-			continue
-		}
-
-		violations = append(violations, unionMember.validate(mapping[key], memberPath)...)
-
-		if lacksRef(mapping[key]) {
+		if lacksRef(member) {
 			violations = append(violations, violation.Violation{
 				ErrorCode: "member.ref_required",
 				Path:      memberPath,
 				Details:   map[string]string{"member": key},
 			})
 		}
-	}
 
-	return violations
+		return violations
+	})
 }
 
 // A member that is not a mapping is already reported as the wrong kind.
