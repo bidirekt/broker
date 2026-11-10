@@ -47,6 +47,8 @@ func DecodeFragment(source, content string) (Fragment, error) {
 		return Fragment{}, malformedContractFile(source, errors.New("anchors and aliases are not supported"))
 	}
 
+	keepKeysAsWritten(body)
+
 	if err := yaml.NodeToValue(body, &decoded.Document); err != nil {
 		return Fragment{}, malformedContractFile(source, err)
 	}
@@ -78,4 +80,22 @@ func usesAnchors(body ast.Node) bool {
 	ast.Walk(finder, body)
 
 	return finder.found
+}
+
+// YAML reads an unquoted numeric key as a number, so 0200 would become 128.
+type keyRespeller struct{}
+
+func (this keyRespeller) Visit(node ast.Node) ast.Visitor {
+	if mapping, isMapping := node.(*ast.MappingValueNode); isMapping {
+		switch mapping.Key.(type) {
+		case *ast.IntegerNode, *ast.FloatNode:
+			mapping.Key = ast.String(mapping.Key.GetToken())
+		}
+	}
+
+	return this
+}
+
+func keepKeysAsWritten(body ast.Node) {
+	ast.Walk(keyRespeller{}, body)
 }
