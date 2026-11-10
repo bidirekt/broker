@@ -292,7 +292,6 @@ deps:
     canUse: [pgx, guregu_null]
   repository_protocols:
     mayDependOn: [repository, model, model_protocols]
-    canUse: [pgx]
 
   model:
     canUse: [guregu_null]
