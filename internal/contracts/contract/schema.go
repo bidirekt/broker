@@ -32,11 +32,7 @@ func SchemaFromDocument(document Document) Schema {
 	}
 
 	if properties, written := document["properties"].(map[string]any); written {
-		schema.Properties = make(map[string]Schema, len(properties))
-
-		for name := range properties {
-			schema.Properties[name] = SchemaFromDocument(Document(properties).Mapping(name))
-		}
+		schema.Properties = schemasFromMapping(properties)
 	}
 
 	if items, written := document["items"].(map[string]any); written {
@@ -50,11 +46,7 @@ func SchemaFromDocument(document Document) Schema {
 	}
 
 	if members, written := document["members"].(map[string]any); written {
-		schema.UnionMembers = make(map[string]Schema, len(members))
-
-		for key := range members {
-			schema.UnionMembers[key] = SchemaFromDocument(Document(members).Mapping(key))
-		}
+		schema.UnionMembers = schemasFromMapping(members)
 	}
 
 	if members, written := document["members"].([]any); written {
@@ -65,6 +57,16 @@ func SchemaFromDocument(document Document) Schema {
 	}
 
 	return schema
+}
+
+func schemasFromMapping(mapping map[string]any) map[string]Schema {
+	schemas := make(map[string]Schema, len(mapping))
+
+	for name := range mapping {
+		schemas[name] = SchemaFromDocument(Document(mapping).Mapping(name))
+	}
+
+	return schemas
 }
 
 // SchemaChild is a schema nested in another: DocumentPath is where it is written below its parent
