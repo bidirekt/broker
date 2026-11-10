@@ -1,31 +1,24 @@
 package compatibility_checker
 
 import (
-	"strings"
-
 	"github.com/bidirekt/broker/internal/contracts/schemagraph"
 	"github.com/bidirekt/broker/internal/model"
 )
 
 type ContractBreakingChange struct {
-	CheckedResource     *model.PersistedResource `json:"-"`
-	CounterpartResource *model.PersistedResource `json:"-"`
-	Reason              model.BreakingReason     `json:"reason"`
-	Role                model.BreakRole          `json:"role"`
-	Details             map[string]string        `json:"details,omitempty"`
+	CheckedResource     *model.PersistedResource
+	CounterpartResource *model.PersistedResource
+	Reason              model.BreakingReason
+	Details             map[string]string
 }
 
-// InteractionKey is the wire spelling of the checked resource's interaction: "request"
-// for requests, the raw status code for responses.
-func (this *ContractBreakingChange) InteractionKey() string {
-	switch this.CheckedResource.Interaction {
-	case model.RestRequest:
-		return "request"
-	case model.RestResponse:
-		return this.CheckedResource.ResponseStatusCode.String
-	default:
-		return this.CheckedResource.Interaction.String()
+func (this *ContractBreakingChange) refine(reason model.BreakingReason, details map[string]string, refined bool) {
+	if !refined {
+		return
 	}
+
+	this.Reason = reason
+	this.Details = details
 }
 
 func (this *ContractBreakingChange) IsPropertyBreak() bool {
@@ -33,11 +26,9 @@ func (this *ContractBreakingChange) IsPropertyBreak() bool {
 }
 
 func (this *ContractBreakingChange) ConsumerResource() *model.PersistedResource {
-	if this.CheckedResource.IsConsumer() {
-		return this.CheckedResource
-	}
+	consumer, _ := consumerAndProvider(this.CheckedResource, this.CounterpartResource)
 
-	return this.CounterpartResource
+	return consumer
 }
 
 func (this *ContractBreakingChange) ConsumerName() string {
@@ -67,25 +58,6 @@ func NewProviderResourceNotFound(checkedResource *model.PersistedResource) Contr
 	}
 }
 
-func NewProviderResourceInteractionNotFound(
-	consumerResource *model.PersistedResource,
-	providerStatuses []string,
-) ContractBreakingChange {
-	var details map[string]string
-
-	if len(providerStatuses) > 0 {
-		details = map[string]string{
-			"providerStatuses": strings.Join(providerStatuses, ", "),
-		}
-	}
-
-	return ContractBreakingChange{
-		CheckedResource: consumerResource,
-		Reason:          model.ReasonProviderResourceInteractionNotFound,
-		Details:         details,
-	}
-}
-
 func NewProviderResourceRemovedButStillConsumed(
 	removedResource *model.PersistedResource,
 	consumerResource *model.PersistedResource,
@@ -97,27 +69,6 @@ func NewProviderResourceRemovedButStillConsumed(
 	}
 }
 
-func NewProviderResourceInteractionRemovedButStillConsumed(
-	removedResource *model.PersistedResource,
-	consumerResource *model.PersistedResource,
-	providerStatuses []string,
-) ContractBreakingChange {
-	var details map[string]string
-
-	if len(providerStatuses) > 0 {
-		details = map[string]string{
-			"providerStatuses": strings.Join(providerStatuses, ", "),
-		}
-	}
-
-	return ContractBreakingChange{
-		CheckedResource:     removedResource,
-		CounterpartResource: consumerResource,
-		Reason:              model.ReasonProviderResourceInteractionRemovedButStillConsumed,
-		Details:             details,
-	}
-}
-
 // consumerNode and providerNode are where each side stands at propertyPath; either may not exist.
 func NewPropertyBreakChange(
 	checkedResource *model.PersistedResource,
@@ -126,24 +77,7 @@ func NewPropertyBreakChange(
 	propertyPath string,
 	consumerNode, providerNode schemagraph.Node,
 ) ContractBreakingChange {
-	consumerResource := checkedResource
-	if !checkedResource.IsConsumer() {
-		consumerResource = counterpartResource
-	}
-
-	details := map[string]string{
-		"property":     propertyPath,
-		"consumerName": consumerResource.ParticipantName,
-		"providerName": consumerResource.ConsumedProvider.String,
-	}
-
-	if consumerNode.Exists() {
-		details["consumerField"] = consumerNode.Field()
-	}
-
-	if providerNode.Exists() {
-		details["providerField"] = providerNode.Field()
-	}
+	details := propertyDetails(checkedResource, counterpartResource, propertyPath, consumerNode, providerNode)
 
 	if reason == model.ReasonPropertyTypeMismatch {
 		details["consumerPropertyType"] = typeToken(consumerNode)
@@ -164,6 +98,49 @@ func NewPropertyBreakChange(
 	}
 }
 
+func NewMemberBreakChange(
+	checkedResource *model.PersistedResource,
+	counterpartResource *model.PersistedResource,
+	member string,
+	propertyPath string,
+	consumerNode, providerNode schemagraph.Node,
+) ContractBreakingChange {
+	details := propertyDetails(checkedResource, counterpartResource, propertyPath, consumerNode, providerNode)
+	details["member"] = member
+
+	return ContractBreakingChange{
+		CheckedResource:     checkedResource,
+		CounterpartResource: counterpartResource,
+		Reason:              model.ReasonPropertyMemberMissingInProvider,
+		Details:             details,
+	}
+}
+
+func propertyDetails(
+	checkedResource *model.PersistedResource,
+	counterpartResource *model.PersistedResource,
+	propertyPath string,
+	consumerNode, providerNode schemagraph.Node,
+) map[string]string {
+	consumerResource, _ := consumerAndProvider(checkedResource, counterpartResource)
+
+	details := map[string]string{
+		"property":     propertyPath,
+		"consumerName": consumerResource.ParticipantName,
+		"providerName": consumerResource.ConsumedProvider.String,
+	}
+
+	if consumerNode.Exists() {
+		details["consumerField"] = consumerNode.Field()
+	}
+
+	if providerNode.Exists() {
+		details["providerField"] = providerNode.Field()
+	}
+
+	return details
+}
+
 // A shape met again while rendering renders as its bare type, so a self-referencing array ends.
 func typeToken(node schemagraph.Node) string {
 	return typeTokenOf(node, map[string]bool{})
@@ -177,12 +154,12 @@ func typeTokenOf(node schemagraph.Node, rendering map[string]bool) string {
 
 	rendering[shape] = true
 
-	if node.Type() == "array" {
-		return "array<" + typeTokenOf(node.Child(model.ItemsSegment), rendering) + ">"
+	if node.Type() == model.ArrayType {
+		return model.ArrayType + "<" + typeTokenOf(node.Child(model.ItemsSegment), rendering) + ">"
 	}
 
-	if node.Type() == "map" {
-		return "map<" + typeTokenOf(node.Child(model.ValuesSegment), rendering) + ">"
+	if node.Type() == model.MapType {
+		return model.MapType + "<" + typeTokenOf(node.Child(model.ValuesSegment), rendering) + ">"
 	}
 
 	return node.Type()

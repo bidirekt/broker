@@ -5,6 +5,8 @@ import (
 
 	"github.com/bidirekt/broker/internal/contracts/contract"
 	"github.com/bidirekt/broker/internal/contracts/mapper/fragmentmapper"
+	"github.com/bidirekt/broker/internal/contracts/protocol"
+	restcontracts "github.com/bidirekt/broker/internal/contracts/protocols/rest"
 	"github.com/bidirekt/broker/internal/contracts/schemagraph"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/stretchr/testify/assert"
@@ -263,7 +265,7 @@ func bothJoinOrders(first, last string) []joinOrder {
 	}
 }
 
-func joinedRoot(t *testing.T, interaction model.Interaction, files ...joinedFile) schemagraph.Node {
+func joinedRoot(t *testing.T, body model.BodyRole, files ...joinedFile) schemagraph.Node {
 	t.Helper()
 
 	fragments := make([]contract.Fragment, 0, len(files))
@@ -274,21 +276,21 @@ func joinedRoot(t *testing.T, interaction model.Interaction, files ...joinedFile
 		fragments = append(fragments, fragment)
 	}
 
-	declarations := fragmentmapper.ToDeclarations(fragments)
+	declarations := fragmentmapper.ToDeclarations(fragments, protocol.NewRegistry([]protocol.Protocol{restcontracts.New()}))
 	graph := schemagraph.New(fragmentmapper.ToSchemaModels(declarations))
 
 	join := schemagraph.Readers
-	if interaction == model.RestRequest {
+	if body == model.Input {
 		join = schemagraph.Senders
 	}
 
 	for _, resource := range fragmentmapper.ToResourceModels(declarations) {
-		if resource.Interaction == interaction {
+		if resource.Body == body {
 			return graph.Root(resource.Bodies, join)
 		}
 	}
 
-	t.Fatalf("no %v resource was built", interaction)
+	t.Fatalf("no %v resource was built", body)
 
 	return schemagraph.Node{}
 }
@@ -313,7 +315,7 @@ func collectJoinedFields(node schemagraph.Node, path string, fields map[string]j
 }
 
 func TestJoin_TwoReadersOfOneResponse_UnionOfTheirFields(t *testing.T) {
-	response := joinedRoot(t, model.RestResponse,
+	response := joinedRoot(t, model.Output,
 		joinedFile{"list.yaml", invoiceListModuleYAML},
 		joinedFile{"detail.yaml", invoiceDetailModuleYAML},
 	)
@@ -327,7 +329,7 @@ func TestJoin_TwoReadersOfOneResponse_UnionOfTheirFields(t *testing.T) {
 }
 
 func TestJoin_TwoSendersOfOneRequest_FieldSentByOneIsOptional(t *testing.T) {
-	request := joinedRoot(t, model.RestRequest,
+	request := joinedRoot(t, model.Input,
 		joinedFile{"create.yaml", invoiceCreateModuleYAML},
 		joinedFile{"import.yaml", invoiceImportModuleYAML},
 	)
@@ -341,7 +343,7 @@ func TestJoin_TwoSendersOfOneRequest_FieldSentByOneIsOptional(t *testing.T) {
 }
 
 func TestJoin_ResponseRequiredByOneReader_StaysRequired(t *testing.T) {
-	response := joinedFields(joinedRoot(t, model.RestResponse,
+	response := joinedFields(joinedRoot(t, model.Output,
 		joinedFile{"optional.yaml", optionalTotalReaderYAML},
 		joinedFile{"required.yaml", requiredTotalReaderYAML},
 	))
@@ -351,7 +353,7 @@ func TestJoin_ResponseRequiredByOneReader_StaysRequired(t *testing.T) {
 }
 
 func TestJoin_ResponseOptionalForEveryReader_StaysOptional(t *testing.T) {
-	response := joinedFields(joinedRoot(t, model.RestResponse,
+	response := joinedFields(joinedRoot(t, model.Output,
 		joinedFile{"optional.yaml", optionalTotalReaderYAML},
 		joinedFile{"other_optional.yaml", otherOptionalTotalReaderYAML},
 	))
@@ -361,7 +363,7 @@ func TestJoin_ResponseOptionalForEveryReader_StaysOptional(t *testing.T) {
 }
 
 func TestJoin_RequestOptionalForOneSender_IsOptionalForAll(t *testing.T) {
-	request := joinedFields(joinedRoot(t, model.RestRequest,
+	request := joinedFields(joinedRoot(t, model.Input,
 		joinedFile{"optional.yaml", optionalNoteSenderYAML},
 		joinedFile{"required.yaml", requiredNoteSenderYAML},
 	))
@@ -378,7 +380,7 @@ func TestJoin_RequestFieldWhoseParentAnotherSenderOmits_KeepsItsOwnOptional(t *t
 				"$.name":         {Type: "string"},
 				"$.address":      {Type: "object", Optional: true},
 				"$.address.city": {Type: "string"},
-			}, joinedFields(joinedRoot(t, model.RestRequest, order.files...)))
+			}, joinedFields(joinedRoot(t, model.Input, order.files...)))
 		})
 	}
 }
@@ -392,7 +394,7 @@ func TestJoin_RequestFieldWhoseParentAnotherSenderSends_IsOptional(t *testing.T)
 				"$.address":       {Type: "object"},
 				"$.address.city":  {Type: "string"},
 				"$.address.state": {Type: "string", Optional: true},
-			}, joinedFields(joinedRoot(t, model.RestRequest, order.files...)))
+			}, joinedFields(joinedRoot(t, model.Input, order.files...)))
 		})
 	}
 }
@@ -405,7 +407,7 @@ func TestJoin_ResponseFieldOfOneReader_KeepsItsDeclaration(t *testing.T) {
 				"$.name":         {Type: "string"},
 				"$.address":      {Type: "object"},
 				"$.address.city": {Type: "string"},
-			}, joinedFields(joinedRoot(t, model.RestResponse, order.files...)))
+			}, joinedFields(joinedRoot(t, model.Output, order.files...)))
 		})
 	}
 }
@@ -416,7 +418,7 @@ func TestJoin_RequestUndescribedByOneSender_MakesTheBodyOptional(t *testing.T) {
 			assert.Equal(t, map[string]joinedField{
 				"$":      {Type: "object", Optional: true},
 				"$.name": {Type: "string"},
-			}, joinedFields(joinedRoot(t, model.RestRequest, order.files...)))
+			}, joinedFields(joinedRoot(t, model.Input, order.files...)))
 		})
 	}
 }
@@ -427,7 +429,7 @@ func TestJoin_ResponseUndescribedByOneReader_KeepsTheOtherReadersDeclaration(t *
 			assert.Equal(t, map[string]joinedField{
 				"$":      {Type: "object"},
 				"$.name": {Type: "string"},
-			}, joinedFields(joinedRoot(t, model.RestResponse, order.files...)))
+			}, joinedFields(joinedRoot(t, model.Output, order.files...)))
 		})
 	}
 }
@@ -435,16 +437,16 @@ func TestJoin_ResponseUndescribedByOneReader_KeepsTheOtherReadersDeclaration(t *
 func TestJoin_UndescribedBodyInEveryModule_HasNoBody(t *testing.T) {
 	files := []joinedFile{{"a.yaml", groupUndescribedBodyYAML}, {"b.yaml", groupUndescribedBodyYAML}}
 
-	assert.False(t, joinedRoot(t, model.RestRequest, files...).Exists())
-	assert.False(t, joinedRoot(t, model.RestResponse, files...).Exists())
+	assert.False(t, joinedRoot(t, model.Input, files...).Exists())
+	assert.False(t, joinedRoot(t, model.Output, files...).Exists())
 }
 
 func TestJoin_IdenticalDeclarationInTwoFiles_ReadsLikeOne(t *testing.T) {
-	twice := joinedRoot(t, model.RestResponse,
+	twice := joinedRoot(t, model.Output,
 		joinedFile{"a.yaml", invoiceListModuleYAML},
 		joinedFile{"b.yaml", invoiceListModuleYAML},
 	)
-	once := joinedRoot(t, model.RestResponse, joinedFile{"a.yaml", invoiceListModuleYAML})
+	once := joinedRoot(t, model.Output, joinedFile{"a.yaml", invoiceListModuleYAML})
 
 	assert.Equal(t, joinedFields(once), joinedFields(twice))
 }
@@ -458,10 +460,10 @@ func TestJoin_FragmentOrderReversed_JoinsTheSameFields(t *testing.T) {
 	}
 	backward := []joinedFile{forward[3], forward[2], forward[1], forward[0]}
 
-	for _, interaction := range []model.Interaction{model.RestRequest, model.RestResponse} {
+	for _, body := range []model.BodyRole{model.Input, model.Output} {
 		assert.Equal(t,
-			joinedFields(joinedRoot(t, interaction, forward...)),
-			joinedFields(joinedRoot(t, interaction, backward...)),
+			joinedFields(joinedRoot(t, body, forward...)),
+			joinedFields(joinedRoot(t, body, backward...)),
 		)
 	}
 }
@@ -475,7 +477,7 @@ func TestJoin_RequestNullableForOneSender_IsNullable(t *testing.T) {
 				"$.bio":      {Type: "string", Nullable: true},
 				"$.nickname": {Type: "string", Optional: true, Nullable: true},
 				"$.tag":      {Type: "string", Optional: true},
-			}, joinedFields(joinedRoot(t, model.RestRequest, order.files...)))
+			}, joinedFields(joinedRoot(t, model.Input, order.files...)))
 		})
 	}
 }
@@ -489,7 +491,7 @@ func TestJoin_ResponseNullableOnlyWhenEveryReaderAllowsNull(t *testing.T) {
 				"$.bio":      {Type: "string"},
 				"$.nickname": {Type: "string", Nullable: true},
 				"$.tag":      {Type: "string"},
-			}, joinedFields(joinedRoot(t, model.RestResponse, order.files...)))
+			}, joinedFields(joinedRoot(t, model.Output, order.files...)))
 		})
 	}
 }
@@ -522,11 +524,11 @@ schemas:
       id: { type: integer }
 `
 
-	response := joinedRoot(t, model.RestResponse, joinedFile{"a.yaml", stringID}, joinedFile{"b.yaml", integerID})
+	response := joinedRoot(t, model.Output, joinedFile{"a.yaml", stringID}, joinedFile{"b.yaml", integerID})
 
 	assert.Equal(t, "string", response.Child("id").Type())
-	assert.Equal(t, []schemagraph.Member{
+	assert.Equal(t, []schemagraph.Declaration{
 		{Source: "a.yaml", Type: "string"},
 		{Source: "b.yaml", Type: "integer"},
-	}, response.Child("id").Members())
+	}, response.Child("id").Declarations())
 }

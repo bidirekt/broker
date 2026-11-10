@@ -5,7 +5,6 @@ type PersistedContract struct {
 	ParticipantID   int64
 	ParticipantName string
 	Version         string
-	ContractContent string
 	Resources       map[string]PersistedResource
 	Schemas         Schemas
 }

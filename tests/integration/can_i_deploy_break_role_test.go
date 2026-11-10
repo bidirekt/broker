@@ -103,9 +103,11 @@ func (this *IntegrationSuite) TestBreakRole_ReplayedVerdictTakesTheRoleOfTheCurr
 	this.Require().NoError(this.Pool.QueryRow(context.Background(),
 		`SELECT breaks::text FROM compatibility_verdicts`).Scan(&storedBreaks))
 	this.JSONEq(`[{
-		"endpoint": "/pets/*",
-		"method": "get",
-		"interaction": "200",
+		"rest": {
+			"endpoint": "/pets/*",
+			"method": "get",
+			"interaction": "200"
+		},
 		"reason": "property_missing_in_provider",
 		"details": {
 			"property": "$.photoUrl",

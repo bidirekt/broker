@@ -76,7 +76,7 @@ func diffFields(current, next model.Schema) map[string]model.FieldChange {
 			continue
 		}
 
-		if field != nextField {
+		if !field.Equal(nextField) {
 			changes[path] = model.FieldChange{Kind: model.ChangeModified, Before: field, After: nextField}
 		}
 	}

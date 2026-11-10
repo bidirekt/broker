@@ -2,8 +2,6 @@ package show_contract_version
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 
 	"github.com/bidirekt/broker/internal/components/breakreport"
 	"github.com/bidirekt/broker/internal/components/pages"
@@ -25,11 +23,6 @@ type ShowContractVersionInput struct {
 	ChecksPage      int64
 }
 
-type ContractFile struct {
-	Source  string `json:"source"`
-	Content string `json:"content"`
-}
-
 type ReportedCheck struct {
 	Check  model.CompatibilityCheck
 	Report breakreport.Report
@@ -38,7 +31,6 @@ type ReportedCheck struct {
 type ShowContractVersionOutput struct {
 	Status             ShowContractVersionStatus
 	ContractVersion    *model.ContractVersion
-	Files              []ContractFile
 	CurrentDeployments []model.Deployment
 	LatestChecks       []ReportedCheck
 	Deployments        []model.Deployment
@@ -48,52 +40,40 @@ type ShowContractVersionOutput struct {
 }
 
 type ShowContractVersionUseCase struct {
-	contractRepository      *repository.ContractRepository
-	deploymentRepository    *repository.DeploymentRepository
-	compatibilityRepository *repository.CompatibilityRepository
+	contractVersionPageRepository *repository.ContractVersionPageRepository
+	reportReader                  *breakreport.Reader
 }
 
 func NewShowContractVersionUseCase(
-	contractRepository *repository.ContractRepository,
-	deploymentRepository *repository.DeploymentRepository,
-	compatibilityRepository *repository.CompatibilityRepository,
+	contractVersionPageRepository *repository.ContractVersionPageRepository,
+	reportReader *breakreport.Reader,
 ) *ShowContractVersionUseCase {
-	return &ShowContractVersionUseCase{
-		contractRepository:      contractRepository,
-		deploymentRepository:    deploymentRepository,
-		compatibilityRepository: compatibilityRepository,
-	}
+	return &ShowContractVersionUseCase{contractVersionPageRepository: contractVersionPageRepository, reportReader: reportReader}
 }
 
 func (this *ShowContractVersionUseCase) Execute(ctx context.Context, input ShowContractVersionInput) ShowContractVersionOutput {
-	contractVersion, found := this.contractRepository.FindContractVersion(ctx, input.ParticipantName, input.Version)
+	contractVersion, found := this.contractVersionPageRepository.FindContractVersion(ctx, input.ParticipantName, input.Version)
 	if !found {
 		return ShowContractVersionOutput{Status: ContractVersionNotFound}
 	}
 
-	var files []ContractFile
-	if err := json.Unmarshal([]byte(contractVersion.ContractContent), &files); err != nil {
-		panic(fmt.Errorf("error decoding contract content: %w", err))
-	}
-
-	latestChecks := this.compatibilityRepository.ListLatestChecksOfVersion(ctx, contractVersion.ParticipantID, contractVersion.Version)
-	deployments, deploymentsTotal := this.deploymentRepository.ListDeploymentsOfVersion(
+	latestChecks := this.contractVersionPageRepository.ListLatestChecksOfVersion(ctx, contractVersion.ParticipantID, contractVersion.Version)
+	deployments, deploymentsTotal := this.contractVersionPageRepository.ListDeploymentsOfVersion(
 		ctx, contractVersion.ParticipantID, contractVersion.Version, pages.PageSize, pages.Offset(input.DeploymentsPage),
 	)
-	checks, checksTotal := this.compatibilityRepository.ListChecksOfVersion(
+	checks, checksTotal := this.contractVersionPageRepository.ListChecksOfVersion(
 		ctx, contractVersion.ParticipantID, contractVersion.Version, pages.PageSize, pages.Offset(input.ChecksPage),
 	)
-	results := this.compatibilityRepository.ListResultsOfChecks(ctx, checkIDs(latestChecks, checks))
+	results := this.contractVersionPageRepository.ListResultsOfChecks(ctx, checkIDs(latestChecks, checks))
 
 	return ShowContractVersionOutput{
 		Status:             ContractVersionFound,
 		ContractVersion:    contractVersion,
-		Files:              files,
-		CurrentDeployments: this.deploymentRepository.ListCurrentDeploymentsOfVersion(ctx, contractVersion.ParticipantID, contractVersion.Version),
-		LatestChecks:       toReportedChecks(latestChecks, results),
+		CurrentDeployments: this.contractVersionPageRepository.ListCurrentDeploymentsOfVersion(ctx, contractVersion.ParticipantID, contractVersion.Version),
+		LatestChecks:       this.toReportedChecks(latestChecks, results),
 		Deployments:        deployments,
 		DeploymentsTotal:   deploymentsTotal,
-		Checks:             toReportedChecks(checks, results),
+		Checks:             this.toReportedChecks(checks, results),
 		ChecksTotal:        checksTotal,
 	}
 }
@@ -109,31 +89,10 @@ func checkIDs(checkLists ...[]model.CompatibilityCheck) []int64 {
 	return ids
 }
 
-func toReportedChecks(checks []model.CompatibilityCheck, results map[int64][]model.CompatibilityCheckResult) []ReportedCheck {
+func (this *ShowContractVersionUseCase) toReportedChecks(checks []model.CompatibilityCheck, results map[int64][]model.CompatibilityCheckResult) []ReportedCheck {
 	reported := make([]ReportedCheck, 0, len(checks))
 	for _, check := range checks {
-		counterparts := make([]breakreport.StoredCounterpart, 0, len(results[check.ID]))
-		for _, result := range results[check.ID] {
-			counterparts = append(counterparts, breakreport.StoredCounterpart{
-				Name:       result.CounterpartName,
-				Role:       result.Role,
-				Version:    result.CounterpartVersion.String,
-				Registered: result.CounterpartParticipantID.Valid,
-				Deployable: result.Deployable,
-			})
-		}
-
-		report, err := breakreport.FromStoredCheck(breakreport.StoredCheck{
-			Participant:  check.ParticipantName,
-			Environment:  check.EnvironmentName,
-			Report:       check.Report,
-			Counterparts: counterparts,
-		})
-		if err != nil {
-			panic(err)
-		}
-
-		reported = append(reported, ReportedCheck{Check: check, Report: report})
+		reported = append(reported, ReportedCheck{Check: check, Report: this.reportReader.FromStoredCheck(check, results[check.ID])})
 	}
 
 	return reported

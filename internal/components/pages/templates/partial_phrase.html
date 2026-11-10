@@ -1,0 +1,1 @@
+{{define "phrase"}}{{range .}}{{if .IsName}}<b class="name">{{.Text}}</b>{{else if .IsCode}}<code>{{.Text}}</code>{{else}}{{.Text}}{{end}}{{end}}{{end}}

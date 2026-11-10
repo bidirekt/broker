@@ -51,15 +51,32 @@ components:
   components_input:         { in: internal/components/input }
   components_access:        { in: internal/components/access }
   components_breakreport:   { in: internal/components/breakreport }
+  components_breakreport_protocols: { in: internal/components/breakreport/protocols/** }
   components_pages:         { in: internal/components/pages }
   components_respond:       { in: internal/components/respond }
   components_bearer:        { in: internal/components/bearer }
   components_sessions:      { in: internal/components/sessions }
   components_database:      { in: internal/components/database }
   components_server:        { in: internal/components/server }
-  contracts:                  { in: internal/contracts/** }
+  components_versions:      { in: internal/components/versions }
+  contracts:
+    in:
+      - internal/contracts/compatibility_checker
+      - internal/contracts/contract
+      - internal/contracts/contract_differ
+      - internal/contracts/contractfiles
+      - internal/contracts/descriptor
+      - internal/contracts/mapper/fragmentmapper
+      - internal/contracts/mapper/schemamapper
+      - internal/contracts/protocol
+      - internal/contracts/schemagraph
+      - internal/contracts/validator
+      - internal/contracts/violation
+  contracts_protocols:        { in: internal/contracts/protocols/** }
   repository:                 { in: internal/repository }
+  repository_protocols:       { in: internal/repository/protocols/** }
   model:                      { in: internal/model }
+  model_protocols:            { in: internal/model/protocols/** }
   validations:                { in: internal/validations }
   pkg:                        { in: pkg/** }
   migrations:                 { in: migrations }
@@ -73,6 +90,7 @@ vendors:
   testify:        { in: [github.com/stretchr/testify, github.com/stretchr/testify/**] }
   testcontainers: { in: [github.com/testcontainers/testcontainers-go, github.com/testcontainers/testcontainers-go/**] }
   x_crypto:       { in: [golang.org/x/crypto/**] }
+  x_mod:          { in: [golang.org/x/mod/**] }
   golang_jwt:     { in: [github.com/golang-jwt/jwt/v5, github.com/golang-jwt/jwt/v5/**] }
   fasthttp:       { in: [github.com/valyala/fasthttp, github.com/valyala/fasthttp/**] }
 
@@ -83,7 +101,13 @@ deps:
   bootstrap:
     mayDependOn:
       - components
+      - components_breakreport
+      - components_breakreport_protocols
       - components_config
+      - contracts
+      - contracts_protocols
+      - repository
+      - repository_protocols
       - feature_can_i_deploy
       - feature_create_api_key
       - feature_create_environment
@@ -144,7 +168,7 @@ deps:
     mayDependOn: [components, components_access, components_pages, components_respond, components_tokens, repository, model]
     canUse: [fiber]
   feature_health:
-    mayDependOn: [components]
+    mayDependOn: [components, components_versions]
     canUse: [fiber]
   feature_invite_user:
     mayDependOn: [components, components_access, components_pages, components_respond, components_tokens, repository, model, validations]
@@ -240,6 +264,8 @@ deps:
     canUse: [fiber]
   components_breakreport:
     mayDependOn: [model]
+  components_breakreport_protocols:
+    mayDependOn: [components_breakreport, model, model_protocols]
   components_bearer:
     mayDependOn: [components_access, components_config, components_pages, components_respond, components_tokens, repository, model]
     canUse: [fiber, golang_jwt]
@@ -258,20 +284,29 @@ deps:
     mayDependOn: [components_pages]
     canUse: [fiber]
   components_server:
-    mayDependOn: [components_bearer, components_config, components_input, components_pages, components_respond, components_sessions]
+    mayDependOn: [components_bearer, components_config, components_input, components_pages, components_respond, components_sessions, components_versions]
     canUse: [fiber]
   components_sessions:
     mayDependOn: [components_access, components_config, components_pages, components_respond, components_tokens, repository, model]
     canUse: [fiber]
+  components_versions:
+    mayDependOn: [components_pages, components_respond]
+    canUse: [fiber, x_mod]
   contracts:
     mayDependOn: [contracts, model, validations]
     canUse: [yaml, guregu_null]
+  contracts_protocols:
+    mayDependOn: [contracts, model, model_protocols]
   repository:
     mayDependOn: [model]
     canUse: [pgx, guregu_null]
+  repository_protocols:
+    mayDependOn: [repository, model, model_protocols]
 
   model:
     canUse: [guregu_null]
+  model_protocols:
+    mayDependOn: [model]
 
   pkg:
     canUse: [pgx]
@@ -283,16 +318,21 @@ deps:
       - components_access
       - components_bearer
       - components_breakreport
+      - components_breakreport_protocols
       - components_config
       - components_database
       - components_pages
       - components_passwords
       - components_tokens
+      - components_versions
       - contracts
+      - contracts_protocols
       - feature_health
       - migrations
       - repository
+      - repository_protocols
       - model
+      - model_protocols
       - validations
       - pkg
     canUse: [fiber, pgx, guregu_null, yaml, testify, testcontainers, golang_jwt]

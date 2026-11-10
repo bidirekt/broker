@@ -1,6 +1,8 @@
 package schemamapper
 
 import (
+	"slices"
+
 	"github.com/bidirekt/broker/internal/contracts/contract"
 	"github.com/bidirekt/broker/internal/model"
 )
@@ -34,39 +36,22 @@ func schemaModelsReachableFrom(catalog contract.SchemasMap, name string, schemas
 }
 
 func fieldModelsFromSchema(fields model.Schema, path string, schema contract.Schema) {
-	switch {
-	case schema.IsObject():
-		fields[path] = model.Field{Type: "object", Optional: schema.Optional, Nullable: schema.Nullable}
+	fields[path] = fieldModelFromSchema(schema)
 
-		for name, property := range schema.Properties {
-			fieldModelsFromSchema(fields, model.ChildPath(path, name), property)
-		}
+	for _, child := range schema.Children() {
+		fieldModelsFromSchema(fields, model.ChildPath(path, child.Segment), child.Schema)
+	}
+}
 
-	case schema.IsMap():
-		fields[path] = model.Field{Type: "map", Optional: schema.Optional, Nullable: schema.Nullable}
+func fieldModelFromSchema(schema contract.Schema) model.Field {
+	if schema.IsRef() {
+		return model.Field{Optional: schema.Optional, Nullable: schema.Nullable, Ref: schema.Ref}
+	}
 
-		if schema.Values == nil {
-			return
-		}
-
-		fieldModelsFromSchema(fields, model.ChildPath(path, model.ValuesSegment), *schema.Values)
-
-	case schema.IsArray():
-		fields[path] = model.Field{Type: "array", Optional: schema.Optional, Nullable: schema.Nullable}
-
-		if schema.Items == nil {
-			return
-		}
-
-		fieldModelsFromSchema(fields, model.ChildPath(path, model.ItemsSegment), *schema.Items)
-
-	case schema.IsPrimitive():
-		fields[path] = model.Field{Type: schema.Type, Optional: schema.Optional, Nullable: schema.Nullable}
-
-	case schema.IsRef():
-		fields[path] = model.Field{Optional: schema.Optional, Nullable: schema.Nullable, Ref: schema.Ref}
-
-	default:
-		fields[path] = model.Field{Type: schema.Type, Optional: schema.Optional, Nullable: schema.Nullable}
+	return model.Field{
+		Type:     schema.Type,
+		Optional: schema.Optional,
+		Nullable: schema.Nullable,
+		Members:  slices.Sorted(slices.Values(schema.Members)),
 	}
 }

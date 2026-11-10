@@ -1,11 +1,26 @@
 package repository
 
 import (
-	"time"
+	"fmt"
 
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/guregu/null"
+	"github.com/jackc/pgx/v5"
 )
+
+const resourceColumns = `
+			pa.id,
+			pa.name,
+			r.id,
+			r.direction,
+			r.protocol,
+			r.body_role,
+			r.consumed_provider,
+			r.provider_hash,
+			r.consumer_hash,
+			rv.change_type,
+			bodies.sources,
+			bodies.schema_names`
 
 // This struct is used to build the entire contract avoiding N+1 problem
 type tableRow struct {
@@ -14,24 +29,18 @@ type tableRow struct {
 	ParticipantName string
 
 	// Contract
-	ContractID        int64
-	ContractVersion   string
-	ContractContent   string
-	ContractCreatedAt time.Time
+	ContractID      int64
+	ContractVersion string
 
 	// Resource
-	ResourceID                 int64
-	ResourceDirection          string
-	ResourceInteraction        string
-	ResourceConsumedProvider   null.String
-	ResourceEndpoint           string
-	ResourceMethod             string
-	ResourceResponseStatusCode null.String
-	ResourceProviderHash       string
-	ResourceConsumerHash       null.String
-	ResourceCreatedAt          time.Time
-	ResourceVersion            string
-	ResourceVersionChangeType  string
+	ResourceID                int64
+	ResourceDirection         string
+	ResourceProtocol          string
+	ResourceBodyRole          string
+	ResourceConsumedProvider  null.String
+	ResourceProviderHash      string
+	ResourceConsumerHash      null.String
+	ResourceVersionChangeType string
 
 	// Bodies, aligned by index
 	BodySources     []string
@@ -44,33 +53,27 @@ func (this *tableRow) toPersistedContractModel() *model.PersistedContract {
 		ParticipantID:   this.ParticipantID,
 		ParticipantName: this.ParticipantName,
 		Version:         this.ContractVersion,
-		ContractContent: this.ContractContent,
 		Resources:       make(map[string]model.PersistedResource),
 	}
 }
 
-func (this *tableRow) toResourceModel() model.PersistedResource {
-	resource := model.PersistedResource{
-		Direction:          model.Direction(this.ResourceDirection),
-		Interaction:        model.Interaction(this.ResourceInteraction),
-		Endpoint:           this.ResourceEndpoint,
-		Method:             this.ResourceMethod,
-		Bodies:             this.toResourceBodies(),
-		ParticipantName:    this.ParticipantName,
-		ParticipantID:      this.ParticipantID,
-		ContractID:         this.ContractID,
-		ProviderHash:       this.ResourceProviderHash,
-		ConsumedProvider:   this.ResourceConsumedProvider,
-		ResponseStatusCode: this.ResourceResponseStatusCode,
-		ConsumerHash:       this.ResourceConsumerHash,
-		Removed:            this.ResourceVersionChangeType == string(model.ChangeRemoved),
+func (this *tableRow) toResourceModel(identity model.ResourceIdentity) model.PersistedResource {
+	return model.PersistedResource{
+		Resource: model.Resource{
+			ParticipantName:  this.ParticipantName,
+			Direction:        model.Direction(this.ResourceDirection),
+			Protocol:         model.Protocol(this.ResourceProtocol),
+			Body:             model.BodyRole(this.ResourceBodyRole),
+			Identity:         identity,
+			ConsumedProvider: this.ResourceConsumedProvider,
+			Bodies:           this.toResourceBodies(),
+		},
+		ParticipantID: this.ParticipantID,
+		ContractID:    this.ContractID,
+		ProviderHash:  this.ResourceProviderHash,
+		ConsumerHash:  this.ResourceConsumerHash,
+		Removed:       this.ResourceVersionChangeType == string(model.ChangeRemoved),
 	}
-
-	if this.ResourceVersion != "" {
-		resource.ParticipantVersion = null.StringFrom(this.ResourceVersion)
-	}
-
-	return resource
 }
 
 func (this *tableRow) toResourceBodies() []model.ResourceBody {
@@ -80,4 +83,41 @@ func (this *tableRow) toResourceBodies() []model.ResourceBody {
 	}
 
 	return bodies
+}
+
+func scanTableRows(rows pgx.Rows) []tableRow {
+	defer rows.Close()
+
+	var tableRows []tableRow
+
+	for rows.Next() {
+		var row tableRow
+
+		if err := rows.Scan(
+			&row.ContractID,
+			&row.ContractVersion,
+			&row.ParticipantID,
+			&row.ParticipantName,
+			&row.ResourceID,
+			&row.ResourceDirection,
+			&row.ResourceProtocol,
+			&row.ResourceBodyRole,
+			&row.ResourceConsumedProvider,
+			&row.ResourceProviderHash,
+			&row.ResourceConsumerHash,
+			&row.ResourceVersionChangeType,
+			&row.BodySources,
+			&row.BodySchemaNames,
+		); err != nil {
+			panic(fmt.Errorf("error scanning resource row: %w", err))
+		}
+
+		tableRows = append(tableRows, row)
+	}
+
+	if err := rows.Err(); err != nil {
+		panic(fmt.Errorf("error reading resource rows: %w", err))
+	}
+
+	return tableRows
 }

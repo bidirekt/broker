@@ -42,25 +42,37 @@ type mapNode struct {
 }
 
 func (this mapNode) validate(value any, path string) []violation.Violation {
+	return validateMapping(value, path, this.key, func(_ string, entry any, entryPath string) []violation.Violation {
+		return this.value.validate(entry, entryPath)
+	})
+}
+
+func validateMapping(
+	value any,
+	path string,
+	key Key,
+	validateEntry func(key string, entry any, entryPath string) []violation.Violation,
+) []violation.Violation {
 	if value == nil {
 		return nil
 	}
 
-	mapping, exists := value.(map[string]any)
-	if !exists {
+	mapping, isMapping := value.(map[string]any)
+	if !isMapping {
 		return []violation.Violation{invalidKind(value, path, "mapping")}
 	}
 
 	var violations []violation.Violation
 
-	for _, key := range slices.Sorted(maps.Keys(mapping)) {
-		if rejected := this.key.reject(key, joinPath(path, key)); rejected != nil {
+	for _, name := range slices.Sorted(maps.Keys(mapping)) {
+		entryPath := joinPath(path, name)
+		if rejected := key.reject(name, entryPath); rejected != nil {
 			violations = append(violations, *rejected)
 
 			continue
 		}
 
-		violations = append(violations, this.value.validate(mapping[key], joinPath(path, key))...)
+		violations = append(violations, validateEntry(name, mapping[name], entryPath)...)
 	}
 
 	return violations

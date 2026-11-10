@@ -156,7 +156,7 @@ func TestSchema_EmptyIsAnInvalidType(t *testing.T) {
 	assert.Equal(t, "", violations[0].Path)
 	assert.Equal(t, map[string]string{
 		"value":   "",
-		"allowed": "object, array, map, string, integer, float, number, boolean",
+		"allowed": "object, array, map, string, integer, float, number, boolean, enum, union",
 	}, violations[0].Details)
 }
 
@@ -203,7 +203,7 @@ func TestSchema_EmptyRefIsAnInvalidType(t *testing.T) {
 			assert.Equal(t, "properties;owner", violations[0].Path)
 			assert.Equal(t, map[string]string{
 				"value":   "",
-				"allowed": "object, array, map, string, integer, float, number, boolean",
+				"allowed": "object, array, map, string, integer, float, number, boolean, enum, union",
 			}, violations[0].Details)
 		})
 	}
@@ -334,7 +334,7 @@ func TestSchema_PropertiesItemsOrValuesWithoutTypeIsAnInvalidType(t *testing.T) 
 			assert.Equal(t, "properties;attributes", violations[0].Path)
 			assert.Equal(t, map[string]string{
 				"value":   "",
-				"allowed": "object, array, map, string, integer, float, number, boolean",
+				"allowed": "object, array, map, string, integer, float, number, boolean, enum, union",
 			}, violations[0].Details)
 		})
 	}

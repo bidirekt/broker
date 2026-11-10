@@ -5,9 +5,20 @@ import (
 
 	"github.com/bidirekt/broker/internal/contracts/contract_differ"
 	"github.com/bidirekt/broker/internal/model"
+	restmodel "github.com/bidirekt/broker/internal/model/protocols/rest"
 	"github.com/guregu/null"
 	"github.com/stretchr/testify/assert"
 )
+
+func restResponseProvider(endpoint, method, status string, bodies []model.ResourceBody) *model.UploadedResource {
+	return &model.UploadedResource{Resource: model.Resource{
+		Direction: model.Provides,
+		Protocol:  restmodel.Protocol,
+		Body:      model.Output,
+		Identity:  restmodel.Identity{Endpoint: endpoint, Method: method, Status: status},
+		Bodies:    bodies,
+	}}
+}
 
 const participantName = "pets-service"
 
@@ -34,15 +45,9 @@ func persistedPets(schemas model.Schemas, resources ...*model.UploadedResource) 
 	for _, resource := range resources {
 		resource.ParticipantName = participantName
 		contract.Resources[resource.PrimaryHash()] = model.PersistedResource{
-			ParticipantName:    participantName,
-			Direction:          resource.Direction,
-			Interaction:        resource.Interaction,
-			ProviderHash:       resource.ProviderHash(),
-			Endpoint:           resource.Endpoint,
-			Method:             resource.Method,
-			ResponseStatusCode: resource.ResponseStatusCode,
-			Bodies:             resource.Bodies,
-			Schemas:            schemas,
+			Resource:     resource.Resource,
+			ProviderHash: resource.ProviderHash(),
+			Schemas:      schemas,
 		}
 	}
 
@@ -50,7 +55,7 @@ func persistedPets(schemas model.Schemas, resources ...*model.UploadedResource) 
 }
 
 func uploadedPets(schemas model.Schemas, resources ...*model.UploadedResource) *model.UploadedContract {
-	contract := model.NewUploadedContract(0, participantName, "1", "raw")
+	contract := model.NewUploadedContract(0, participantName, "1", nil)
 	contract.Schemas = schemas
 
 	for _, resource := range resources {
@@ -61,11 +66,11 @@ func uploadedPets(schemas model.Schemas, resources ...*model.UploadedResource) *
 }
 
 func listPets() *model.UploadedResource {
-	return model.NewRestResponseProvider("/pets", "get", "200", petBody())
+	return restResponseProvider("/pets", "get", "200", petBody())
 }
 
 func getPet() *model.UploadedResource {
-	return model.NewRestResponseProvider("/pets/*", "get", "200", petBody())
+	return restResponseProvider("/pets/*", "get", "200", petBody())
 }
 
 func TestDiff_EquivalentContracts_HaveNoChanges(t *testing.T) {
@@ -94,7 +99,7 @@ func TestDiff_RemovedResource_IsRemoved(t *testing.T) {
 }
 
 func TestDiff_ResourceWhoseBodyChanged_IsNotAResourceChange(t *testing.T) {
-	undescribed := model.NewRestResponseProvider("/pets", "get", "200", []model.ResourceBody{{Source: "pets.yaml"}})
+	undescribed := restResponseProvider("/pets", "get", "200", []model.ResourceBody{{Source: "pets.yaml"}})
 
 	diff := contract_differ.DiffContracts(persistedPets(petSchemas(), listPets()), uploadedPets(model.Schemas{}, undescribed))
 
@@ -163,6 +168,7 @@ func TestDiff_FieldWhoseAttributeChanged_IsModified(t *testing.T) {
 		{name: "optional", after: model.Field{Type: "string", Optional: true}},
 		{name: "nullable", after: model.Field{Type: "string", Nullable: true}},
 		{name: "ref", after: model.Field{Ref: "PetId"}},
+		{name: "members", after: model.Field{Type: "string", Members: []string{"available"}}},
 	}
 
 	for _, testCase := range cases {
@@ -200,25 +206,34 @@ func TestDiff_RefTargetRenamed_ModifiesTheRefField(t *testing.T) {
 
 func TestRemovedSinceDeployed_ResourceGoneFromTheFiles_Counts(t *testing.T) {
 	gone := model.PersistedResource{
-		ParticipantName:    participantName,
-		Direction:          model.Provides,
-		Interaction:        model.RestResponse,
-		ProviderHash:       "get-pet",
-		Endpoint:           "/pets/*",
-		Method:             "get",
-		ResponseStatusCode: null.StringFrom("200"),
-		Bodies:             petBody(),
+		Resource: model.Resource{
+			ParticipantName: participantName,
+			Direction:       model.Provides,
+			Protocol:        restmodel.Protocol,
+			Body:            model.Output,
+			Identity:        restmodel.Identity{Endpoint: "/pets/*", Method: "get", Status: "200"},
+			Bodies:          petBody(),
+		},
+		ProviderHash: "get-pet",
 	}
 	deployed := &model.PersistedContract{
 		ParticipantName: participantName,
 		Resources: map[string]model.PersistedResource{
-			"list-pets": {Bodies: petBody()},
-			"get-pet":   gone,
+			"list-pets": {
+				Resource: model.Resource{
+					Bodies: petBody(),
+				},
+			},
+			"get-pet": gone,
 		},
 	}
 	next := &model.UploadedContract{
 		ParticipantName: participantName,
-		Resources:       map[string]model.UploadedResource{"list-pets": {Bodies: petBody()}},
+		Resources: map[string]model.UploadedResource{"list-pets": {
+			Resource: model.Resource{
+				Bodies: petBody(),
+			},
+		}},
 	}
 
 	removed := contract_differ.RemovedSinceDeployed(deployed, next)
@@ -230,13 +245,21 @@ func TestRemovedSinceDeployed_ResourceGoneFromTheFiles_Counts(t *testing.T) {
 func TestRemovedSinceDeployed_ResourceThatOnlyLostFields_DoesNotCount(t *testing.T) {
 	deployed := &model.PersistedContract{
 		ParticipantName: participantName,
-		Resources:       map[string]model.PersistedResource{"list-pets": {Bodies: petBody()}},
-		Schemas:         petSchemas(),
+		Resources: map[string]model.PersistedResource{"list-pets": {
+			Resource: model.Resource{
+				Bodies: petBody(),
+			},
+		}},
+		Schemas: petSchemas(),
 	}
 	next := &model.UploadedContract{
 		ParticipantName: participantName,
-		Resources:       map[string]model.UploadedResource{"list-pets": {Bodies: petBody()}},
-		Schemas:         model.Schemas{"Pet": {"": {Type: "object"}}},
+		Resources: map[string]model.UploadedResource{"list-pets": {
+			Resource: model.Resource{
+				Bodies: petBody(),
+			},
+		}},
+		Schemas: model.Schemas{"Pet": {"": {Type: "object"}}},
 	}
 
 	assert.Empty(t, contract_differ.RemovedSinceDeployed(deployed, next))
@@ -246,14 +269,49 @@ func TestRemovedSinceDeployed_ResourceAlreadyRemovedInTheDeployedVersion_DoesNot
 	deployed := &model.PersistedContract{
 		ParticipantName: participantName,
 		Resources: map[string]model.PersistedResource{
-			"list-pets": {Bodies: petBody()},
-			"get-pet":   {Removed: true},
+			"list-pets": {
+				Resource: model.Resource{
+					Bodies: petBody(),
+				},
+			},
+			"get-pet": {Removed: true},
 		},
 	}
 	next := &model.UploadedContract{
 		ParticipantName: participantName,
-		Resources:       map[string]model.UploadedResource{"list-pets": {Bodies: petBody()}},
+		Resources: map[string]model.UploadedResource{"list-pets": {
+			Resource: model.Resource{
+				Bodies: petBody(),
+			},
+		}},
 	}
 
 	assert.Empty(t, contract_differ.RemovedSinceDeployed(deployed, next))
+}
+
+func TestDiff_EnumWhoseValuesChanged_IsModified(t *testing.T) {
+	current := model.Schemas{"Pet": {"": {Type: "object"}, "status": {Type: "enum", Members: []string{"available", "sold"}}}}
+	next := model.Schemas{"Pet": {"": {Type: "object"}, "status": {Type: "enum", Members: []string{"available", "pending"}}}}
+
+	diff := contract_differ.DiffContracts(persistedPets(current), uploadedPets(next))
+
+	assert.Equal(t, map[string]model.SchemaChange{
+		"Pet": {Kind: model.ChangeModified, Fields: map[string]model.FieldChange{
+			"status": {
+				Kind:   model.ChangeModified,
+				Before: model.Field{Type: "enum", Members: []string{"available", "sold"}},
+				After:  model.Field{Type: "enum", Members: []string{"available", "pending"}},
+			},
+		}},
+	}, diff.Schemas)
+}
+
+func TestDiff_EnumWithTheSameValues_HasNoChanges(t *testing.T) {
+	enumSchemas := func() model.Schemas {
+		return model.Schemas{"Pet": {"": {Type: "object"}, "status": {Type: "enum", Members: []string{"available", "sold"}}}}
+	}
+
+	diff := contract_differ.DiffContracts(persistedPets(enumSchemas()), uploadedPets(enumSchemas()))
+
+	assert.Empty(t, diff.Schemas)
 }

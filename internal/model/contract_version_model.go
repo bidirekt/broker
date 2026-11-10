@@ -7,6 +7,6 @@ type ContractVersion struct {
 	ParticipantID   int64
 	ParticipantName string
 	Version         string
-	ContractContent string
+	Files           []ContractFile
 	CreatedAt       time.Time
 }

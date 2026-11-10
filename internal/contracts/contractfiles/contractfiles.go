@@ -7,23 +7,27 @@ import (
 	"github.com/bidirekt/broker/internal/contracts/contract"
 	"github.com/bidirekt/broker/internal/contracts/descriptor"
 	"github.com/bidirekt/broker/internal/contracts/mapper/fragmentmapper"
+	"github.com/bidirekt/broker/internal/contracts/protocol"
 	"github.com/bidirekt/broker/internal/contracts/validator"
 	"github.com/bidirekt/broker/internal/contracts/violation"
 	"github.com/bidirekt/broker/internal/model"
 )
 
-type File struct {
-	Source  string `json:"source"`
-	Content string `json:"content"`
-}
-
-func HasBlankSource(files []File) bool {
-	return slices.ContainsFunc(files, func(file File) bool {
+func HasBlankSource(files []model.ContractFile) bool {
+	return slices.ContainsFunc(files, func(file model.ContractFile) bool {
 		return strings.TrimSpace(file.Source) == ""
 	})
 }
 
-func ToFragments(files []File) ([]contract.Fragment, []violation.Violation, error) {
+type Interpreter struct {
+	registry *protocol.Registry
+}
+
+func NewInterpreter(registry *protocol.Registry) *Interpreter {
+	return &Interpreter{registry: registry}
+}
+
+func (this *Interpreter) ToFragments(files []model.ContractFile) ([]contract.Fragment, []violation.Violation, error) {
 	fragments := make([]contract.Fragment, 0, len(files))
 	for _, file := range files {
 		fragment, err := contract.DecodeFragment(file.Source, file.Content)
@@ -36,7 +40,7 @@ func ToFragments(files []File) ([]contract.Fragment, []violation.Violation, erro
 
 	var shapeViolations []violation.Violation
 	for _, fragment := range contract.SortedBySource(fragments) {
-		shapeViolations = append(shapeViolations, descriptor.Validate(descriptor.Contract, fragment.Document, fragment.Source)...)
+		shapeViolations = append(shapeViolations, descriptor.Validate(this.registry.Grammar(), fragment.Document, fragment.Source)...)
 	}
 
 	if len(shapeViolations) > 0 {
@@ -46,13 +50,13 @@ func ToFragments(files []File) ([]contract.Fragment, []violation.Violation, erro
 	return fragments, nil, nil
 }
 
-func ToUploadedContract(
+func (this *Interpreter) ToUploadedContract(
 	fragments []contract.Fragment,
 	participant *model.Participant,
 	version string,
-	contractContent string,
+	files []model.ContractFile,
 ) (*model.UploadedContract, []violation.Violation, error) {
-	declarations := fragmentmapper.ToDeclarations(fragments)
+	declarations := fragmentmapper.ToDeclarations(fragments, this.registry)
 
 	if violations := validator.Validate(declarations); len(violations) > 0 {
 		return nil, violations, nil
@@ -60,7 +64,7 @@ func ToUploadedContract(
 
 	resources := fragmentmapper.ToResourceModels(declarations)
 
-	uploadedContract := model.NewUploadedContract(participant.ID, participant.Name, version, contractContent)
+	uploadedContract := model.NewUploadedContract(participant.ID, participant.Name, version, files)
 	uploadedContract.Schemas = fragmentmapper.ToSchemaModels(declarations)
 
 	for _, resource := range resources {

@@ -8,7 +8,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/bidirekt/broker/internal/contracts/descriptor"
+	restcontracts "github.com/bidirekt/broker/internal/contracts/protocols/rest"
 )
+
+var contractGrammar = descriptor.Contract(descriptor.Fields{"rest": restcontracts.New().Grammar()})
 
 func contractDocument(t *testing.T, source string) any {
 	t.Helper()
@@ -73,7 +76,7 @@ schemas:
         type: float
 `
 
-	violations := descriptor.Validate(descriptor.Contract, contractDocument(t, source), "api.yaml")
+	violations := descriptor.Validate(contractGrammar, contractDocument(t, source), "api.yaml")
 
 	assert.Empty(t, violations)
 }
@@ -107,7 +110,7 @@ schemas:
         type: string
 `
 
-	violations := descriptor.Validate(descriptor.Contract, contractDocument(t, source), "api.yaml")
+	violations := descriptor.Validate(contractGrammar, contractDocument(t, source), "api.yaml")
 
 	assert.Empty(t, violations)
 }
@@ -137,7 +140,7 @@ schemas:
     type: array
 `
 
-	violations := descriptor.Validate(descriptor.Contract, contractDocument(t, source), "api.yaml")
+	violations := descriptor.Validate(contractGrammar, contractDocument(t, source), "api.yaml")
 
 	require.Len(t, violations, 5)
 
@@ -166,7 +169,7 @@ schemas:
 }
 
 func TestContract_MessageViraChaveDesconhecida(t *testing.T) {
-	violations := descriptor.Validate(descriptor.Contract, contractDocument(t, "provides:\n  message:\n    saudacao: ola\n"), "api.yaml")
+	violations := descriptor.Validate(contractGrammar, contractDocument(t, "provides:\n  message:\n    saudacao: ola\n"), "api.yaml")
 
 	require.Len(t, violations, 1)
 	assert.Equal(t, "key.unknown", violations[0].ErrorCode)
@@ -174,17 +177,17 @@ func TestContract_MessageViraChaveDesconhecida(t *testing.T) {
 }
 
 func TestContract_EmptySchemaIsAnInvalidType(t *testing.T) {
-	violations := descriptor.Validate(descriptor.Contract, contractDocument(t, "schemas:\n  Pet: {}\n"), "api.yaml")
+	violations := descriptor.Validate(contractGrammar, contractDocument(t, "schemas:\n  Pet: {}\n"), "api.yaml")
 
 	require.Len(t, violations, 1)
 	assert.Equal(t, "schema.invalid_type", violations[0].ErrorCode)
 	assert.Equal(t, "schemas;Pet", violations[0].Path)
 	assert.Equal(t, "", violations[0].Details["value"])
-	assert.Equal(t, "object, array, map, string, integer, float, number, boolean", violations[0].Details["allowed"])
+	assert.Equal(t, "object, array, map, string, integer, float, number, boolean, enum, union", violations[0].Details["allowed"])
 }
 
 func TestContract_SchemaNuloEhTipoInvalido(t *testing.T) {
-	violations := descriptor.Validate(descriptor.Contract, contractDocument(t, "schemas:\n  Pet:\n"), "api.yaml")
+	violations := descriptor.Validate(contractGrammar, contractDocument(t, "schemas:\n  Pet:\n"), "api.yaml")
 
 	require.Len(t, violations, 1)
 	assert.Equal(t, "schema.invalid_type", violations[0].ErrorCode)
@@ -194,7 +197,7 @@ func TestContract_SchemaNuloEhTipoInvalido(t *testing.T) {
 func TestContract_NonBooleanOptionalIsAnInvalidKind(t *testing.T) {
 	source := "schemas:\n  Pet:\n    type: object\n    properties:\n      id:\n        type: string\n        optional: maybe\n"
 
-	violations := descriptor.Validate(descriptor.Contract, contractDocument(t, source), "api.yaml")
+	violations := descriptor.Validate(contractGrammar, contractDocument(t, source), "api.yaml")
 
 	require.Len(t, violations, 1)
 	assert.Equal(t, "value.invalid_kind", violations[0].ErrorCode)
@@ -207,7 +210,7 @@ func TestContract_OptionalOnANamedSchemaIsNotAllowed(t *testing.T) {
 		t.Run(optional, func(t *testing.T) {
 			source := "schemas:\n  Pet:\n    type: object\n    optional: " + optional + "\n    properties:\n      id:\n        type: string\n"
 
-			violations := descriptor.Validate(descriptor.Contract, contractDocument(t, source), "api.yaml")
+			violations := descriptor.Validate(contractGrammar, contractDocument(t, source), "api.yaml")
 
 			require.Len(t, violations, 1)
 			assert.Equal(t, "schema.optional_not_allowed", violations[0].ErrorCode)
@@ -226,7 +229,7 @@ func TestContract_NullOptionalOrNullableOnANamedSchemaIsValid(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			source := "schemas:\n  Pet:\n    type: object\n    " + flag + "\n    properties:\n      id:\n        type: string\n"
 
-			violations := descriptor.Validate(descriptor.Contract, contractDocument(t, source), "api.yaml")
+			violations := descriptor.Validate(contractGrammar, contractDocument(t, source), "api.yaml")
 
 			assert.Empty(t, violations)
 		})
@@ -234,13 +237,13 @@ func TestContract_NullOptionalOrNullableOnANamedSchemaIsValid(t *testing.T) {
 }
 
 func TestContract_DocumentoNuloNaoViola(t *testing.T) {
-	violations := descriptor.Validate(descriptor.Contract, nil, "api.yaml")
+	violations := descriptor.Validate(contractGrammar, nil, "api.yaml")
 
 	assert.Empty(t, violations)
 }
 
 func TestContract_RaizQueNaoEhMapaEhKind(t *testing.T) {
-	violations := descriptor.Validate(descriptor.Contract, contractDocument(t, "- a\n- b\n"), "api.yaml")
+	violations := descriptor.Validate(contractGrammar, contractDocument(t, "- a\n- b\n"), "api.yaml")
 
 	require.Len(t, violations, 1)
 	assert.Equal(t, "value.invalid_kind", violations[0].ErrorCode)
@@ -251,7 +254,7 @@ func TestContract_RaizQueNaoEhMapaEhKind(t *testing.T) {
 func TestContract_JsonDecodificadoSegueOMesmoCaminho(t *testing.T) {
 	source := `{"provides": {"rest": {"/pets": {"get": {"responses": {"200": "Pet", "600": "Nope"}}}}}}`
 
-	violations := descriptor.Validate(descriptor.Contract, contractDocument(t, source), "api.yaml")
+	violations := descriptor.Validate(contractGrammar, contractDocument(t, source), "api.yaml")
 
 	require.Len(t, violations, 1)
 	assert.Equal(t, "status.out_of_range", violations[0].ErrorCode)
@@ -275,7 +278,7 @@ consumes:
             200: User
 `
 
-	violations := descriptor.Validate(descriptor.Contract, contractDocument(t, source), "api.yaml")
+	violations := descriptor.Validate(contractGrammar, contractDocument(t, source), "api.yaml")
 
 	require.Len(t, violations, 2)
 
@@ -298,7 +301,7 @@ func TestContract_NomeDeServicoInvalidoSuprimeADescida(t *testing.T) {
             600: Missing
 `
 
-	violations := descriptor.Validate(descriptor.Contract, contractDocument(t, source), "api.yaml")
+	violations := descriptor.Validate(contractGrammar, contractDocument(t, source), "api.yaml")
 
 	require.Len(t, violations, 1)
 	assert.Equal(t, "service.name_syntax", violations[0].ErrorCode)
@@ -312,17 +315,18 @@ func TestContract_PropertyNameWithAPathCharacterIsRejected(t *testing.T) {
 		"tags[]":    "schemas;Pet;properties;tags[]",
 		"a{b":       "schemas;Pet;properties;a{b",
 		"x;y":       "schemas;Pet;properties;x;y",
+		"card(x)":   "schemas;Pet;properties;card(x)",
 	} {
 		t.Run(name, func(t *testing.T) {
 			source := "schemas:\n  Pet:\n    type: object\n    properties:\n      \"" + name + "\":\n        type: string\n"
 
-			violations := descriptor.Validate(descriptor.Contract, contractDocument(t, source), "api.yaml")
+			violations := descriptor.Validate(contractGrammar, contractDocument(t, source), "api.yaml")
 
 			require.Len(t, violations, 1)
 			assert.Equal(t, "property.name_syntax", violations[0].ErrorCode)
 			assert.Equal(t, path, violations[0].Path)
 			assert.Equal(t, "api.yaml", violations[0].Source)
-			assert.Equal(t, map[string]string{"key": name, "error": `must not contain ".", "[", "]", "{", "}" or ";"`}, violations[0].Details)
+			assert.Equal(t, map[string]string{"key": name, "error": `must not contain ".", "[", "]", "{", "}", ";", "(" or ")"`}, violations[0].Details)
 		})
 	}
 }
@@ -330,7 +334,7 @@ func TestContract_PropertyNameWithAPathCharacterIsRejected(t *testing.T) {
 func TestContract_EmptyPropertyNameIsRejected(t *testing.T) {
 	source := "schemas:\n  Pet:\n    type: object\n    properties:\n      \"\":\n        type: string\n"
 
-	violations := descriptor.Validate(descriptor.Contract, contractDocument(t, source), "api.yaml")
+	violations := descriptor.Validate(contractGrammar, contractDocument(t, source), "api.yaml")
 
 	require.Len(t, violations, 1)
 	assert.Equal(t, "property.name_syntax", violations[0].ErrorCode)
@@ -349,7 +353,7 @@ func TestContract_PropertyNameWithAControlCharacterIsRejected(t *testing.T) {
         type: string
 `
 
-	violations := descriptor.Validate(descriptor.Contract, contractDocument(t, source), "api.yaml")
+	violations := descriptor.Validate(contractGrammar, contractDocument(t, source), "api.yaml")
 
 	require.Len(t, violations, 2)
 	assert.Equal(t, "property.name_syntax", violations[0].ErrorCode)
@@ -363,7 +367,7 @@ func TestContract_PropertyNameWithAControlCharacterIsRejected(t *testing.T) {
 func TestContract_RejectedPropertyIsReportedOnlyByItsName(t *testing.T) {
 	source := "schemas:\n  Pet:\n    type: object\n    properties:\n      user.name:\n        type: decimal\n"
 
-	violations := descriptor.Validate(descriptor.Contract, contractDocument(t, source), "api.yaml")
+	violations := descriptor.Validate(contractGrammar, contractDocument(t, source), "api.yaml")
 
 	require.Len(t, violations, 1)
 	assert.Equal(t, "property.name_syntax", violations[0].ErrorCode)
@@ -373,19 +377,19 @@ func TestContract_RejectedPropertyIsReportedOnlyByItsName(t *testing.T) {
 func TestContract_SchemaNameWithAPathCharacterIsRejected(t *testing.T) {
 	source := "schemas:\n  Pet.v2:\n    type: object\n    properties:\n      id:\n        type: string\n"
 
-	violations := descriptor.Validate(descriptor.Contract, contractDocument(t, source), "api.yaml")
+	violations := descriptor.Validate(contractGrammar, contractDocument(t, source), "api.yaml")
 
 	require.Len(t, violations, 1)
 	assert.Equal(t, "schema.name_syntax", violations[0].ErrorCode)
 	assert.Equal(t, "schemas;Pet.v2", violations[0].Path)
 	assert.Equal(t, "api.yaml", violations[0].Source)
-	assert.Equal(t, map[string]string{"key": "Pet.v2", "error": `must not contain ".", "[", "]", "{", "}" or ";"`}, violations[0].Details)
+	assert.Equal(t, map[string]string{"key": "Pet.v2", "error": `must not contain ".", "[", "]", "{", "}", ";", "(" or ")"`}, violations[0].Details)
 }
 
 func TestContract_EmptySchemaNameIsRejected(t *testing.T) {
 	source := "schemas:\n  \"\":\n    type: object\n    properties:\n      id:\n        type: string\n"
 
-	violations := descriptor.Validate(descriptor.Contract, contractDocument(t, source), "api.yaml")
+	violations := descriptor.Validate(contractGrammar, contractDocument(t, source), "api.yaml")
 
 	require.Len(t, violations, 1)
 	assert.Equal(t, "schema.name_syntax", violations[0].ErrorCode)
@@ -402,7 +406,7 @@ func TestContract_SchemaNameWithAControlCharacterIsRejected(t *testing.T) {
         type: string
 `
 
-	violations := descriptor.Validate(descriptor.Contract, contractDocument(t, source), "api.yaml")
+	violations := descriptor.Validate(contractGrammar, contractDocument(t, source), "api.yaml")
 
 	require.Len(t, violations, 1)
 	assert.Equal(t, "schema.name_syntax", violations[0].ErrorCode)
@@ -421,7 +425,7 @@ schemas:
     type: decimal
 `
 
-	violations := descriptor.Validate(descriptor.Contract, contractDocument(t, source), "api.yaml")
+	violations := descriptor.Validate(contractGrammar, contractDocument(t, source), "api.yaml")
 
 	require.Len(t, violations, 1)
 	assert.Equal(t, "schema.name_syntax", violations[0].ErrorCode)

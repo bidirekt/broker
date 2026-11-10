@@ -5,7 +5,10 @@ import (
 
 	"github.com/bidirekt/broker/internal/contracts/contract"
 	"github.com/bidirekt/broker/internal/contracts/mapper/fragmentmapper"
+	"github.com/bidirekt/broker/internal/contracts/protocol"
+	restcontracts "github.com/bidirekt/broker/internal/contracts/protocols/rest"
 	"github.com/bidirekt/broker/internal/model"
+	restmodel "github.com/bidirekt/broker/internal/model/protocols/rest"
 	"github.com/goccy/go-yaml"
 	"github.com/guregu/null"
 	"github.com/stretchr/testify/assert"
@@ -173,7 +176,7 @@ func bothFileOrders(first, second mergedFile) []fileOrder {
 	}
 }
 
-func mergeDeclarations(t *testing.T, files ...mergedFile) fragmentmapper.Declarations {
+func mergeDeclarations(t *testing.T, files ...mergedFile) protocol.Declarations {
 	t.Helper()
 
 	fragments := make([]contract.Fragment, 0, len(files))
@@ -184,7 +187,7 @@ func mergeDeclarations(t *testing.T, files ...mergedFile) fragmentmapper.Declara
 		fragments = append(fragments, contract.Fragment{Source: file.source, Document: document})
 	}
 
-	return fragmentmapper.ToDeclarations(fragments)
+	return fragmentmapper.ToDeclarations(fragments, protocol.NewRegistry([]protocol.Protocol{restcontracts.New()}))
 }
 
 func mergeResources(t *testing.T, files ...mergedFile) []model.UploadedResource {
@@ -198,7 +201,7 @@ func mergeContract(t *testing.T, files ...mergedFile) *model.UploadedContract {
 
 	declarations := mergeDeclarations(t, files...)
 
-	uploaded := model.NewUploadedContract(0, "front_app", "1", "")
+	uploaded := model.NewUploadedContract(0, "front_app", "1", nil)
 	uploaded.Schemas = fragmentmapper.ToSchemaModels(declarations)
 
 	for _, resource := range fragmentmapper.ToResourceModels(declarations) {
@@ -208,18 +211,29 @@ func mergeContract(t *testing.T, files ...mergedFile) *model.UploadedContract {
 	return uploaded
 }
 
-func mergedResource(t *testing.T, resources []model.UploadedResource, interaction model.Interaction) model.UploadedResource {
+func mergedResource(t *testing.T, resources []model.UploadedResource, body model.BodyRole) model.UploadedResource {
 	t.Helper()
 
 	for _, resource := range resources {
-		if resource.Interaction == interaction {
+		if resource.Body == body {
 			return resource
 		}
 	}
 
-	t.Fatalf("no %v resource was built", interaction)
+	t.Fatalf("no %v resource was built", body)
 
 	return model.UploadedResource{}
+}
+
+func groupsConsumer(body model.BodyRole, status string, bodies []model.ResourceBody) model.UploadedResource {
+	return model.UploadedResource{Resource: model.Resource{
+		Direction:        model.Consumes,
+		Protocol:         restmodel.Protocol,
+		Body:             body,
+		Identity:         restmodel.Identity{Endpoint: "/api/groups", Method: "post", Status: status},
+		ConsumedProvider: null.StringFrom("api"),
+		Bodies:           bodies,
+	}}
 }
 
 func TestMerge_TwoConsumerModulesReadingOneResponse_OneResourceWithABodyPerModuleInSourceOrder(t *testing.T) {
@@ -229,9 +243,9 @@ func TestMerge_TwoConsumerModulesReadingOneResponse_OneResourceWithABodyPerModul
 
 			require.Len(t, resources, 1)
 
-			resource := mergedResource(t, resources, model.RestResponse)
-			assert.Equal(t, "/invoices", resource.Endpoint)
-			assert.Equal(t, "200", resource.ResponseStatusCode.String)
+			resource := mergedResource(t, resources, model.Output)
+			assert.Equal(t, "/invoices", resource.Identity.(restmodel.Identity).Endpoint)
+			assert.Equal(t, "200", resource.Identity.(restmodel.Identity).Status)
 			assert.Equal(t, []model.ResourceBody{
 				{Source: "detail.yaml", SchemaName: null.StringFrom("InvoiceDetail")},
 				{Source: "list.yaml", SchemaName: null.StringFrom("InvoiceList")},
@@ -247,7 +261,7 @@ func TestMerge_TwoConsumerModulesSendingOneRequest_OneResourceWithABodyPerModule
 
 			require.Len(t, resources, 2)
 
-			request := mergedResource(t, resources, model.RestRequest)
+			request := mergedResource(t, resources, model.Input)
 			assert.Equal(t, []model.ResourceBody{
 				{Source: "create.yaml", SchemaName: null.StringFrom("InvoiceCreate")},
 				{Source: "import.yaml", SchemaName: null.StringFrom("InvoiceImport")},
@@ -265,8 +279,8 @@ func TestMerge_UndescribedBodyInOneModule_IsABodyWithoutSchema(t *testing.T) {
 			}
 
 			assert.Equal(t, []model.UploadedResource{
-				*model.NewRestRequestConsumer("api", "/api/groups", "post", bodies),
-				*model.NewRestResponseConsumer("api", "/api/groups", "post", "201", bodies),
+				groupsConsumer(model.Input, "", bodies),
+				groupsConsumer(model.Output, "201", bodies),
 			}, mergeResources(t, order.files...))
 		})
 	}
@@ -281,8 +295,8 @@ func TestMerge_UndescribedBodyInEveryModule_BuildsResourcesWithBodiesWithoutSche
 	bodies := []model.ResourceBody{{Source: "a.yaml"}, {Source: "b.yaml"}}
 
 	assert.Equal(t, []model.UploadedResource{
-		*model.NewRestRequestConsumer("api", "/api/groups", "post", bodies),
-		*model.NewRestResponseConsumer("api", "/api/groups", "post", "201", bodies),
+		groupsConsumer(model.Input, "", bodies),
+		groupsConsumer(model.Output, "201", bodies),
 	}, resources)
 }
 

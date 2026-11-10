@@ -100,7 +100,7 @@
                 </table>
                 {{if .VersionMissing}}<p class="muted small">no version: not deployed in {{$environment}}</p>{{end}}
                 {{else if .Report.Stored}}
-                <p class="muted small">nothing deployed in {{$environment}} shares an endpoint</p>
+                <p class="muted small">nothing deployed in {{$environment}} shares a resource</p>
                 {{end}}
                 {{else}}
                 <p class="muted small">not checked yet</p>

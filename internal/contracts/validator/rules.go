@@ -1,11 +1,11 @@
 package validator
 
 import (
-	"github.com/bidirekt/broker/internal/contracts/mapper/fragmentmapper"
+	"github.com/bidirekt/broker/internal/contracts/protocol"
 	"github.com/bidirekt/broker/internal/contracts/violation"
 )
 
-type rule func(declarations fragmentmapper.Declarations) []violation.Violation
+type rule func(declarations protocol.Declarations) []violation.Violation
 
 var rules = []rule{
 	duplicateResources,

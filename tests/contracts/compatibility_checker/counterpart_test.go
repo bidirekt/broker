@@ -6,7 +6,9 @@ import (
 	"testing"
 
 	"github.com/bidirekt/broker/internal/contracts/compatibility_checker"
+	restcontracts "github.com/bidirekt/broker/internal/contracts/protocols/rest"
 	"github.com/bidirekt/broker/internal/model"
+	restmodel "github.com/bidirekt/broker/internal/model/protocols/rest"
 	"github.com/guregu/null"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,32 +27,34 @@ func (this rolesWithoutVerdict) GetVerdict(context.Context, int64, int64) (*mode
 
 func rolesProvider(participantID int64, participantName string) model.PersistedResource {
 	return model.PersistedResource{
+		Resource: model.Resource{
+			ParticipantName: participantName,
+			Direction:       model.Provides,
+			Protocol:        restmodel.Protocol,
+			Body:            model.Output,
+			Identity:        restmodel.Identity{Endpoint: "/orders", Method: "get", Status: "204"},
+		},
 		ParticipantID:      participantID,
-		ParticipantName:    participantName,
 		ContractID:         participantID * 10,
-		Direction:          model.Provides,
-		Interaction:        model.RestResponse,
 		ProviderHash:       rolesHash,
-		Endpoint:           "/orders",
-		Method:             "get",
-		ResponseStatusCode: null.StringFrom("204"),
 		ParticipantVersion: null.StringFrom("v1"),
 	}
 }
 
 func rolesConsumer(participantID int64, participantName, providerName string) model.PersistedResource {
 	return model.PersistedResource{
+		Resource: model.Resource{
+			ParticipantName:  participantName,
+			Direction:        model.Consumes,
+			Protocol:         restmodel.Protocol,
+			Body:             model.Output,
+			Identity:         restmodel.Identity{Endpoint: "/orders", Method: "get", Status: "204"},
+			ConsumedProvider: null.StringFrom(providerName),
+		},
 		ParticipantID:      participantID,
-		ParticipantName:    participantName,
 		ContractID:         participantID * 10,
-		Direction:          model.Consumes,
-		Interaction:        model.RestResponse,
-		ConsumedProvider:   null.StringFrom(providerName),
 		ConsumerHash:       null.StringFrom(participantName + "-" + rolesHash),
 		ProviderHash:       rolesHash,
-		Endpoint:           "/orders",
-		Method:             "get",
-		ResponseStatusCode: null.StringFrom("204"),
 		ParticipantVersion: null.StringFrom("v1"),
 	}
 }
@@ -71,7 +75,7 @@ func rolesReportCheckedFrom(
 		contract.Resources[resource.PrimaryHash()] = resource
 	}
 
-	return compatibility_checker.NewCompatibilityChecker(rolesWithoutVerdict{}).Check(
+	return compatibility_checker.NewCompatibilityChecker(rolesWithoutVerdict{}, []compatibility_checker.ProtocolHooks{restcontracts.New()}).Check(
 		context.Background(),
 		contract,
 		model.NewEnvironment(rolesEnvironment),
@@ -146,7 +150,7 @@ func TestAppendResultMergesTheRolesOfOneCounterpart(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			report := compatibility_checker.NewContractCompatibilityReport("orders", "v2", rolesEnvironment)
+			report := compatibility_checker.NewContractCompatibilityReport("orders", "v2", rolesEnvironment, []compatibility_checker.ProtocolHooks{restcontracts.New()})
 
 			for _, role := range tc.roles {
 				result := compatibility_checker.NewCounterpartResult()

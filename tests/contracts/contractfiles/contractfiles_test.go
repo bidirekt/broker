@@ -8,9 +8,13 @@ import (
 
 	"github.com/bidirekt/broker/internal/contracts/contract"
 	"github.com/bidirekt/broker/internal/contracts/contractfiles"
+	"github.com/bidirekt/broker/internal/contracts/protocol"
+	restcontracts "github.com/bidirekt/broker/internal/contracts/protocols/rest"
 	"github.com/bidirekt/broker/internal/contracts/violation"
 	"github.com/bidirekt/broker/internal/model"
 )
+
+var interpreter = contractfiles.NewInterpreter(protocol.NewRegistry([]protocol.Protocol{restcontracts.New()}))
 
 const petsEndpointYAML = `provides:
   rest:
@@ -40,9 +44,9 @@ const malformedYAML = "provides: {"
 
 const malformedYAMLError = "malformed contract file: broken.yaml: [1:11] could not find flow mapping end token '}'\n>  1 | provides: {\n                 ^\n"
 
-const contractContent = "raw contract content"
+var contractFiles = []model.ContractFile{{Source: "api.yaml", Content: "raw contract content"}}
 
-func decodeFragments(t *testing.T, files ...contractfiles.File) []contract.Fragment {
+func decodeFragments(t *testing.T, files ...model.ContractFile) []contract.Fragment {
 	t.Helper()
 
 	fragments := make([]contract.Fragment, 0, len(files))
@@ -58,11 +62,11 @@ func decodeFragments(t *testing.T, files ...contractfiles.File) []contract.Fragm
 
 func TestHasBlankSource_BlankSourceInAnyFile_ReturnsTrue(t *testing.T) {
 	for _, source := range []string{"", "   "} {
-		assert.True(t, contractfiles.HasBlankSource([]contractfiles.File{
+		assert.True(t, contractfiles.HasBlankSource([]model.ContractFile{
 			{Source: source, Content: petsEndpointYAML},
 			{Source: "broken.yaml", Content: malformedYAML},
 		}))
-		assert.True(t, contractfiles.HasBlankSource([]contractfiles.File{
+		assert.True(t, contractfiles.HasBlankSource([]model.ContractFile{
 			{Source: "broken.yaml", Content: malformedYAML},
 			{Source: source, Content: petsEndpointYAML},
 		}))
@@ -70,14 +74,14 @@ func TestHasBlankSource_BlankSourceInAnyFile_ReturnsTrue(t *testing.T) {
 }
 
 func TestHasBlankSource_EverySourceSet_ReturnsFalse(t *testing.T) {
-	assert.False(t, contractfiles.HasBlankSource([]contractfiles.File{
+	assert.False(t, contractfiles.HasBlankSource([]model.ContractFile{
 		{Source: "schemas.yaml", Content: petSchemaYAML},
 		{Source: "endpoints.yaml", Content: petsEndpointYAML},
 	}))
 }
 
 func TestToFragments_ValidFiles_DecodedInRequestOrder(t *testing.T) {
-	fragments, violations, err := contractfiles.ToFragments([]contractfiles.File{
+	fragments, violations, err := interpreter.ToFragments([]model.ContractFile{
 		{Source: "schemas.yaml", Content: petSchemaYAML},
 		{Source: "endpoints.yaml", Content: petsEndpointYAML},
 	})
@@ -92,7 +96,7 @@ func TestToFragments_ValidFiles_DecodedInRequestOrder(t *testing.T) {
 }
 
 func TestToFragments_UnsupportedExtension_ReturnsTheDecodeError(t *testing.T) {
-	fragments, violations, err := contractfiles.ToFragments([]contractfiles.File{
+	fragments, violations, err := interpreter.ToFragments([]model.ContractFile{
 		{Source: "notes.txt", Content: petsEndpointYAML},
 	})
 
@@ -102,7 +106,7 @@ func TestToFragments_UnsupportedExtension_ReturnsTheDecodeError(t *testing.T) {
 }
 
 func TestToFragments_MalformedYAML_ReturnsTheDecodeError(t *testing.T) {
-	fragments, violations, err := contractfiles.ToFragments([]contractfiles.File{
+	fragments, violations, err := interpreter.ToFragments([]model.ContractFile{
 		{Source: "broken.yaml", Content: malformedYAML},
 	})
 
@@ -112,13 +116,13 @@ func TestToFragments_MalformedYAML_ReturnsTheDecodeError(t *testing.T) {
 }
 
 func TestToFragments_FirstFailingFileInRequestOrder_DecidesTheError(t *testing.T) {
-	_, _, err := contractfiles.ToFragments([]contractfiles.File{
+	_, _, err := interpreter.ToFragments([]model.ContractFile{
 		{Source: "broken.yaml", Content: malformedYAML},
 		{Source: "notes.txt", Content: petsEndpointYAML},
 	})
 	assert.EqualError(t, err, malformedYAMLError)
 
-	_, _, err = contractfiles.ToFragments([]contractfiles.File{
+	_, _, err = interpreter.ToFragments([]model.ContractFile{
 		{Source: "notes.txt", Content: petsEndpointYAML},
 		{Source: "broken.yaml", Content: malformedYAML},
 	})
@@ -126,7 +130,7 @@ func TestToFragments_FirstFailingFileInRequestOrder_DecidesTheError(t *testing.T
 }
 
 func TestToFragments_DecodeErrorInAnyFile_WinsOverShapeViolations(t *testing.T) {
-	fragments, violations, err := contractfiles.ToFragments([]contractfiles.File{
+	fragments, violations, err := interpreter.ToFragments([]model.ContractFile{
 		{Source: "a.yaml", Content: statusOutOfRangeYAML},
 		{Source: "broken.yaml", Content: malformedYAML},
 	})
@@ -137,7 +141,7 @@ func TestToFragments_DecodeErrorInAnyFile_WinsOverShapeViolations(t *testing.T) 
 }
 
 func TestToFragments_ShapeViolations_SortedBySourceWithoutFragments(t *testing.T) {
-	fragments, violations, err := contractfiles.ToFragments([]contractfiles.File{
+	fragments, violations, err := interpreter.ToFragments([]model.ContractFile{
 		{Source: "b.yaml", Content: statusOutOfRangeYAML},
 		{Source: "a.yaml", Content: statusOutOfRangeYAML},
 	})
@@ -162,29 +166,29 @@ func TestToFragments_ShapeViolations_SortedBySourceWithoutFragments(t *testing.T
 
 func TestToUploadedContract_ValidFragments_StampsTheParticipantVersionAndContent(t *testing.T) {
 	fragments := decodeFragments(t,
-		contractfiles.File{Source: "endpoints.yaml", Content: petsEndpointYAML},
-		contractfiles.File{Source: "schemas.yaml", Content: petSchemaYAML},
+		model.ContractFile{Source: "endpoints.yaml", Content: petsEndpointYAML},
+		model.ContractFile{Source: "schemas.yaml", Content: petSchemaYAML},
 	)
 	participant := &model.Participant{ID: 7, Name: "pets_service"}
 
-	uploadedContract, violations, err := contractfiles.ToUploadedContract(fragments, participant, "v1", contractContent)
+	uploadedContract, violations, err := interpreter.ToUploadedContract(fragments, participant, "v1", contractFiles)
 
 	require.NoError(t, err)
 	assert.Empty(t, violations)
 	assert.Equal(t, int64(7), uploadedContract.ParticipantID)
 	assert.Equal(t, "pets_service", uploadedContract.ParticipantName)
 	assert.Equal(t, "v1", uploadedContract.Version)
-	assert.Equal(t, contractContent, uploadedContract.ContractContent)
+	assert.Equal(t, contractFiles, uploadedContract.Files)
 }
 
 func TestToUploadedContract_ValidFragments_AddsEachResourceUnderItsHash(t *testing.T) {
 	fragments := decodeFragments(t,
-		contractfiles.File{Source: "endpoints.yaml", Content: petsEndpointYAML},
-		contractfiles.File{Source: "schemas.yaml", Content: petSchemaYAML},
+		model.ContractFile{Source: "endpoints.yaml", Content: petsEndpointYAML},
+		model.ContractFile{Source: "schemas.yaml", Content: petSchemaYAML},
 	)
 	participant := &model.Participant{ID: 7, Name: "pets_service"}
 
-	uploadedContract, _, err := contractfiles.ToUploadedContract(fragments, participant, "v1", contractContent)
+	uploadedContract, _, err := interpreter.ToUploadedContract(fragments, participant, "v1", contractFiles)
 
 	require.NoError(t, err)
 	require.Len(t, uploadedContract.Resources, 1)
@@ -195,10 +199,10 @@ func TestToUploadedContract_ValidFragments_AddsEachResourceUnderItsHash(t *testi
 }
 
 func TestToUploadedContract_RuleViolations_ReturnedWithoutContract(t *testing.T) {
-	fragments := decodeFragments(t, contractfiles.File{Source: "endpoints.yaml", Content: petsEndpointYAML})
+	fragments := decodeFragments(t, model.ContractFile{Source: "endpoints.yaml", Content: petsEndpointYAML})
 	participant := &model.Participant{ID: 7, Name: "pets_service"}
 
-	uploadedContract, violations, err := contractfiles.ToUploadedContract(fragments, participant, "v1", contractContent)
+	uploadedContract, violations, err := interpreter.ToUploadedContract(fragments, participant, "v1", contractFiles)
 
 	require.NoError(t, err)
 	assert.Nil(t, uploadedContract)

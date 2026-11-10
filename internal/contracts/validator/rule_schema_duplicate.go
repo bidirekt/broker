@@ -1,11 +1,11 @@
 package validator
 
 import (
-	"github.com/bidirekt/broker/internal/contracts/mapper/fragmentmapper"
+	"github.com/bidirekt/broker/internal/contracts/protocol"
 	"github.com/bidirekt/broker/internal/contracts/violation"
 )
 
-func duplicateSchemas(declarations fragmentmapper.Declarations) []violation.Violation {
+func duplicateSchemas(declarations protocol.Declarations) []violation.Violation {
 	var violations []violation.Violation
 
 	declaredIn := map[string]string{}

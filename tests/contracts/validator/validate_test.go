@@ -11,6 +11,8 @@ import (
 
 	"github.com/bidirekt/broker/internal/contracts/contract"
 	"github.com/bidirekt/broker/internal/contracts/mapper/fragmentmapper"
+	"github.com/bidirekt/broker/internal/contracts/protocol"
+	restcontracts "github.com/bidirekt/broker/internal/contracts/protocols/rest"
 	"github.com/bidirekt/broker/internal/contracts/validator"
 	"github.com/bidirekt/broker/internal/contracts/violation"
 )
@@ -320,7 +322,7 @@ func validateFiles(t *testing.T, files ...validatedFile) []violation.Violation {
 		fragments = append(fragments, contract.Fragment{Source: file.source, Document: document})
 	}
 
-	return validator.Validate(fragmentmapper.ToDeclarations(fragments))
+	return validator.Validate(fragmentmapper.ToDeclarations(fragments, protocol.NewRegistry([]protocol.Protocol{restcontracts.New()})))
 }
 
 func deepInlinePetYAML(levels int) string {
@@ -1219,4 +1221,158 @@ schemas:
 			},
 		},
 	}, conflicts)
+}
+
+func petStatusConsumerYAML(schema, status string) string {
+	return `consumes:
+  petstore_api:
+    rest:
+      /pets:
+        get:
+          responses:
+            200: ` + schema + `
+schemas:
+  ` + schema + `:
+    type: object
+    properties:
+      status:
+` + status
+}
+
+func TestValidate_ConsumedEnumWithDifferentValues_IsATypeConflictNamingBothValueLists(t *testing.T) {
+	violations := validateFiles(t,
+		validatedFile{"b.yaml", petStatusConsumerYAML("PetB", "        type: enum\n        members: [b, a]\n")},
+		validatedFile{"a.yaml", petStatusConsumerYAML("PetA", "        type: enum\n        members: [c, a]\n")},
+	)
+
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "resource.type_conflict",
+			Path:      "consumes;petstore_api;rest;/pets;get;responses;200",
+			Source:    "b.yaml",
+			Details: map[string]string{
+				"resource":       "consumes petstore_api GET /pets 200",
+				"property":       "$.status",
+				"type":           "enum",
+				"declaredIn":     "a.yaml",
+				"declaredType":   "enum",
+				"values":         "a, b",
+				"declaredValues": "a, c",
+			},
+		},
+	}, violations)
+}
+
+func TestValidate_ConsumedEnumWithTheSameValuesInAnotherOrder_ReportsNothing(t *testing.T) {
+	violations := validateFiles(t,
+		validatedFile{"b.yaml", petStatusConsumerYAML("PetB", "        type: enum\n        members: [b, a]\n")},
+		validatedFile{"a.yaml", petStatusConsumerYAML("PetA", "        type: enum\n        members: [a, b]\n")},
+	)
+
+	assert.Empty(t, violations)
+}
+
+func TestValidate_ConsumedEnumAndString_IsATypeConflictWithoutValues(t *testing.T) {
+	violations := validateFiles(t,
+		validatedFile{"b.yaml", petStatusConsumerYAML("PetB", "        type: string\n")},
+		validatedFile{"a.yaml", petStatusConsumerYAML("PetA", "        type: enum\n        members: [a, b]\n")},
+	)
+
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "resource.type_conflict",
+			Path:      "consumes;petstore_api;rest;/pets;get;responses;200",
+			Source:    "b.yaml",
+			Details: map[string]string{
+				"resource":     "consumes petstore_api GET /pets 200",
+				"property":     "$.status",
+				"type":         "string",
+				"declaredIn":   "a.yaml",
+				"declaredType": "enum",
+			},
+		},
+	}, violations)
+}
+
+const orderPaymentUnionYAML = `provides:
+  rest:
+    /orders:
+      get:
+        responses:
+          200: Order
+schemas:
+  Order:
+    type: object
+    properties:
+      payment:
+        type: union
+        members:
+          card: { ref: CardPayment }
+          pix:  { ref: PixPayment }
+  CardPayment:
+    type: object
+    properties:
+      number: { type: string }
+  PixPayment:
+    type: object
+    properties:
+      key: { type: string }
+`
+
+func TestValidate_UnionOfDeclaredSchemas_ReportsNothing(t *testing.T) {
+	violations := validateFiles(t, validatedFile{"api.yaml", orderPaymentUnionYAML})
+
+	assert.Empty(t, violations)
+}
+
+func TestValidate_UnionMemberRefToAnUndeclaredSchema_ReportedAtTheMember(t *testing.T) {
+	violations := validateFiles(t, validatedFile{"api.yaml", strings.Replace(orderPaymentUnionYAML, "ref: PixPayment", "ref: BoletoPayment", 1)})
+
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "schema.unresolved_ref",
+			Path:      "schemas;Order;properties;payment;members;pix",
+			Source:    "api.yaml",
+			Details:   map[string]string{"schema": "BoletoPayment", "property": "Order.payment(pix)"},
+		},
+	}, violations)
+}
+
+func orderPaymentConsumerYAML(schema, members string) string {
+	return `consumes:
+  shop_api:
+    rest:
+      /orders:
+        get:
+          responses:
+            200: ` + schema + `
+schemas:
+  ` + schema + `:
+    type: object
+    properties:
+      payment:
+        type: union
+        members:
+` + members
+}
+
+const paymentSchemasYAML = `schemas:
+  CardPayment:
+    type: object
+    properties:
+      number: { type: string }
+  PixPayment:
+    type: object
+    properties:
+      key: { type: string }
+`
+
+func TestValidate_ConsumedUnionWithDifferentMembers_JoinsThemWithoutAConflict(t *testing.T) {
+	violations := validateFiles(t,
+		validatedFile{"a.yaml", orderPaymentConsumerYAML("OrderA", "          card: { ref: CardPayment }\n")},
+		validatedFile{"b.yaml", orderPaymentConsumerYAML("OrderB", "          card: { ref: CardPayment }\n          pix: { ref: PixPayment }\n")},
+		validatedFile{"payments.yaml", paymentSchemasYAML},
+	)
+
+	assert.Empty(t, violations)
 }

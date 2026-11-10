@@ -1,6 +1,7 @@
 package health
 
 import (
+	"github.com/bidirekt/broker/internal/components/versions"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -13,7 +14,7 @@ func NewHealthHandler() *HealthHandler {
 func (this *HealthHandler) Handle(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusOK).JSON(HealthResponseBody{
 		Status:        HealthOK,
-		BrokerVersion: brokerVersion,
+		BrokerVersion: versions.Broker(),
 		APIVersion:    apiVersion,
 	})
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/bidirekt/broker/internal/components/pages"
 	"github.com/bidirekt/broker/internal/components/respond"
 	"github.com/bidirekt/broker/internal/components/sessions"
+	"github.com/bidirekt/broker/internal/components/versions"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/helmet"
 	"github.com/gofiber/fiber/v3/middleware/recover"
@@ -65,6 +66,7 @@ func New(settings config.Settings, sessionKeeper *sessions.Keeper, bearerKeeper 
 	}))
 	server.Use(input.Door())
 	serveAssets(server)
+	server.Use(versions.Door)
 	server.Use(sessionKeeper.Door)
 	server.Use(bearerKeeper.Door)
 

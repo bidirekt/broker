@@ -24,11 +24,15 @@ type removalCanIDeployJSON struct {
 }
 
 type removalVerdictBreakJSON struct {
-	Endpoint    string            `json:"endpoint"`
-	Method      string            `json:"method"`
-	Interaction string            `json:"interaction"`
-	Reason      string            `json:"reason"`
-	Details     map[string]string `json:"details"`
+	Rest    removalVerdictLocationJSON `json:"rest"`
+	Reason  string                     `json:"reason"`
+	Details map[string]string          `json:"details"`
+}
+
+type removalVerdictLocationJSON struct {
+	Endpoint    string `json:"endpoint"`
+	Method      string `json:"method"`
+	Interaction string `json:"interaction"`
 }
 
 const removedProviderReason = "provider_resource_removed_but_still_consumed"
@@ -259,7 +263,7 @@ func (this *IntegrationSuite) TestRemovedProvider_IsNeverStoredAsAVerdict() {
 		this.Require().Len(verdicts, 1)
 		this.Require().Len(verdicts[0], 1)
 		this.Equal("property_missing_in_provider", verdicts[0][0].Reason)
-		this.Equal("/stock", verdicts[0][0].Endpoint)
+		this.Equal("/stock", verdicts[0][0].Rest.Endpoint)
 	}
 }
 

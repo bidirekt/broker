@@ -295,3 +295,70 @@ values: string
 
 	assert.Equal(t, contract.Schema{Type: "map"}, schema)
 }
+
+func TestSchemaChildren_ObjectPropertiesInNameOrder(t *testing.T) {
+	schema := contract.SchemaFromDocument(schemaDocument(t, `type: object
+properties:
+  name: { type: string }
+  age: { type: integer }
+`))
+
+	assert.Equal(t, []contract.SchemaChild{
+		{DocumentPath: "properties;age", Segment: "age", Schema: contract.Schema{Type: "integer"}},
+		{DocumentPath: "properties;name", Segment: "name", Schema: contract.Schema{Type: "string"}},
+	}, schema.Children())
+}
+
+func TestSchemaChildren_ArrayItemsAndMapValues(t *testing.T) {
+	array := contract.SchemaFromDocument(schemaDocument(t, "type: array\nitems: { type: string }\n"))
+	mapping := contract.SchemaFromDocument(schemaDocument(t, "type: map\nvalues: { ref: Pet }\n"))
+
+	assert.Equal(t, []contract.SchemaChild{
+		{DocumentPath: "items", Segment: "[]", Schema: contract.Schema{Type: "string"}},
+	}, array.Children())
+	assert.Equal(t, []contract.SchemaChild{
+		{DocumentPath: "values", Segment: "{}", Schema: contract.Schema{Ref: "Pet"}},
+	}, mapping.Children())
+}
+
+func TestSchemaChildren_NoneForLeavesRefsAndMissingChildren(t *testing.T) {
+	for name, source := range map[string]string{
+		"primitive":               "type: string\n",
+		"ref":                     "ref: Pet\n",
+		"array without items":     "type: array\n",
+		"map without values":      "type: map\n",
+		"properties without type": "properties:\n  name: { type: string }\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			schema := contract.SchemaFromDocument(schemaDocument(t, source))
+
+			assert.Empty(t, schema.Children())
+		})
+	}
+}
+
+func TestSchemaFromDocument_EnumKeepsItsMembersInTheWrittenOrder(t *testing.T) {
+	schema := contract.SchemaFromDocument(schemaDocument(t, `type: enum
+members: [sold, available, pending]
+`))
+
+	assert.Equal(t, contract.Schema{Type: "enum", Members: []string{"sold", "available", "pending"}}, schema)
+	assert.Empty(t, schema.Children())
+}
+
+func TestSchemaFromDocument_UnionKeepsEachMemberAsARef(t *testing.T) {
+	schema := contract.SchemaFromDocument(schemaDocument(t, `type: union
+members:
+  pix: { ref: PixPayment }
+  card: { ref: CardPayment }
+`))
+
+	assert.Equal(t, contract.Schema{Type: "union", UnionMembers: map[string]contract.Schema{
+		"card": {Ref: "CardPayment"},
+		"pix":  {Ref: "PixPayment"},
+	}}, schema)
+	assert.Equal(t, []contract.SchemaChild{
+		{DocumentPath: "members;card", Segment: "(card)", Schema: contract.Schema{Ref: "CardPayment"}},
+		{DocumentPath: "members;pix", Segment: "(pix)", Schema: contract.Schema{Ref: "PixPayment"}},
+	}, schema.Children())
+}

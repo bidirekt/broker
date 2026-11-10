@@ -6,11 +6,11 @@ import (
 	"github.com/bidirekt/broker/internal/repository"
 )
 
-func Register(kernel *components.Components) {
-	contractRepository := repository.NewContractRepository(kernel.Pool)
+func Register(kernel *components.Components, tables []repository.ProtocolTable, hooks []compatibility_checker.ProtocolHooks) {
+	contractRepository := repository.NewContractRepository(kernel.Pool, tables)
 	participantRepository := repository.NewParticipantRepository(kernel.Pool)
 	compatibilityRepository := repository.NewCompatibilityRepository(kernel.Pool)
-	compatibilityChecker := compatibility_checker.NewCompatibilityChecker(compatibilityRepository)
+	compatibilityChecker := compatibility_checker.NewCompatibilityChecker(compatibilityRepository, hooks)
 	environmentRepository := repository.NewEnvironmentRepository(kernel.Pool)
 
 	useCase := NewCanIDeployUseCase(

@@ -13,11 +13,15 @@ type memoizationBreak struct {
 }
 
 type memoizationStoredBreak struct {
-	Endpoint    string            `json:"endpoint"`
-	Method      string            `json:"method"`
-	Interaction string            `json:"interaction"`
-	Reason      string            `json:"reason"`
-	Details     map[string]string `json:"details"`
+	Rest    memoizationStoredLocation `json:"rest"`
+	Reason  string                    `json:"reason"`
+	Details map[string]string         `json:"details"`
+}
+
+type memoizationStoredLocation struct {
+	Endpoint    string `json:"endpoint"`
+	Method      string `json:"method"`
+	Interaction string `json:"interaction"`
 }
 
 type memoizationResult struct {
@@ -89,7 +93,7 @@ const memoizationBillingProviderContract = `
 }`
 
 const memoizationFabricatedBreaks = `
-[{ "endpoint": "/orders", "method": "get", "interaction": "200",
+[{ "rest": { "endpoint": "/orders", "method": "get", "interaction": "200" },
    "reason": "property_missing_in_consumer",
    "details": { "property": "$.fabricated", "consumerName": "cart",
                 "providerName": "orders", "propertyType": "boolean" } }]`
@@ -281,11 +285,9 @@ func (this *IntegrationSuite) TestMemoization_CachedVerdictKeepsLiveEnvironmentB
 
 	this.Equal(1, this.countRows("compatibility_verdicts"))
 	this.Equal([]memoizationStoredBreak{{
-		Endpoint:    "/orders",
-		Method:      "get",
-		Interaction: "200",
-		Reason:      "property_missing_in_provider",
-		Details:     expectedBreak.Details,
+		Rest:    memoizationStoredLocation{Endpoint: "/orders", Method: "get", Interaction: "200"},
+		Reason:  "property_missing_in_provider",
+		Details: expectedBreak.Details,
 	}}, this.storedVerdictForMemoization())
 
 	secondBody, second := this.canIDeployForMemoization("cart", "v1")

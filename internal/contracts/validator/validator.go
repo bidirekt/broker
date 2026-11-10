@@ -1,11 +1,11 @@
 package validator
 
 import (
-	"github.com/bidirekt/broker/internal/contracts/mapper/fragmentmapper"
+	"github.com/bidirekt/broker/internal/contracts/protocol"
 	"github.com/bidirekt/broker/internal/contracts/violation"
 )
 
-func Validate(declarations fragmentmapper.Declarations) []violation.Violation {
+func Validate(declarations protocol.Declarations) []violation.Violation {
 	var violations []violation.Violation
 
 	for _, rule := range rules {

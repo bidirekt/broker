@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/bidirekt/broker/internal/contracts/compatibility_checker"
+	restcontracts "github.com/bidirekt/broker/internal/contracts/protocols/rest"
 	"github.com/bidirekt/broker/internal/model"
+	restmodel "github.com/bidirekt/broker/internal/model/protocols/rest"
 	"github.com/guregu/null"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -61,7 +63,7 @@ func ordersBreaksCheckedFrom(
 		Resources:       map[string]model.PersistedResource{checked.PrimaryHash(): checked},
 	}
 
-	report := compatibility_checker.NewCompatibilityChecker(ordersWithoutVerdict{}).Check(
+	report := compatibility_checker.NewCompatibilityChecker(ordersWithoutVerdict{}, []compatibility_checker.ProtocolHooks{restcontracts.New()}).Check(
 		context.Background(),
 		checkedContract,
 		model.NewEnvironment(ordersEnvironment),
@@ -69,7 +71,7 @@ func ordersBreaksCheckedFrom(
 	)
 
 	var breaks []ordersBreak
-	for _, leaf := range report.Hierarchical[counterpartName].Endpoints[ordersEndpoint][ordersMethod][interaction] {
+	for _, leaf := range report.Hierarchical[counterpartName].Trees[restmodel.Protocol].(restmodel.ReportTree)[ordersEndpoint][ordersMethod][interaction] {
 		breaks = append(breaks, ordersBreak{leaf.Reason, leaf.Details})
 	}
 
@@ -79,33 +81,35 @@ func ordersBreaksCheckedFrom(
 func ordersBreaks(t *testing.T, interaction string, consumerSide, providerSide ordersSide) []ordersBreak {
 	t.Helper()
 
-	kind, status := model.RestResponse, null.StringFrom(interaction)
+	body, status := model.Output, interaction
 	if interaction == "request" {
-		kind, status = model.RestRequest, null.String{}
+		body, status = model.Input, ""
 	}
 
 	consumer := model.PersistedResource{
-		ParticipantName:    ordersConsumerName,
-		Direction:          model.Consumes,
-		Interaction:        kind,
-		ConsumedProvider:   null.StringFrom(ordersProviderName),
-		ConsumerHash:       null.StringFrom("spa-" + ordersProviderHash),
-		ProviderHash:       ordersProviderHash,
-		Endpoint:           ordersEndpoint,
-		Method:             ordersMethod,
-		ResponseStatusCode: status,
-		Bodies:             consumerSide.bodies,
-		Schemas:            consumerSide.schemas,
+		Resource: model.Resource{
+			ParticipantName:  ordersConsumerName,
+			Direction:        model.Consumes,
+			Protocol:         restmodel.Protocol,
+			Body:             body,
+			Identity:         restmodel.Identity{Endpoint: ordersEndpoint, Method: ordersMethod, Status: status},
+			ConsumedProvider: null.StringFrom(ordersProviderName),
+			Bodies:           consumerSide.bodies,
+		},
+		ConsumerHash: null.StringFrom("spa-" + ordersProviderHash),
+		ProviderHash: ordersProviderHash,
+		Schemas:      consumerSide.schemas,
 	}
 	provider := model.PersistedResource{
-		ParticipantName:    ordersProviderName,
-		Direction:          model.Provides,
-		Interaction:        kind,
+		Resource: model.Resource{
+			ParticipantName: ordersProviderName,
+			Direction:       model.Provides,
+			Protocol:        restmodel.Protocol,
+			Body:            body,
+			Identity:        restmodel.Identity{Endpoint: ordersEndpoint, Method: ordersMethod, Status: status},
+			Bodies:          providerSide.bodies,
+		},
 		ProviderHash:       ordersProviderHash,
-		Endpoint:           ordersEndpoint,
-		Method:             ordersMethod,
-		ResponseStatusCode: status,
-		Bodies:             providerSide.bodies,
 		Schemas:            providerSide.schemas,
 		ParticipantVersion: null.StringFrom("1.0.0"),
 	}

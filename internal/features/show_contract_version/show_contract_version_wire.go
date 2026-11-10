@@ -44,8 +44,8 @@ type CheckRow struct {
 }
 
 func newShowContractVersionPage(output ShowContractVersionOutput, deploymentsPager, checksPager pages.Pager) ShowContractVersionPage {
-	files := make([]ShownFile, 0, len(output.Files))
-	for _, file := range output.Files {
+	files := make([]ShownFile, 0, len(output.ContractVersion.Files))
+	for _, file := range output.ContractVersion.Files {
 		files = append(files, ShownFile{Source: file.Source, Lines: toLines(file.Content)})
 	}
 

@@ -47,13 +47,13 @@ const (
 
 	insertFieldVersionQuery = `
 		INSERT INTO field_versions
-			(field_id, contract_id, type, optional, nullable, ref, change_type)
+			(field_id, contract_id, type, optional, nullable, ref, members, change_type)
 		VALUES
-			($1, $2, NULLIF($3, ''), $4, $5, NULLIF($6, ''), $7)
+			($1, $2, NULLIF($3, ''), $4, $5, NULLIF($6, ''), $7, $8)
 	`
 
 	schemasAtContractQuery = `
-		SELECT s.name, f.path, COALESCE(fv.type, ''), fv.optional, fv.nullable, COALESCE(fv.ref, '')
+		SELECT s.name, f.path, COALESCE(fv.type, ''), fv.optional, fv.nullable, COALESCE(fv.ref, ''), fv.members
 		FROM contracts c
 		JOIN schemas s ON s.participant_id = c.participant_id
 		JOIN LATERAL (
@@ -65,7 +65,7 @@ const (
 		) sv ON true
 		JOIN fields f ON f.schema_id = s.id
 		JOIN LATERAL (
-			SELECT type, optional, nullable, ref, change_type
+			SELECT type, optional, nullable, ref, members, change_type
 			FROM field_versions
 			WHERE field_id = f.id AND contract_id <= c.id
 			ORDER BY contract_id DESC
@@ -81,7 +81,7 @@ type schemaCatalogs map[int64]model.Schemas
 
 func (this *ContractRepository) loadSchemasAt(
 	ctx context.Context,
-	q querier,
+	q Querier,
 	catalogs schemaCatalogs,
 	contractID int64,
 ) model.Schemas {
@@ -102,7 +102,7 @@ func (this *ContractRepository) loadSchemasAt(
 		var name, path string
 		var field model.Field
 
-		if err := rows.Scan(&name, &path, &field.Type, &field.Optional, &field.Nullable, &field.Ref); err != nil {
+		if err := rows.Scan(&name, &path, &field.Type, &field.Optional, &field.Nullable, &field.Ref, &field.Members); err != nil {
 			panic(fmt.Errorf("error scanning schema field: %w", err))
 		}
 
@@ -270,6 +270,7 @@ func (this *ContractRepository) insertFieldVersion(
 		field.Optional,
 		field.Nullable,
 		field.Ref,
+		field.Members,
 		string(kind),
 	); err != nil {
 		panic(fmt.Errorf("error inserting field version: %w", err))

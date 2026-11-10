@@ -59,9 +59,10 @@ func (this *IntegrationSuite) mustPostForPatchRoute(path, body string) {
 
 func (this *IntegrationSuite) patchRouteResources() []string {
 	rows, err := this.Pool.Query(context.Background(),
-		`SELECT concat_ws(' ', direction, consumed_provider, interaction, method, endpoint, response_status_code)
-		   FROM resources
-		  ORDER BY direction, interaction`)
+		`SELECT concat_ws(' ', r.direction, r.consumed_provider, r.body_role, rr.method, rr.endpoint, rr.response_status_code)
+		   FROM resources r
+		   JOIN rest_resources rr ON rr.resource_id = r.id
+		  ORDER BY r.direction, r.body_role`)
 	this.Require().NoError(err)
 
 	resources, err := pgx.CollectRows(rows, pgx.RowTo[string])
@@ -86,10 +87,10 @@ func (this *IntegrationSuite) TestPatchRoute_PublishesOnBothSidesAndCanIDeployRe
 	this.JSONEq(`{"message":"contract publish successful"}`, body)
 
 	this.Equal([]string{
-		"consumes pets_api rest_request patch /pets/*",
-		"consumes pets_api rest_response patch /pets/* 200",
-		"provides rest_request patch /pets/*",
-		"provides rest_response patch /pets/* 200",
+		"consumes pets_api input patch /pets/*",
+		"consumes pets_api output patch /pets/* 200",
+		"provides input patch /pets/*",
+		"provides output patch /pets/* 200",
 	}, this.patchRouteResources())
 
 	this.mustPostForPatchRoute("/api/deployments",

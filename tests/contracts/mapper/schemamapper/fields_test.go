@@ -218,3 +218,59 @@ func TestToSchemaModels_OptionalAndNullable_StayOnTheNodeThatDeclaresThem(t *tes
 		},
 	}, schemas)
 }
+
+func TestToSchemaModels_EnumValues_AreSorted(t *testing.T) {
+	catalog := contract.SchemasMap{
+		"Pet": {
+			Type:       "object",
+			Properties: map[string]contract.Schema{"status": {Type: "enum", Members: []string{"sold", "available", "pending"}}},
+		},
+	}
+
+	schemas := schemamapper.ToSchemaModels(catalog, []string{"Pet"})
+
+	assert.Equal(t, model.Schemas{"Pet": {
+		"":       {Type: "object"},
+		"status": {Type: "enum", Members: []string{"available", "pending", "sold"}},
+	}}, schemas)
+	assert.Equal(t, []string{"sold", "available", "pending"}, catalog["Pet"].Properties["status"].Members)
+}
+
+func TestToSchemaModels_UnionMembers_AreRefFieldsBelowTheUnion(t *testing.T) {
+	catalog := contract.SchemasMap{
+		"Order": {
+			Type: "object",
+			Properties: map[string]contract.Schema{"payment": {Type: "union", UnionMembers: map[string]contract.Schema{
+				"card": {Ref: "CardPayment"},
+				"pix":  {Ref: "PixPayment"},
+			}}},
+		},
+		"CardPayment": {Type: "object", Properties: map[string]contract.Schema{"number": {Type: "string"}}},
+		"PixPayment":  {Type: "object", Properties: map[string]contract.Schema{"key": {Type: "string"}}},
+	}
+
+	schemas := schemamapper.ToSchemaModels(catalog, []string{"Order"})
+
+	assert.Equal(t, model.Schemas{
+		"Order": {
+			"":              {Type: "object"},
+			"payment":       {Type: "union"},
+			"payment(card)": {Ref: "CardPayment"},
+			"payment(pix)":  {Ref: "PixPayment"},
+		},
+		"CardPayment": {"": {Type: "object"}, "number": {Type: "string"}},
+		"PixPayment":  {"": {Type: "object"}, "key": {Type: "string"}},
+	}, schemas)
+}
+
+func TestToSchemaModels_UnionAtTheRoot_HasItsMembersRightAfterTheSchema(t *testing.T) {
+	catalog := contract.SchemasMap{
+		"Payment":     {Type: "union", UnionMembers: map[string]contract.Schema{"card": {Ref: "CardPayment"}}},
+		"CardPayment": {Type: "object", Properties: map[string]contract.Schema{"number": {Type: "string"}}},
+	}
+
+	schemas := schemamapper.ToSchemaModels(catalog, []string{"Payment"})
+
+	assert.Equal(t, model.Schema{"": {Type: "union"}, "(card)": {Ref: "CardPayment"}}, schemas["Payment"])
+	assert.Equal(t, "Payment(card)", model.FieldName("Payment", "(card)"))
+}

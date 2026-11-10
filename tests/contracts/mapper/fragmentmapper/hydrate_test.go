@@ -5,7 +5,10 @@ import (
 
 	"github.com/bidirekt/broker/internal/contracts/contract"
 	"github.com/bidirekt/broker/internal/contracts/mapper/fragmentmapper"
+	"github.com/bidirekt/broker/internal/contracts/protocol"
+	restcontracts "github.com/bidirekt/broker/internal/contracts/protocols/rest"
 	"github.com/bidirekt/broker/internal/model"
+	restmodel "github.com/bidirekt/broker/internal/model/protocols/rest"
 	"github.com/goccy/go-yaml"
 	"github.com/guregu/null"
 	"github.com/stretchr/testify/assert"
@@ -49,7 +52,7 @@ func singleFragment(t *testing.T, raw string) []contract.Fragment {
 func toResourceModels(t *testing.T, raw string) []model.UploadedResource {
 	t.Helper()
 
-	return fragmentmapper.ToResourceModels(fragmentmapper.ToDeclarations(singleFragment(t, raw)))
+	return fragmentmapper.ToResourceModels(fragmentmapper.ToDeclarations(singleFragment(t, raw), protocol.NewRegistry([]protocol.Protocol{restcontracts.New()})))
 }
 
 func TestToResourceModels_Happy_MaterializesResources(t *testing.T) {
@@ -59,11 +62,9 @@ func TestToResourceModels_Happy_MaterializesResources(t *testing.T) {
 	resource := resources[0]
 
 	assert.Equal(t, model.Consumes, resource.Direction)
-	assert.Equal(t, model.RestResponse, resource.Interaction)
+	assert.Equal(t, model.Output, resource.Body)
 	assert.Equal(t, "pets_service", resource.ConsumedProvider.String)
-	assert.Equal(t, "/pets", resource.Endpoint)
-	assert.Equal(t, "get", resource.Method)
-	assert.Equal(t, "200", resource.ResponseStatusCode.String)
+	assert.Equal(t, restmodel.Identity{Endpoint: "/pets", Method: "get", Status: "200"}, resource.Identity)
 	assert.Equal(t, []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Pet")}}, resource.Bodies)
 }
 
@@ -122,24 +123,22 @@ func TestToResourceModels_PostWithRequestBody_EmitsRequestAndResponses(t *testin
 
 	var request, response model.UploadedResource
 	for _, r := range resources {
-		switch r.Interaction {
-		case model.RestRequest:
+		switch r.Body {
+		case model.Input:
 			request = r
-		case model.RestResponse:
+		case model.Output:
 			response = r
 		}
 	}
 
 	assert.Equal(t, model.Consumes, request.Direction)
-	assert.Equal(t, model.RestRequest, request.Interaction)
-	assert.Equal(t, "/pets", request.Endpoint)
-	assert.Equal(t, "post", request.Method)
-	assert.Empty(t, request.ResponseStatusCode)
+	assert.Equal(t, model.Input, request.Body)
+	assert.Equal(t, restmodel.Identity{Endpoint: "/pets", Method: "post"}, request.Identity)
 	assert.Equal(t, []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("NewPet")}}, request.Bodies)
 
 	assert.Equal(t, model.Consumes, response.Direction)
-	assert.Equal(t, model.RestResponse, response.Interaction)
-	assert.Equal(t, "201", response.ResponseStatusCode.String)
+	assert.Equal(t, model.Output, response.Body)
+	assert.Equal(t, "201", response.Identity.(restmodel.Identity).Status)
 	assert.Equal(t, []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Pet")}}, response.Bodies)
 }
 
@@ -150,10 +149,8 @@ func TestToResourceModels_ProvidesSide_EmitsProvidedResource(t *testing.T) {
 	resource := resources[0]
 
 	assert.Equal(t, model.Provides, resource.Direction)
-	assert.Equal(t, model.RestResponse, resource.Interaction)
+	assert.Equal(t, model.Output, resource.Body)
 	assert.Empty(t, resource.ConsumedProvider)
-	assert.Equal(t, "/pets", resource.Endpoint)
-	assert.Equal(t, "get", resource.Method)
-	assert.Equal(t, "200", resource.ResponseStatusCode.String)
+	assert.Equal(t, restmodel.Identity{Endpoint: "/pets", Method: "get", Status: "200"}, resource.Identity)
 	assert.Equal(t, []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Pet")}}, resource.Bodies)
 }

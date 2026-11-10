@@ -5,7 +5,9 @@ import (
 	"testing"
 
 	"github.com/bidirekt/broker/internal/contracts/compatibility_checker"
+	restcontracts "github.com/bidirekt/broker/internal/contracts/protocols/rest"
 	"github.com/bidirekt/broker/internal/model"
+	restmodel "github.com/bidirekt/broker/internal/model/protocols/rest"
 	"github.com/guregu/null"
 	"github.com/stretchr/testify/assert"
 )
@@ -48,7 +50,7 @@ func petsBreaksCheckedFrom(
 		Resources:       map[string]model.PersistedResource{checked.PrimaryHash(): checked},
 	}
 
-	report := compatibility_checker.NewCompatibilityChecker(petsWithoutVerdict{}).Check(
+	report := compatibility_checker.NewCompatibilityChecker(petsWithoutVerdict{}, []compatibility_checker.ProtocolHooks{restcontracts.New()}).Check(
 		context.Background(),
 		checkedContract,
 		model.NewEnvironment(petsEnvironment),
@@ -56,7 +58,7 @@ func petsBreaksCheckedFrom(
 	)
 
 	var breaks []petsBreak
-	for _, leaf := range report.Hierarchical[counterpartName].Endpoints["/api/pets"]["get"]["200"] {
+	for _, leaf := range report.Hierarchical[counterpartName].Trees[restmodel.Protocol].(restmodel.ReportTree)["/api/pets"]["get"]["200"] {
 		breaks = append(breaks, petsBreak{leaf.Reason, leaf.Details["property"]})
 	}
 
@@ -67,27 +69,29 @@ func assertPetsBreaks(t *testing.T, readByTheConsumer, providedByTheProvider mod
 	t.Helper()
 
 	consumer := model.PersistedResource{
-		ParticipantName:    petsConsumerName,
-		Direction:          model.Consumes,
-		Interaction:        model.RestResponse,
-		ConsumedProvider:   null.StringFrom(petsProviderName),
-		ConsumerHash:       null.StringFrom("spa-" + petsProviderHash),
-		ProviderHash:       petsProviderHash,
-		Endpoint:           "/api/pets",
-		Method:             "get",
-		ResponseStatusCode: null.StringFrom("200"),
-		Bodies:             []model.ResourceBody{{Source: "spa.yaml", SchemaName: null.StringFrom("Pets")}},
-		Schemas:            model.Schemas{"Pets": readByTheConsumer},
+		Resource: model.Resource{
+			ParticipantName:  petsConsumerName,
+			Direction:        model.Consumes,
+			Protocol:         restmodel.Protocol,
+			Body:             model.Output,
+			Identity:         restmodel.Identity{Endpoint: "/api/pets", Method: "get", Status: "200"},
+			ConsumedProvider: null.StringFrom(petsProviderName),
+			Bodies:           []model.ResourceBody{{Source: "spa.yaml", SchemaName: null.StringFrom("Pets")}},
+		},
+		ConsumerHash: null.StringFrom("spa-" + petsProviderHash),
+		ProviderHash: petsProviderHash,
+		Schemas:      model.Schemas{"Pets": readByTheConsumer},
 	}
 	provider := model.PersistedResource{
-		ParticipantName:    petsProviderName,
-		Direction:          model.Provides,
-		Interaction:        model.RestResponse,
+		Resource: model.Resource{
+			ParticipantName: petsProviderName,
+			Direction:       model.Provides,
+			Protocol:        restmodel.Protocol,
+			Body:            model.Output,
+			Identity:        restmodel.Identity{Endpoint: "/api/pets", Method: "get", Status: "200"},
+			Bodies:          []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Pets")}},
+		},
 		ProviderHash:       petsProviderHash,
-		Endpoint:           "/api/pets",
-		Method:             "get",
-		ResponseStatusCode: null.StringFrom("200"),
-		Bodies:             []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Pets")}},
 		Schemas:            model.Schemas{"Pets": providedByTheProvider},
 		ParticipantVersion: null.StringFrom("1.0.0"),
 	}
