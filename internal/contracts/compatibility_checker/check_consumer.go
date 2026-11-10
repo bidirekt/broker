@@ -34,7 +34,7 @@ func (this *CompatibilityChecker) checkConsumer(
 
 		notFound := NewProviderResourceNotFound(&consumerResource)
 		if hint, declaresAround := counterparts.ProviderHints[consumerResource.ProviderHash]; declaresAround {
-			notFound.refine(this.hooksOf(consumerResource.Protocol).RefineNotFound(&consumerResource, hint))
+			notFound.refine(this.hooksOf(consumerResource.Protocol).RefineNotFound(hint))
 		}
 
 		result.AppendContractBreakChange(notFound)

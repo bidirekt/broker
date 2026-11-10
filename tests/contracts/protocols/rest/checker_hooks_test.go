@@ -33,9 +33,6 @@ func TestPluginIsTheCheckerHooksOfRest(t *testing.T) {
 }
 
 func TestRefineNotFound(t *testing.T) {
-	consumer := hooksUsersProvider("get", model.Output, "200")
-	consumer.Direction = model.Consumes
-
 	cases := []struct {
 		name    string
 		hint    any
@@ -45,18 +42,23 @@ func TestRefineNotFound(t *testing.T) {
 	}{
 		{"statuses declared on the method", restmodel.DeployedStatuses{"201", "204"}, model.ReasonProviderResourceInteractionNotFound, map[string]string{"providerStatuses": "201, 204"}, true},
 		{"only a request declared on the method", restmodel.DeployedStatuses(nil), model.ReasonProviderResourceInteractionNotFound, nil, true},
-		{"a hint of another protocol", []string{"204"}, "", nil, false},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			reason, details, refined := restcontracts.New().RefineNotFound(&consumer, tc.hint)
+			reason, details, refined := restcontracts.New().RefineNotFound(tc.hint)
 
 			assert.Equal(t, tc.reason, reason)
 			assert.Equal(t, tc.details, details)
 			assert.Equal(t, tc.refined, refined)
 		})
 	}
+}
+
+func TestRefineNotFound_AHintOfAnotherProtocolPanics(t *testing.T) {
+	assert.Panics(t, func() {
+		restcontracts.New().RefineNotFound([]string{"204"})
+	})
 }
 
 func TestRefineRemoved_ResponseOnSurvivingMethod_ListsTheLiveProviderStatusesSorted(t *testing.T) {
