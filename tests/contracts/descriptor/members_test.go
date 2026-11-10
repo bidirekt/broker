@@ -120,6 +120,19 @@ func TestMembers_ValueThatIsNotNonEmptyTextIsRejectedAtItsIndex(t *testing.T) {
 	}
 }
 
+func TestMembers_ValueWithNulByteIsNotText(t *testing.T) {
+	source := "type: enum\n" +
+		"members: [\"a\\0b\"]\n"
+
+	violations := descriptor.Validate(descriptor.Property(), membersDocument(t, source), "api.yaml")
+
+	assert.Equal(t, []violation.Violation{{
+		ErrorCode: "members.not_text",
+		Path:      "members;0",
+		Source:    "api.yaml",
+	}}, violations)
+}
+
 func TestMembers_EnumMembersThatIsNotAListIsAnInvalidKind(t *testing.T) {
 	source := "type: enum\n" +
 		"members: available\n"

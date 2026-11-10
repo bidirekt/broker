@@ -181,6 +181,26 @@ func TestUnionSentByTwoConsumerBodies_JoinsTheirMembers(t *testing.T) {
 	assertPaymentBreaks(t, "request", []string{"OrderA", "OrderB"}, consumerSchemas, paymentUnion("OrderRecord", "card", "pix"), nil)
 }
 
+func TestUnionSentByTwoConsumerBodies_MissingMemberNamesTheBodyDeclaringIt(t *testing.T) {
+	consumerSchemas := paymentUnion("OrderA", "card")
+	for name, fields := range paymentUnion("OrderB", "pix") {
+		consumerSchemas[name] = fields
+	}
+
+	for _, interaction := range []string{"request", "200"} {
+		t.Run(interaction, func(t *testing.T) {
+			assertPaymentBreaks(t, interaction, []string{"OrderA", "OrderB"}, consumerSchemas, paymentUnion("OrderRecord", "card"), []paymentBreak{{model.ReasonPropertyMemberMissingInProvider, map[string]string{
+				"property":      "$.payment",
+				"consumerName":  paymentConsumerName,
+				"providerName":  paymentProviderName,
+				"consumerField": "OrderB.payment",
+				"providerField": "OrderRecord.payment",
+				"member":        "pix",
+			}}})
+		})
+	}
+}
+
 func TestUnionAgainstAnotherTypeIsATypeMismatch(t *testing.T) {
 	providerSchemas := model.Schemas{"OrderRecord": {"": {Type: "object"}, "payment": {Type: "string"}}}
 

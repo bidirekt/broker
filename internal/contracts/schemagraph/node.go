@@ -125,6 +125,17 @@ func (this Node) Child(segment string) Node {
 	return child
 }
 
+func (this Node) Declaring(segment string) Node {
+	declaring := Node{graph: this.graph, join: this.join}
+	for _, declaration := range this.declarations {
+		if this.graph.declares(Site{Schema: declaration.shape.Schema, Path: model.ChildPath(declaration.shape.Path, segment)}) {
+			declaring.declarations = append(declaring.declarations, declaration)
+		}
+	}
+
+	return declaring
+}
+
 // SiteKey identifies the node by the fields it was reached through, which carry its optional and nullable.
 func (this Node) SiteKey() string {
 	var key strings.Builder

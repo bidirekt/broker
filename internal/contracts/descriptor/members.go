@@ -4,6 +4,7 @@ import (
 	"maps"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/bidirekt/broker/internal/contracts/violation"
 )
@@ -77,7 +78,7 @@ func (enumValuesNode) validate(value any, path string) []violation.Violation {
 type enumValueNode struct{}
 
 func (enumValueNode) validate(value any, path string) []violation.Violation {
-	if text, isText := value.(string); isText && text != "" {
+	if text, isText := value.(string); isText && text != "" && !strings.ContainsRune(text, 0) {
 		return nil
 	}
 

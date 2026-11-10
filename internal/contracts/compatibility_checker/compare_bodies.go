@@ -123,7 +123,7 @@ func (this *bodyComparison) compareUnionMembers(reader, producer schemagraph.Nod
 
 	for _, segment := range consumer.Segments() {
 		if !provider.Child(segment).Exists() {
-			this.breaks = append(this.breaks, NewMemberBreakChange(this.checked, this.counterpart, model.MemberKey(segment), path, consumer, provider))
+			this.breaks = append(this.breaks, NewMemberBreakChange(this.checked, this.counterpart, model.MemberKey(segment), path, consumer.Declaring(segment), provider))
 
 			continue
 		}
