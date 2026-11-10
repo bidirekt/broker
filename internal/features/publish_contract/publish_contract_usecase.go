@@ -2,6 +2,7 @@ package publish_contract
 
 import (
 	"context"
+	"slices"
 
 	"github.com/bidirekt/broker/internal/contracts/contract_differ"
 	"github.com/bidirekt/broker/internal/contracts/contractfiles"
@@ -87,6 +88,10 @@ func (this *PublishContractUseCase) Execute(ctx context.Context, input PublishCo
 }
 
 func hasSameContent(stored []model.ContractFile, participant *model.Participant, uploadedContract *model.UploadedContract) bool {
+	if slices.Equal(stored, uploadedContract.Files) {
+		return true
+	}
+
 	fragments, shapeViolations, err := contractfiles.ToFragments(stored)
 	if err != nil || len(shapeViolations) > 0 {
 		return false
