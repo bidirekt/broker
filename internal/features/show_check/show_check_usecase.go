@@ -27,10 +27,11 @@ type ShowCheckOutput struct {
 
 type ShowCheckUseCase struct {
 	compatibilityRepository *repository.CompatibilityRepository
+	reportReader            *breakreport.Reader
 }
 
-func NewShowCheckUseCase(compatibilityRepository *repository.CompatibilityRepository) *ShowCheckUseCase {
-	return &ShowCheckUseCase{compatibilityRepository: compatibilityRepository}
+func NewShowCheckUseCase(compatibilityRepository *repository.CompatibilityRepository, reportReader *breakreport.Reader) *ShowCheckUseCase {
+	return &ShowCheckUseCase{compatibilityRepository: compatibilityRepository, reportReader: reportReader}
 }
 
 func (this *ShowCheckUseCase) Execute(ctx context.Context, input ShowCheckInput) ShowCheckOutput {
@@ -39,27 +40,7 @@ func (this *ShowCheckUseCase) Execute(ctx context.Context, input ShowCheckInput)
 		return ShowCheckOutput{Status: CheckNotFound}
 	}
 
-	results := this.compatibilityRepository.ListCheckResults(ctx, check.ID)
-	counterparts := make([]breakreport.StoredCounterpart, 0, len(results))
-	for _, result := range results {
-		counterparts = append(counterparts, breakreport.StoredCounterpart{
-			Name:       result.CounterpartName,
-			Role:       result.Role,
-			Version:    result.CounterpartVersion.String,
-			Registered: result.CounterpartParticipantID.Valid,
-			Deployable: result.Deployable,
-		})
-	}
-
-	report, err := breakreport.FromStoredCheck(breakreport.StoredCheck{
-		Participant:  check.ParticipantName,
-		Environment:  check.EnvironmentName,
-		Report:       check.Report,
-		Counterparts: counterparts,
-	})
-	if err != nil {
-		panic(err)
-	}
+	report := this.reportReader.FromStoredCheck(*check, this.compatibilityRepository.ListCheckResults(ctx, check.ID))
 
 	return ShowCheckOutput{Status: CheckFound, Check: check, Report: report}
 }

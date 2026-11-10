@@ -93,7 +93,7 @@
           <div class="badges">
             {{range .Shown}}<span>{{template "role" .Role}}{{if .ParticipantURL}}<a class="badge cpb{{if .Breaks}} no{{else if not .Version}} quiet{{end}}" href="{{.ParticipantURL}}">{{template "counterpart" .}}</a>{{else}}<span class="badge cpb{{if .Breaks}} no{{else if not .Version}} quiet{{end}}">{{template "counterpart" .}}</span>{{end}}</span>{{end}}
             {{if .More}}<a class="badge more" href="/checks/{{.Check.ID}}">+{{.More}} more</a>{{end}}
-            {{if and .Report.Stored (not .Report.Counterparts)}}<span class="muted">nothing deployed shares an endpoint</span>{{end}}
+            {{if and .Report.Stored (not .Report.Counterparts)}}<span class="muted">nothing deployed shares a resource</span>{{end}}
           </div>
         </td>
         <td data-l="Asked">{{listTime .Check.CreatedAt}}</td>

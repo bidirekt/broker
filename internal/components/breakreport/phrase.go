@@ -33,14 +33,14 @@ func (this Phrase) String() string {
 	return text.String()
 }
 
-func plain(text string) Segment {
+func Plain(text string) Segment {
 	return Segment{Text: text, Kind: PlainSegment}
 }
 
-func name(text string) Segment {
+func Name(text string) Segment {
 	return Segment{Text: text, Kind: NameSegment}
 }
 
-func code(text string) Segment {
+func Code(text string) Segment {
 	return Segment{Text: text, Kind: CodeSegment}
 }

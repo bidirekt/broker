@@ -51,6 +51,7 @@ components:
   components_input:         { in: internal/components/input }
   components_access:        { in: internal/components/access }
   components_breakreport:   { in: internal/components/breakreport }
+  components_breakreport_protocols: { in: internal/components/breakreport/protocols/** }
   components_pages:         { in: internal/components/pages }
   components_respond:       { in: internal/components/respond }
   components_bearer:        { in: internal/components/bearer }
@@ -98,6 +99,8 @@ deps:
   bootstrap:
     mayDependOn:
       - components
+      - components_breakreport
+      - components_breakreport_protocols
       - components_config
       - contracts
       - contracts_protocols
@@ -259,6 +262,8 @@ deps:
     canUse: [fiber]
   components_breakreport:
     mayDependOn: [model]
+  components_breakreport_protocols:
+    mayDependOn: [components_breakreport, model, model_protocols]
   components_bearer:
     mayDependOn: [components_access, components_config, components_pages, components_respond, components_tokens, repository, model]
     canUse: [fiber, golang_jwt]
@@ -308,6 +313,7 @@ deps:
       - components_access
       - components_bearer
       - components_breakreport
+      - components_breakreport_protocols
       - components_config
       - components_database
       - components_pages

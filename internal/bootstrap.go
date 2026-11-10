@@ -2,6 +2,8 @@ package internal
 
 import (
 	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components/breakreport"
+	restbreakreport "github.com/bidirekt/broker/internal/components/breakreport/protocols/rest"
 	"github.com/bidirekt/broker/internal/components/config"
 	"github.com/bidirekt/broker/internal/contracts/compatibility_checker"
 	"github.com/bidirekt/broker/internal/contracts/protocol"
@@ -56,6 +58,7 @@ func Run() (*components.Components, error) {
 	protocols := protocol.NewRegistry([]protocol.Protocol{restContracts})
 	hooks := []compatibility_checker.ProtocolHooks{restContracts}
 	tables := []repository.ProtocolTable{restrepository.New()}
+	reportReader := breakreport.NewReader([]breakreport.ProtocolSection{restbreakreport.New()})
 
 	// registers /participants/new-participant, which must precede show_participant_versions' /participants/:name
 	create_participant.Register(kernel)
@@ -84,17 +87,17 @@ func Run() (*components.Components, error) {
 	reactivate_user.Register(kernel)
 	set_password.Register(kernel)
 	setup_admin.Register(kernel)
-	show_check.Register(kernel)
+	show_check.Register(kernel, reportReader)
 	list_participant_pages.Register(kernel)
 	show_participant_versions.Register(kernel)
 	list_participant_deployments.Register(kernel)
-	list_participant_checks.Register(kernel)
-	show_contract_version.Register(kernel)
+	list_participant_checks.Register(kernel, reportReader)
+	show_contract_version.Register(kernel, reportReader)
 	show_participant_relations.Register(kernel)
 	list_environment_pages.Register(kernel)
-	show_environment.Register(kernel)
-	show_compatibility.Register(kernel)
-	show_overview.Register(kernel)
+	show_environment.Register(kernel, reportReader)
+	show_compatibility.Register(kernel, reportReader)
+	show_overview.Register(kernel, reportReader)
 
 	return kernel, nil
 }

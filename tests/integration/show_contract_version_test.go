@@ -312,7 +312,7 @@ func (this *IntegrationSuite) TestShowContractVersion_StoredCheckWithNoCounterpa
 
 	_, _, body := this.getPage(contractVersionProviderPath, this.signInAsAdmin())
 
-	this.Contains(body, `<span class="muted">nothing deployed shares an endpoint</span>`)
+	this.Contains(body, `<span class="muted">nothing deployed shares a resource</span>`)
 }
 
 func (this *IntegrationSuite) TestShowContractVersion_CheckWithoutAStoredReportOrCounterpartsLeavesComparedWithEmpty() {
@@ -324,7 +324,7 @@ func (this *IntegrationSuite) TestShowContractVersion_CheckWithoutAStoredReportO
 	_, _, body := this.getPage(contractVersionProviderPath, this.signInAsAdmin())
 
 	this.Regexp(`<td data-l="Compared with">\s*<div class="badges">\s*</div>\s*</td>`, body)
-	this.NotContains(body, `nothing deployed shares an endpoint`)
+	this.NotContains(body, `nothing deployed shares a resource`)
 }
 
 func (this *IntegrationSuite) TestShowContractVersion_PaginatesTheChecks() {

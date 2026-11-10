@@ -41,10 +41,14 @@ type ShowContractVersionOutput struct {
 
 type ShowContractVersionUseCase struct {
 	contractVersionPageRepository *repository.ContractVersionPageRepository
+	reportReader                  *breakreport.Reader
 }
 
-func NewShowContractVersionUseCase(contractVersionPageRepository *repository.ContractVersionPageRepository) *ShowContractVersionUseCase {
-	return &ShowContractVersionUseCase{contractVersionPageRepository: contractVersionPageRepository}
+func NewShowContractVersionUseCase(
+	contractVersionPageRepository *repository.ContractVersionPageRepository,
+	reportReader *breakreport.Reader,
+) *ShowContractVersionUseCase {
+	return &ShowContractVersionUseCase{contractVersionPageRepository: contractVersionPageRepository, reportReader: reportReader}
 }
 
 func (this *ShowContractVersionUseCase) Execute(ctx context.Context, input ShowContractVersionInput) ShowContractVersionOutput {
@@ -66,10 +70,10 @@ func (this *ShowContractVersionUseCase) Execute(ctx context.Context, input ShowC
 		Status:             ContractVersionFound,
 		ContractVersion:    contractVersion,
 		CurrentDeployments: this.contractVersionPageRepository.ListCurrentDeploymentsOfVersion(ctx, contractVersion.ParticipantID, contractVersion.Version),
-		LatestChecks:       toReportedChecks(latestChecks, results),
+		LatestChecks:       this.toReportedChecks(latestChecks, results),
 		Deployments:        deployments,
 		DeploymentsTotal:   deploymentsTotal,
-		Checks:             toReportedChecks(checks, results),
+		Checks:             this.toReportedChecks(checks, results),
 		ChecksTotal:        checksTotal,
 	}
 }
@@ -85,31 +89,10 @@ func checkIDs(checkLists ...[]model.CompatibilityCheck) []int64 {
 	return ids
 }
 
-func toReportedChecks(checks []model.CompatibilityCheck, results map[int64][]model.CompatibilityCheckResult) []ReportedCheck {
+func (this *ShowContractVersionUseCase) toReportedChecks(checks []model.CompatibilityCheck, results map[int64][]model.CompatibilityCheckResult) []ReportedCheck {
 	reported := make([]ReportedCheck, 0, len(checks))
 	for _, check := range checks {
-		counterparts := make([]breakreport.StoredCounterpart, 0, len(results[check.ID]))
-		for _, result := range results[check.ID] {
-			counterparts = append(counterparts, breakreport.StoredCounterpart{
-				Name:       result.CounterpartName,
-				Role:       result.Role,
-				Version:    result.CounterpartVersion.String,
-				Registered: result.CounterpartParticipantID.Valid,
-				Deployable: result.Deployable,
-			})
-		}
-
-		report, err := breakreport.FromStoredCheck(breakreport.StoredCheck{
-			Participant:  check.ParticipantName,
-			Environment:  check.EnvironmentName,
-			Report:       check.Report,
-			Counterparts: counterparts,
-		})
-		if err != nil {
-			panic(err)
-		}
-
-		reported = append(reported, ReportedCheck{Check: check, Report: report})
+		reported = append(reported, ReportedCheck{Check: check, Report: this.reportReader.FromStoredCheck(check, results[check.ID])})
 	}
 
 	return reported

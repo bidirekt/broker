@@ -1,4 +1,4 @@
-package breakreport
+package rest
 
 import (
 	"fmt"
@@ -6,10 +6,11 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/bidirekt/broker/internal/components/breakreport"
 	"github.com/bidirekt/broker/internal/model"
 )
 
-func toEndpointBreak(checked checkedInteraction, contractBreak storedBreak) EndpointBreak {
+func toEndpointBreak(checked checkedInteraction, contractBreak model.ReportBreak) EndpointBreak {
 	sentence, fixes := endpointBreakLine(checked, contractBreak)
 
 	return EndpointBreak{
@@ -20,16 +21,16 @@ func toEndpointBreak(checked checkedInteraction, contractBreak storedBreak) Endp
 	}
 }
 
-func endpointBreakLine(checked checkedInteraction, contractBreak storedBreak) (Phrase, []Fix) {
-	me, other := checked.participant, checked.counterpart.Name
+func endpointBreakLine(checked checkedInteraction, contractBreak model.ReportBreak) (breakreport.Phrase, []breakreport.Fix) {
+	me, other := checked.Participant, checked.Counterpart.Name
 	resource := checked.resource()
 	status := checked.interaction
 	reason, details := contractBreak.Reason, contractBreak.Details
 	asConsumer, asProvider := contractBreak.Role == model.RoleConsumer, contractBreak.Role == model.RoleProvider
 	onRequest, onResponse := checked.isRequest(), !checked.isRequest()
 
-	fixes := func(checkedAction, otherAction string) []Fix {
-		return []Fix{
+	fixes := func(checkedAction, otherAction string) []breakreport.Fix {
+		return []breakreport.Fix{
 			{Participant: me, Action: checkedAction, Checked: true},
 			{Participant: other, Action: otherAction},
 		}
@@ -37,41 +38,41 @@ func endpointBreakLine(checked checkedInteraction, contractBreak storedBreak) (P
 
 	switch {
 	case reason == model.ReasonProviderResourceNotFound && asConsumer:
-		return Phrase{name(me), plain(" calls "), code(resource), plain(", but "), name(other), plain(" doesn't provide it")},
+		return breakreport.Phrase{breakreport.Name(me), breakreport.Plain(" calls "), breakreport.Code(resource), breakreport.Plain(", but "), breakreport.Name(other), breakreport.Plain(" doesn't provide it")},
 			fixes("stop calling it", "publish it")
 	case reason == model.ReasonProviderResourceInteractionNotFound && asConsumer && onRequest:
-		return Phrase{name(me), plain(" sends a request body, but "), name(other), plain(" declares none")},
+		return breakreport.Phrase{breakreport.Name(me), breakreport.Plain(" sends a request body, but "), breakreport.Name(other), breakreport.Plain(" declares none")},
 			fixes("stop sending it", "accept a request body")
 	case reason == model.ReasonProviderResourceInteractionNotFound && asConsumer && onResponse && details["providerStatuses"] == "":
-		return Phrase{name(me), plain(" reads response " + status + ", but "), name(other), plain(" declares no response")},
+		return breakreport.Phrase{breakreport.Name(me), breakreport.Plain(" reads response " + status + ", but "), breakreport.Name(other), breakreport.Plain(" declares no response")},
 			fixes("stop reading it", "answer "+status)
 	case reason == model.ReasonProviderResourceInteractionNotFound && asConsumer && onResponse:
 		providerStatuses := orList(details["providerStatuses"])
-		return Phrase{name(me), plain(" reads response " + status + ", but "), name(other), plain(" answers only " + providerStatuses)},
+		return breakreport.Phrase{breakreport.Name(me), breakreport.Plain(" reads response " + status + ", but "), breakreport.Name(other), breakreport.Plain(" answers only " + providerStatuses)},
 			fixes("read response "+providerStatuses, "answer "+status)
 	case reason == model.ReasonProviderResourceNotDeployedInEnvironment && asConsumer:
-		return Phrase{name(me), plain(" calls "), code(resource), plain(", but "), name(other), plain(" is not deployed in "), name(checked.environment)},
-			[]Fix{{Participant: other, Action: "deploy it to " + checked.environment + " first"}}
+		return breakreport.Phrase{breakreport.Name(me), breakreport.Plain(" calls "), breakreport.Code(resource), breakreport.Plain(", but "), breakreport.Name(other), breakreport.Plain(" is not deployed in "), breakreport.Name(checked.Environment)},
+			[]breakreport.Fix{{Participant: other, Action: "deploy it to " + checked.Environment + " first"}}
 	case reason == model.ReasonProviderResourceRemovedButStillConsumed && asProvider:
-		return Phrase{name(me), plain(" removed "), code(resource), plain(", but "), name(other), plain(" still calls it")},
+		return breakreport.Phrase{breakreport.Name(me), breakreport.Plain(" removed "), breakreport.Code(resource), breakreport.Plain(", but "), breakreport.Name(other), breakreport.Plain(" still calls it")},
 			fixes("keep it until "+other+" stops calling it", "stop calling it")
 	case reason == model.ReasonProviderResourceInteractionRemovedButStillConsumed && asProvider && onRequest:
-		return Phrase{name(me), plain(" dropped the request body of "), code(resource), plain(", but "), name(other), plain(" still sends it")},
+		return breakreport.Phrase{breakreport.Name(me), breakreport.Plain(" dropped the request body of "), breakreport.Code(resource), breakreport.Plain(", but "), breakreport.Name(other), breakreport.Plain(" still sends it")},
 			fixes("keep accepting it until "+other+" stops sending it", "stop sending it")
 	case reason == model.ReasonProviderResourceInteractionRemovedButStillConsumed && asProvider && onResponse && details["providerStatuses"] == "":
-		return Phrase{name(me), plain(" no longer answers "), code(resource), plain(", but "), name(other), plain(" still reads response " + status)},
+		return breakreport.Phrase{breakreport.Name(me), breakreport.Plain(" no longer answers "), breakreport.Code(resource), breakreport.Plain(", but "), breakreport.Name(other), breakreport.Plain(" still reads response " + status)},
 			fixes("keep answering "+status+" until "+other+" stops reading it", "stop reading it")
 	case reason == model.ReasonProviderResourceInteractionRemovedButStillConsumed && asProvider && onResponse:
 		providerStatuses := orList(details["providerStatuses"])
-		return Phrase{name(me), plain(" now answers "), code(resource), plain(" only with " + providerStatuses + ", but "), name(other), plain(" still reads response " + status)},
+		return breakreport.Phrase{breakreport.Name(me), breakreport.Plain(" now answers "), breakreport.Code(resource), breakreport.Plain(" only with " + providerStatuses + ", but "), breakreport.Name(other), breakreport.Plain(" still reads response " + status)},
 			fixes("keep answering "+status+" until "+other+" stops reading it", "read response "+providerStatuses)
 	default:
-		return Phrase{plain(fallbackBreakLine(reason, details))}, nil
+		return breakreport.Phrase{breakreport.Plain(fallbackBreakLine(reason, details))}, nil
 	}
 }
 
-func reasonLine(checked checkedInteraction, contractBreak storedBreak) string {
-	counterpart, environment := checked.counterpart, checked.environment
+func reasonLine(checked checkedInteraction, contractBreak model.ReportBreak) string {
+	counterpart, environment := checked.Counterpart, checked.Environment
 	deployedCounterpart := strings.TrimSpace(counterpart.Name + " " + counterpart.Version)
 
 	switch contractBreak.Reason {

@@ -52,10 +52,11 @@ type ShowOverviewOutput struct {
 
 type ShowOverviewUseCase struct {
 	overviewRepository *repository.OverviewRepository
+	reportReader       *breakreport.Reader
 }
 
-func NewShowOverviewUseCase(overviewRepository *repository.OverviewRepository) *ShowOverviewUseCase {
-	return &ShowOverviewUseCase{overviewRepository: overviewRepository}
+func NewShowOverviewUseCase(overviewRepository *repository.OverviewRepository, reportReader *breakreport.Reader) *ShowOverviewUseCase {
+	return &ShowOverviewUseCase{overviewRepository: overviewRepository, reportReader: reportReader}
 }
 
 func (this *ShowOverviewUseCase) Execute(ctx context.Context, _ ShowOverviewInput) ShowOverviewOutput {
@@ -81,14 +82,14 @@ func (this *ShowOverviewUseCase) Execute(ctx context.Context, _ ShowOverviewInpu
 	saidNoChecks := make([]SaidNoCheck, 0, len(saidNo))
 	for _, check := range saidNo {
 		saidNoChecks = append(saidNoChecks, SaidNoCheck{
-			ReportedCheck:       toReportedCheck(check.CompatibilityCheck, resultsByCheck[check.ID]),
+			ReportedCheck:       this.toReportedCheck(check.CompatibilityCheck, resultsByCheck[check.ID]),
 			DeployedThereAnyway: check.DeployedThereAnyway,
 		})
 	}
 
 	reportedChecks := make([]ReportedCheck, 0, len(recentChecks))
 	for _, check := range recentChecks {
-		reportedChecks = append(reportedChecks, toReportedCheck(check, resultsByCheck[check.ID]))
+		reportedChecks = append(reportedChecks, this.toReportedCheck(check, resultsByCheck[check.ID]))
 	}
 
 	return ShowOverviewOutput{
@@ -132,27 +133,6 @@ func toNewestEvents(deployments []model.Deployment, checks []ReportedCheck) []Ev
 	return events
 }
 
-func toReportedCheck(check model.CompatibilityCheck, results []model.CompatibilityCheckResult) ReportedCheck {
-	counterparts := make([]breakreport.StoredCounterpart, 0, len(results))
-	for _, result := range results {
-		counterparts = append(counterparts, breakreport.StoredCounterpart{
-			Name:       result.CounterpartName,
-			Role:       result.Role,
-			Version:    result.CounterpartVersion.String,
-			Registered: result.CounterpartParticipantID.Valid,
-			Deployable: result.Deployable,
-		})
-	}
-
-	report, err := breakreport.FromStoredCheck(breakreport.StoredCheck{
-		Participant:  check.ParticipantName,
-		Environment:  check.EnvironmentName,
-		Report:       check.Report,
-		Counterparts: counterparts,
-	})
-	if err != nil {
-		panic(err)
-	}
-
-	return ReportedCheck{Check: check, Report: report}
+func (this *ShowOverviewUseCase) toReportedCheck(check model.CompatibilityCheck, results []model.CompatibilityCheckResult) ReportedCheck {
+	return ReportedCheck{Check: check, Report: this.reportReader.FromStoredCheck(check, results)}
 }

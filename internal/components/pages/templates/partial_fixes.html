@@ -1,0 +1,1 @@
+{{define "fixes"}}{{if .}}<div class="fixes">{{range $index, $fix := .}}<div class="fix {{if .Checked}}self{{else}}other{{end}}{{if eq (len $) 1}} only{{end}}"><span class="side">{{if eq $index 0}}Fix in{{else}}or fix in{{end}} <b>{{.Participant}}</b></span><span>{{.Action}}</span></div>{{end}}</div>{{end}}{{end}}

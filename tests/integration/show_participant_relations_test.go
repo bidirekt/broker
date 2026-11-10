@@ -101,7 +101,7 @@ const relationsOrdersWebContract = `consumes:
             200: ~
 `
 
-const relationsFooter = `A can-i-deploy compares the version with the deployed counterparts that share an endpoint with it. A consumer counts only when it is deployed; a provider it consumes from that is not deployed is a break.`
+const relationsFooter = `A can-i-deploy compares the version with the deployed counterparts that share a resource with it. A consumer counts only when it is deployed; a provider it consumes from that is not deployed is a break.`
 
 func (this *IntegrationSuite) mustPostForRelations(path, body string) {
 	status, response := this.post(path, body)

@@ -363,7 +363,7 @@ func (this *IntegrationSuite) TestShowCheck_YesWithNothingToCompareSaysNothingSh
 
 	_, _, body := this.getPage(checkPath, this.signInAsAdmin())
 
-	this.Contains(body, `nothing deployed in <span class="name">production</span> shares an endpoint with <span class="name">petstore_reviews</span>`)
+	this.Contains(body, `nothing deployed in <span class="name">production</span> shares a resource with <span class="name">petstore_reviews</span>`)
 }
 
 func (this *IntegrationSuite) TestShowCheck_KeepsTheEnvironmentNameOfTheCheck() {
