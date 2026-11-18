@@ -7,9 +7,11 @@ import (
 	"unicode"
 )
 
+const segmentName = `[A-Za-z0-9._~-]+`
+
 var (
-	literalSegment     = regexp.MustCompile(`^[A-Za-z0-9._~-]+$`)
-	placeholderSegment = regexp.MustCompile(`^(?:\{.+\}|:.+|<.+>|\[.+\])$`)
+	literalSegment     = regexp.MustCompile(`^` + segmentName + `$`)
+	placeholderSegment = regexp.MustCompile(`^(?:\{` + segmentName + `\}|:` + segmentName + `|<` + segmentName + `>|\[` + segmentName + `\])$`)
 	errDynamicSegment  = errors.New("dynamic path segments must use *")
 )
 
