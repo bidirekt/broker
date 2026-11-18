@@ -382,7 +382,7 @@ func (this *IntegrationSuite) TestPublishContract_ParamEndpoint_RejectedNothingS
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1", contractFragment{"api.yaml", contractBodyParamEndpoint}))
 	this.Equal(http.StatusBadRequest, status)
 	this.JSONEq(`{"message":"contract validation failed","violations":[`+
-		`{"code":"endpoint.syntax","path":"provides;rest;/users/{userId}","source":"api.yaml","details":{"key":"/users/{userId}","error":"dynamic path segments must use *"}}`+
+		`{"code":"endpoint.syntax","path":"provides;rest;/users/{userId}","source":"api.yaml","details":{"key":"/users/{userId}","error":"dynamic path segments must use *","suggestion":"/users/*"}}`+
 		`]}`, body)
 
 	this.Equal(0, this.countRows("contracts"))
@@ -395,7 +395,7 @@ func (this *IntegrationSuite) TestPublishContract_ColonParamEndpoint_RejectedNot
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1", contractFragment{"api.yaml", contractBodyColonParamEndpoint}))
 	this.Equal(http.StatusBadRequest, status)
 	this.JSONEq(`{"message":"contract validation failed","violations":[`+
-		`{"code":"endpoint.syntax","path":"provides;rest;/pets/:petId","source":"api.yaml","details":{"key":"/pets/:petId","error":"dynamic path segments must use *"}}`+
+		`{"code":"endpoint.syntax","path":"provides;rest;/pets/:petId","source":"api.yaml","details":{"key":"/pets/:petId","error":"dynamic path segments must use *","suggestion":"/pets/*"}}`+
 		`]}`, body)
 
 	this.Equal(0, this.countRows("contracts"))
@@ -1038,7 +1038,7 @@ func (this *IntegrationSuite) TestPublishContract_ShapeViolation_ReportedBeforeC
 	))
 	this.Equal(http.StatusBadRequest, status)
 	this.JSONEq(`{"message":"contract validation failed","violations":[`+
-		`{"code":"endpoint.syntax","path":"provides;rest;/users/*/{orderId}","source":"api.yaml","details":{"key":"/users/*/{orderId}","error":"dynamic path segments must use *"}}`+
+		`{"code":"endpoint.syntax","path":"provides;rest;/users/*/{orderId}","source":"api.yaml","details":{"key":"/users/*/{orderId}","error":"dynamic path segments must use *","suggestion":"/users/*/*"}}`+
 		`]}`, body)
 
 	this.Equal(0, this.countRows("contracts"))

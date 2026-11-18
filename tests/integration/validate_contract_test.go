@@ -504,7 +504,7 @@ func (this *IntegrationSuite) TestValidateContract_ColonParamEndpoint_Rejected()
 
 	this.Equal(http.StatusBadRequest, status)
 	this.JSONEq(`{"message":"contract validation failed","violations":[`+
-		`{"code":"endpoint.syntax","path":"provides;rest;/pets/:petId","source":"api.yaml","details":{"key":"/pets/:petId","error":"dynamic path segments must use *"}}`+
+		`{"code":"endpoint.syntax","path":"provides;rest;/pets/:petId","source":"api.yaml","details":{"key":"/pets/:petId","error":"dynamic path segments must use *","suggestion":"/pets/*"}}`+
 		`]}`, body)
 }
 

@@ -159,6 +159,7 @@ schemas:
 	assert.Equal(t, "endpoint.syntax", violations[2].ErrorCode)
 	assert.Equal(t, "provides;rest;/users/{id}", violations[2].Path)
 	assert.Equal(t, "/users/{id}", violations[2].Details["key"])
+	assert.Equal(t, "/users/*", violations[2].Details["suggestion"])
 
 	assert.Equal(t, "schema.invalid_type", violations[3].ErrorCode)
 	assert.Equal(t, "schemas;Pet;type", violations[3].Path)
@@ -285,10 +286,12 @@ consumes:
 	assert.Equal(t, "endpoint.syntax", violations[0].ErrorCode)
 	assert.Equal(t, "consumes;users_api;rest;/users/{userId}", violations[0].Path)
 	assert.Equal(t, "/users/{userId}", violations[0].Details["key"])
+	assert.Equal(t, "/users/*", violations[0].Details["suggestion"])
 
 	assert.Equal(t, "endpoint.syntax", violations[1].ErrorCode)
 	assert.Equal(t, "provides;rest;/users/{userId}", violations[1].Path)
 	assert.Equal(t, "/users/{userId}", violations[1].Details["key"])
+	assert.Equal(t, "/users/*", violations[1].Details["suggestion"])
 }
 
 func TestContract_NomeDeServicoInvalidoSuprimeADescida(t *testing.T) {

@@ -57,3 +57,35 @@ func TestCheckEndpoint_RejectsNamedDynamicSegments(t *testing.T) {
 		})
 	}
 }
+
+func TestSuggestEndpoint(t *testing.T) {
+	for _, test := range []struct {
+		endpoint   string
+		suggestion string
+	}{
+		{endpoint: "/users/{id}", suggestion: "/users/*"},
+		{endpoint: "/pets/:petId", suggestion: "/pets/*"},
+		{endpoint: "/pets/<id>", suggestion: "/pets/*"},
+		{endpoint: "/pets/[id]", suggestion: "/pets/*"},
+		{endpoint: "/pets/{id}/", suggestion: "/pets/*"},
+		{endpoint: "/owners/{ownerId}/pets/:petId", suggestion: "/owners/*/pets/*"},
+		{endpoint: "/users/*/{orderId}", suggestion: "/users/*/*"},
+		{endpoint: "/pets/p*", suggestion: ""},
+		{endpoint: "/users/*id", suggestion: ""},
+		{endpoint: "/v1/items:batchGet", suggestion: ""},
+		{endpoint: "/pets/{petId};v=2", suggestion: ""},
+		{endpoint: "/pets/{}", suggestion: ""},
+		{endpoint: "/pets/:", suggestion: ""},
+		{endpoint: "pets/{id}", suggestion: ""},
+		{endpoint: "/a b/{id}", suggestion: ""},
+		{endpoint: "/{id}/a b", suggestion: ""},
+		{endpoint: "/pets/{a\x00b}", suggestion: ""},
+		{endpoint: "/users//{id}", suggestion: ""},
+		{endpoint: "/users/*", suggestion: ""},
+		{endpoint: "/users/", suggestion: ""},
+	} {
+		t.Run(test.endpoint, func(t *testing.T) {
+			assert.Equal(t, test.suggestion, restcontracts.SuggestEndpoint(test.endpoint))
+		})
+	}
+}
