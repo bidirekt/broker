@@ -10,6 +10,7 @@ import (
 type Key struct {
 	ErrorCode string
 	Check     func(key string) error
+	Suggest   func(key string) string
 }
 
 func (this Key) reject(key string, path string) *violation.Violation {
@@ -22,14 +23,14 @@ func (this Key) reject(key string, path string) *violation.Violation {
 		return nil
 	}
 
-	return &violation.Violation{
-		ErrorCode: this.ErrorCode,
-		Path:      path,
-		Details: map[string]string{
-			"key":   key,
-			"error": err.Error(),
-		},
+	details := map[string]string{"key": key, "error": err.Error()}
+	if this.Suggest != nil {
+		if suggestion := this.Suggest(key); suggestion != "" {
+			details["suggestion"] = suggestion
+		}
 	}
+
+	return &violation.Violation{ErrorCode: this.ErrorCode, Path: path, Details: details}
 }
 
 func Map(key Key, value Node) Node {

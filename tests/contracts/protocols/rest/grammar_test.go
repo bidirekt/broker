@@ -40,7 +40,11 @@ func TestEndpoint_RejectsADynamicSegmentWithAColon(t *testing.T) {
 	require.Len(t, violations, 1)
 	assert.Equal(t, "endpoint.syntax", violations[0].ErrorCode)
 	assert.Equal(t, "/pets/:petId", violations[0].Path)
-	assert.Equal(t, map[string]string{"key": "/pets/:petId", "error": "dynamic path segments must use *"}, violations[0].Details)
+	assert.Equal(t, map[string]string{
+		"key":        "/pets/:petId",
+		"error":      "dynamic path segments must use *",
+		"suggestion": "/pets/*",
+	}, violations[0].Details)
 }
 
 func TestEndpoint_NormalizesTheTrailingSlashBeforeChecking(t *testing.T) {

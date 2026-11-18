@@ -31,6 +31,7 @@ var (
 		Check: func(key string) error {
 			return CheckEndpoint(NormalizeEndpoint(key))
 		},
+		Suggest: SuggestEndpoint,
 	}
 	StatusCode = descriptor.Key{ErrorCode: "status.out_of_range", Check: statusCodeInRange}
 )

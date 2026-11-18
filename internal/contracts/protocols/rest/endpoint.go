@@ -7,7 +7,13 @@ import (
 	"unicode"
 )
 
-var literalSegment = regexp.MustCompile(`^[A-Za-z0-9._~-]+$`)
+const segmentName = `[A-Za-z0-9._~-]+`
+
+var (
+	literalSegment     = regexp.MustCompile(`^` + segmentName + `$`)
+	placeholderSegment = regexp.MustCompile(`^(?:\{` + segmentName + `\}|:` + segmentName + `|<` + segmentName + `>|\[` + segmentName + `\])$`)
+	errDynamicSegment  = errors.New("dynamic path segments must use *")
+)
 
 func NormalizeEndpoint(endpoint string) string {
 	path, hasTrailingSlash := strings.CutSuffix(endpoint, "/")
@@ -35,7 +41,7 @@ func CheckEndpoint(value string) error {
 		}
 
 		if strings.ContainsAny(segment, "*:{}<>[]") {
-			return errors.New("dynamic path segments must use *")
+			return errDynamicSegment
 		}
 
 		if !literalSegment.MatchString(segment) {
@@ -44,4 +50,25 @@ func CheckEndpoint(value string) error {
 	}
 
 	return nil
+}
+
+func SuggestEndpoint(endpoint string) string {
+	normalized := NormalizeEndpoint(endpoint)
+	if !errors.Is(CheckEndpoint(normalized), errDynamicSegment) {
+		return ""
+	}
+
+	segments := strings.Split(normalized, "/")
+	for index, segment := range segments {
+		if placeholderSegment.MatchString(segment) {
+			segments[index] = "*"
+		}
+	}
+
+	suggestion := strings.Join(segments, "/")
+	if CheckEndpoint(suggestion) != nil {
+		return ""
+	}
+
+	return suggestion
 }
