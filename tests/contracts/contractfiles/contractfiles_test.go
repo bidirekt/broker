@@ -215,3 +215,54 @@ func TestToUploadedContract_RuleViolations_ReturnedWithoutContract(t *testing.T)
 		},
 	}, violations)
 }
+
+func TestToViolations_UnresolvedSchemaName_SameViolationsAsToUploadedContract(t *testing.T) {
+	fragments := decodeFragments(t, model.ContractFile{Source: "endpoints.yaml", Content: petsEndpointYAML})
+	participant := &model.Participant{ID: 7, Name: "pets_service"}
+	_, uploadedContractViolations, err := interpreter.ToUploadedContract(fragments, participant, "v1", contractFiles)
+	require.NoError(t, err)
+
+	violations := interpreter.ToViolations(fragments)
+
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "schema.unresolved_name",
+			Path:      "provides;rest;/pets;get;responses;200",
+			Source:    "endpoints.yaml",
+			Details:   map[string]string{"schema": "Pet", "resource": "provides GET /pets 200"},
+		},
+	}, violations)
+	assert.Equal(t, uploadedContractViolations, violations)
+}
+
+func TestToViolations_SchemaDeclaredInTwoFiles_SameViolationsAsToUploadedContract(t *testing.T) {
+	fragments := decodeFragments(t,
+		model.ContractFile{Source: "endpoints.yaml", Content: petsEndpointYAML},
+		model.ContractFile{Source: "schemas.yaml", Content: petSchemaYAML},
+		model.ContractFile{Source: "pets.yaml", Content: petSchemaYAML},
+	)
+	participant := &model.Participant{ID: 7, Name: "pets_service"}
+	_, uploadedContractViolations, err := interpreter.ToUploadedContract(fragments, participant, "v1", contractFiles)
+	require.NoError(t, err)
+
+	violations := interpreter.ToViolations(fragments)
+
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "schema.duplicate",
+			Path:      "schemas;Pet",
+			Source:    "schemas.yaml",
+			Details:   map[string]string{"schema": "Pet", "declaredIn": "pets.yaml"},
+		},
+	}, violations)
+	assert.Equal(t, uploadedContractViolations, violations)
+}
+
+func TestToViolations_ValidFragments_ReturnsNoViolation(t *testing.T) {
+	fragments := decodeFragments(t,
+		model.ContractFile{Source: "endpoints.yaml", Content: petsEndpointYAML},
+		model.ContractFile{Source: "schemas.yaml", Content: petSchemaYAML},
+	)
+
+	assert.Empty(t, interpreter.ToViolations(fragments))
+}

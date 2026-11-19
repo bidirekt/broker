@@ -75,6 +75,12 @@ func (this *Interpreter) ToUploadedContract(
 	return uploadedContract, nil, nil
 }
 
+func (this *Interpreter) ToViolations(fragments []contract.Fragment) []violation.Violation {
+	_, violations := this.toCheckedDeclarations(fragments)
+
+	return violations
+}
+
 func (this *Interpreter) toCheckedDeclarations(fragments []contract.Fragment) (protocol.Declarations, []violation.Violation) {
 	declarations := fragmentmapper.ToDeclarations(fragments, this.registry)
 

@@ -28,6 +28,10 @@ type ValidateContractResponseBody struct {
 	Results     map[string]compatibility_checker.Hierarchical `json:"results"`
 }
 
+type ValidateContractSyntaxResponseBody struct {
+	Message string `json:"message"`
+}
+
 type ValidateContractErrorResponseBody struct {
 	Message string `json:"message"`
 }
