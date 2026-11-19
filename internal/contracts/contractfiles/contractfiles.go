@@ -56,9 +56,8 @@ func (this *Interpreter) ToUploadedContract(
 	version string,
 	files []model.ContractFile,
 ) (*model.UploadedContract, []violation.Violation, error) {
-	declarations := fragmentmapper.ToDeclarations(fragments, this.registry)
-
-	if violations := validator.Validate(declarations); len(violations) > 0 {
+	declarations, violations := this.toCheckedDeclarations(fragments)
+	if len(violations) > 0 {
 		return nil, violations, nil
 	}
 
@@ -74,4 +73,16 @@ func (this *Interpreter) ToUploadedContract(
 	}
 
 	return uploadedContract, nil, nil
+}
+
+func (this *Interpreter) ToViolations(fragments []contract.Fragment) []violation.Violation {
+	_, violations := this.toCheckedDeclarations(fragments)
+
+	return violations
+}
+
+func (this *Interpreter) toCheckedDeclarations(fragments []contract.Fragment) (protocol.Declarations, []violation.Violation) {
+	declarations := fragmentmapper.ToDeclarations(fragments, this.registry)
+
+	return declarations, validator.Validate(declarations)
 }

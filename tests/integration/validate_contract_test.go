@@ -3,6 +3,13 @@ package integration_test
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/bidirekt/broker/internal/model"
+)
+
+const (
+	validateReaderEmail    = "validate-reader@x.com"
+	validateReaderPassword = "validate-reader-correct-horse"
 )
 
 type validateBreakJSON struct {
@@ -272,6 +279,17 @@ func (this *IntegrationSuite) validateBody(participant, environment string, file
 	return string(body)
 }
 
+func (this *IntegrationSuite) validateSyntaxBody(files ...validateFile) string {
+	body, err := json.Marshal(struct {
+		Contracts []validateFile `json:"contracts"`
+	}{
+		Contracts: files,
+	})
+	this.Require().NoError(err)
+
+	return string(body)
+}
+
 func (this *IntegrationSuite) validateOK(participant string, files ...validateFile) (validateResponseJSON, string) {
 	status, body := this.post("/api/contracts/validate", this.validateBody(participant, "production", files...))
 	this.Require().Equalf(http.StatusOK, status, "validate %s: %s", participant, body)
@@ -313,7 +331,8 @@ func (this *IntegrationSuite) TestValidateContract_InvalidInput() {
 	file := validateFile{"api.yaml", validateCatalogStockYAML}
 	cases := map[string]string{
 		"unparseable body":    `{"participant":`,
-		"empty participant":   this.validateBody(" ", "production", file),
+		"blank participant":   this.validateBody(" ", "production", file),
+		"empty participant":   this.validateBody("", "production", file),
 		"empty environment":   this.validateBody("catalog", "", file),
 		"empty contracts":     this.validateBody("catalog", "production"),
 		"blank source":        this.validateBody("catalog", "production", validateFile{"  ", validateCatalogStockYAML}),
@@ -327,6 +346,33 @@ func (this *IntegrationSuite) TestValidateContract_InvalidInput() {
 		this.Equal(http.StatusBadRequest, status, name)
 		this.JSONEq(`{"message":"contract invalid input"}`, response, name)
 	}
+}
+
+func (this *IntegrationSuite) TestValidateContract_OnlyParticipantOrOnlyEnvironment_InvalidInput() {
+	this.setupForValidate("catalog")
+
+	contracts := []validateFile{{"api.yaml", validateCatalogStockYAML}}
+	cases := map[string]map[string]any{
+		"only participant": {"participant": "catalog", "contracts": contracts},
+		"only environment": {"environment": "production", "contracts": contracts},
+	}
+
+	for name, fields := range cases {
+		body, err := json.Marshal(fields)
+		this.Require().NoError(err)
+
+		status, response := this.post("/api/contracts/validate", string(body))
+		this.Equal(http.StatusBadRequest, status, name)
+		this.JSONEq(`{"message":"contract invalid input"}`, response, name)
+	}
+}
+
+func (this *IntegrationSuite) TestValidateContract_BlankParticipantAndEnvironment_InvalidInput() {
+	status, body := this.post("/api/contracts/validate",
+		this.validateBody(" ", " ", validateFile{"api.yaml", validateCatalogStockYAML}))
+
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(`{"message":"contract invalid input"}`, body)
 }
 
 func (this *IntegrationSuite) TestValidateContract_PaddedParticipantOrEnvironment() {
@@ -699,4 +745,89 @@ func (this *IntegrationSuite) TestValidateContract_RemovalIsMeasuredFromTheDeplo
 	breaks := response.Results["web"].Endpoints["/items"]["get"]["200"]
 	this.Require().Len(breaks, 1)
 	this.Equal("provider_resource_removed_but_still_consumed", breaks[0].Reason)
+}
+
+func (this *IntegrationSuite) TestValidateContract_WithoutParticipantAndEnvironment_ValidFiles() {
+	cases := map[string]string{
+		"provider":                        this.validateSyntaxBody(validateFile{"api.yaml", validateCatalogItemsAndStockYAML}),
+		"consumer of an unknown provider": this.validateSyntaxBody(validateFile{"api.yaml", validateWebItemsYAML}),
+		"empty participant and environment": this.validateBody("", "",
+			validateFile{"api.yaml", validateCatalogItemsAndStockYAML}),
+	}
+
+	for name, body := range cases {
+		status, response := this.post("/api/contracts/validate", body)
+		this.Equal(http.StatusOK, status, name)
+		this.JSONEq(`{"message":"contract validated successfully"}`, response, name)
+	}
+}
+
+func (this *IntegrationSuite) TestValidateContract_WithoutParticipantAndEnvironment_InvalidFilesAnsweredAsWithBoth() {
+	this.setupForValidate("catalog")
+
+	cases := map[string]struct {
+		file     validateFile
+		response string
+	}{
+		"unsupported extension": {
+			validateFile{"notes.txt", validateCatalogStockYAML},
+			`{"message":"unsupported contract file: notes.txt (expected .yaml or .yml)"}`,
+		},
+		"malformed YAML": {
+			validateFile{"broken.yaml", "provides: {"},
+			`{"message":"malformed contract file: broken.yaml: [1:11] could not find flow mapping end token '}'\n>  1 | provides: {\n                 ^\n"}`,
+		},
+		"shape violation": {
+			validateFile{"api.yaml", validateColonParamEndpointYAML},
+			`{"message":"contract validation failed","violations":[` +
+				`{"code":"endpoint.syntax","path":"provides;rest;/pets/:petId","source":"api.yaml","details":{"key":"/pets/:petId","error":"dynamic path segments must use *","suggestion":"/pets/*"}}` +
+				`]}`,
+		},
+		"rule violation": {
+			validateFile{"api.yaml", validateUnresolvedSchemaYAML},
+			`{"message":"contract validation failed","violations":[` +
+				`{"code":"schema.unresolved_name","path":"provides;rest;/items;get;responses;200","source":"api.yaml","details":{"schema":"Missing","resource":"provides GET /items 200"}}` +
+				`]}`,
+		},
+	}
+
+	for name, testCase := range cases {
+		status, withoutBoth := this.post("/api/contracts/validate", this.validateSyntaxBody(testCase.file))
+		this.Equal(http.StatusBadRequest, status, name)
+		this.JSONEq(testCase.response, withoutBoth, name)
+
+		status, withBoth := this.post("/api/contracts/validate", this.validateBody("catalog", "production", testCase.file))
+		this.Equal(http.StatusBadRequest, status, name)
+		this.JSONEq(withBoth, withoutBoth, name)
+	}
+}
+
+func (this *IntegrationSuite) TestValidateContract_WithoutParticipantAndEnvironment_StoresNothing() {
+	this.setupForValidate("catalog", "web")
+	this.publishAndDeployForValidate("catalog", "v1", validateCatalogItemsAndStockYAML)
+	this.publishAndDeployForValidate("web", "v1", validateWebItemsYAML)
+
+	before := this.rowCountsForValidate()
+
+	status, body := this.post("/api/contracts/validate",
+		this.validateSyntaxBody(validateFile{"api.yaml", validateCatalogStockYAML}))
+	this.Equal(http.StatusOK, status)
+	this.JSONEq(`{"message":"contract validated successfully"}`, body)
+	this.Equal(before, this.rowCountsForValidate())
+
+	status, _ = this.post("/api/contracts/validate",
+		this.validateSyntaxBody(validateFile{"api.yaml", validateUnresolvedSchemaYAML}))
+	this.Equal(http.StatusBadRequest, status)
+	this.Equal(before, this.rowCountsForValidate())
+}
+
+func (this *IntegrationSuite) TestValidateContract_WithoutParticipantAndEnvironment_ReadPermissionIsEnough() {
+	this.createActiveUser(validateReaderEmail, model.PermissionRead, validateReaderPassword)
+	token := this.signInToApi(validateReaderEmail, validateReaderPassword)
+
+	status, _, body := this.postWithToken("/api/contracts/validate", token,
+		this.validateSyntaxBody(validateFile{"api.yaml", validateCatalogStockYAML}))
+
+	this.Equal(http.StatusOK, status)
+	this.JSONEq(`{"message":"contract validated successfully"}`, body)
 }

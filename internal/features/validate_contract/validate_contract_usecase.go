@@ -15,6 +15,7 @@ type ValidateContractStatus int
 
 const (
 	ContractValidated ValidateContractStatus = iota
+	ContractSyntaxValidated
 	ParticipantNotFound
 	EnvironmentNotFound
 	ContractFilesUnreadable
@@ -65,6 +66,10 @@ func NewValidateContractUseCase(
 }
 
 func (this *ValidateContractUseCase) Execute(ctx context.Context, input ValidateContractInput) (ValidateContractOutput, error) {
+	if input.EnvironmentName == "" {
+		return this.validateSyntax(input.Contracts), nil
+	}
+
 	participant, exists := this.participantRepository.FindByName(ctx, input.ParticipantName)
 	if !exists {
 		return ValidateContractOutput{Status: ParticipantNotFound}, nil
@@ -107,6 +112,23 @@ func (this *ValidateContractUseCase) Execute(ctx context.Context, input Validate
 		Deployable:  compatibilityReport.Deployable(),
 		Results:     compatibilityReport.Hierarchical,
 	}, nil
+}
+
+func (this *ValidateContractUseCase) validateSyntax(files []model.ContractFile) ValidateContractOutput {
+	fragments, shapeViolations, err := this.interpreter.ToFragments(files)
+	if err != nil {
+		return ValidateContractOutput{Status: ContractFilesUnreadable, ReadError: err.Error()}
+	}
+
+	if len(shapeViolations) > 0 {
+		return ValidateContractOutput{Status: ContractValidationFailed, Violations: shapeViolations}
+	}
+
+	if violations := this.interpreter.ToViolations(fragments); len(violations) > 0 {
+		return ValidateContractOutput{Status: ContractValidationFailed, Violations: violations}
+	}
+
+	return ValidateContractOutput{Status: ContractSyntaxValidated}
 }
 
 func (this *ValidateContractUseCase) toRemovedSinceDeployed(

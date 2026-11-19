@@ -29,7 +29,7 @@ func (this *ValidateContractApiHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondInvalidInput(ctx)
 	}
 
-	if validations.UnpaddedValue(requestBody.Participant) != nil || validations.UnpaddedValue(requestBody.Environment) != nil || len(requestBody.Contracts) == 0 || contractfiles.HasBlankSource(requestBody.Contracts) {
+	if !hasBothOrNeither(requestBody.Participant, requestBody.Environment) || len(requestBody.Contracts) == 0 || contractfiles.HasBlankSource(requestBody.Contracts) {
 		return this.respondInvalidInput(ctx)
 	}
 
@@ -51,6 +51,8 @@ func (this *ValidateContractApiHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondBadRequest(ctx, output.ReadError)
 	case ContractValidationFailed:
 		return this.respondValidationFailed(ctx, output.Violations)
+	case ContractSyntaxValidated:
+		return this.respondSyntaxValidated(ctx)
 	}
 
 	return ctx.Status(fiber.StatusOK).JSON(ValidateContractResponseBody{
@@ -60,6 +62,14 @@ func (this *ValidateContractApiHandler) Handle(ctx fiber.Ctx) error {
 		Deployable:  output.Deployable,
 		Results:     output.Results,
 	})
+}
+
+func hasBothOrNeither(participant, environment string) bool {
+	if participant == "" && environment == "" {
+		return true
+	}
+
+	return validations.UnpaddedValue(participant) == nil && validations.UnpaddedValue(environment) == nil
 }
 
 func (this *ValidateContractApiHandler) respondForbidden(ctx fiber.Ctx) error {
@@ -90,5 +100,11 @@ func (this *ValidateContractApiHandler) respondValidationFailed(ctx fiber.Ctx, v
 func (this *ValidateContractApiHandler) respondNotFound(ctx fiber.Ctx, message string) error {
 	return ctx.Status(fiber.StatusNotFound).JSON(ValidateContractErrorResponseBody{
 		Message: message,
+	})
+}
+
+func (this *ValidateContractApiHandler) respondSyntaxValidated(ctx fiber.Ctx) error {
+	return ctx.Status(fiber.StatusOK).JSON(ValidateContractSyntaxResponseBody{
+		Message: ContractValidatedMessage,
 	})
 }
