@@ -150,3 +150,88 @@ func TestSchemaName_AcceptsUnderscoreAndHyphen(t *testing.T) {
 
 	assert.Empty(t, violations)
 }
+
+const descriptionSyntaxError = "must be ASCII letters and digits, with single spaces between words"
+
+func TestDescription_RejectsPunctuation(t *testing.T) {
+	for _, description := range []string{"In kilograms, rounded", "In kilograms.", "the pet's age", "e-mail address"} {
+		t.Run(description, func(t *testing.T) {
+			violations := descriptor.Validate(descriptor.Description, description, "api.yaml")
+
+			require.Len(t, violations, 1)
+			assert.Equal(t, "schema.description_syntax", violations[0].ErrorCode)
+			assert.Equal(t, map[string]string{"value": description, "error": descriptionSyntaxError}, violations[0].Details)
+		})
+	}
+}
+
+func TestDescription_RejectsSpacingOtherThanSingleSpacesBetweenWords(t *testing.T) {
+	for name, description := range map[string]string{
+		"double space":   "In  kilograms",
+		"leading space":  " In kilograms",
+		"trailing space": "In kilograms ",
+		"only a space":   " ",
+		"tab":            "In\tkilograms",
+		"line break":     "In kilograms\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			violations := descriptor.Validate(descriptor.Description, description, "api.yaml")
+
+			require.Len(t, violations, 1)
+			assert.Equal(t, "schema.description_syntax", violations[0].ErrorCode)
+			assert.Equal(t, map[string]string{"value": description, "error": descriptionSyntaxError}, violations[0].Details)
+		})
+	}
+}
+
+func TestDescription_RejectsNonASCIICharacters(t *testing.T) {
+	for name, description := range map[string]string{
+		"accented letter":    "naïve owner",
+		"non-breaking space": "In kilograms",
+		"full-width digits":  "１２３",
+	} {
+		t.Run(name, func(t *testing.T) {
+			violations := descriptor.Validate(descriptor.Description, description, "api.yaml")
+
+			require.Len(t, violations, 1)
+			assert.Equal(t, "schema.description_syntax", violations[0].ErrorCode)
+			assert.Equal(t, map[string]string{"value": description, "error": descriptionSyntaxError}, violations[0].Details)
+		})
+	}
+}
+
+func TestDescription_RejectsAnEmptyDescription(t *testing.T) {
+	violations := descriptor.Validate(descriptor.Description, "", "api.yaml")
+
+	require.Len(t, violations, 1)
+	assert.Equal(t, "schema.description_syntax", violations[0].ErrorCode)
+	assert.Equal(t, map[string]string{"value": "", "error": "must not be empty"}, violations[0].Details)
+}
+
+func TestDescription_AcceptsASCIILettersAndDigitsWithSingleSpaces(t *testing.T) {
+	for _, description := range []string{"In kilograms", "who walks the pet", "HTTP 2 status", "plain text", "yes", "true", "null", "123", "0x1F"} {
+		assert.Empty(t, descriptor.Validate(descriptor.Description, description, "api.yaml"), description)
+	}
+}
+
+func TestDescription_NullCountsAsAbsent(t *testing.T) {
+	violations := descriptor.Validate(descriptor.Description, nil, "api.yaml")
+
+	assert.Empty(t, violations)
+}
+
+func TestDescription_RejectsANonStringAsInvalidKind(t *testing.T) {
+	for kind, description := range map[string]any{
+		"integer":  uint64(123),
+		"boolean":  true,
+		"sequence": []any{"In kilograms"},
+	} {
+		t.Run(kind, func(t *testing.T) {
+			violations := descriptor.Validate(descriptor.Description, description, "api.yaml")
+
+			require.Len(t, violations, 1)
+			assert.Equal(t, "value.invalid_kind", violations[0].ErrorCode)
+			assert.Equal(t, map[string]string{"expected": "string", "got": kind}, violations[0].Details)
+		})
+	}
+}

@@ -1,6 +1,8 @@
 package descriptor_test
 
 import (
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -29,6 +31,54 @@ func TestString_RejeitaMapeamento(t *testing.T) {
 	assert.Equal(t, "", violations[0].Path)
 	assert.Equal(t, "api.yaml", violations[0].Source)
 	assert.Equal(t, map[string]string{"expected": "string", "got": "mapping"}, violations[0].Details)
+}
+
+func withoutDigits(value string) error {
+	if strings.ContainsAny(value, "0123456789") {
+		return errors.New("must not contain digits")
+	}
+
+	return nil
+}
+
+func TestText_AcceptsTextThatPassesTheCheck(t *testing.T) {
+	subject := descriptor.Text{ErrorCode: "text.digits", Check: withoutDigits}
+
+	violations := descriptor.Validate(subject, "Pet", "api.yaml")
+
+	assert.Empty(t, violations)
+}
+
+func TestText_RejectedTextComesWithTheValueAndTheCheckError(t *testing.T) {
+	subject := descriptor.Object(descriptor.Fields{
+		"name": descriptor.Text{ErrorCode: "text.digits", Check: withoutDigits},
+	})
+
+	violations := descriptor.Validate(subject, map[string]any{"name": "Pet2"}, "api.yaml")
+
+	require.Len(t, violations, 1)
+	assert.Equal(t, "text.digits", violations[0].ErrorCode)
+	assert.Equal(t, "name", violations[0].Path)
+	assert.Equal(t, "api.yaml", violations[0].Source)
+	assert.Equal(t, map[string]string{"value": "Pet2", "error": "must not contain digits"}, violations[0].Details)
+}
+
+func TestText_NullCountsAsAbsent(t *testing.T) {
+	subject := descriptor.Text{ErrorCode: "text.digits", Check: withoutDigits}
+
+	violations := descriptor.Validate(subject, nil, "api.yaml")
+
+	assert.Empty(t, violations)
+}
+
+func TestText_RejectsANonStringAsInvalidKind(t *testing.T) {
+	subject := descriptor.Text{ErrorCode: "text.digits", Check: withoutDigits}
+
+	violations := descriptor.Validate(subject, uint64(2), "api.yaml")
+
+	require.Len(t, violations, 1)
+	assert.Equal(t, "value.invalid_kind", violations[0].ErrorCode)
+	assert.Equal(t, map[string]string{"expected": "string", "got": "integer"}, violations[0].Details)
 }
 
 func TestBool_AceitaBooleano(t *testing.T) {
