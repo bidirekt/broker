@@ -10,9 +10,9 @@ import (
 )
 
 var (
-	Text      = String()
-	Flag      = Bool()
-	SchemaRef = String()
+	Description = Text{ErrorCode: "schema.description_syntax", Check: alphanumericWords}
+	Flag        = Bool()
+	SchemaRef   = String()
 
 	SchemaType = Enum{
 		ErrorCode: "schema.invalid_type",
@@ -47,4 +47,28 @@ func pathSafeName(key string) error {
 	default:
 		return nil
 	}
+}
+
+func alphanumericWords(value string) error {
+	if value == "" {
+		return errors.New("must not be empty")
+	}
+
+	for _, word := range strings.Split(value, " ") {
+		if word == "" || !isAlphanumeric(word) {
+			return errors.New("must be ASCII letters and digits, with single spaces between words")
+		}
+	}
+
+	return nil
+}
+
+func isAlphanumeric(word string) bool {
+	for _, character := range word {
+		if (character < 'a' || character > 'z') && (character < 'A' || character > 'Z') && (character < '0' || character > '9') {
+			return false
+		}
+	}
+
+	return true
 }

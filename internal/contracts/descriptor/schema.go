@@ -19,7 +19,7 @@ func SchemaAt(position string) Node {
 func schema(positionRules ...Rule) Node {
 	return Object(Fields{
 		"type":        SchemaType,
-		"description": Text,
+		"description": Description,
 		"properties":  Map(PropertyName, Lazy(Property)),
 		"items":       Lazy(func() Node { return SchemaAt("items") }),
 		"values":      Lazy(func() Node { return SchemaAt("values") }),

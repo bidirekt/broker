@@ -259,6 +259,27 @@ const validateColonParamEndpointYAML = `provides:
           200: ~
 `
 
+const validateDescriptionOutsideTheRuleYAML = `provides:
+  rest:
+    /pets:
+      get:
+        responses:
+          200: Pet
+schemas:
+  Pet:
+    type: object
+    description: A pet, as the store sells it.
+    properties:
+      name:
+        type: string
+        description: ""
+`
+
+const validateDescriptionOutsideTheRuleResponse = `{"message":"contract validation failed","violations":[` +
+	`{"code":"schema.description_syntax","path":"schemas;Pet;description","source":"api.yaml","details":{"value":"A pet, as the store sells it.","error":"must be ASCII letters and digits, with single spaces between words"}},` +
+	`{"code":"schema.description_syntax","path":"schemas;Pet;properties;name;description","source":"api.yaml","details":{"value":"","error":"must not be empty"}}` +
+	`]}`
+
 func (this *IntegrationSuite) mustPostForValidate(path, body string) {
 	status, response := this.post(path, body)
 	this.Require().Equalf(http.StatusOK, status, "POST %s: %s", path, response)
@@ -554,6 +575,18 @@ func (this *IntegrationSuite) TestValidateContract_ColonParamEndpoint_Rejected()
 		`]}`, body)
 }
 
+func (this *IntegrationSuite) TestValidateContract_DescriptionOutsideTheRule_RejectedNothingStored() {
+	this.setupForValidate("pets_service")
+	before := this.rowCountsForValidate()
+
+	status, body := this.post("/api/contracts/validate",
+		this.validateBody("pets_service", "production", validateFile{"api.yaml", validateDescriptionOutsideTheRuleYAML}))
+
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(validateDescriptionOutsideTheRuleResponse, body)
+	this.Equal(before, this.rowCountsForValidate())
+}
+
 func (this *IntegrationSuite) TestValidateContract_Compatible() {
 	this.setupForValidate("catalog", "web")
 	this.publishAndDeployForValidate("catalog", "v1", validateCatalogItemsAndStockYAML)
@@ -818,6 +851,17 @@ func (this *IntegrationSuite) TestValidateContract_WithoutParticipantAndEnvironm
 	status, _ = this.post("/api/contracts/validate",
 		this.validateSyntaxBody(validateFile{"api.yaml", validateUnresolvedSchemaYAML}))
 	this.Equal(http.StatusBadRequest, status)
+	this.Equal(before, this.rowCountsForValidate())
+}
+
+func (this *IntegrationSuite) TestValidateContract_WithoutParticipantAndEnvironment_DescriptionOutsideTheRule_RejectedNothingStored() {
+	before := this.rowCountsForValidate()
+
+	status, body := this.post("/api/contracts/validate",
+		this.validateSyntaxBody(validateFile{"api.yaml", validateDescriptionOutsideTheRuleYAML}))
+
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(validateDescriptionOutsideTheRuleResponse, body)
 	this.Equal(before, this.rowCountsForValidate())
 }
 

@@ -22,6 +22,33 @@ func (stringNode) validate(value any, path string) []violation.Violation {
 	return []violation.Violation{invalidKind(value, path, "string")}
 }
 
+type Text struct {
+	ErrorCode string
+	Check     func(value string) error
+}
+
+func (this Text) validate(value any, path string) []violation.Violation {
+	if value == nil {
+		return nil
+	}
+
+	text, isText := value.(string)
+	if !isText {
+		return []violation.Violation{invalidKind(value, path, "string")}
+	}
+
+	err := this.Check(text)
+	if err == nil {
+		return nil
+	}
+
+	return []violation.Violation{{
+		ErrorCode: this.ErrorCode,
+		Path:      path,
+		Details:   map[string]string{"value": text, "error": err.Error()},
+	}}
+}
+
 func Bool() Node {
 	return boolNode{}
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/bidirekt/broker/internal/contracts/descriptor"
+	"github.com/bidirekt/broker/internal/contracts/violation"
 )
 
 func schemaDocument(t *testing.T, source string) any {
@@ -543,4 +544,37 @@ func TestSchema_OptionalOnAPropertyIsValid(t *testing.T) {
 	violations := descriptor.Validate(descriptor.SchemaAt("schema"), schemaDocument(t, source), "api.yaml")
 
 	assert.Empty(t, violations)
+}
+
+func TestSchema_DescriptionIsCheckedAtEveryLevel(t *testing.T) {
+	source := "type: object\n" +
+		"description: A pet.\n" +
+		"properties:\n" +
+		"  name:\n" +
+		"    type: string\n" +
+		"    description: \"\"\n" +
+		"  notes:\n" +
+		"    type: map\n" +
+		"    values:\n" +
+		"      type: string\n" +
+		"      description: free text, as typed\n" +
+		"  owner:\n" +
+		"    ref: Person\n" +
+		"    description: who looks after the pet!\n" +
+		"  tags:\n" +
+		"    type: array\n" +
+		"    items:\n" +
+		"      type: string\n" +
+		"      description: \" one tag\"\n"
+
+	violations := descriptor.Validate(descriptor.SchemaAt("schema"), schemaDocument(t, source), "api.yaml")
+
+	syntaxError := "must be ASCII letters and digits, with single spaces between words"
+	assert.Equal(t, []violation.Violation{
+		{ErrorCode: "schema.description_syntax", Path: "description", Source: "api.yaml", Details: map[string]string{"value": "A pet.", "error": syntaxError}},
+		{ErrorCode: "schema.description_syntax", Path: "properties;name;description", Source: "api.yaml", Details: map[string]string{"value": "", "error": "must not be empty"}},
+		{ErrorCode: "schema.description_syntax", Path: "properties;notes;values;description", Source: "api.yaml", Details: map[string]string{"value": "free text, as typed", "error": syntaxError}},
+		{ErrorCode: "schema.description_syntax", Path: "properties;owner;description", Source: "api.yaml", Details: map[string]string{"value": "who looks after the pet!", "error": syntaxError}},
+		{ErrorCode: "schema.description_syntax", Path: "properties;tags;items;description", Source: "api.yaml", Details: map[string]string{"value": " one tag", "error": syntaxError}},
+	}, violations)
 }
