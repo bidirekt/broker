@@ -20,6 +20,7 @@ type fieldBlockKey struct {
 	member                                   string
 	side                                     string
 	role                                     model.BreakRole
+	graph                                    string
 }
 
 type fieldBlock struct {
@@ -210,6 +211,7 @@ func toFieldBlock(checked checkedOperation, contractBreak model.ReportBreak) (fi
 			member:       details["member"],
 			side:         side,
 			role:         contractBreak.Role,
+			graph:        details[graphqlmodel.GraphKey],
 		},
 		places: []blockPlace{{Place: place, property: property.path, argument: property.argument}},
 	}
@@ -220,6 +222,11 @@ func toFieldBlock(checked checkedOperation, contractBreak model.ReportBreak) (fi
 		block.sentence, block.checkedFix, block.otherFix = phrases.consumerChecked, consumerFix, providerFix
 	} else {
 		block.sentence, block.checkedFix, block.otherFix = phrases.providerChecked, providerFix, consumerFix
+	}
+
+	// Every sentence of a provider under check opens with its name.
+	if asProvider && block.graph != "" {
+		block.sentence = slices.Insert(slices.Clone(block.sentence), 1, viaGraph(block.graph))
 	}
 
 	return block, true
@@ -260,6 +267,7 @@ func compareFieldBlockKeys(a, b fieldBlockKey) int {
 		strings.Compare(a.member, b.member),
 		strings.Compare(a.side, b.side),
 		strings.Compare(string(a.role), string(b.role)),
+		strings.Compare(a.graph, b.graph),
 	)
 }
 

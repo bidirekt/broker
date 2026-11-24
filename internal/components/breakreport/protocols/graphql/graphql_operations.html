@@ -9,6 +9,7 @@
       {{with .Interaction}}<p class="op-ix">{{.}}</p>{{end}}
       <p class="op-brk">{{template "icon_x" 14}}<span>{{template "phrase" .Sentence}}</span></p>
       {{template "fixes" .Fixes}}
+      {{with .Graph}}<p class="op-see">See <a href="/graphs/{{.}}">/graphs/{{.}}</a></p>{{end}}
     </div>
     {{end}}
   </div>
