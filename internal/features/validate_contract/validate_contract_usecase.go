@@ -155,7 +155,7 @@ func toPersistedContract(
 	for hash, resource := range uploadedContract.Resources {
 		resources[hash] = model.PersistedResource{
 			Resource:     resource.Resource,
-			Schemas:      uploadedContract.Schemas,
+			Schemas:      model.CatalogFor(uploadedContract.Schemas, resource.Bodies),
 			ProviderHash: resource.ProviderHash(),
 		}
 	}

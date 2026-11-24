@@ -16,7 +16,7 @@ type UploadedContract struct {
 	Version         string
 	Files           []ContractFile
 	Resources       map[string]UploadedResource
-	Schemas         Schemas
+	Schemas         map[string]Schemas
 	ParticipantID   int64
 	ParticipantName string
 }
@@ -64,11 +64,22 @@ func (this *UploadedContract) Checksum() string {
 		resources[hash] = resource
 	}
 
+	yamlSchemas := Schemas{}
+	namespacedSchemas := map[string]Schemas{}
+	for namespace, schemas := range this.Schemas {
+		if namespace == YAMLNamespace {
+			yamlSchemas = schemas
+		} else {
+			namespacedSchemas[namespace] = schemas
+		}
+	}
+
 	payload, _ := json.Marshal(struct {
-		Resources map[string]UploadedResource
-		Roots     map[string][]null.String
-		Schemas   Schemas
-	}{resources, roots, this.Schemas})
+		Resources         map[string]UploadedResource
+		Roots             map[string][]null.String
+		Schemas           Schemas
+		NamespacedSchemas map[string]Schemas `json:",omitempty"`
+	}{resources, roots, yamlSchemas, namespacedSchemas})
 	sum := sha256.Sum256(payload)
 	return hex.EncodeToString(sum[:])
 }

@@ -188,7 +188,7 @@ func (this *ContractRepository) loadDeployedResources(
 	}
 
 	for index := range resources {
-		resources[index].Schemas = this.loadSchemasAt(ctx, this.pool, catalogs, resources[index].ContractID)
+		resources[index].Schemas = model.CatalogFor(this.loadSchemasAt(ctx, this.pool, catalogs, resources[index].ContractID), resources[index].Bodies)
 	}
 
 	return resources

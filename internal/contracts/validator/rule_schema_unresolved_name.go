@@ -13,7 +13,7 @@ func unresolvedSchemaNames(declarations protocol.Declarations) []violation.Viola
 			continue
 		}
 
-		if _, declared := declarations.Catalog[declaration.SchemaName]; declared {
+		if _, declared := declarations.Catalog[declaration.Namespace][declaration.SchemaName]; declared {
 			continue
 		}
 

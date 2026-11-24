@@ -20,12 +20,14 @@ const resourceColumns = `
 			r.consumer_hash,
 			rv.change_type,
 			bodies.sources,
+			bodies.schema_namespaces,
 			bodies.schema_names`
 
 func resourceBodiesJoin(contractIDColumn string) string {
 	return `JOIN LATERAL (
 			SELECT
 				array_agg(rb.source ORDER BY rb.source COLLATE "C", rb.id) AS sources,
+				array_agg(COALESCE(s.namespace, '') ORDER BY rb.source COLLATE "C", rb.id) AS schema_namespaces,
 				array_agg(s.name ORDER BY rb.source COLLATE "C", rb.id) AS schema_names
 			FROM resource_bodies rb
 			LEFT JOIN schemas s ON s.id = rb.schema_id
@@ -54,8 +56,9 @@ type tableRow struct {
 	ResourceVersionChangeType string
 
 	// Bodies, aligned by index
-	BodySources     []string
-	BodySchemaNames []null.String
+	BodySources          []string
+	BodySchemaNamespaces []string
+	BodySchemaNames      []null.String
 }
 
 func (this *tableRow) toPersistedContractModel() *model.PersistedContract {
@@ -90,7 +93,7 @@ func (this *tableRow) toResourceModel(identity model.ResourceIdentity) model.Per
 func (this *tableRow) toResourceBodies() []model.ResourceBody {
 	bodies := make([]model.ResourceBody, len(this.BodySources))
 	for index, source := range this.BodySources {
-		bodies[index] = model.ResourceBody{Source: source, SchemaName: this.BodySchemaNames[index]}
+		bodies[index] = model.ResourceBody{Source: source, Namespace: this.BodySchemaNamespaces[index], SchemaName: this.BodySchemaNames[index]}
 	}
 
 	return bodies
@@ -118,6 +121,7 @@ func scanTableRows(rows pgx.Rows) []tableRow {
 			&row.ResourceConsumerHash,
 			&row.ResourceVersionChangeType,
 			&row.BodySources,
+			&row.BodySchemaNamespaces,
 			&row.BodySchemaNames,
 		); err != nil {
 			panic(fmt.Errorf("error scanning resource row: %w", err))

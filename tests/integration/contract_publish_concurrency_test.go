@@ -154,7 +154,7 @@ func (this *IntegrationSuite) assertConcurrentPublishRebuilds(version string, co
 	slices.Sort(resources)
 
 	this.Equal(content.resources, resources, "version %s", version)
-	this.Equal(content.schemas, contract.Schemas, "version %s", version)
+	this.Equal(content.schemas, contract.Schemas[model.YAMLNamespace], "version %s", version)
 }
 
 func (this *IntegrationSuite) TestPublish_ConcurrentNewVersionsOfDifferentContent_EachRebuildsToWhatWasPublished() {

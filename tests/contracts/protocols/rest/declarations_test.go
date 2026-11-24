@@ -62,7 +62,7 @@ func TestToResourceDeclarations_ConsumerResponse_IsAnOutputAndCarriesTheBody(t *
 	assert.Equal(t, model.Output, resource.Body)
 	assert.Equal(t, "pets-service", resource.ConsumedProvider.String)
 	assert.Equal(t, restmodel.Identity{Endpoint: "/pets", Method: "get", Status: "200"}, resource.Identity)
-	assert.Equal(t, []model.ResourceBody{{Source: "web.yaml", SchemaName: null.StringFrom("PetList")}}, resource.Bodies)
+	assert.Equal(t, []model.ResourceBody{{Source: "web.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("PetList")}}, resource.Bodies)
 	assert.Equal(t, "PetList", declarations[0].SchemaName)
 }
 

@@ -5,7 +5,7 @@ import "github.com/bidirekt/broker/internal/model"
 func DiffContracts(current *model.PersistedContract, next *model.UploadedContract) model.ContractDiff {
 	return model.ContractDiff{
 		Resources: diffResources(current.Resources, next.Resources),
-		Schemas:   diffSchemas(current.Schemas, next.Schemas),
+		Schemas:   diffNamespaces(current.Schemas, next.Schemas),
 	}
 }
 
@@ -36,6 +36,28 @@ func diffResources(current map[string]model.PersistedResource, next map[string]m
 	for hash := range next {
 		if _, existed := current[hash]; !existed {
 			changes[hash] = model.ChangeAdded
+		}
+	}
+
+	return changes
+}
+
+func diffNamespaces(current, next map[string]model.Schemas) map[string]map[string]model.SchemaChange {
+	changes := map[string]map[string]model.SchemaChange{}
+
+	for namespace, schemas := range current {
+		if schemaChanges := diffSchemas(schemas, next[namespace]); len(schemaChanges) > 0 {
+			changes[namespace] = schemaChanges
+		}
+	}
+
+	for namespace, schemas := range next {
+		if _, existed := current[namespace]; existed {
+			continue
+		}
+
+		if schemaChanges := diffSchemas(nil, schemas); len(schemaChanges) > 0 {
+			changes[namespace] = schemaChanges
 		}
 	}
 

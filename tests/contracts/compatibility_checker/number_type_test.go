@@ -33,7 +33,7 @@ type pricesBreak struct {
 }
 
 func pricesBody(amountType string) ([]model.ResourceBody, model.Schemas) {
-	bodies := []model.ResourceBody{{Source: "prices.yaml", SchemaName: null.StringFrom("Price")}}
+	bodies := []model.ResourceBody{{Source: "prices.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Price")}}
 
 	return bodies, model.Schemas{"Price": {
 		"":       {Type: "object"},
@@ -62,7 +62,7 @@ func pricesResources(interaction, consumerType, providerType string) (consumer, 
 		},
 		ConsumerHash: null.StringFrom("storefront-" + pricesProviderHash),
 		ProviderHash: pricesProviderHash,
-		Schemas:      consumerSchemas,
+		Schemas:      map[string]model.Schemas{model.YAMLNamespace: consumerSchemas},
 	}
 
 	provider = model.PersistedResource{
@@ -75,7 +75,7 @@ func pricesResources(interaction, consumerType, providerType string) (consumer, 
 			Bodies:          providerBodies,
 		},
 		ProviderHash:       pricesProviderHash,
-		Schemas:            providerSchemas,
+		Schemas:            map[string]model.Schemas{model.YAMLNamespace: providerSchemas},
 		ParticipantVersion: null.StringFrom("1.0.0"),
 	}
 

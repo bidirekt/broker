@@ -207,8 +207,10 @@ func (this *ContractRepository) insertFirstSnapshot(
 	this.insertContract(ctx, tx, contract)
 	this.insertContractVersion(ctx, tx, contract)
 
-	for name, schema := range contract.Schemas {
-		this.insertAddedSchema(ctx, tx, contract, name, schema)
+	for namespace, schemas := range contract.Schemas {
+		for name, schema := range schemas {
+			this.insertAddedSchema(ctx, tx, contract, namespace, name, schema)
+		}
 	}
 
 	for _, resource := range contract.Resources {
@@ -229,14 +231,16 @@ func (this *ContractRepository) insertNextSnapshot(
 	this.insertContract(ctx, tx, next)
 	this.insertContractVersion(ctx, tx, next)
 
-	for name, schemaChange := range diff.Schemas {
-		switch schemaChange.Kind {
-		case model.ChangeAdded:
-			this.insertAddedSchema(ctx, tx, next, name, next.Schemas[name])
-		case model.ChangeModified:
-			this.insertFieldChanges(ctx, tx, next, name, schemaChange.Fields)
-		case model.ChangeRemoved:
-			this.insertRemovedSchema(ctx, tx, next, name, schemaChange.Fields)
+	for namespace, schemaChanges := range diff.Schemas {
+		for name, schemaChange := range schemaChanges {
+			switch schemaChange.Kind {
+			case model.ChangeAdded:
+				this.insertAddedSchema(ctx, tx, next, namespace, name, next.Schemas[namespace][name])
+			case model.ChangeModified:
+				this.insertFieldChanges(ctx, tx, next, namespace, name, schemaChange.Fields)
+			case model.ChangeRemoved:
+				this.insertRemovedSchema(ctx, tx, next, namespace, name, schemaChange.Fields)
+			}
 		}
 	}
 
@@ -377,7 +381,7 @@ func (this *ContractRepository) insertResourceBodies(
 		resourceID, _ := this.findResourceIDByHash(ctx, tx, hash, resource.Direction)
 
 		for _, body := range resource.Bodies {
-			schemaID := null.NewInt(schemaIDs[body.SchemaName.String], body.SchemaName.Valid)
+			schemaID := null.NewInt(schemaIDs[body.Namespace][body.SchemaName.String], body.SchemaName.Valid)
 
 			if _, err := tx.Exec(ctx, insertResourceBodyQuery, resourceID, contract.ID, body.Source, schemaID); err != nil {
 				panic(fmt.Errorf("error inserting resource body: %w", err))
@@ -449,7 +453,7 @@ func (this *ContractRepository) withSchemas(
 	contract.Schemas = this.loadSchemasAt(ctx, q, schemaCatalogs{}, contract.ID)
 
 	for hash, resource := range contract.Resources {
-		resource.Schemas = contract.Schemas
+		resource.Schemas = model.CatalogFor(contract.Schemas, resource.Bodies)
 		contract.Resources[hash] = resource
 	}
 

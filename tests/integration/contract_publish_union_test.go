@@ -102,11 +102,11 @@ func (this *IntegrationSuite) TestPublishContract_Union_ReadsBackEachMemberAsARe
 		"payment":       {Type: "union"},
 		"payment(card)": {Ref: "CardPayment"},
 		"payment(pix)":  {Ref: "PixPayment"},
-	}, contract.Schemas["Order"])
+	}, contract.Schemas[model.YAMLNamespace]["Order"])
 	this.Equal(model.Schema{
 		"":       {Type: "union"},
 		"(card)": {Ref: "CardPayment"},
-	}, contract.Schemas["Payment"])
+	}, contract.Schemas[model.YAMLNamespace]["Payment"])
 }
 
 func (this *IntegrationSuite) TestPublishContract_UnionMemberChanged_WritesAModifiedFieldVersion() {

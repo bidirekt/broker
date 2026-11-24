@@ -76,7 +76,7 @@ func (this *IntegrationSuite) TestPublishContract_Enum_ReadsBackItsValuesSorted(
 		"":       {Type: "object"},
 		"status": {Type: "enum", Members: []string{"available", "pending", "sold"}},
 		"name":   {Type: "string"},
-	}, contract.Schemas["Pet"])
+	}, contract.Schemas[model.YAMLNamespace]["Pet"])
 }
 
 func (this *IntegrationSuite) TestPublishContract_OnlyEnumValuesChanged_WritesAModifiedFieldVersion() {
