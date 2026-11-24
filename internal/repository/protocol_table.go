@@ -40,8 +40,8 @@ func (this *ContractRepository) tableOf(resourceID int64, protocol model.Protoco
 func (this *ContractRepository) identitiesOf(ctx context.Context, q Querier, rows []tableRow) map[int64]model.ResourceIdentity {
 	idsByProtocol := make(map[model.Protocol][]int64)
 	for _, row := range rows {
-		protocol := model.Protocol(row.ResourceProtocol)
-		idsByProtocol[protocol] = append(idsByProtocol[protocol], row.ResourceID)
+		protocol := model.Protocol(row.ResourceProtocol.String)
+		idsByProtocol[protocol] = append(idsByProtocol[protocol], row.ResourceID.Int64)
 	}
 
 	identities := make(map[int64]model.ResourceIdentity, len(rows))
@@ -52,8 +52,8 @@ func (this *ContractRepository) identitiesOf(ctx context.Context, q Querier, row
 	}
 
 	for _, row := range rows {
-		if _, found := identities[row.ResourceID]; !found {
-			panic(fmt.Errorf("resource %d has no row in its protocol table", row.ResourceID))
+		if _, found := identities[row.ResourceID.Int64]; !found {
+			panic(fmt.Errorf("resource %d has no row in its protocol table", row.ResourceID.Int64))
 		}
 	}
 

@@ -173,7 +173,7 @@ func TestCounterpartRoleStaysOffTheWire(t *testing.T) {
 	wire, err := json.Marshal(report.Hierarchical)
 	require.NoError(t, err)
 
-	assert.JSONEq(t, `{"orders":{"deployable":true,"participantVersion":"v1","endpoints":{}}}`, string(wire))
+	assert.JSONEq(t, `{"orders":{"deployable":true,"participantVersion":"v1"}}`, string(wire))
 }
 
 func TestUnmatchedRegisteredProviderKeepsItsIdentity(t *testing.T) {

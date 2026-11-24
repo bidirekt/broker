@@ -18,6 +18,8 @@ type Schema struct {
 	Members      []string
 	UnionMembers map[string]Schema
 	Ref          string
+	Scalar       string
+	Arguments    string
 	Optional     bool
 	Nullable     bool
 }
@@ -27,6 +29,8 @@ func SchemaFromDocument(document Document) Schema {
 		Type:        document.Text("type"),
 		Description: document.Text("description"),
 		Ref:         document.Text("ref"),
+		Scalar:      document.Text("name"),
+		Arguments:   document.Text("arguments"),
 		Optional:    document.Flag("optional"),
 		Nullable:    document.Flag("nullable"),
 	}

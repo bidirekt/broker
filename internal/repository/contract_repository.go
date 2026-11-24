@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/guregu/null"
@@ -92,39 +93,24 @@ var (
 	getLatestSnapshotByParticipantID = `
 		SELECT
 			c.id,
-			(SELECT version FROM contract_versions WHERE contract_id = c.id ORDER BY id DESC LIMIT 1),` + resourceColumns + `
+			(SELECT version FROM contract_versions WHERE contract_id = c.id ORDER BY id DESC LIMIT 1),` + resourceColumns("r.change_type") + `
 		FROM contracts c
 		JOIN participants pa ON pa.id = c.participant_id
-		JOIN resources r ON r.participant_id = c.participant_id
-		JOIN LATERAL (
-			SELECT change_type
-			FROM resource_versions
-			WHERE resource_id = r.id AND contract_id <= c.id
-			ORDER BY contract_id DESC
-			LIMIT 1
-		) rv ON true
+		` + contractResourcesJoin(" AND rv.change_type = 'added'") + `
 		` + resourceBodiesJoin("c.id") + `
 		WHERE c.participant_id = $1
 		  AND c.id = (SELECT MAX(id) FROM contracts WHERE participant_id = pa.id)
-		  AND rv.change_type = 'added'
 		ORDER BY r.id
 	`
 
 	contractVersionTreeQuery = `
 		SELECT
 			c.id,
-			cv.version,` + resourceColumns + `
+			cv.version,` + resourceColumns("r.change_type") + `
 		FROM contract_versions cv
 		JOIN contracts c ON c.id = cv.contract_id
 		JOIN participants pa ON pa.id = cv.participant_id
-		JOIN resources r ON r.participant_id = cv.participant_id
-		JOIN LATERAL (
-			SELECT change_type
-			FROM resource_versions
-			WHERE resource_id = r.id AND contract_id <= c.id
-			ORDER BY contract_id DESC
-			LIMIT 1
-		) rv ON true
+		` + contractResourcesJoin("") + `
 		` + resourceBodiesJoin("c.id") + `
 	`
 
@@ -461,17 +447,18 @@ func (this *ContractRepository) withSchemas(
 }
 
 func (this *ContractRepository) toPersistedContractTree(ctx context.Context, q Querier, rows pgx.Rows) *model.PersistedContract {
-	var contract *model.PersistedContract
-
 	tableRows := scanTableRows(rows)
-	identities := this.identitiesOf(ctx, q, tableRows)
+	if len(tableRows) == 0 {
+		return nil
+	}
 
-	for _, row := range tableRows {
-		if contract == nil {
-			contract = row.toPersistedContractModel()
-		}
+	contract := tableRows[0].toPersistedContractModel()
 
-		resource := row.toResourceModel(identities[row.ResourceID])
+	resourceRows := slices.DeleteFunc(tableRows, func(row tableRow) bool { return !row.ResourceID.Valid })
+	identities := this.identitiesOf(ctx, q, resourceRows)
+
+	for _, row := range resourceRows {
+		resource := row.toResourceModel(identities[row.ResourceID.Int64])
 		contract.Resources[resource.PrimaryHash()] = resource
 	}
 

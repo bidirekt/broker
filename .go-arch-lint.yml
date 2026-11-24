@@ -52,6 +52,7 @@ components:
   components_access:        { in: internal/components/access }
   components_breakreport:   { in: internal/components/breakreport }
   components_breakreport_protocols_rest: { in: internal/components/breakreport/protocols/rest }
+  components_breakreport_protocols_graphql: { in: internal/components/breakreport/protocols/graphql }
   components_pages:         { in: internal/components/pages }
   components_respond:       { in: internal/components/respond }
   components_bearer:        { in: internal/components/bearer }
@@ -73,10 +74,13 @@ components:
       - internal/contracts/validator
       - internal/contracts/violation
   contracts_protocols_rest:   { in: internal/contracts/protocols/rest }
+  contracts_protocols_graphql: { in: internal/contracts/protocols/graphql }
   repository:                 { in: internal/repository }
   repository_protocols_rest:  { in: internal/repository/protocols/rest }
+  repository_protocols_graphql: { in: internal/repository/protocols/graphql }
   model:                      { in: internal/model }
   model_protocols_rest:       { in: internal/model/protocols/rest }
+  model_protocols_graphql:    { in: internal/model/protocols/graphql }
   validations:                { in: internal/validations }
   pkg:                        { in: pkg/** }
   migrations:                 { in: migrations }
@@ -93,6 +97,7 @@ vendors:
   x_mod:          { in: [golang.org/x/mod/**] }
   golang_jwt:     { in: [github.com/golang-jwt/jwt/v5, github.com/golang-jwt/jwt/v5/**] }
   fasthttp:       { in: [github.com/valyala/fasthttp, github.com/valyala/fasthttp/**] }
+  gqlparser:      { in: [github.com/vektah/gqlparser/v2, github.com/vektah/gqlparser/v2/**] }
 
 deps:
   cmd:
@@ -103,11 +108,15 @@ deps:
       - components
       - components_breakreport
       - components_breakreport_protocols_rest
+      - components_breakreport_protocols_graphql
       - components_config
       - contracts
       - contracts_protocols_rest
+      - contracts_protocols_graphql
       - repository
       - repository_protocols_rest
+      - repository_protocols_graphql
+      - model_protocols_graphql
       - feature_can_i_deploy
       - feature_create_api_key
       - feature_create_environment
@@ -266,6 +275,8 @@ deps:
     mayDependOn: [model]
   components_breakreport_protocols_rest:
     mayDependOn: [components_breakreport, model, model_protocols_rest]
+  components_breakreport_protocols_graphql:
+    mayDependOn: [components_breakreport, model, model_protocols_graphql]
   components_bearer:
     mayDependOn: [components_access, components_config, components_pages, components_respond, components_tokens, repository, model]
     canUse: [fiber, golang_jwt]
@@ -297,15 +308,22 @@ deps:
     canUse: [yaml, guregu_null]
   contracts_protocols_rest:
     mayDependOn: [contracts, model, model_protocols_rest]
+  contracts_protocols_graphql:
+    mayDependOn: [contracts, model, model_protocols_graphql]
+    canUse: [gqlparser, guregu_null]
   repository:
     mayDependOn: [model]
     canUse: [pgx, guregu_null]
   repository_protocols_rest:
     mayDependOn: [repository, model, model_protocols_rest]
+  repository_protocols_graphql:
+    mayDependOn: [repository, model, model_protocols_graphql]
 
   model:
     canUse: [guregu_null]
   model_protocols_rest:
+    mayDependOn: [model]
+  model_protocols_graphql:
     mayDependOn: [model]
 
   pkg:
@@ -319,6 +337,7 @@ deps:
       - components_bearer
       - components_breakreport
       - components_breakreport_protocols_rest
+      - components_breakreport_protocols_graphql
       - components_config
       - components_database
       - components_pages
@@ -327,13 +346,16 @@ deps:
       - components_versions
       - contracts
       - contracts_protocols_rest
+      - contracts_protocols_graphql
       - feature_health
       - feature_show_check
       - migrations
       - repository
       - repository_protocols_rest
+      - repository_protocols_graphql
       - model
       - model_protocols_rest
+      - model_protocols_graphql
       - validations
       - pkg
     canUse: [fiber, pgx, guregu_null, yaml, testify, testcontainers, golang_jwt]

@@ -20,4 +20,5 @@ type RemovedRefiner interface {
 type ReportTree interface {
 	ReportKey() string
 	Append(location map[string]string, reportBreak model.ReportBreak)
+	IsEmpty() bool
 }

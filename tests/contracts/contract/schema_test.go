@@ -362,3 +362,23 @@ members:
 		{DocumentPath: "members;pix", Segment: "(pix)", Schema: contract.Schema{Ref: "PixPayment"}},
 	}, schema.Children())
 }
+
+func TestSchemaFromDocument_ScalarNameAndPropertyArguments(t *testing.T) {
+	schema := contract.SchemaFromDocument(schemaDocument(t, `type: object
+properties:
+  bornAt:
+    type: scalar
+    name: DateTime
+  reviews:
+    ref: ReviewList
+    arguments: ReviewsArguments
+`))
+
+	assert.Equal(t, contract.Schema{
+		Type: "object",
+		Properties: map[string]contract.Schema{
+			"bornAt":  {Type: "scalar", Scalar: "DateTime"},
+			"reviews": {Ref: "ReviewList", Arguments: "ReviewsArguments"},
+		},
+	}, schema)
+}

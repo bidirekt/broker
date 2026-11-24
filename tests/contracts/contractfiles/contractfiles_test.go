@@ -8,12 +8,18 @@ import (
 
 	"github.com/bidirekt/broker/internal/contracts/contractfiles"
 	"github.com/bidirekt/broker/internal/contracts/protocol"
+	graphqlcontracts "github.com/bidirekt/broker/internal/contracts/protocols/graphql"
 	restcontracts "github.com/bidirekt/broker/internal/contracts/protocols/rest"
 	"github.com/bidirekt/broker/internal/contracts/violation"
 	"github.com/bidirekt/broker/internal/model"
 )
 
-var interpreter = contractfiles.NewInterpreter(protocol.NewRegistry([]protocol.Protocol{restcontracts.New()}))
+var interpreter = contractfiles.NewInterpreter(
+	protocol.NewRegistry([]protocol.Protocol{restcontracts.New(), graphqlcontracts.New()}),
+	[]contractfiles.FileFormat{graphqlcontracts.NewSDLFormat()},
+)
+
+const unsupportedNotesError = "unsupported contract file: notes.txt (expected .yaml, .yml, .graphql or .graphqls)"
 
 var participant = &model.Participant{ID: 7, Name: "pets_service"}
 
@@ -83,7 +89,7 @@ func TestToUploadedContract_UnsupportedExtension_ReturnsTheReadError(t *testing.
 		{Source: "notes.txt", Content: petsEndpointYAML},
 	}, participant, "v1")
 
-	assert.EqualError(t, readErr, "unsupported contract file: notes.txt (expected .yaml or .yml)")
+	assert.EqualError(t, readErr, unsupportedNotesError)
 	assert.NoError(t, err)
 	assert.Nil(t, uploadedContract)
 	assert.Nil(t, violations)
@@ -111,7 +117,7 @@ func TestToUploadedContract_FirstFailingFileInRequestOrder_DecidesTheReadError(t
 		{Source: "notes.txt", Content: petsEndpointYAML},
 		{Source: "broken.yaml", Content: malformedYAML},
 	}, participant, "v1")
-	assert.EqualError(t, readErr, "unsupported contract file: notes.txt (expected .yaml or .yml)")
+	assert.EqualError(t, readErr, unsupportedNotesError)
 }
 
 func TestToUploadedContract_ReadErrorInAnyFile_WinsOverShapeViolations(t *testing.T) {
@@ -206,7 +212,7 @@ func TestToViolations_UnsupportedExtension_ReturnsTheReadError(t *testing.T) {
 		{Source: "notes.txt", Content: petsEndpointYAML},
 	})
 
-	assert.EqualError(t, readErr, "unsupported contract file: notes.txt (expected .yaml or .yml)")
+	assert.EqualError(t, readErr, unsupportedNotesError)
 	assert.Nil(t, violations)
 }
 

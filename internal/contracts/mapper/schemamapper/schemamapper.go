@@ -29,8 +29,10 @@ func schemaModelsReachableFrom(catalog contract.SchemasMap, name string, schemas
 	schemas[name] = fields
 
 	for _, field := range fields {
-		if field.Ref != "" {
-			schemaModelsReachableFrom(catalog, field.Ref, schemas)
+		for _, reached := range []string{field.Ref, field.Arguments} {
+			if reached != "" {
+				schemaModelsReachableFrom(catalog, reached, schemas)
+			}
 		}
 	}
 }
@@ -45,13 +47,15 @@ func fieldModelsFromSchema(fields model.Schema, path string, schema contract.Sch
 
 func fieldModelFromSchema(schema contract.Schema) model.Field {
 	if schema.IsRef() {
-		return model.Field{Optional: schema.Optional, Nullable: schema.Nullable, Ref: schema.Ref}
+		return model.Field{Optional: schema.Optional, Nullable: schema.Nullable, Ref: schema.Ref, Arguments: schema.Arguments}
 	}
 
 	return model.Field{
-		Type:     schema.Type,
-		Optional: schema.Optional,
-		Nullable: schema.Nullable,
-		Members:  slices.Sorted(slices.Values(schema.Members)),
+		Type:      schema.Type,
+		Optional:  schema.Optional,
+		Nullable:  schema.Nullable,
+		Members:   slices.Sorted(slices.Values(schema.Members)),
+		Scalar:    schema.Scalar,
+		Arguments: schema.Arguments,
 	}
 }

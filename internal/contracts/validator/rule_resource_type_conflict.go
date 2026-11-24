@@ -80,21 +80,28 @@ func (this *typeConflicts) compare(node schemagraph.Node, property string) {
 }
 
 func (this *typeConflicts) compareDeclarations(first, other schemagraph.Declaration, property string) {
-	if other.Type == first.Type && slices.Equal(other.Members, first.Members) {
+	sameType := other.Type == first.Type && other.Scalar == first.Scalar
+	sameMembers := slices.Equal(other.Members, first.Members)
+	if sameType && sameMembers && other.Arguments == first.Arguments {
 		return
 	}
 
 	details := map[string]string{
 		"resource":     this.resource,
 		"property":     property,
-		"type":         other.Type,
+		"type":         typeName(other),
 		"declaredIn":   first.Source,
-		"declaredType": first.Type,
+		"declaredType": typeName(first),
 	}
 
-	if other.Type == first.Type {
+	if sameType && !sameMembers {
 		details["values"] = strings.Join(other.Members, ", ")
 		details["declaredValues"] = strings.Join(first.Members, ", ")
+	}
+
+	if sameType && sameMembers {
+		details["arguments"] = other.Arguments
+		details["declaredArguments"] = first.Arguments
 	}
 
 	this.violations = append(this.violations, violation.Violation{
@@ -103,4 +110,12 @@ func (this *typeConflicts) compareDeclarations(first, other schemagraph.Declarat
 		Source:    other.Source,
 		Details:   details,
 	})
+}
+
+func typeName(declaration schemagraph.Declaration) string {
+	if declaration.Type == model.ScalarType {
+		return declaration.Scalar
+	}
+
+	return declaration.Type
 }

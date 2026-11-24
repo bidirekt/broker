@@ -9,9 +9,16 @@ import (
 
 	"github.com/bidirekt/broker/internal/contracts/descriptor"
 	restcontracts "github.com/bidirekt/broker/internal/contracts/protocols/rest"
+	"github.com/bidirekt/broker/internal/contracts/violation"
 )
 
-var contractGrammar = descriptor.Contract(descriptor.Fields{"rest": restcontracts.New().Grammar()}, descriptor.CoreVocabulary())
+var restGrammar = restcontracts.New().Grammar()
+
+var contractGrammar = descriptor.Contract(
+	descriptor.Fields{"rest": restGrammar.Provides},
+	descriptor.Fields{"rest": restGrammar.Consumes},
+	descriptor.CoreVocabulary(),
+)
 
 func contractDocument(t *testing.T, source string) any {
 	t.Helper()
@@ -79,6 +86,33 @@ schemas:
 	violations := descriptor.Validate(contractGrammar, contractDocument(t, source), "api.yaml")
 
 	assert.Empty(t, violations)
+}
+
+func TestContract_EachSideTakesOnlyItsOwnGrammar(t *testing.T) {
+	grammar := descriptor.Contract(
+		descriptor.Fields{"sided": descriptor.Object(descriptor.Fields{"graph": descriptor.String()})},
+		descriptor.Fields{"sided": descriptor.Object(descriptor.Fields{"query": descriptor.String()})},
+		descriptor.CoreVocabulary(),
+	)
+	document := map[string]any{
+		"provides": map[string]any{"sided": map[string]any{"graph": "pets", "query": "pet"}},
+		"consumes": map[string]any{"pets_api": map[string]any{"sided": map[string]any{"graph": "pets", "query": "pet"}}},
+	}
+
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "key.unknown",
+			Path:      "consumes;pets_api;sided;graph",
+			Source:    "api.yaml",
+			Details:   map[string]string{"key": "graph"},
+		},
+		{
+			ErrorCode: "key.unknown",
+			Path:      "provides;sided;query",
+			Source:    "api.yaml",
+			Details:   map[string]string{"key": "query"},
+		},
+	}, descriptor.Validate(grammar, document, "api.yaml"))
 }
 
 func TestContract_PatchWithRequestAndResponses_IsAcceptedInProvidesAndConsumes(t *testing.T) {

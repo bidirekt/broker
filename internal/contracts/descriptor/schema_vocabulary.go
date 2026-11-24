@@ -1,6 +1,10 @@
 package descriptor
 
 import (
+	"fmt"
+	"maps"
+	"slices"
+
 	"github.com/bidirekt/broker/internal/model"
 )
 
@@ -57,6 +61,33 @@ func CoreVocabulary() Vocabulary {
 			Rules: []Rule{membersRequired(model.UnionType)},
 		},
 	}}
+}
+
+// With panics on a type or a property key this vocabulary already has.
+func (this Vocabulary) With(extension Vocabulary) Vocabulary {
+	joined := Vocabulary{Types: slices.Clone(this.Types), PropertyKeys: maps.Clone(this.PropertyKeys)}
+
+	for _, added := range extension.Types {
+		if slices.ContainsFunc(joined.Types, func(schemaType TypeVocabulary) bool { return schemaType.Name == added.Name }) {
+			panic(fmt.Errorf("schema type %q is defined twice", added.Name))
+		}
+
+		joined.Types = append(joined.Types, added)
+	}
+
+	for _, key := range slices.Sorted(maps.Keys(extension.PropertyKeys)) {
+		if _, defined := joined.PropertyKeys[key]; defined {
+			panic(fmt.Errorf("property key %q is defined twice", key))
+		}
+
+		if joined.PropertyKeys == nil {
+			joined.PropertyKeys = Keys{}
+		}
+
+		joined.PropertyKeys[key] = extension.PropertyKeys[key]
+	}
+
+	return joined
 }
 
 func (this Vocabulary) Type() Enum {

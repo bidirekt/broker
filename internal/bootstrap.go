@@ -3,10 +3,13 @@ package internal
 import (
 	"github.com/bidirekt/broker/internal/components"
 	"github.com/bidirekt/broker/internal/components/breakreport"
+	graphqlbreakreport "github.com/bidirekt/broker/internal/components/breakreport/protocols/graphql"
 	restbreakreport "github.com/bidirekt/broker/internal/components/breakreport/protocols/rest"
 	"github.com/bidirekt/broker/internal/components/config"
 	"github.com/bidirekt/broker/internal/contracts/compatibility_checker"
+	"github.com/bidirekt/broker/internal/contracts/contractfiles"
 	"github.com/bidirekt/broker/internal/contracts/protocol"
+	graphqlcontracts "github.com/bidirekt/broker/internal/contracts/protocols/graphql"
 	restcontracts "github.com/bidirekt/broker/internal/contracts/protocols/rest"
 	"github.com/bidirekt/broker/internal/features/can_i_deploy"
 	"github.com/bidirekt/broker/internal/features/create_api_key"
@@ -45,28 +48,80 @@ import (
 	"github.com/bidirekt/broker/internal/features/update_profile"
 	"github.com/bidirekt/broker/internal/features/validate_contract"
 	"github.com/bidirekt/broker/internal/repository"
+	graphqlrepository "github.com/bidirekt/broker/internal/repository/protocols/graphql"
 	restrepository "github.com/bidirekt/broker/internal/repository/protocols/rest"
 )
 
+// Module is one protocol: the pieces every protocol has, and its optional ports, nil when it has none.
+type Module struct {
+	Protocol   protocol.Protocol
+	Hooks      compatibility_checker.ProtocolHooks
+	Table      repository.ProtocolTable
+	Section    breakreport.ProtocolSection
+	FileFormat contractfiles.FileFormat
+}
+
+func RESTModule() Module {
+	plugin := restcontracts.New()
+
+	return Module{
+		Protocol: plugin,
+		Hooks:    plugin,
+		Table:    restrepository.New(),
+		Section:  restbreakreport.New(),
+	}
+}
+
+func GraphQLModule() Module {
+	plugin := graphqlcontracts.New()
+
+	return Module{
+		Protocol:   plugin,
+		Hooks:      plugin,
+		Table:      graphqlrepository.New(),
+		Section:    graphqlbreakreport.New(),
+		FileFormat: graphqlcontracts.NewSDLFormat(),
+	}
+}
+
 func Run() (*components.Components, error) {
-	sections := []breakreport.ProtocolSection{restbreakreport.New()}
+	return RunWith([]Module{RESTModule(), GraphQLModule()})
+}
+
+func RunWith(modules []Module) (*components.Components, error) {
+	var (
+		plugins  []protocol.Protocol
+		hooks    []compatibility_checker.ProtocolHooks
+		tables   []repository.ProtocolTable
+		sections []breakreport.ProtocolSection
+		formats  []contractfiles.FileFormat
+	)
+
+	for _, module := range modules {
+		plugins = append(plugins, module.Protocol)
+		hooks = append(hooks, module.Hooks)
+		tables = append(tables, module.Table)
+		sections = append(sections, module.Section)
+
+		if module.FileFormat != nil {
+			formats = append(formats, module.FileFormat)
+		}
+	}
+
 	kernel, err := components.New(sections)
 	if err != nil {
 		return nil, err
 	}
 
-	restContracts := restcontracts.New()
-	protocols := protocol.NewRegistry([]protocol.Protocol{restContracts})
-	hooks := []compatibility_checker.ProtocolHooks{restContracts}
-	tables := []repository.ProtocolTable{restrepository.New()}
+	interpreter := contractfiles.NewInterpreter(protocol.NewRegistry(plugins), formats)
 	reportReader := breakreport.NewReader(sections)
 
 	// registers /participants/new-participant, which must precede show_participant_versions' /participants/:name
 	create_participant.Register(kernel)
 	// registers /environments/new-environment, which must precede show_environment's /environments/:id
 	create_environment.Register(kernel)
-	publish_contract.Register(kernel, protocols, tables)
-	validate_contract.Register(kernel, protocols, tables, hooks)
+	publish_contract.Register(kernel, interpreter, tables)
+	validate_contract.Register(kernel, interpreter, tables, hooks)
 	can_i_deploy.Register(kernel, tables, hooks)
 	record_deployment.Register(kernel)
 	rename_environment.Register(kernel)

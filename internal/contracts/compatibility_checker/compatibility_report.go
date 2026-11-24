@@ -199,7 +199,7 @@ type hierarchicalField struct {
 }
 
 // MarshalJSON writes the fields in a fixed order, the trees last and sorted by their key, so
-// the bytes of a stored report never depend on map order.
+// the bytes of a stored report never depend on map order. An empty tree is left out.
 func (this Hierarchical) MarshalJSON() ([]byte, error) {
 	fields := []hierarchicalField{
 		{"deployable", this.Deployable},
@@ -210,7 +210,9 @@ func (this Hierarchical) MarshalJSON() ([]byte, error) {
 		return strings.Compare(a.ReportKey(), b.ReportKey())
 	})
 	for _, tree := range trees {
-		fields = append(fields, hierarchicalField{tree.ReportKey(), tree})
+		if !tree.IsEmpty() {
+			fields = append(fields, hierarchicalField{tree.ReportKey(), tree})
+		}
 	}
 
 	var buffer bytes.Buffer

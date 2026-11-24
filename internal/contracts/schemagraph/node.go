@@ -27,14 +27,18 @@ type declaration struct {
 	shape     Site
 	fieldType string
 	members   []string
+	scalar    string
+	arguments string
 	optional  bool
 	nullable  bool
 }
 
 type Declaration struct {
-	Source  string
-	Type    string
-	Members []string
+	Source    string
+	Type      string
+	Members   []string
+	Scalar    string
+	Arguments string
 }
 
 func (this Node) Exists() bool {
@@ -59,6 +63,24 @@ func (this Node) Members() []string {
 	return this.declarations[0].members
 }
 
+// Scalar is the first body's: bodies that disagree are rejected at publish.
+func (this Node) Scalar() string {
+	if !this.Exists() {
+		return ""
+	}
+
+	return this.declarations[0].scalar
+}
+
+// Arguments is the first body's: bodies that disagree are rejected at publish.
+func (this Node) Arguments() string {
+	if !this.Exists() {
+		return ""
+	}
+
+	return this.declarations[0].arguments
+}
+
 func (this Node) Optional() bool {
 	if this.join == Senders {
 		return this.lacking || slices.ContainsFunc(this.declarations, func(declaration declaration) bool { return declaration.optional })
@@ -78,7 +100,13 @@ func (this Node) Nullable() bool {
 func (this Node) Declarations() []Declaration {
 	declarations := make([]Declaration, 0, len(this.declarations))
 	for _, declaration := range this.declarations {
-		declarations = append(declarations, Declaration{Source: declaration.source, Type: declaration.fieldType, Members: declaration.members})
+		declarations = append(declarations, Declaration{
+			Source:    declaration.source,
+			Type:      declaration.fieldType,
+			Members:   declaration.members,
+			Scalar:    declaration.scalar,
+			Arguments: declaration.arguments,
+		})
 	}
 
 	return declarations

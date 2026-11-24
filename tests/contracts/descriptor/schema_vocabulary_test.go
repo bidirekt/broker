@@ -37,8 +37,8 @@ var nestedScalarDocument = map[string]any{"schemas": map[string]any{
 }}
 
 func TestContract_TwoVocabulariesInOneProcess_EachValidatesWithItsOwn(t *testing.T) {
-	scalarGrammar := descriptor.Contract(descriptor.Fields{}, scalarVocabulary())
-	coreGrammar := descriptor.Contract(descriptor.Fields{}, descriptor.CoreVocabulary())
+	scalarGrammar := descriptor.Contract(descriptor.Fields{}, descriptor.Fields{}, scalarVocabulary())
+	coreGrammar := descriptor.Contract(descriptor.Fields{}, descriptor.Fields{}, descriptor.CoreVocabulary())
 
 	assert.Empty(t, descriptor.Validate(scalarGrammar, nestedScalarDocument, "api.yaml"))
 	assert.Equal(t, []violation.Violation{
@@ -67,7 +67,7 @@ func TestContract_TwoVocabulariesInOneProcess_EachValidatesWithItsOwn(t *testing
 }
 
 func TestContract_TypeAddedByAVocabulary_BringsItsKeysAndRules(t *testing.T) {
-	grammar := descriptor.Contract(descriptor.Fields{}, scalarVocabulary())
+	grammar := descriptor.Contract(descriptor.Fields{}, descriptor.Fields{}, scalarVocabulary())
 
 	violations := descriptor.Validate(grammar, map[string]any{"schemas": map[string]any{
 		"DateTime": map[string]any{"type": "scalar"},
@@ -90,7 +90,7 @@ func TestContract_TypeAddedByAVocabulary_BringsItsKeysAndRules(t *testing.T) {
 }
 
 func TestContract_PropertyKeyAddedByAVocabulary_NotTakenOutsideAProperty(t *testing.T) {
-	grammar := descriptor.Contract(descriptor.Fields{}, scalarVocabulary())
+	grammar := descriptor.Contract(descriptor.Fields{}, descriptor.Fields{}, scalarVocabulary())
 
 	violations := descriptor.Validate(grammar, map[string]any{"schemas": map[string]any{
 		"Pets": map[string]any{"type": "array", "items": map[string]any{"type": "string", "arguments": "PetsArguments"}},

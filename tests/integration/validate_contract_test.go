@@ -804,7 +804,7 @@ func (this *IntegrationSuite) TestValidateContract_WithoutParticipantAndEnvironm
 	}{
 		"unsupported extension": {
 			validateFile{"notes.txt", validateCatalogStockYAML},
-			`{"message":"unsupported contract file: notes.txt (expected .yaml or .yml)"}`,
+			`{"message":"unsupported contract file: notes.txt (expected .yaml, .yml, .graphql or .graphqls)"}`,
 		},
 		"malformed YAML": {
 			validateFile{"broken.yaml", "provides: {"},

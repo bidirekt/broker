@@ -6,9 +6,24 @@ import (
 )
 
 type Declarations struct {
+	Resources       []ResourceDeclaration
+	Schemas         []SchemaDeclaration
+	Catalog         map[string]contract.SchemasMap
+	ExtensionPieces map[string][]ExtensionPiece
+	Extensions      map[string]any
+	Formats         []string
+}
+
+// BlockDeclarations are what one block declares; its Schemas are generated, each in a namespace the protocol chooses.
+type BlockDeclarations struct {
 	Resources []ResourceDeclaration
 	Schemas   []SchemaDeclaration
-	Catalog   map[string]contract.SchemasMap
+	Extension any
+}
+
+type ExtensionPiece struct {
+	Source string
+	Value  any
 }
 
 type ResourceDeclaration struct {
@@ -21,8 +36,9 @@ type ResourceDeclaration struct {
 }
 
 type SchemaDeclaration struct {
-	Source    string
-	Namespace string
-	Name      string
-	Schema    contract.Schema
+	Source        string
+	Namespace     string
+	Name          string
+	Schema        contract.Schema
+	KeepUnreached bool
 }

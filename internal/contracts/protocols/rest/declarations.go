@@ -6,7 +6,7 @@ import (
 	restmodel "github.com/bidirekt/broker/internal/model/protocols/rest"
 )
 
-func (this Plugin) ToResourceDeclarations(block protocol.Block) []protocol.ResourceDeclaration {
+func (this Plugin) ToDeclarations(block protocol.Block) protocol.BlockDeclarations {
 	var declarations []protocol.ResourceDeclaration
 
 	for _, endpoint := range block.Document.Keys() {
@@ -31,5 +31,5 @@ func (this Plugin) ToResourceDeclarations(block protocol.Block) []protocol.Resou
 		}
 	}
 
-	return declarations
+	return protocol.BlockDeclarations{Resources: declarations}
 }

@@ -239,3 +239,38 @@ func TestToSchemaModels_SchemaThatIsARefToItself_IsConvertedOnce(t *testing.T) {
 		"Loop": {"": {Ref: "Loop"}},
 	}, schemas)
 }
+
+func TestToSchemaModels_ArgumentsOfAProperty_AreReachedLikeARef(t *testing.T) {
+	catalog := contract.SchemasMap{
+		"Pet": {
+			Type: "object",
+			Properties: map[string]contract.Schema{
+				"reviews": {Type: "array", Items: &contract.Schema{Type: "string"}, Arguments: "ReviewsArguments"},
+				"owner":   {Ref: "Owner", Arguments: "OwnerArguments"},
+			},
+		},
+		"Owner":            {Type: "string"},
+		"ReviewsArguments": {Type: "object", Properties: map[string]contract.Schema{"first": {Type: "integer"}}},
+		"OwnerArguments":   {Type: "object", Properties: map[string]contract.Schema{"locale": {Type: "string"}}},
+	}
+
+	schemas := schemamapper.ToSchemaModels(catalog, []string{"Pet"})
+
+	assert.Equal(t, model.Schemas{
+		"Pet": {
+			"":          {Type: "object"},
+			"owner":     {Ref: "Owner", Arguments: "OwnerArguments"},
+			"reviews":   {Type: "array", Arguments: "ReviewsArguments"},
+			"reviews[]": {Type: "string"},
+		},
+		"Owner": {"": {Type: "string"}},
+		"ReviewsArguments": {
+			"":      {Type: "object"},
+			"first": {Type: "integer"},
+		},
+		"OwnerArguments": {
+			"":       {Type: "object"},
+			"locale": {Type: "string"},
+		},
+	}, schemas)
+}

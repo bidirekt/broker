@@ -1,6 +1,8 @@
 package contractfiles
 
 import (
+	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -13,6 +15,16 @@ import (
 	"github.com/bidirekt/broker/internal/model"
 )
 
+const yamlFormat = "yaml"
+
+var yamlExtensions = []string{".yaml", ".yml"}
+
+// FileFormat reads the contract files of its extensions; the error is a read error, answered as the file's own.
+type FileFormat interface {
+	Extensions() []string
+	ToDeclarations(files []model.ContractFile) (protocol.Declarations, error)
+}
+
 func HasBlankSource(files []model.ContractFile) bool {
 	return slices.ContainsFunc(files, func(file model.ContractFile) bool {
 		return strings.TrimSpace(file.Source) == ""
@@ -20,11 +32,33 @@ func HasBlankSource(files []model.ContractFile) bool {
 }
 
 type Interpreter struct {
-	registry *protocol.Registry
+	registry    *protocol.Registry
+	formats     []FileFormat
+	formatOf    map[string]FileFormat
+	unsupported string
 }
 
-func NewInterpreter(registry *protocol.Registry) *Interpreter {
-	return &Interpreter{registry: registry}
+func NewInterpreter(registry *protocol.Registry, formats []FileFormat) *Interpreter {
+	extensions := slices.Clone(yamlExtensions)
+	formatOf := map[string]FileFormat{}
+
+	for _, format := range formats {
+		for _, extension := range format.Extensions() {
+			if slices.Contains(extensions, extension) {
+				panic(fmt.Errorf("contract file extension %q is registered twice", extension))
+			}
+
+			extensions = append(extensions, extension)
+			formatOf[extension] = format
+		}
+	}
+
+	return &Interpreter{
+		registry:    registry,
+		formats:     formats,
+		formatOf:    formatOf,
+		unsupported: strings.Join(extensions[:len(extensions)-1], ", ") + " or " + extensions[len(extensions)-1],
+	}
 }
 
 func (this *Interpreter) ToUploadedContract(
@@ -58,19 +92,69 @@ func (this *Interpreter) ToViolations(files []model.ContractFile) ([]violation.V
 }
 
 func (this *Interpreter) toCheckedDeclarations(files []model.ContractFile) (protocol.Declarations, []violation.Violation, error) {
-	fragments, shapeViolations, readErr := this.toFragments(files)
-	if readErr != nil || len(shapeViolations) > 0 {
-		return protocol.Declarations{}, shapeViolations, readErr
+	fragments, formatFiles, readErr := this.toFragmentsAndFormatFiles(files)
+	if readErr != nil {
+		return protocol.Declarations{}, nil, readErr
+	}
+
+	formatDeclarations := make([]protocol.Declarations, 0, len(this.formats))
+	for _, format := range this.formats {
+		if len(formatFiles[format]) == 0 {
+			continue
+		}
+
+		declarations, readErr := format.ToDeclarations(formatFiles[format])
+		if readErr != nil {
+			return protocol.Declarations{}, nil, readErr
+		}
+
+		formatDeclarations = append(formatDeclarations, declarations)
+	}
+
+	var shapeViolations []violation.Violation
+	for _, fragment := range contract.SortedBySource(fragments) {
+		shapeViolations = append(shapeViolations, descriptor.Validate(this.registry.Grammar(), fragment.Document, fragment.Source)...)
+	}
+
+	if len(shapeViolations) > 0 {
+		return protocol.Declarations{}, shapeViolations, nil
 	}
 
 	declarations := fragmentmapper.ToDeclarations(fragments, this.registry)
+	if len(fragments) > 0 {
+		declarations.Formats = []string{yamlFormat}
+	}
 
-	return declarations, validator.Validate(declarations), nil
+	for _, joined := range formatDeclarations {
+		declarations = joinDeclarations(declarations, joined)
+	}
+
+	extensions, mergeViolations := this.registry.MergeExtensions(declarations.ExtensionPieces)
+	declarations.Extensions = extensions
+
+	violations := append(mergeViolations, validator.Validate(declarations, this.registry.Rules()...)...)
+
+	return declarations, violation.SortedByLocation(violations), nil
 }
 
-func (this *Interpreter) toFragments(files []model.ContractFile) ([]contract.Fragment, []violation.Violation, error) {
+// toFragmentsAndFormatFiles decodes the YAML files and groups the others by format, failing on the first unreadable file in request order.
+func (this *Interpreter) toFragmentsAndFormatFiles(files []model.ContractFile) ([]contract.Fragment, map[FileFormat][]model.ContractFile, error) {
 	fragments := make([]contract.Fragment, 0, len(files))
+	formatFiles := map[FileFormat][]model.ContractFile{}
+
 	for _, file := range files {
+		extension := strings.ToLower(filepath.Ext(file.Source))
+
+		if format, registered := this.formatOf[extension]; registered {
+			formatFiles[format] = append(formatFiles[format], file)
+
+			continue
+		}
+
+		if !slices.Contains(yamlExtensions, extension) {
+			return nil, nil, fmt.Errorf("unsupported contract file: %s (expected %s)", file.Source, this.unsupported)
+		}
+
 		fragment, err := contract.DecodeFragment(file.Source, file.Content)
 		if err != nil {
 			return nil, nil, err
@@ -79,10 +163,34 @@ func (this *Interpreter) toFragments(files []model.ContractFile) ([]contract.Fra
 		fragments = append(fragments, fragment)
 	}
 
-	var shapeViolations []violation.Violation
-	for _, fragment := range contract.SortedBySource(fragments) {
-		shapeViolations = append(shapeViolations, descriptor.Validate(this.registry.Grammar(), fragment.Document, fragment.Source)...)
+	return fragments, formatFiles, nil
+}
+
+// The first schema of a name stays the one the catalog resolves; a later one is left to the duplicate rule.
+func joinDeclarations(declarations, joined protocol.Declarations) protocol.Declarations {
+	declarations.Resources = append(declarations.Resources, joined.Resources...)
+	declarations.Schemas = append(declarations.Schemas, joined.Schemas...)
+	declarations.Formats = append(declarations.Formats, joined.Formats...)
+
+	for namespace, catalog := range joined.Catalog {
+		if declarations.Catalog[namespace] == nil {
+			declarations.Catalog[namespace] = contract.SchemasMap{}
+		}
+
+		for name, schema := range catalog {
+			if _, declared := declarations.Catalog[namespace][name]; !declared {
+				declarations.Catalog[namespace][name] = schema
+			}
+		}
 	}
 
-	return fragments, shapeViolations, nil
+	for name, pieces := range joined.ExtensionPieces {
+		if declarations.ExtensionPieces == nil {
+			declarations.ExtensionPieces = map[string][]protocol.ExtensionPiece{}
+		}
+
+		declarations.ExtensionPieces[name] = append(declarations.ExtensionPieces[name], pieces...)
+	}
+
+	return declarations
 }
