@@ -81,6 +81,23 @@ func (this Node) Arguments() string {
 	return this.declarations[0].arguments
 }
 
+// A field without arguments takes an empty object, never nothing: an argument it newly requires must break.
+func (this Node) ArgumentsRoot(join Join) Node {
+	root := Node{graph: this.graph, join: join}
+
+	for _, declaration := range this.declarations {
+		if declaration.arguments != "" {
+			root.declarations = append(root.declarations, this.graph.declaration(declaration.source, Site{Namespace: declaration.site.Namespace, Schema: declaration.arguments}))
+		}
+	}
+
+	if !root.Exists() {
+		root.declarations = []declaration{{fieldType: model.ObjectType}}
+	}
+
+	return root
+}
+
 func (this Node) Optional() bool {
 	if this.join == Senders {
 		return this.lacking || slices.ContainsFunc(this.declarations, func(declaration declaration) bool { return declaration.optional })

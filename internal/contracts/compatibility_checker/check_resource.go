@@ -12,17 +12,26 @@ type BodyReading struct {
 
 func (this *CompatibilityChecker) checkResources(checked *model.PersistedResource, counterpart *model.PersistedResource) []ContractBreakingChange {
 	consumer, provider := consumerAndProvider(checked, counterpart)
-	reading := this.hooksOf(consumer.Protocol).BodyReading(consumer.Body)
+	hooks := this.hooksOf(consumer.Protocol)
+	reading := hooks.BodyReading(consumer.Body)
 
-	consumerBody := schemagraph.New(consumer.Schemas).Root(consumer.Bodies, reading.Join)
-	providerBody := schemagraph.New(provider.Schemas).Root(provider.Bodies, reading.Join)
+	body := compareBodies(checked, counterpart, reading.Rules,
+		schemagraph.New(consumer.Schemas).Root(consumer.Bodies, reading.Join),
+		schemagraph.New(provider.Schemas).Root(provider.Bodies, reading.Join),
+	)
 
-	reader, producer := providerBody, consumerBody
-	if reading.Rules.ReaderIsConsumer {
-		reader, producer = consumerBody, providerBody
+	breaks := body.breaks
+	arguments := hooks.BodyReading(model.Input)
+
+	for _, field := range body.argumentFields {
+		comparison := compareBodies(checked, counterpart, arguments.Rules, field.consumer.ArgumentsRoot(arguments.Join), field.provider.ArgumentsRoot(arguments.Join))
+		for _, argumentBreak := range comparison.breaks {
+			argumentBreak.placeInArgumentsOf(field.path)
+			breaks = append(breaks, argumentBreak)
+		}
 	}
 
-	return compareBodies(checked, counterpart, reading.Rules, reader, producer)
+	return breaks
 }
 
 func consumerAndProvider(checked, counterpart *model.PersistedResource) (consumer, provider *model.PersistedResource) {
@@ -33,11 +42,11 @@ func consumerAndProvider(checked, counterpart *model.PersistedResource) (consume
 	return counterpart, checked
 }
 
-func acceptsType(reader, producer string) bool {
-	if reader == producer {
-		return true
+func acceptsType(reader, producer schemagraph.Node) bool {
+	if reader.Type() == producer.Type() {
+		return reader.Scalar() == producer.Scalar()
 	}
 
-	return (reader == model.NumberType && (producer == model.IntegerType || producer == model.FloatType)) ||
-		(reader == model.StringType && producer == model.EnumType)
+	return (reader.Type() == model.NumberType && (producer.Type() == model.IntegerType || producer.Type() == model.FloatType)) ||
+		(reader.Type() == model.StringType && producer.Type() == model.EnumType)
 }

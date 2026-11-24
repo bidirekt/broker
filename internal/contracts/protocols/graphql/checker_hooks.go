@@ -18,6 +18,7 @@ var bodyReadings = map[model.BodyRole]compatibility_checker.BodyReading{
 			Missing:          model.ReasonPropertyMissingInConsumer,
 			Optional:         model.ReasonPropertyOptionalInConsumerRequiredInProvider,
 			Nullable:         model.ReasonPropertyNullableInConsumerNotNullableInProvider,
+			Unknown:          model.ReasonPropertyMissingInProvider,
 		},
 		Join: schemagraph.Senders,
 	},

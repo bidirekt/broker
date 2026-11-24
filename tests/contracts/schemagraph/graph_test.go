@@ -315,3 +315,37 @@ func TestArguments_StayOnThePropertyThatDeclaresThem(t *testing.T) {
 	assert.Equal(t, []schemagraph.Declaration{{Source: "orders.yaml", Type: "array", Arguments: "ReviewsArguments"}}, reviews.Declarations())
 	assert.Empty(t, reviews.Child("[]").Arguments())
 }
+
+func TestArgumentsRoot_IsTheArgumentsSchemaOfTheField(t *testing.T) {
+	catalog := model.Schemas{
+		"Pet": {
+			"":        {Type: "object"},
+			"reviews": {Ref: "Reviews", Arguments: "ReviewsArguments"},
+		},
+		"Reviews":          {"": {Type: "array"}, "[]": {Type: "string"}},
+		"ReviewsArguments": {"": {Type: "object"}, "first": {Type: "integer", Optional: true}},
+	}
+
+	arguments := graphRoot(catalog, "Pet").Child("reviews").ArgumentsRoot(schemagraph.Senders)
+
+	assert.Equal(t, "object", arguments.Type())
+	assert.Equal(t, "ReviewsArguments", arguments.Field())
+	assert.Equal(t, []string{"first"}, arguments.Segments())
+	assert.True(t, arguments.Child("first").Optional())
+}
+
+func TestArgumentsRoot_OfAFieldWithoutArguments_IsAnEmptyObject(t *testing.T) {
+	catalog := model.Schemas{
+		"Pet": {
+			"":     {Type: "object"},
+			"name": {Type: "string"},
+		},
+	}
+
+	arguments := graphRoot(catalog, "Pet").Child("name").ArgumentsRoot(schemagraph.Senders)
+
+	assert.True(t, arguments.Exists())
+	assert.Equal(t, "object", arguments.Type())
+	assert.Empty(t, arguments.Segments())
+	assert.False(t, arguments.Optional())
+}

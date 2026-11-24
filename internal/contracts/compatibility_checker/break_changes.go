@@ -1,6 +1,8 @@
 package compatibility_checker
 
 import (
+	"strings"
+
 	"github.com/bidirekt/broker/internal/contracts/schemagraph"
 	"github.com/bidirekt/broker/internal/model"
 )
@@ -19,6 +21,11 @@ func (this *ContractBreakingChange) refine(reason model.BreakingReason, details 
 
 	this.Reason = reason
 	this.Details = details
+}
+
+func (this *ContractBreakingChange) placeInArgumentsOf(fieldPath string) {
+	this.Details["argument"] = strings.TrimPrefix(this.Details["property"], "$.")
+	this.Details["property"] = fieldPath
 }
 
 func (this *ContractBreakingChange) IsPropertyBreak() bool {
@@ -153,6 +160,10 @@ func typeTokenOf(node schemagraph.Node, rendering map[string]bool) string {
 	}
 
 	rendering[shape] = true
+
+	if node.Type() == model.ScalarType {
+		return node.Scalar()
+	}
 
 	if node.Type() == model.ArrayType {
 		return model.ArrayType + "<" + typeTokenOf(node.Child(model.ItemsSegment), rendering) + ">"

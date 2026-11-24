@@ -8,6 +8,11 @@ const ReportKey = "operations"
 
 const Namespace = "graphql"
 
+// GeneratedNamespace holds the schemas the YAML grammar implies, which no YAML or SDL writes.
+const GeneratedNamespace = "graphql_generated"
+
+const EmptyArgumentsSchema = "EmptyArguments"
+
 const (
 	QueryOperation    = "query"
 	MutationOperation = "mutation"

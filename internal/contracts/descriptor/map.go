@@ -11,6 +11,7 @@ type Key struct {
 	ErrorCode string
 	Check     func(key string) error
 	Suggest   func(key string) string
+	Details   func(key string) map[string]string
 }
 
 func (this Key) reject(key string, path string) *violation.Violation {
@@ -24,6 +25,10 @@ func (this Key) reject(key string, path string) *violation.Violation {
 	}
 
 	details := map[string]string{"key": key, "error": err.Error()}
+	if this.Details != nil {
+		details = this.Details(key)
+	}
+
 	if this.Suggest != nil {
 		if suggestion := this.Suggest(key); suggestion != "" {
 			details["suggestion"] = suggestion
