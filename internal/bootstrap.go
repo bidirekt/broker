@@ -49,7 +49,8 @@ import (
 )
 
 func Run() (*components.Components, error) {
-	kernel, err := components.New()
+	sections := []breakreport.ProtocolSection{restbreakreport.New()}
+	kernel, err := components.New(sections)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +59,7 @@ func Run() (*components.Components, error) {
 	protocols := protocol.NewRegistry([]protocol.Protocol{restContracts})
 	hooks := []compatibility_checker.ProtocolHooks{restContracts}
 	tables := []repository.ProtocolTable{restrepository.New()}
-	reportReader := breakreport.NewReader([]breakreport.ProtocolSection{restbreakreport.New()})
+	reportReader := breakreport.NewReader(sections)
 
 	// registers /participants/new-participant, which must precede show_participant_versions' /participants/:name
 	create_participant.Register(kernel)

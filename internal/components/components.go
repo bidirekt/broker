@@ -2,6 +2,7 @@ package components
 
 import (
 	"github.com/bidirekt/broker/internal/components/bearer"
+	"github.com/bidirekt/broker/internal/components/breakreport"
 	"github.com/bidirekt/broker/internal/components/config"
 	"github.com/bidirekt/broker/internal/components/database"
 	"github.com/bidirekt/broker/internal/components/server"
@@ -19,7 +20,7 @@ type Components struct {
 	SessionKeeper *sessions.Keeper
 }
 
-func New() (*Components, error) {
+func New(sections []breakreport.ProtocolSection) (*Components, error) {
 	settings, err := config.Read()
 	if err != nil {
 		return nil, err
@@ -32,7 +33,7 @@ func New() (*Components, error) {
 	users := repository.NewUserRepository(pool)
 	sessionKeeper := sessions.NewKeeper(settings, repository.NewSessionRepository(pool), users)
 	bearerKeeper := bearer.NewKeeper(settings, users, repository.NewAPIKeyRepository(pool))
-	httpServer := server.New(settings, sessionKeeper, bearerKeeper)
+	httpServer := server.New(settings, sessionKeeper, bearerKeeper, sections)
 
 	if err := database.Migrate(pool); err != nil {
 		pool.Close()
