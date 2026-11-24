@@ -96,8 +96,10 @@ func (this *ContractRepository) LoadCounterparts(
 				continue
 			}
 
-			if hint, found := this.tables[resource.Protocol].LoadProviderHint(ctx, this.pool, resource, environmentID); found {
-				counterparts.ProviderHints[resource.ProviderHash] = hint
+			if table, hints := this.tables[resource.Protocol].(ProviderHintTable); hints {
+				if hint, found := table.LoadProviderHint(ctx, this.pool, resource, environmentID); found {
+					counterparts.ProviderHints[resource.ProviderHash] = hint
+				}
 			}
 		case model.Provides:
 			if _, queried := counterparts.Consumers[resource.ProviderHash]; queried {

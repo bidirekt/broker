@@ -12,6 +12,10 @@ type ProtocolTable interface {
 	Protocol() model.Protocol
 	Insert(ctx context.Context, q Querier, resourceID int64, identity model.ResourceIdentity)
 	LoadIdentities(ctx context.Context, q Querier, resourceIDs []int64) map[int64]model.ResourceIdentity
+}
+
+// ProviderHintTable is a ProtocolTable that, for a consumer resource with no provider, finds what the provider declares around it.
+type ProviderHintTable interface {
 	LoadProviderHint(ctx context.Context, q Querier, consumer model.PersistedResource, environmentID int64) (hint any, found bool)
 }
 
