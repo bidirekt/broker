@@ -5,6 +5,7 @@ import (
 
 	"github.com/bidirekt/broker/internal/components/pages"
 	"github.com/bidirekt/broker/internal/model"
+	"github.com/bidirekt/broker/internal/repository"
 )
 
 const (
@@ -20,6 +21,7 @@ type ShowParticipantVersionsPage struct {
 	LatestURL      string
 	Versions       []VersionRow
 	Pager          pages.Pager
+	Links          []repository.Link
 }
 
 type VersionRow struct {
@@ -27,13 +29,15 @@ type VersionRow struct {
 	URL string
 }
 
-func newShowParticipantVersionsPage(header *model.ParticipantVersionsHeader, versions []model.PublishedVersion, pager pages.Pager) ShowParticipantVersionsPage {
+func newShowParticipantVersionsPage(output ShowParticipantVersionsOutput, pager pages.Pager) ShowParticipantVersionsPage {
+	header, versions := output.Header, output.Versions
 	page := ShowParticipantVersionsPage{
 		Header:         header,
 		ParticipantURL: participantURL(header.Participant.Name),
 		LatestURL:      versionURL(header.Participant.Name, header.LatestVersion.String),
 		Versions:       make([]VersionRow, len(versions)),
 		Pager:          pager,
+		Links:          output.Links,
 	}
 	for i, version := range versions {
 		page.Versions[i] = VersionRow{PublishedVersion: version, URL: versionURL(header.Participant.Name, version.Version)}

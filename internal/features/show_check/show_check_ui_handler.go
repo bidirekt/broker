@@ -38,5 +38,5 @@ func (this *ShowCheckUiHandler) Handle(ctx fiber.Ctx) error {
 		return respond.NotFound(ctx)
 	}
 
-	return pages.Render(ctx, fiber.StatusOK, pageFiles, showCheckTemplate, newShowCheckPage(output.Check, output.Report), this.sectionFiles...)
+	return pages.Render(ctx, fiber.StatusOK, pageFiles, showCheckTemplate, newShowCheckPage(output), this.sectionFiles...)
 }

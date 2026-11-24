@@ -40,6 +40,7 @@ import (
 	"github.com/bidirekt/broker/internal/features/show_compatibility"
 	"github.com/bidirekt/broker/internal/features/show_contract_version"
 	"github.com/bidirekt/broker/internal/features/show_environment"
+	"github.com/bidirekt/broker/internal/features/show_graph"
 	"github.com/bidirekt/broker/internal/features/show_overview"
 	"github.com/bidirekt/broker/internal/features/show_participant_relations"
 	"github.com/bidirekt/broker/internal/features/show_participant_versions"
@@ -61,8 +62,10 @@ type Module struct {
 	FileFormat         contractfiles.FileFormat
 	ContractExtensions repository.ContractExtensionStore
 	ReservedNames      repository.ReservedNames
+	Links              repository.Links
 	// BindHooks stands in for Hooks when the protocol's hooks read the database, once it is open.
-	BindHooks func(kernel *components.Components, contracts *repository.ContractRepository) compatibility_checker.ProtocolHooks
+	BindHooks      func(kernel *components.Components, contracts *repository.ContractRepository) compatibility_checker.ProtocolHooks
+	RegisterRoutes func(kernel *components.Components, contracts *repository.ContractRepository)
 }
 
 func RESTModule() Module {
@@ -87,11 +90,13 @@ func GraphQLModule() Module {
 		FileFormat:         graphqlcontracts.NewSDLFormat(),
 		ContractExtensions: store,
 		ReservedNames:      store,
+		Links:              store,
 		BindHooks: func(kernel *components.Components, contracts *repository.ContractRepository) compatibility_checker.ProtocolHooks {
 			return graphqlcontracts.NewCheckerHooks(
 				graphqlrepository.NewGraphLoader(kernel.Pool), repository.NewDeploymentRepository(kernel.Pool), contracts,
 			)
 		},
+		RegisterRoutes: show_graph.Register,
 	}
 }
 
@@ -108,6 +113,7 @@ func RunWith(modules []Module) (*components.Components, error) {
 		formats  []contractfiles.FileFormat
 		stores   []repository.ContractExtensionStore
 		reserved []repository.ReservedNames
+		links    []repository.Links
 	)
 
 	for _, module := range modules {
@@ -125,6 +131,10 @@ func RunWith(modules []Module) (*components.Components, error) {
 
 		if module.ReservedNames != nil {
 			reserved = append(reserved, module.ReservedNames)
+		}
+
+		if module.Links != nil {
+			links = append(links, module.Links)
 		}
 	}
 
@@ -173,9 +183,9 @@ func RunWith(modules []Module) (*components.Components, error) {
 	reactivate_user.Register(kernel)
 	set_password.Register(kernel)
 	setup_admin.Register(kernel)
-	show_check.Register(kernel, reportReader)
+	show_check.Register(kernel, reportReader, links)
 	list_participant_pages.Register(kernel)
-	show_participant_versions.Register(kernel)
+	show_participant_versions.Register(kernel, links)
 	list_participant_deployments.Register(kernel)
 	list_participant_checks.Register(kernel, reportReader)
 	show_contract_version.Register(kernel, reportReader)
@@ -184,6 +194,12 @@ func RunWith(modules []Module) (*components.Components, error) {
 	show_environment.Register(kernel, reportReader)
 	show_compatibility.Register(kernel, reportReader)
 	show_overview.Register(kernel, reportReader)
+
+	for _, module := range modules {
+		if module.RegisterRoutes != nil {
+			module.RegisterRoutes(kernel, contracts)
+		}
+	}
 
 	return kernel, nil
 }
