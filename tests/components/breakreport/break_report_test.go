@@ -216,7 +216,7 @@ func TestRemovedCountsOncePerEndpointAndMethodAndInteractionRemovedOncePerIntera
 	require.Len(t, interactionRemoved.Breaks, 2)
 	assert.Equal(t, "response 200", interactionRemoved.Breaks[0].Interaction)
 	assert.Equal(t, "response 404", interactionRemoved.Breaks[1].Interaction)
-	assert.Equal(t, model.ReasonProviderResourceInteractionRemovedButStillConsumed, interactionRemoved.Breaks[0].Reason)
+	assert.Equal(t, restmodel.ReasonProviderResourceInteractionRemovedButStillConsumed, interactionRemoved.Breaks[0].Reason)
 	assert.Equal(t, "petstore_api now answers GET /pets only with 204, but petstore_web still reads response 200", interactionRemoved.Breaks[0].Sentence.String())
 	assert.Empty(t, interactionRemoved.Breaks[0].ReasonLine)
 

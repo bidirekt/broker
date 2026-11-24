@@ -5,13 +5,14 @@ import (
 	"testing"
 
 	"github.com/bidirekt/broker/internal/model"
+	restmodel "github.com/bidirekt/broker/internal/model/protocols/rest"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestBreakingReason_IsPropertyBreak_OnlyForPropertyReasons(t *testing.T) {
 	reasons := []model.BreakingReason{
 		model.ReasonProviderResourceNotFound,
-		model.ReasonProviderResourceInteractionNotFound,
+		restmodel.ReasonProviderResourceInteractionNotFound,
 		model.ReasonPropertyMissingInProvider,
 		model.ReasonPropertyMissingInConsumer,
 		model.ReasonPropertyMemberMissingInProvider,
@@ -22,7 +23,7 @@ func TestBreakingReason_IsPropertyBreak_OnlyForPropertyReasons(t *testing.T) {
 		model.ReasonPropertyNullableInConsumerNotNullableInProvider,
 		model.ReasonProviderResourceNotDeployedInEnvironment,
 		model.ReasonProviderResourceRemovedButStillConsumed,
-		model.ReasonProviderResourceInteractionRemovedButStillConsumed,
+		restmodel.ReasonProviderResourceInteractionRemovedButStillConsumed,
 	}
 
 	for _, reason := range reasons {
