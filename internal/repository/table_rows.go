@@ -22,6 +22,17 @@ const resourceColumns = `
 			bodies.sources,
 			bodies.schema_names`
 
+func resourceBodiesJoin(contractIDColumn string) string {
+	return `JOIN LATERAL (
+			SELECT
+				array_agg(rb.source ORDER BY rb.source COLLATE "C", rb.id) AS sources,
+				array_agg(s.name ORDER BY rb.source COLLATE "C", rb.id) AS schema_names
+			FROM resource_bodies rb
+			LEFT JOIN schemas s ON s.id = rb.schema_id
+			WHERE rb.resource_id = r.id AND rb.contract_id = ` + contractIDColumn + `
+		) bodies ON true`
+}
+
 // This struct is used to build the entire contract avoiding N+1 problem
 type tableRow struct {
 	// Participant

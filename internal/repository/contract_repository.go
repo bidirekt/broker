@@ -86,7 +86,9 @@ const (
 		VALUES
 			($1, $2, $3)
 	`
+)
 
+var (
 	getLatestSnapshotByParticipantID = `
 		SELECT
 			c.id,
@@ -101,14 +103,7 @@ const (
 			ORDER BY contract_id DESC
 			LIMIT 1
 		) rv ON true
-		JOIN LATERAL (
-			SELECT
-				array_agg(rb.source ORDER BY rb.source COLLATE "C", rb.id) AS sources,
-				array_agg(s.name ORDER BY rb.source COLLATE "C", rb.id) AS schema_names
-			FROM resource_bodies rb
-			LEFT JOIN schemas s ON s.id = rb.schema_id
-			WHERE rb.resource_id = r.id AND rb.contract_id = c.id
-		) bodies ON true
+		` + resourceBodiesJoin("c.id") + `
 		WHERE c.participant_id = $1
 		  AND c.id = (SELECT MAX(id) FROM contracts WHERE participant_id = pa.id)
 		  AND rv.change_type = 'added'
@@ -130,14 +125,7 @@ const (
 			ORDER BY contract_id DESC
 			LIMIT 1
 		) rv ON true
-		JOIN LATERAL (
-			SELECT
-				array_agg(rb.source ORDER BY rb.source COLLATE "C", rb.id) AS sources,
-				array_agg(s.name ORDER BY rb.source COLLATE "C", rb.id) AS schema_names
-			FROM resource_bodies rb
-			LEFT JOIN schemas s ON s.id = rb.schema_id
-			WHERE rb.resource_id = r.id AND rb.contract_id = c.id
-		) bodies ON true
+		` + resourceBodiesJoin("c.id") + `
 	`
 
 	getContractByNameAndVersion = contractVersionTreeQuery + `

@@ -10,8 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-const (
-	deployedResourcesByProviderHashAndEnvironmentQuery = `
+var deployedResourcesByProviderHashAndEnvironmentQuery = `
 		SELECT
 			cd.contract_id,
 			cd.version,` + resourceColumns + `
@@ -29,14 +28,7 @@ const (
 			ORDER BY contract_id DESC
 			LIMIT 1
 		) rv ON true
-		JOIN LATERAL (
-			SELECT
-				array_agg(rb.source ORDER BY rb.source COLLATE "C", rb.id) AS sources,
-				array_agg(s.name ORDER BY rb.source COLLATE "C", rb.id) AS schema_names
-			FROM resource_bodies rb
-			LEFT JOIN schemas s ON s.id = rb.schema_id
-			WHERE rb.resource_id = r.id AND rb.contract_id = cd.contract_id
-		) bodies ON true
+		` + resourceBodiesJoin("cd.contract_id") + `
 		WHERE
 			r.direction = $1
 		AND
@@ -45,6 +37,7 @@ const (
 			rv.change_type = 'added'
 	`
 
+const (
 	registeredProviderQuery = `
 		SELECT
 			pa.id,
