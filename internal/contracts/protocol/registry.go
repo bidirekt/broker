@@ -28,7 +28,7 @@ func NewRegistry(protocols []Protocol) *Registry {
 		blocks[name] = protocol.Grammar()
 	}
 
-	return &Registry{protocols: sorted, grammar: descriptor.Contract(blocks)}
+	return &Registry{protocols: sorted, grammar: descriptor.Contract(blocks, descriptor.CoreVocabulary())}
 }
 
 func (this *Registry) Protocols() []Protocol {

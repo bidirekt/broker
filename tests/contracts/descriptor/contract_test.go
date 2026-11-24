@@ -11,7 +11,7 @@ import (
 	restcontracts "github.com/bidirekt/broker/internal/contracts/protocols/rest"
 )
 
-var contractGrammar = descriptor.Contract(descriptor.Fields{"rest": restcontracts.New().Grammar()})
+var contractGrammar = descriptor.Contract(descriptor.Fields{"rest": restcontracts.New().Grammar()}, descriptor.CoreVocabulary())
 
 func contractDocument(t *testing.T, source string) any {
 	t.Helper()
