@@ -1,7 +1,6 @@
 package graphql
 
 import (
-	"github.com/bidirekt/broker/internal/contracts/compatibility_checker"
 	"github.com/bidirekt/broker/internal/contracts/descriptor"
 	"github.com/bidirekt/broker/internal/contracts/protocol"
 	"github.com/bidirekt/broker/internal/model"
@@ -26,8 +25,4 @@ func (this Plugin) Grammar() protocol.Grammar {
 
 func (this Plugin) ToDeclarations(protocol.Block) protocol.BlockDeclarations {
 	return protocol.BlockDeclarations{}
-}
-
-func (this Plugin) NewReportTree() compatibility_checker.ReportTree {
-	return graphqlmodel.ReportTree{}
 }

@@ -56,7 +56,7 @@ func (this *CompatibilityChecker) checkConsumer(
 		result.VerdictCached = true
 		pair.replay(result)
 	} else {
-		for _, breakingChange := range checkResources(&consumerResource, &providerResource) {
+		for _, breakingChange := range this.checkResources(&consumerResource, &providerResource) {
 			result.AppendContractBreakChange(breakingChange)
 		}
 	}

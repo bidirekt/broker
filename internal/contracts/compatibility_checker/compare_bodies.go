@@ -7,11 +7,11 @@ import (
 	"github.com/bidirekt/broker/internal/model"
 )
 
-type readingRules struct {
-	readerIsConsumer bool
-	missing          model.BreakingReason
-	optional         model.BreakingReason
-	nullable         model.BreakingReason
+type ReadingRules struct {
+	ReaderIsConsumer bool
+	Missing          model.BreakingReason
+	Optional         model.BreakingReason
+	Nullable         model.BreakingReason
 }
 
 // Optional and nullable belong to the fields a node is reached through, so each pair of them is compared once;
@@ -20,7 +20,7 @@ type readingRules struct {
 type bodyComparison struct {
 	checked        *model.PersistedResource
 	counterpart    *model.PersistedResource
-	rules          readingRules
+	rules          ReadingRules
 	comparedSites  map[[2]string]bool
 	comparedShapes map[[2]string]bool
 	breaks         []ContractBreakingChange
@@ -29,7 +29,7 @@ type bodyComparison struct {
 func compareBodies(
 	checked *model.PersistedResource,
 	counterpart *model.PersistedResource,
-	rules readingRules,
+	rules ReadingRules,
 	reader, producer schemagraph.Node,
 ) []ContractBreakingChange {
 	comparison := &bodyComparison{
@@ -52,7 +52,7 @@ func (this *bodyComparison) compareRead(reader, producer schemagraph.Node, path 
 
 	if !producer.Exists() {
 		if !reader.Optional() {
-			this.breakAt(this.rules.missing, path, reader, producer)
+			this.breakAt(this.rules.Missing, path, reader, producer)
 		}
 
 		return
@@ -77,11 +77,11 @@ func (this *bodyComparison) compareRead(reader, producer schemagraph.Node, path 
 	}
 
 	if !reader.Optional() && producer.Optional() {
-		this.breakAt(this.rules.optional, path, reader, producer)
+		this.breakAt(this.rules.Optional, path, reader, producer)
 	}
 
 	if producer.Nullable() && !reader.Nullable() {
-		this.breakAt(this.rules.nullable, path, reader, producer)
+		this.breakAt(this.rules.Nullable, path, reader, producer)
 	}
 
 	if this.comparedShapes[shapes] {
@@ -139,7 +139,7 @@ func (this *bodyComparison) breakAt(reason model.BreakingReason, path string, re
 }
 
 func (this *bodyComparison) consumerAndProvider(reader, producer schemagraph.Node) (consumer, provider schemagraph.Node) {
-	if this.rules.readerIsConsumer {
+	if this.rules.ReaderIsConsumer {
 		return reader, producer
 	}
 

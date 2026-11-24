@@ -5,6 +5,7 @@ import "github.com/bidirekt/broker/internal/model"
 type ProtocolHooks interface {
 	Protocol() model.Protocol
 	NewReportTree() ReportTree
+	BodyReading(body model.BodyRole) BodyReading
 }
 
 type NotFoundRefiner interface {

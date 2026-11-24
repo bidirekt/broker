@@ -29,7 +29,7 @@ func (this *CompatibilityChecker) checkProvider(
 			result.VerdictCached = true
 			pair.replay(result)
 		} else {
-			for _, breakingChange := range checkResources(&providerResource, &consumerResource) {
+			for _, breakingChange := range this.checkResources(&providerResource, &consumerResource) {
 				result.AppendContractBreakChange(breakingChange)
 			}
 		}

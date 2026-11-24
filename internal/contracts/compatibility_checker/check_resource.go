@@ -5,43 +5,24 @@ import (
 	"github.com/bidirekt/broker/internal/model"
 )
 
-type bodyReading struct {
-	rules readingRules
-	join  schemagraph.Join
+type BodyReading struct {
+	Rules ReadingRules
+	Join  schemagraph.Join
 }
 
-var inputRules = readingRules{
-	readerIsConsumer: false,
-	missing:          model.ReasonPropertyMissingInConsumer,
-	optional:         model.ReasonPropertyOptionalInConsumerRequiredInProvider,
-	nullable:         model.ReasonPropertyNullableInConsumerNotNullableInProvider,
-}
-
-var outputRules = readingRules{
-	readerIsConsumer: true,
-	missing:          model.ReasonPropertyMissingInProvider,
-	optional:         model.ReasonPropertyOptionalInProviderRequiredInConsumer,
-	nullable:         model.ReasonPropertyNullableInProviderNotNullableInConsumer,
-}
-
-var bodyReadings = map[model.BodyRole]bodyReading{
-	model.Input:  {rules: inputRules, join: schemagraph.Senders},
-	model.Output: {rules: outputRules, join: schemagraph.Readers},
-}
-
-func checkResources(checked *model.PersistedResource, counterpart *model.PersistedResource) []ContractBreakingChange {
+func (this *CompatibilityChecker) checkResources(checked *model.PersistedResource, counterpart *model.PersistedResource) []ContractBreakingChange {
 	consumer, provider := consumerAndProvider(checked, counterpart)
-	reading := bodyReadings[consumer.Body]
+	reading := this.hooksOf(consumer.Protocol).BodyReading(consumer.Body)
 
-	consumerBody := schemagraph.New(consumer.Schemas).Root(consumer.Bodies, reading.join)
-	providerBody := schemagraph.New(provider.Schemas).Root(provider.Bodies, reading.join)
+	consumerBody := schemagraph.New(consumer.Schemas).Root(consumer.Bodies, reading.Join)
+	providerBody := schemagraph.New(provider.Schemas).Root(provider.Bodies, reading.Join)
 
 	reader, producer := providerBody, consumerBody
-	if reading.rules.readerIsConsumer {
+	if reading.Rules.ReaderIsConsumer {
 		reader, producer = consumerBody, providerBody
 	}
 
-	return compareBodies(checked, counterpart, reading.rules, reader, producer)
+	return compareBodies(checked, counterpart, reading.Rules, reader, producer)
 }
 
 func consumerAndProvider(checked, counterpart *model.PersistedResource) (consumer, provider *model.PersistedResource) {
