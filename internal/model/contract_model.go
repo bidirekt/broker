@@ -17,6 +17,7 @@ type UploadedContract struct {
 	Files           []ContractFile
 	Resources       map[string]UploadedResource
 	Schemas         map[string]Schemas
+	Extensions      map[string]any
 	ParticipantID   int64
 	ParticipantName string
 }
@@ -54,7 +55,8 @@ func (this *UploadedContract) AddResource(resource *UploadedResource) error {
 }
 
 // The sources are left out, like the files themselves: the same content split into other files is the
-// same snapshot. Roots are sorted so the slice order never changes it.
+// same snapshot; an extension keeps its sources out of its JSON for the same reason. Roots are sorted so the
+// slice order never changes it.
 func (this *UploadedContract) Checksum() string {
 	resources := make(map[string]UploadedResource, len(this.Resources))
 	roots := make(map[string][]null.String, len(this.Resources))
@@ -79,7 +81,8 @@ func (this *UploadedContract) Checksum() string {
 		Roots             map[string][]null.String
 		Schemas           Schemas
 		NamespacedSchemas map[string]Schemas `json:",omitempty"`
-	}{resources, roots, yamlSchemas, namespacedSchemas})
+		Extensions        map[string]any     `json:",omitempty"`
+	}{resources, roots, yamlSchemas, namespacedSchemas, this.Extensions})
 	sum := sha256.Sum256(payload)
 	return hex.EncodeToString(sum[:])
 }

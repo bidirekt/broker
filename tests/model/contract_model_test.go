@@ -209,6 +209,41 @@ func TestContract_Checksum_DiffersWhenASchemaMovesToAnotherNamespace(t *testing.
 	assert.NotEqual(t, inYAML.Checksum(), inAnotherNamespace.Checksum())
 }
 
+type probeExtension struct {
+	Graph  string `json:"graph"`
+	Source string `json:"-"`
+}
+
+func TestContract_Checksum_DiffersWhenOnlyTheExtensionsDiffer(t *testing.T) {
+	withoutExtensions := newOrdersContract("1", "Address", addressBodies("Address"))
+	withExtension := newOrdersContract("1", "Address", addressBodies("Address"))
+	withExtension.Extensions = map[string]any{"probe": probeExtension{Graph: "petstore_graph"}}
+	withOtherExtension := newOrdersContract("1", "Address", addressBodies("Address"))
+	withOtherExtension.Extensions = map[string]any{"probe": probeExtension{Graph: "orders_graph"}}
+
+	assert.NotEqual(t, withoutExtensions.Checksum(), withExtension.Checksum())
+	assert.NotEqual(t, withExtension.Checksum(), withOtherExtension.Checksum())
+}
+
+func TestContract_Checksum_IgnoresTheFilesAnExtensionCameFrom(t *testing.T) {
+	fromOneFile := newOrdersContract("1", "Address", addressBodies("Address"))
+	fromOneFile.Files = []model.ContractFile{{Source: "graph.yaml", Content: "provides: {}"}}
+	fromOneFile.Extensions = map[string]any{"probe": probeExtension{Graph: "petstore_graph", Source: "graph.yaml"}}
+	fromAnotherFile := newOrdersContract("1", "Address", addressBodies("Address"))
+	fromAnotherFile.Files = []model.ContractFile{{Source: "subgraph/federation.yaml", Content: "provides: {}"}}
+	fromAnotherFile.Extensions = map[string]any{"probe": probeExtension{Graph: "petstore_graph", Source: "subgraph/federation.yaml"}}
+
+	assert.Equal(t, fromOneFile.Checksum(), fromAnotherFile.Checksum())
+}
+
+func TestContract_Checksum_NoExtensionsIsTheSameAsAnEmptyMap(t *testing.T) {
+	withoutExtensions := newOrdersContract("1", "Address", addressBodies("Address"))
+	withEmptyExtensions := newOrdersContract("1", "Address", addressBodies("Address"))
+	withEmptyExtensions.Extensions = map[string]any{}
+
+	assert.Equal(t, withoutExtensions.Checksum(), withEmptyExtensions.Checksum())
+}
+
 func TestContract_AddResource_RejectsAlreadyAddedHash(t *testing.T) {
 	contract := newContractWithOnePetsResource("pets-service")
 

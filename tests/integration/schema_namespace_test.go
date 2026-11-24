@@ -125,10 +125,10 @@ func (this *IntegrationSuite) TestSchemaNamespace_SameNameInTwoNamespaces_Coexis
 		Bodies:    []model.ResourceBody{{Source: "api.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Pet")}},
 	}}))
 
-	conflict := repo.Publish(ctx, contract,
+	result := repo.Publish(ctx, contract,
 		func(*model.PersistedContract) model.ContractDiff { return model.ContractDiff{} },
 		func([]model.ContractFile) bool { return true })
-	this.Require().False(conflict)
+	this.Require().Equal(repository.Published, result.Outcome)
 
 	var bodyNamespace string
 	this.Require().NoError(this.Pool.QueryRow(ctx, `

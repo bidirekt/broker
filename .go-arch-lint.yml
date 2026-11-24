@@ -309,7 +309,7 @@ deps:
   contracts_protocols_rest:
     mayDependOn: [contracts, model, model_protocols_rest]
   contracts_protocols_graphql:
-    mayDependOn: [contracts, model, model_protocols_graphql]
+    mayDependOn: [contracts, model, model_protocols_graphql, validations]
     canUse: [gqlparser, guregu_null]
   repository:
     mayDependOn: [model]

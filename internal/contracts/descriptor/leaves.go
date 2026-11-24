@@ -1,6 +1,7 @@
 package descriptor
 
 import (
+	"cmp"
 	"fmt"
 	"slices"
 	"strings"
@@ -23,8 +24,9 @@ func (stringNode) validate(value any, path string) []violation.Violation {
 }
 
 type Text struct {
-	ErrorCode string
-	Check     func(value string) error
+	ErrorCode   string
+	Check       func(value string) error
+	ValueDetail string
 }
 
 func (this Text) validate(value any, path string) []violation.Violation {
@@ -45,7 +47,7 @@ func (this Text) validate(value any, path string) []violation.Violation {
 	return []violation.Violation{{
 		ErrorCode: this.ErrorCode,
 		Path:      path,
-		Details:   map[string]any{"value": text, "error": err.Error()},
+		Details:   map[string]any{cmp.Or(this.ValueDetail, "value"): text, "error": err.Error()},
 	}}
 }
 

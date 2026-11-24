@@ -121,7 +121,7 @@ func TestToDeclarations_TheHashParts_AreTheProvidedOnes(t *testing.T) {
 	assert.Equal(t, []string{"mutation", "adoptPet", "returns"}, declarations.Resources[1].Resource.Identity.HashParts())
 }
 
-func TestToDeclarations_AProvidesBlock_DeclaresNothing(t *testing.T) {
+func TestToDeclarations_AProvidesBlock_DeclaresOnlyItsGraph(t *testing.T) {
 	block := protocol.Block{
 		Source:    "api.yaml",
 		Path:      contract.NewResourcePath("provides;graphql"),
@@ -130,7 +130,13 @@ func TestToDeclarations_AProvidesBlock_DeclaresNothing(t *testing.T) {
 		Protocol:  graphqlmodel.Protocol,
 	}
 
-	assert.Empty(t, graphqlcontracts.New().ToDeclarations(block))
+	assert.Equal(t, protocol.BlockDeclarations{Extension: graphqlmodel.Extension{Graph: "petstore_graph"}}, graphqlcontracts.New().ToDeclarations(block))
+}
+
+func TestToDeclarations_ABlockWithoutGraph_HasNoExtension(t *testing.T) {
+	block := consumedGraphQLBlock(contract.Document{"query": map[string]any{"pet": map[string]any{"returns": "MaybePet"}}})
+
+	assert.Nil(t, graphqlcontracts.New().ToDeclarations(block).Extension)
 }
 
 func TestToDeclarations_TheIntrospectionFields_AreNeverDeclared(t *testing.T) {

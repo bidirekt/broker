@@ -97,6 +97,10 @@ func (this *ValidateContractUseCase) Execute(ctx context.Context, input Validate
 
 	localContract := toPersistedContract(uploadedContract, removedResources)
 
+	if refusal, refused := this.contractRepository.RefuseContractExtensions(ctx, localContract); refused {
+		return ValidateContractOutput{Status: ContractValidationFailed, Violations: []violation.Violation{violation.FromRefusal(refusal)}}, nil
+	}
+
 	counterparts := this.contractRepository.LoadCounterparts(ctx, localContract, environment.ID)
 	compatibilityReport := this.compatibilityChecker.Check(ctx, localContract, environment, counterparts)
 
@@ -156,8 +160,10 @@ func toPersistedContract(
 	}
 
 	return &model.PersistedContract{
+		ParticipantID:   uploadedContract.ParticipantID,
 		ParticipantName: uploadedContract.ParticipantName,
 		Resources:       resources,
 		Schemas:         uploadedContract.Schemas,
+		Extensions:      uploadedContract.Extensions,
 	}
 }

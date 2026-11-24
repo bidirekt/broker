@@ -39,7 +39,12 @@ func (this SDLFormat) ToDeclarations(files []model.ContractFile) (protocol.Decla
 		sources = append(sources, source)
 	}
 
-	schema, err := gqlparser.LoadSchema(sources...)
+	federation, err := toFederation(sources)
+	if err != nil {
+		return protocol.Declarations{}, err
+	}
+
+	schema, err := gqlparser.LoadSchema(withDefinitions(sources, federation.definitions)...)
 	if err != nil {
 		return protocol.Declarations{}, err
 	}
@@ -48,7 +53,11 @@ func (this SDLFormat) ToDeclarations(files []model.ContractFile) (protocol.Decla
 		return protocol.Declarations{}, err
 	}
 
-	return toDeclarations(schema), nil
+	if err := federation.checkKeys(schema, sources); err != nil {
+		return protocol.Declarations{}, err
+	}
+
+	return toDeclarations(schema, federation), nil
 }
 
 // gqlparser takes the extension of a type no file defines as its definition; graphql-js refuses it.
@@ -112,4 +121,12 @@ func readTokenSkippingComments(scanner *lexer.Lexer) lexer.Token {
 
 func isDescription(token lexer.Token) bool {
 	return token.Kind == lexer.String || token.Kind == lexer.BlockString
+}
+
+func withDefinitions(sources []*ast.Source, definitions *ast.Source) []*ast.Source {
+	if definitions == nil {
+		return sources
+	}
+
+	return append([]*ast.Source{definitions}, sources...)
 }

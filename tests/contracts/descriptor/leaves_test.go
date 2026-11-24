@@ -63,6 +63,15 @@ func TestText_RejectedTextComesWithTheValueAndTheCheckError(t *testing.T) {
 	assert.Equal(t, map[string]any{"value": "Pet2", "error": "must not contain digits"}, violations[0].Details)
 }
 
+func TestText_TheValueDetail_NamesTheDetailThatCarriesTheValue(t *testing.T) {
+	subject := descriptor.Text{ErrorCode: "text.digits", Check: withoutDigits, ValueDetail: "name"}
+
+	violations := descriptor.Validate(subject, "Pet2", "api.yaml")
+
+	require.Len(t, violations, 1)
+	assert.Equal(t, map[string]any{"name": "Pet2", "error": "must not contain digits"}, violations[0].Details)
+}
+
 func TestText_NullCountsAsAbsent(t *testing.T) {
 	subject := descriptor.Text{ErrorCode: "text.digits", Check: withoutDigits}
 

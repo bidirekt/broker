@@ -99,13 +99,13 @@ func (this *ContractRepositoryProtocolSuite) uploadedPetsContract(participantNam
 }
 
 func (this *ContractRepositoryProtocolSuite) publish(repo *repository.ContractRepository, contract *model.UploadedContract) {
-	conflict := repo.Publish(
+	result := repo.Publish(
 		context.Background(),
 		contract,
 		func(*model.PersistedContract) model.ContractDiff { return model.ContractDiff{} },
 		func([]model.ContractFile) bool { return true },
 	)
-	this.Require().False(conflict)
+	this.Require().Equal(repository.Published, result.Outcome)
 }
 
 func (this *ContractRepositoryProtocolSuite) insertLiveResource(contract *model.UploadedContract, protocol string, providerHash string) int64 {
@@ -211,4 +211,143 @@ func (this *ContractRepositoryProtocolSuite) TestLoadingAResourceWithoutItsProto
 	this.PanicsWithError(fmt.Sprintf(`resource %d has no row in its protocol table`, rowlessResourceID), func() {
 		repo.GetContractByNameAndVersion(context.Background(), "pets_rowless", "1")
 	})
+}
+
+type recordingExtensionStore struct {
+	refusal                      model.Refusal
+	refuses                      bool
+	refusalAsked                 []any
+	inserted                     map[int64]any
+	insertedInsideTheTransaction map[int64]bool
+}
+
+func newRecordingExtensionStore() *recordingExtensionStore {
+	return &recordingExtensionStore{inserted: map[int64]any{}, insertedInsideTheTransaction: map[int64]bool{}}
+}
+
+func (this *recordingExtensionStore) Protocol() model.Protocol {
+	return restmodel.Protocol
+}
+
+func (this *recordingExtensionStore) RefuseContractExtension(_ context.Context, _ repository.Querier, extension any) (model.Refusal, bool) {
+	this.refusalAsked = append(this.refusalAsked, extension)
+
+	return this.refusal, this.refuses
+}
+
+func (this *recordingExtensionStore) InsertContractExtension(ctx context.Context, q repository.Querier, contractID int64, extension any) {
+	var visible bool
+	if err := q.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM contracts WHERE id = $1)`, contractID).Scan(&visible); err != nil {
+		panic(err)
+	}
+
+	this.inserted[contractID] = extension
+	this.insertedInsideTheTransaction[contractID] = visible
+}
+
+func (this *recordingExtensionStore) LoadContractExtensions(_ context.Context, _ repository.Querier, contractIDs []int64) map[int64]any {
+	loaded := map[int64]any{}
+	for _, id := range contractIDs {
+		if extension, found := this.inserted[id]; found {
+			loaded[id] = extension
+		}
+	}
+
+	return loaded
+}
+
+func (this *ContractRepositoryProtocolSuite) repositoryWithExtensions(store *recordingExtensionStore) *repository.ContractRepository {
+	return repository.NewContractRepository(this.pool, repository.Protocols{
+		Tables:     []repository.ProtocolTable{restrepository.New()},
+		Extensions: []repository.ContractExtensionStore{store},
+	})
+}
+
+func (this *ContractRepositoryProtocolSuite) countContractsOf(participantID int64) int {
+	var count int
+	this.Require().NoError(this.pool.QueryRow(context.Background(),
+		`SELECT count(*) FROM contracts WHERE participant_id = $1`, participantID).Scan(&count))
+
+	return count
+}
+
+func (this *ContractRepositoryProtocolSuite) TestALoadedContractCarriesTheExtensionsItWasPublishedWith() {
+	store := newRecordingExtensionStore()
+	repo := this.repositoryWithExtensions(store)
+	uploaded := this.uploadedPetsContract("pets_extended")
+	uploaded.Extensions = map[string]any{"rest": "petstore_graph"}
+	this.publish(repo, uploaded)
+
+	contract, found := repo.GetContractByNameAndVersion(context.Background(), "pets_extended", "1")
+	this.Require().True(found)
+
+	this.Equal(map[string]any{"rest": "petstore_graph"}, contract.Extensions)
+	this.Equal(map[int64]bool{contract.ID: true}, store.insertedInsideTheTransaction)
+}
+
+func (this *ContractRepositoryProtocolSuite) TestAContractWithoutExtensionsIsNeitherAskedNorInserted() {
+	store := newRecordingExtensionStore()
+	repo := this.repositoryWithExtensions(store)
+	this.publish(repo, this.uploadedPetsContract("pets_plain"))
+
+	contract, found := repo.GetContractByNameAndVersion(context.Background(), "pets_plain", "1")
+	this.Require().True(found)
+
+	this.Nil(contract.Extensions)
+	this.Empty(store.refusalAsked)
+	this.Empty(store.inserted)
+}
+
+func (this *ContractRepositoryProtocolSuite) TestAVersionReusingASnapshotReusesItsExtensionWithoutInsertingIt() {
+	store := newRecordingExtensionStore()
+	repo := this.repositoryWithExtensions(store)
+	first := this.uploadedPetsContract("pets_aliased_extension")
+	first.Extensions = map[string]any{"rest": "petstore_graph"}
+	this.publish(repo, first)
+
+	second := model.NewUploadedContract(first.ParticipantID, first.ParticipantName, "2", first.Files)
+	second.Resources = first.Resources
+	second.Extensions = map[string]any{"rest": "petstore_graph"}
+	this.publish(repo, second)
+
+	contract, found := repo.GetContractByNameAndVersion(context.Background(), "pets_aliased_extension", "2")
+	this.Require().True(found)
+
+	this.Equal(map[string]any{"rest": "petstore_graph"}, contract.Extensions)
+	this.Len(store.inserted, 1)
+	this.Equal([]any{"petstore_graph", "petstore_graph"}, store.refusalAsked)
+}
+
+func (this *ContractRepositoryProtocolSuite) TestARefusedExtensionWritesNothing() {
+	refusal := model.Refusal{Code: "probe.refused", Path: "provides;rest", Source: "api.yaml", Details: map[string]any{"graph": "petstore_graph"}}
+	store := newRecordingExtensionStore()
+	store.refusal, store.refuses = refusal, true
+	uploaded := this.uploadedPetsContract("pets_refused")
+	uploaded.Extensions = map[string]any{"rest": "petstore_graph"}
+
+	result := this.repositoryWithExtensions(store).Publish(
+		context.Background(),
+		uploaded,
+		func(*model.PersistedContract) model.ContractDiff { return model.ContractDiff{} },
+		func([]model.ContractFile) bool { return true },
+	)
+
+	this.Equal(repository.PublishResult{Outcome: repository.PublishRefused, Refusal: refusal}, result)
+	this.Equal(0, this.countContractsOf(uploaded.ParticipantID))
+	this.Empty(store.inserted)
+}
+
+func (this *ContractRepositoryProtocolSuite) TestRefuseContractExtensionsAsksTheStoreOfEachCarriedExtension() {
+	refusal := model.Refusal{Code: "probe.refused", Path: "provides;rest", Source: "api.yaml", Details: map[string]any{}}
+	store := newRecordingExtensionStore()
+	store.refusal, store.refuses = refusal, true
+	repo := this.repositoryWithExtensions(store)
+
+	_, refusedWithout := repo.RefuseContractExtensions(context.Background(), &model.PersistedContract{})
+	got, refusedWith := repo.RefuseContractExtensions(context.Background(), &model.PersistedContract{Extensions: map[string]any{"rest": "petstore_graph"}})
+
+	this.False(refusedWithout)
+	this.True(refusedWith)
+	this.Equal(refusal, got)
+	this.Equal([]any{"petstore_graph"}, store.refusalAsked)
 }

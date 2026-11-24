@@ -76,6 +76,7 @@ func (this *Interpreter) ToUploadedContract(
 
 	uploadedContract = model.NewUploadedContract(participant.ID, participant.Name, version, files)
 	uploadedContract.Schemas = fragmentmapper.ToSchemaModels(declarations)
+	uploadedContract.Extensions = declarations.Extensions
 
 	for _, resource := range resources {
 		if err = uploadedContract.AddResource(&resource); err != nil {

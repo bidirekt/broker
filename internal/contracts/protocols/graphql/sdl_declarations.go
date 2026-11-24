@@ -34,16 +34,22 @@ var definitionKinds = map[ast.DefinitionKind]string{
 
 type sdlDeclarations struct {
 	schema       *ast.Schema
+	directives   map[string]string
 	declarations protocol.Declarations
-	typeInfos    map[string][]graphqlmodel.TypeInfo
+	pieces       map[string]*graphqlmodel.Extension
 }
 
 // Every type becomes a schema kept in the contract, whether a root field reaches it or not.
-func toDeclarations(schema *ast.Schema) protocol.Declarations {
+func toDeclarations(schema *ast.Schema, federation federation) protocol.Declarations {
 	converted := &sdlDeclarations{
 		schema:       schema,
+		directives:   federation.countedDirectives(),
 		declarations: protocol.Declarations{Formats: []string{formatName}},
-		typeInfos:    map[string][]graphqlmodel.TypeInfo{},
+		pieces:       map[string]*graphqlmodel.Extension{},
+	}
+
+	if federation.linkSource != "" {
+		converted.pieceOf(federation.linkSource).LinkSource = federation.linkSource
 	}
 
 	for _, name := range slices.Sorted(maps.Keys(schema.Types)) {
@@ -70,13 +76,21 @@ func toDeclarations(schema *ast.Schema) protocol.Declarations {
 func (this *sdlDeclarations) addDefinition(definition *ast.Definition) {
 	this.addSchema(definition.Position, definition.Name, this.toDefinitionSchema(definition))
 	this.addTypeInfo(definition.Position, definition.Name, definitionKinds[definition.Kind], "")
+	this.addDirectives(definition.Name, definition.Directives)
+
+	for _, value := range definition.EnumValues {
+		this.addDirectives(definition.Name+"."+value.Name, value.Directives)
+	}
 
 	for _, field := range declaredFields(definition) {
 		coordinate := definition.Name + "." + field.Name
 		this.addTypeInfo(field.Position, coordinate, graphqlmodel.FieldKind, field.Type.Name())
+		this.addDirectives(coordinate, field.Directives)
 
 		for _, argument := range field.Arguments {
-			this.addTypeInfo(argument.Position, coordinate+"("+argument.Name+":)", graphqlmodel.ArgumentKind, argument.Type.Name())
+			argumentCoordinate := coordinate + "(" + argument.Name + ":)"
+			this.addTypeInfo(argument.Position, argumentCoordinate, graphqlmodel.ArgumentKind, argument.Type.Name())
+			this.addDirectives(argumentCoordinate, argument.Directives)
 		}
 
 		if len(field.Arguments) > 0 {
@@ -133,15 +147,44 @@ func (this *sdlDeclarations) addSchema(position *ast.Position, name string, sche
 }
 
 func (this *sdlDeclarations) addTypeInfo(position *ast.Position, coordinate, kind, namedType string) {
-	source := position.Src.Name
-	this.typeInfos[source] = append(this.typeInfos[source], graphqlmodel.TypeInfo{Coordinate: coordinate, Kind: kind, NamedType: namedType})
+	piece := this.pieceOf(position.Src.Name)
+	piece.Types = append(piece.Types, graphqlmodel.TypeInfo{Coordinate: coordinate, Kind: kind, NamedType: namedType})
+}
+
+// Only the directives the composition counts are kept; the others are read and ignored.
+func (this *sdlDeclarations) addDirectives(coordinate string, directives ast.DirectiveList) {
+	for _, directive := range directives {
+		counted, counts := this.directives[directive.Name]
+		if !counts {
+			continue
+		}
+
+		kept := graphqlmodel.Directive{Coordinate: coordinate, Directive: counted, Resolvable: true}
+		if counted == graphqlmodel.KeyDirective {
+			kept.Fields = toNormalizedFieldSet(directive.Arguments.ForName("fields").Value.Raw)
+			if resolvable := directive.Arguments.ForName("resolvable"); resolvable != nil {
+				kept.Resolvable = resolvable.Value.Raw != "false"
+			}
+		}
+
+		piece := this.pieceOf(directive.Position.Src.Name)
+		piece.Directives = append(piece.Directives, kept)
+	}
+}
+
+func (this *sdlDeclarations) pieceOf(source string) *graphqlmodel.Extension {
+	if this.pieces[source] == nil {
+		this.pieces[source] = &graphqlmodel.Extension{}
+	}
+
+	return this.pieces[source]
 }
 
 func (this *sdlDeclarations) addExtensionPieces() {
-	for _, source := range slices.Sorted(maps.Keys(this.typeInfos)) {
+	for _, source := range slices.Sorted(maps.Keys(this.pieces)) {
 		this.declarations.AddExtensionPiece(graphqlmodel.Protocol.String(), protocol.ExtensionPiece{
 			Source: source,
-			Value:  graphqlmodel.Extension{Types: this.typeInfos[source]},
+			Value:  *this.pieces[source],
 		})
 	}
 }

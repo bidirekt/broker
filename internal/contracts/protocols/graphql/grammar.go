@@ -8,6 +8,7 @@ import (
 	"github.com/bidirekt/broker/internal/contracts/protocol"
 	"github.com/bidirekt/broker/internal/contracts/violation"
 	graphqlmodel "github.com/bidirekt/broker/internal/model/protocols/graphql"
+	"github.com/bidirekt/broker/internal/validations"
 )
 
 var fieldNamePattern = regexp.MustCompile(`^[_A-Za-z][_0-9A-Za-z]*$`)
@@ -21,6 +22,9 @@ var FieldName = descriptor.Key{
 	},
 }
 
+// A graph's name is one participants may not take, so it has their format.
+var graphName = descriptor.Text{ErrorCode: "graph.name_syntax", Check: validations.ParticipantName, ValueDetail: graphqlmodel.GraphKey}
+
 func (this Plugin) Grammar() protocol.Grammar {
 	field := descriptor.Object(descriptor.Fields{
 		graphqlmodel.ArgumentsInteraction: descriptor.SchemaRef,
@@ -29,7 +33,7 @@ func (this Plugin) Grammar() protocol.Grammar {
 	fields := descriptor.Map(FieldName, field)
 
 	return protocol.Grammar{
-		Provides: descriptor.Object(descriptor.Fields{"graph": descriptor.String()}),
+		Provides: descriptor.Object(descriptor.Fields{graphqlmodel.GraphKey: graphName}),
 		Consumes: descriptor.Object(descriptor.Fields{
 			graphqlmodel.QueryOperation:    fields,
 			graphqlmodel.MutationOperation: fields,

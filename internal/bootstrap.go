@@ -54,11 +54,13 @@ import (
 
 // Module is one protocol: the pieces every protocol has, and its optional ports, nil when it has none.
 type Module struct {
-	Protocol   protocol.Protocol
-	Hooks      compatibility_checker.ProtocolHooks
-	Table      repository.ProtocolTable
-	Section    breakreport.ProtocolSection
-	FileFormat contractfiles.FileFormat
+	Protocol           protocol.Protocol
+	Hooks              compatibility_checker.ProtocolHooks
+	Table              repository.ProtocolTable
+	Section            breakreport.ProtocolSection
+	FileFormat         contractfiles.FileFormat
+	ContractExtensions repository.ContractExtensionStore
+	ReservedNames      repository.ReservedNames
 }
 
 func RESTModule() Module {
@@ -74,13 +76,16 @@ func RESTModule() Module {
 
 func GraphQLModule() Module {
 	plugin := graphqlcontracts.New()
+	store := graphqlrepository.New()
 
 	return Module{
-		Protocol:   plugin,
-		Hooks:      plugin,
-		Table:      graphqlrepository.New(),
-		Section:    graphqlbreakreport.New(),
-		FileFormat: graphqlcontracts.NewSDLFormat(),
+		Protocol:           plugin,
+		Hooks:              plugin,
+		Table:              store,
+		Section:            graphqlbreakreport.New(),
+		FileFormat:         graphqlcontracts.NewSDLFormat(),
+		ContractExtensions: store,
+		ReservedNames:      store,
 	}
 }
 
@@ -95,6 +100,8 @@ func RunWith(modules []Module) (*components.Components, error) {
 		tables   []repository.ProtocolTable
 		sections []breakreport.ProtocolSection
 		formats  []contractfiles.FileFormat
+		stores   []repository.ContractExtensionStore
+		reserved []repository.ReservedNames
 	)
 
 	for _, module := range modules {
@@ -106,6 +113,14 @@ func RunWith(modules []Module) (*components.Components, error) {
 		if module.FileFormat != nil {
 			formats = append(formats, module.FileFormat)
 		}
+
+		if module.ContractExtensions != nil {
+			stores = append(stores, module.ContractExtensions)
+		}
+
+		if module.ReservedNames != nil {
+			reserved = append(reserved, module.ReservedNames)
+		}
 	}
 
 	kernel, err := components.New(sections)
@@ -115,10 +130,10 @@ func RunWith(modules []Module) (*components.Components, error) {
 
 	interpreter := contractfiles.NewInterpreter(protocol.NewRegistry(plugins), formats)
 	reportReader := breakreport.NewReader(sections)
-	protocols := repository.Protocols{Tables: tables}
+	protocols := repository.Protocols{Tables: tables, Extensions: stores}
 
 	// registers /participants/new-participant, which must precede show_participant_versions' /participants/:name
-	create_participant.Register(kernel)
+	create_participant.Register(kernel, reserved)
 	// registers /environments/new-environment, which must precede show_environment's /environments/:id
 	create_environment.Register(kernel)
 	publish_contract.Register(kernel, interpreter, protocols)

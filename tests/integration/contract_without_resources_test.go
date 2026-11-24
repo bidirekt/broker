@@ -69,12 +69,12 @@ func (this *IntegrationSuite) withPetsResource(contract *model.UploadedContract)
 }
 
 func (this *IntegrationSuite) publishWithoutResources(repo *repository.ContractRepository, contract *model.UploadedContract) {
-	conflict := repo.Publish(context.Background(), contract,
+	result := repo.Publish(context.Background(), contract,
 		func(current *model.PersistedContract) model.ContractDiff {
 			return contract_differ.DiffContracts(current, contract)
 		},
 		func([]model.ContractFile) bool { return true })
-	this.Require().False(conflict)
+	this.Require().Equal(repository.Published, result.Outcome)
 }
 
 func (this *IntegrationSuite) TestContractRepository_ContractWithoutResources_LoadsWithItsSchemas() {
