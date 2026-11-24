@@ -105,7 +105,7 @@ func (this *IntegrationSuite) TestSchemaNamespaceMigration_KeepsTheSchemasAlread
 
 func (this *IntegrationSuite) TestSchemaNamespace_SameNameInTwoNamespaces_CoexistAndARestResourceLoadsOnlyTheYAMLCatalog() {
 	ctx := context.Background()
-	repo := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()})
+	repo := repository.NewContractRepository(this.Pool, repository.Protocols{Tables: []repository.ProtocolTable{restrepository.New()}})
 
 	var participantID int64
 	this.Require().NoError(this.Pool.QueryRow(ctx, `INSERT INTO participants (name) VALUES ('petstore_api') RETURNING id`).Scan(&participantID))

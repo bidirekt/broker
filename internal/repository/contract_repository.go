@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/guregu/null"
@@ -132,8 +133,8 @@ type ContractRepository struct {
 	tables map[model.Protocol]ProtocolTable
 }
 
-func NewContractRepository(pool *pgxpool.Pool, protocols []ProtocolTable) *ContractRepository {
-	return &ContractRepository{pool: pool, tables: toProtocolTables(protocols)}
+func NewContractRepository(pool *pgxpool.Pool, protocols Protocols) *ContractRepository {
+	return &ContractRepository{pool: pool, tables: toProtocolTables(protocols.Tables)}
 }
 
 func (this *ContractRepository) loadFilesForVersion(ctx context.Context, tx pgx.Tx, participantID int64, version string) ([]model.ContractFile, bool) {
@@ -325,7 +326,7 @@ func (this *ContractRepository) insertResource(
 		panic(fmt.Errorf("error inserting resource: %w", err))
 	}
 
-	this.tableOf(id, resource.Protocol).Insert(ctx, tx, id, resource.Identity)
+	this.tableOf(strconv.FormatInt(id, 10), resource.Protocol).Insert(ctx, tx, id, resource.Identity)
 
 	return id
 }

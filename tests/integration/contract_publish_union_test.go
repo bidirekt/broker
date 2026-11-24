@@ -90,7 +90,7 @@ func (this *IntegrationSuite) publishUnionOrdersProvider(version, cardRef string
 
 func (this *IntegrationSuite) TestPublishContract_Union_ReadsBackEachMemberAsARefField() {
 	ctx := context.Background()
-	repo := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()})
+	repo := repository.NewContractRepository(this.Pool, repository.Protocols{Tables: []repository.ProtocolTable{restrepository.New()}})
 
 	this.mustPostForUnion("/api/participants", `{"participant":"shop_api"}`)
 	this.publishUnionOrdersProvider("1", "CardPayment")

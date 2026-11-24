@@ -67,7 +67,7 @@ func (this *ContractRepositoryProtocolSuite) TearDownSuite() {
 }
 
 func (this *ContractRepositoryProtocolSuite) restRepository() *repository.ContractRepository {
-	return repository.NewContractRepository(this.pool, []repository.ProtocolTable{restrepository.New()})
+	return repository.NewContractRepository(this.pool, repository.Protocols{Tables: []repository.ProtocolTable{restrepository.New()}})
 }
 
 func (this *ContractRepositoryProtocolSuite) uploadedPetsContract(participantName string) *model.UploadedContract {
@@ -180,7 +180,7 @@ func (this *ContractRepositoryProtocolSuite) TestLoadedResourcesCarryTheirProtoc
 
 func (this *ContractRepositoryProtocolSuite) TestPublishingAProtocolWithoutARegisteredTableFails() {
 	contract := this.uploadedPetsContract("pets_unregistered_publish")
-	repo := repository.NewContractRepository(this.pool, nil)
+	repo := repository.NewContractRepository(this.pool, repository.Protocols{})
 
 	defer func() {
 		panicked, isError := recover().(error)

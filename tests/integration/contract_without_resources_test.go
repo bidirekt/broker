@@ -79,7 +79,7 @@ func (this *IntegrationSuite) publishWithoutResources(repo *repository.ContractR
 
 func (this *IntegrationSuite) TestContractRepository_ContractWithoutResources_LoadsWithItsSchemas() {
 	ctx := context.Background()
-	repo := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()})
+	repo := repository.NewContractRepository(this.Pool, repository.Protocols{Tables: []repository.ProtocolTable{restrepository.New()}})
 	participantID := this.withoutResourcesParticipantID()
 	this.publishWithoutResources(repo, withoutResourcesContract(participantID, "1", withoutResourcesSchemas("Pet", "Owner")))
 
@@ -101,7 +101,7 @@ func (this *IntegrationSuite) TestContractRepository_ContractWithoutResources_Lo
 
 func (this *IntegrationSuite) TestContractRepository_NextSnapshotOverAContractWithoutResources_RemovesTheDroppedSchema() {
 	ctx := context.Background()
-	repo := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()})
+	repo := repository.NewContractRepository(this.Pool, repository.Protocols{Tables: []repository.ProtocolTable{restrepository.New()}})
 	participantID := this.withoutResourcesParticipantID()
 	this.publishWithoutResources(repo, withoutResourcesContract(participantID, "1", withoutResourcesSchemas("Pet", "Owner")))
 	this.publishWithoutResources(repo, withoutResourcesContract(participantID, "2", withoutResourcesSchemas("Pet")))
@@ -119,7 +119,7 @@ func (this *IntegrationSuite) TestContractRepository_NextSnapshotOverAContractWi
 
 func (this *IntegrationSuite) TestContractRepository_EveryResourceRemoved_StaysOutOfTheVersionThatRemovedIt() {
 	ctx := context.Background()
-	repo := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()})
+	repo := repository.NewContractRepository(this.Pool, repository.Protocols{Tables: []repository.ProtocolTable{restrepository.New()}})
 	participantID := this.withoutResourcesParticipantID()
 	this.publishWithoutResources(repo, this.withPetsResource(withoutResourcesContract(participantID, "1", withoutResourcesSchemas("Pet"))))
 	this.publishWithoutResources(repo, withoutResourcesContract(participantID, "2", withoutResourcesSchemas("Pet")))

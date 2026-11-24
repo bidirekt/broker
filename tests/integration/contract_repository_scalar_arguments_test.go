@@ -63,7 +63,7 @@ func (this *IntegrationSuite) publishScalarArgumentsContract(repo *repository.Co
 }
 
 func (this *IntegrationSuite) TestContractRepository_ScalarAndArguments_ReadBackAsWritten() {
-	repo := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()})
+	repo := repository.NewContractRepository(this.Pool, repository.Protocols{Tables: []repository.ProtocolTable{restrepository.New()}})
 	written := scalarArgumentsPetSchemas("DateTime", "ReviewsArguments")
 	this.publishScalarArgumentsContract(repo, this.scalarArgumentsContract(this.scalarArgumentsParticipantID(), "1", written))
 
@@ -75,7 +75,7 @@ func (this *IntegrationSuite) TestContractRepository_ScalarAndArguments_ReadBack
 
 func (this *IntegrationSuite) TestContractRepository_ScalarOrArgumentsChanged_WritesAModifiedFieldVersion() {
 	ctx := context.Background()
-	repo := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()})
+	repo := repository.NewContractRepository(this.Pool, repository.Protocols{Tables: []repository.ProtocolTable{restrepository.New()}})
 	participantID := this.scalarArgumentsParticipantID()
 
 	this.publishScalarArgumentsContract(repo, this.scalarArgumentsContract(participantID, "1", scalarArgumentsPetSchemas("DateTime", "ReviewsArguments")))

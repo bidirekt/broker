@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/bidirekt/broker/internal/model"
 )
@@ -28,10 +29,10 @@ func toProtocolTables(tables []ProtocolTable) map[model.Protocol]ProtocolTable {
 	return byProtocol
 }
 
-func (this *ContractRepository) tableOf(resourceID int64, protocol model.Protocol) ProtocolTable {
+func (this *ContractRepository) tableOf(resource string, protocol model.Protocol) ProtocolTable {
 	table, registered := this.tables[protocol]
 	if !registered {
-		panic(fmt.Errorf("resource %d has protocol %q, which has no registered table", resourceID, protocol))
+		panic(fmt.Errorf("resource %s has protocol %q, which has no registered table", resource, protocol))
 	}
 
 	return table
@@ -46,7 +47,7 @@ func (this *ContractRepository) identitiesOf(ctx context.Context, q Querier, row
 
 	identities := make(map[int64]model.ResourceIdentity, len(rows))
 	for protocol, ids := range idsByProtocol {
-		for id, identity := range this.tableOf(ids[0], protocol).LoadIdentities(ctx, q, ids) {
+		for id, identity := range this.tableOf(strconv.FormatInt(ids[0], 10), protocol).LoadIdentities(ctx, q, ids) {
 			identities[id] = identity
 		}
 	}

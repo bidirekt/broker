@@ -115,14 +115,15 @@ func RunWith(modules []Module) (*components.Components, error) {
 
 	interpreter := contractfiles.NewInterpreter(protocol.NewRegistry(plugins), formats)
 	reportReader := breakreport.NewReader(sections)
+	protocols := repository.Protocols{Tables: tables}
 
 	// registers /participants/new-participant, which must precede show_participant_versions' /participants/:name
 	create_participant.Register(kernel)
 	// registers /environments/new-environment, which must precede show_environment's /environments/:id
 	create_environment.Register(kernel)
-	publish_contract.Register(kernel, interpreter, tables)
-	validate_contract.Register(kernel, interpreter, tables, hooks)
-	can_i_deploy.Register(kernel, tables, hooks)
+	publish_contract.Register(kernel, interpreter, protocols)
+	validate_contract.Register(kernel, interpreter, protocols, hooks)
+	can_i_deploy.Register(kernel, protocols, hooks)
 	record_deployment.Register(kernel)
 	rename_environment.Register(kernel)
 	health.Register(kernel)
