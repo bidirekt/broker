@@ -80,16 +80,11 @@ func (this *ValidateContractUseCase) Execute(ctx context.Context, input Validate
 		return ValidateContractOutput{Status: EnvironmentNotFound}, nil
 	}
 
-	fragments, shapeViolations, err := this.interpreter.ToFragments(input.Contracts)
-	if err != nil {
-		return ValidateContractOutput{Status: ContractFilesUnreadable, ReadError: err.Error()}, nil
+	uploadedContract, violations, readErr, err := this.interpreter.ToUploadedContract(input.Contracts, participant, "")
+	if readErr != nil {
+		return ValidateContractOutput{Status: ContractFilesUnreadable, ReadError: readErr.Error()}, nil
 	}
 
-	if len(shapeViolations) > 0 {
-		return ValidateContractOutput{Status: ContractValidationFailed, Violations: shapeViolations}, nil
-	}
-
-	uploadedContract, violations, err := this.interpreter.ToUploadedContract(fragments, participant, "", nil)
 	if len(violations) > 0 {
 		return ValidateContractOutput{Status: ContractValidationFailed, Violations: violations}, nil
 	}
@@ -115,16 +110,12 @@ func (this *ValidateContractUseCase) Execute(ctx context.Context, input Validate
 }
 
 func (this *ValidateContractUseCase) validateSyntax(files []model.ContractFile) ValidateContractOutput {
-	fragments, shapeViolations, err := this.interpreter.ToFragments(files)
-	if err != nil {
-		return ValidateContractOutput{Status: ContractFilesUnreadable, ReadError: err.Error()}
+	violations, readErr := this.interpreter.ToViolations(files)
+	if readErr != nil {
+		return ValidateContractOutput{Status: ContractFilesUnreadable, ReadError: readErr.Error()}
 	}
 
-	if len(shapeViolations) > 0 {
-		return ValidateContractOutput{Status: ContractValidationFailed, Violations: shapeViolations}
-	}
-
-	if violations := this.interpreter.ToViolations(fragments); len(violations) > 0 {
+	if len(violations) > 0 {
 		return ValidateContractOutput{Status: ContractValidationFailed, Violations: violations}
 	}
 

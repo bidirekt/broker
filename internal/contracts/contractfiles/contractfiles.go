@@ -27,7 +27,48 @@ func NewInterpreter(registry *protocol.Registry) *Interpreter {
 	return &Interpreter{registry: registry}
 }
 
-func (this *Interpreter) ToFragments(files []model.ContractFile) ([]contract.Fragment, []violation.Violation, error) {
+func (this *Interpreter) ToUploadedContract(
+	files []model.ContractFile,
+	participant *model.Participant,
+	version string,
+) (uploadedContract *model.UploadedContract, violations []violation.Violation, readErr error, err error) {
+	declarations, violations, readErr := this.toCheckedDeclarations(files)
+	if readErr != nil || len(violations) > 0 {
+		return nil, violations, readErr, nil
+	}
+
+	resources := fragmentmapper.ToResourceModels(declarations)
+
+	uploadedContract = model.NewUploadedContract(participant.ID, participant.Name, version, files)
+	uploadedContract.Schemas = fragmentmapper.ToSchemaModels(declarations)
+
+	for _, resource := range resources {
+		if err = uploadedContract.AddResource(&resource); err != nil {
+			return nil, nil, nil, err
+		}
+	}
+
+	return uploadedContract, nil, nil, nil
+}
+
+func (this *Interpreter) ToViolations(files []model.ContractFile) ([]violation.Violation, error) {
+	_, violations, readErr := this.toCheckedDeclarations(files)
+
+	return violations, readErr
+}
+
+func (this *Interpreter) toCheckedDeclarations(files []model.ContractFile) (protocol.Declarations, []violation.Violation, error) {
+	fragments, shapeViolations, readErr := this.toFragments(files)
+	if readErr != nil || len(shapeViolations) > 0 {
+		return protocol.Declarations{}, shapeViolations, readErr
+	}
+
+	declarations := fragmentmapper.ToDeclarations(fragments, this.registry)
+
+	return declarations, validator.Validate(declarations), nil
+}
+
+func (this *Interpreter) toFragments(files []model.ContractFile) ([]contract.Fragment, []violation.Violation, error) {
 	fragments := make([]contract.Fragment, 0, len(files))
 	for _, file := range files {
 		fragment, err := contract.DecodeFragment(file.Source, file.Content)
@@ -43,46 +84,5 @@ func (this *Interpreter) ToFragments(files []model.ContractFile) ([]contract.Fra
 		shapeViolations = append(shapeViolations, descriptor.Validate(this.registry.Grammar(), fragment.Document, fragment.Source)...)
 	}
 
-	if len(shapeViolations) > 0 {
-		return nil, shapeViolations, nil
-	}
-
-	return fragments, nil, nil
-}
-
-func (this *Interpreter) ToUploadedContract(
-	fragments []contract.Fragment,
-	participant *model.Participant,
-	version string,
-	files []model.ContractFile,
-) (*model.UploadedContract, []violation.Violation, error) {
-	declarations, violations := this.toCheckedDeclarations(fragments)
-	if len(violations) > 0 {
-		return nil, violations, nil
-	}
-
-	resources := fragmentmapper.ToResourceModels(declarations)
-
-	uploadedContract := model.NewUploadedContract(participant.ID, participant.Name, version, files)
-	uploadedContract.Schemas = fragmentmapper.ToSchemaModels(declarations)
-
-	for _, resource := range resources {
-		if err := uploadedContract.AddResource(&resource); err != nil {
-			return nil, nil, err
-		}
-	}
-
-	return uploadedContract, nil, nil
-}
-
-func (this *Interpreter) ToViolations(fragments []contract.Fragment) []violation.Violation {
-	_, violations := this.toCheckedDeclarations(fragments)
-
-	return violations
-}
-
-func (this *Interpreter) toCheckedDeclarations(fragments []contract.Fragment) (protocol.Declarations, []violation.Violation) {
-	declarations := fragmentmapper.ToDeclarations(fragments, this.registry)
-
-	return declarations, validator.Validate(declarations)
+	return fragments, shapeViolations, nil
 }

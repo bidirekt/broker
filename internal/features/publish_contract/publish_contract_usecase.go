@@ -57,16 +57,11 @@ func (this *PublishContractUseCase) Execute(ctx context.Context, input PublishCo
 		return PublishContractOutput{Status: ContractParticipantNotFound}, nil
 	}
 
-	fragments, shapeViolations, err := this.interpreter.ToFragments(input.Contracts)
-	if err != nil {
-		return PublishContractOutput{Status: ContractFilesUnreadable, ReadError: err.Error()}, nil
+	uploadedContract, violations, readErr, err := this.interpreter.ToUploadedContract(input.Contracts, participant, input.Version)
+	if readErr != nil {
+		return PublishContractOutput{Status: ContractFilesUnreadable, ReadError: readErr.Error()}, nil
 	}
 
-	if len(shapeViolations) > 0 {
-		return PublishContractOutput{Status: ContractValidationFailed, Violations: shapeViolations}, nil
-	}
-
-	uploadedContract, violations, err := this.interpreter.ToUploadedContract(fragments, participant, input.Version, input.Contracts)
 	if len(violations) > 0 {
 		return PublishContractOutput{Status: ContractValidationFailed, Violations: violations}, nil
 	}
@@ -95,12 +90,7 @@ func (this *PublishContractUseCase) hasSameContent(stored []model.ContractFile, 
 		return true
 	}
 
-	fragments, shapeViolations, err := this.interpreter.ToFragments(stored)
-	if err != nil || len(shapeViolations) > 0 {
-		return false
-	}
+	storedContract, violations, readErr, err := this.interpreter.ToUploadedContract(stored, participant, uploadedContract.Version)
 
-	storedContract, violations, err := this.interpreter.ToUploadedContract(fragments, participant, uploadedContract.Version, stored)
-
-	return err == nil && len(violations) == 0 && storedContract.Checksum() == uploadedContract.Checksum()
+	return readErr == nil && err == nil && len(violations) == 0 && storedContract.Checksum() == uploadedContract.Checksum()
 }
