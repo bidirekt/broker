@@ -192,7 +192,7 @@ func TestToUploadedContract_ValidFragments_AddsEachResourceUnderItsHash(t *testi
 
 	require.NoError(t, err)
 	require.Len(t, uploadedContract.Resources, 1)
-	resource, added := uploadedContract.Resources[model.Hash("pets_service", "/pets", "get", "200")]
+	resource, added := uploadedContract.Resources[model.Hash("pets_service", "rest", "/pets", "get", "200")]
 	require.True(t, added)
 	assert.Equal(t, "pets_service", resource.ParticipantName)
 	assert.Equal(t, "provides GET /pets 200", resource.Describe())

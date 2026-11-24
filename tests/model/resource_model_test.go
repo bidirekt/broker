@@ -58,7 +58,7 @@ func TestResource_ConsumerHash_RestResponse_IncludesStatusCode(t *testing.T) {
 	assert.NotEqual(t, a.ConsumerHash(), b.ConsumerHash())
 }
 
-func TestResource_Hashes_KeepTheValuesFromBeforeTheProtocolRefactor(t *testing.T) {
+func TestResource_Hashes_IncludeTheProtocol(t *testing.T) {
 	cases := []struct {
 		name         string
 		resource     *model.UploadedResource
@@ -68,24 +68,24 @@ func TestResource_Hashes_KeepTheValuesFromBeforeTheProtocolRefactor(t *testing.T
 		{
 			name:         "provides GET /pets 200",
 			resource:     restResource("petstore_api", "", "/pets", "get", "200"),
-			providerHash: "4186fd903c086826655928f1aac69b6a09dd339d11d370c19df275c56878aca4",
+			providerHash: "37813efdc420db42e3868749998e97ecd2808ace36c32d3b3d419eac850ee314",
 		},
 		{
 			name:         "provides POST /pets request",
 			resource:     restResource("petstore_api", "", "/pets", "post", ""),
-			providerHash: "821227ce1e0880384ff4d8d8891cafb957ebeadfde79a4df94ab3874491beedf",
+			providerHash: "0b96b38688a352c7097de6ccb0c214ccf09005914a56503eeae2ea6c28a81aaa",
 		},
 		{
 			name:         "consumes petstore_api GET /pets 200",
 			resource:     restResource("petstore_web", "petstore_api", "/pets", "get", "200"),
-			providerHash: "4186fd903c086826655928f1aac69b6a09dd339d11d370c19df275c56878aca4",
-			consumerHash: "0c6429446ddbdc49fcbc14dd1f160a345f7d30ce6bbd63660f019df6517b2243",
+			providerHash: "37813efdc420db42e3868749998e97ecd2808ace36c32d3b3d419eac850ee314",
+			consumerHash: "bcf5c1d280cf9726a966b13fd9aae98751c3288fb75d99d6224d52371deb2f72",
 		},
 		{
 			name:         "consumes petstore_api POST /pets request",
 			resource:     restResource("petstore_web", "petstore_api", "/pets", "post", ""),
-			providerHash: "821227ce1e0880384ff4d8d8891cafb957ebeadfde79a4df94ab3874491beedf",
-			consumerHash: "66c18366e53a4ae1638906821bab8b81376821afe29c3f1ed448dfca299e427a",
+			providerHash: "0b96b38688a352c7097de6ccb0c214ccf09005914a56503eeae2ea6c28a81aaa",
+			consumerHash: "ef0ddff5d7ab1aadb3475059d488dd3be7fa2511b09a2e2388e0ee45e0a4bee1",
 		},
 	}
 
