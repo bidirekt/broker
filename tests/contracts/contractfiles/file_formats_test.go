@@ -69,7 +69,7 @@ func (this probeFormat) Extensions() []string {
 	return []string{".probe"}
 }
 
-func (this probeFormat) ToDeclarations(files []model.ContractFile) (protocol.Declarations, error) {
+func (this probeFormat) ToDeclarations(files []model.ContractFile, yaml protocol.Declarations) (protocol.Declarations, error) {
 	declarations := protocol.Declarations{
 		Catalog:         map[string]contract.SchemasMap{"probe": {}},
 		ExtensionPieces: map[string][]protocol.ExtensionPiece{},
@@ -79,6 +79,10 @@ func (this probeFormat) ToDeclarations(files []model.ContractFile) (protocol.Dec
 	for _, file := range files {
 		if file.Content == "broken" {
 			return protocol.Declarations{}, errors.New(file.Source + ": unreadable")
+		}
+
+		if file.Content == "tagged" && len(yaml.ExtensionPieces["probe"]) == 0 {
+			return protocol.Declarations{}, errors.New(file.Source + ": read without the YAML tag")
 		}
 
 		schema := contract.Schema{Type: "string"}
@@ -109,6 +113,28 @@ func TestToViolations_FilesOfARegisteredFormat_AreReadByIt_AndJoinedWithTheYAMLB
 		"extension": "Scalar,Tagged",
 		"schemas":   "probe:Scalar",
 	}}}, violations)
+}
+
+func TestToViolations_AFormat_ReadsItsFilesByWhatTheYAMLDeclares(t *testing.T) {
+	_, violations, readErr := probeInterpreter.ToViolations([]model.ContractFile{
+		{Source: "api.yaml", Content: probeTagYAML},
+		{Source: "schema.probe", Content: "tagged"},
+	})
+
+	require.NoError(t, readErr)
+	assert.Equal(t, "Tagged,tagged", violations[0].Details["extension"])
+}
+
+func TestToViolations_AFormat_ReadsItsFilesByTheYAMLWhoseShapeIsValid(t *testing.T) {
+	_, violations, readErr := probeInterpreter.ToViolations([]model.ContractFile{
+		{Source: "api.yaml", Content: probeTagYAML},
+		{Source: "other.yaml", Content: "provides:\n  probe:\n    unknown: x\n"},
+		{Source: "schema.probe", Content: "tagged"},
+	})
+
+	require.NoError(t, readErr)
+	require.Len(t, violations, 1)
+	assert.Equal(t, "other.yaml", violations[0].Source)
 }
 
 func TestToViolations_AFormatReadError_IsTheReadError(t *testing.T) {

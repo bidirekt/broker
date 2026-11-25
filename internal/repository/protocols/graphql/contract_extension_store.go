@@ -16,9 +16,9 @@ const (
 
 	insertGraphMemberQuery = `
 		INSERT INTO graphql_graph_members
-			(contract_id, graph_name)
+			(contract_id, graph_name, federation1)
 		VALUES
-			($1, $2)
+			($1, $2, $3)
 	`
 
 	insertTypeInfoQuery = `
@@ -76,7 +76,8 @@ const (
 	loadGraphMembersQuery = `
 		SELECT
 			contract_id,
-			graph_name
+			graph_name,
+			federation1
 		FROM
 			graphql_graph_members
 		WHERE
@@ -130,7 +131,7 @@ func (this Plugin) InsertContractExtension(ctx context.Context, q repository.Que
 	graphqlExtension := extension.(graphqlmodel.Extension)
 
 	if graphqlExtension.Graph != "" {
-		if _, err := q.Exec(ctx, insertGraphMemberQuery, contractID, graphqlExtension.Graph); err != nil {
+		if _, err := q.Exec(ctx, insertGraphMemberQuery, contractID, graphqlExtension.Graph, graphqlExtension.Federation1); err != nil {
 			panic(fmt.Errorf("error inserting graphql graph member: %w", err))
 		}
 	}
@@ -235,12 +236,14 @@ func (this Plugin) loadGraphMembers(ctx context.Context, q repository.Querier, c
 	for rows.Next() {
 		var contractID int64
 		var graph string
+		var federation1 bool
 
-		if err := rows.Scan(&contractID, &graph); err != nil {
+		if err := rows.Scan(&contractID, &graph, &federation1); err != nil {
 			panic(fmt.Errorf("error scanning graphql graph member: %w", err))
 		}
 
-		extensionOf(contractID).Graph = graph
+		extension := extensionOf(contractID)
+		extension.Graph, extension.Federation1 = graph, federation1
 	}
 
 	if err := rows.Err(); err != nil {

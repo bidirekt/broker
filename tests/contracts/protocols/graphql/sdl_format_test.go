@@ -21,7 +21,7 @@ const petsSDL = "type Query {\n  pet(id: ID!): Pet\n}\n\ntype Pet {\n  id: ID!\n
 func sdlDeclarations(t *testing.T, sdl string) protocol.Declarations {
 	t.Helper()
 
-	declarations, readErr := graphqlcontracts.NewSDLFormat().ToDeclarations([]model.ContractFile{{Source: "schema.graphqls", Content: sdl}})
+	declarations, readErr := graphqlcontracts.NewSDLFormat().ToDeclarations([]model.ContractFile{{Source: "schema.graphqls", Content: sdl}}, protocol.Declarations{})
 	require.NoError(t, readErr)
 
 	return declarations
@@ -332,7 +332,7 @@ func TestSDLFormat_KindsAndNamedTypes_AreTheGraphQLPieceOfEachFile(t *testing.T)
 	declarations, readErr := graphqlcontracts.NewSDLFormat().ToDeclarations([]model.ContractFile{
 		{Source: "schema.graphqls", Content: "type Query {\n  pet(id: ID!, name: String): Pet\n}\n"},
 		{Source: "pet.graphqls", Content: "type Pet {\n  id: ID!\n  tags: [String!]!\n}\n\ninput PetInput {\n  id: ID!\n}\n"},
-	})
+	}, protocol.Declarations{})
 	require.NoError(t, readErr)
 
 	assert.Equal(t, map[string][]protocol.ExtensionPiece{"graphql": {
@@ -377,7 +377,7 @@ func TestSDLFormat_SeveralFiles_AreOneSchema(t *testing.T) {
 	declarations, readErr := graphqlcontracts.NewSDLFormat().ToDeclarations([]model.ContractFile{
 		{Source: "query.graphqls", Content: "type Query {\n  pet: Pet\n}\n"},
 		{Source: "pet.graphqls", Content: "type Pet {\n  id: ID!\n}\n\nextend type Query {\n  pets: [Pet!]!\n}\n"},
-	})
+	}, protocol.Declarations{})
 	require.NoError(t, readErr)
 
 	assert.Equal(t, contract.Schema{Ref: "Pet", Nullable: true}, sdlSchema(t, declarations, "Query:pet:returns"))
@@ -399,7 +399,7 @@ func TestSDLFormat_SeveralFiles_AreOneSchema(t *testing.T) {
 func TestSDLFormat_AnInvalidSDL_IsAReadErrorWithTheParserText(t *testing.T) {
 	_, readErr := graphqlcontracts.NewSDLFormat().ToDeclarations([]model.ContractFile{
 		{Source: "schema.graphqls", Content: "type Query {\n  pet: Pet\n}\n\ntype Pet {\n  owner: Owner\n}\n"},
-	})
+	}, protocol.Declarations{})
 
 	assert.EqualError(t, readErr, "schema.graphqls:6:10: Undefined type Owner.")
 }
@@ -408,7 +408,7 @@ func TestSDLFormat_AnExtendOfATypeNoFileDefines_IsAReadErrorWithTheGraphQLJSText
 	_, readErr := graphqlcontracts.NewSDLFormat().ToDeclarations([]model.ContractFile{
 		{Source: "pet.graphqls", Content: "type Pet {\n  id: ID!\n}\n"},
 		{Source: "query.graphqls", Content: "extend type Query {\n  pets: [Pet!]!\n}\n"},
-	})
+	}, protocol.Declarations{})
 
 	assert.EqualError(t, readErr, `query.graphqls:1:13: Cannot extend type "Query" because it is not defined.`)
 }
@@ -417,7 +417,7 @@ func TestSDLFormat_ADocumentOfOperations_IsAReadError(t *testing.T) {
 	_, readErr := graphqlcontracts.NewSDLFormat().ToDeclarations([]model.ContractFile{
 		{Source: "schema.graphqls", Content: petsSDL},
 		{Source: "queries.graphql", Content: "query {\n  pet(id: 1) {\n    id\n  }\n}\n"},
-	})
+	}, protocol.Declarations{})
 
 	assert.EqualError(t, readErr, "queries.graphql: holds client operations; publish expects the GraphQL schema")
 }
@@ -431,7 +431,7 @@ func TestSDLFormat_ADocumentOpeningWithAnyOperationKind_IsAReadErrorOfClientOper
 		_, readErr := graphqlcontracts.NewSDLFormat().ToDeclarations([]model.ContractFile{
 			{Source: "schema.graphqls", Content: petsSDL},
 			{Source: "queries.graphql", Content: operations},
-		})
+		}, protocol.Declarations{})
 
 		assert.EqualError(t, readErr, "queries.graphql: holds client operations; publish expects the GraphQL schema", operations)
 	}
@@ -441,7 +441,7 @@ func TestSDLFormat_ADocumentOfOperationsAfterAComment_IsAReadErrorOfClientOperat
 	_, readErr := graphqlcontracts.NewSDLFormat().ToDeclarations([]model.ContractFile{
 		{Source: "schema.graphqls", Content: petsSDL},
 		{Source: "queries.graphql", Content: "# The pet page\nquery {\n  pet(id: 1) {\n    id\n  }\n}\n"},
-	})
+	}, protocol.Declarations{})
 
 	assert.EqualError(t, readErr, "queries.graphql: holds client operations; publish expects the GraphQL schema")
 }
@@ -450,7 +450,7 @@ func TestSDLFormat_ADocumentOfOperationsAfterADescription_IsAReadErrorOfClientOp
 	_, readErr := graphqlcontracts.NewSDLFormat().ToDeclarations([]model.ContractFile{
 		{Source: "schema.graphqls", Content: petsSDL},
 		{Source: "queries.graphql", Content: "\"\"\"The pet page\"\"\"\nquery PetPage {\n  pet(id: 1) {\n    id\n  }\n}\n"},
-	})
+	}, protocol.Declarations{})
 
 	assert.EqualError(t, readErr, "queries.graphql: holds client operations; publish expects the GraphQL schema")
 }
@@ -465,7 +465,7 @@ func TestSDLFormat_ADocumentOfFragmentsOnly_IsAReadErrorOfClientOperations(t *te
 	_, readErr := graphqlcontracts.NewSDLFormat().ToDeclarations([]model.ContractFile{
 		{Source: "schema.graphqls", Content: petsSDL},
 		{Source: "fragments.graphql", Content: "fragment PetFields on Pet {\n  id\n}\n"},
-	})
+	}, protocol.Declarations{})
 
 	assert.EqualError(t, readErr, "fragments.graphql: holds client operations; publish expects the GraphQL schema")
 }
@@ -474,7 +474,7 @@ func TestSDLFormat_ADocumentOfOperationsWithASyntaxError_IsAReadErrorAtTheSyntax
 	_, readErr := graphqlcontracts.NewSDLFormat().ToDeclarations([]model.ContractFile{
 		{Source: "schema.graphqls", Content: petsSDL},
 		{Source: "queries.graphql", Content: "query PetName {\n  pet(id: 1) {\n    id\n  }\n"},
-	})
+	}, protocol.Declarations{})
 
 	assert.EqualError(t, readErr, "queries.graphql:5:1: Expected Name, found <EOF> in client operations; publish expects the GraphQL schema")
 }
@@ -482,7 +482,7 @@ func TestSDLFormat_ADocumentOfOperationsWithASyntaxError_IsAReadErrorAtTheSyntax
 func TestSDLFormat_ASchemaWithAnOperationAfterItsTypes_IsAReadErrorAtTheOperation(t *testing.T) {
 	_, readErr := graphqlcontracts.NewSDLFormat().ToDeclarations([]model.ContractFile{
 		{Source: "schema.graphqls", Content: petsSDL + "\nquery {\n  pet(id: 1) {\n    id\n  }\n}\n"},
-	})
+	}, protocol.Declarations{})
 
 	assert.EqualError(t, readErr, `schema.graphqls:9:1: Unexpected Name "query"`)
 }

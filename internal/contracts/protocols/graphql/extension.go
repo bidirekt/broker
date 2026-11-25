@@ -34,6 +34,7 @@ func (this Plugin) MergeExtensions(pieces []protocol.ExtensionPiece) (any, []vio
 		merged.Types = append(merged.Types, extension.Types...)
 		merged.Directives = append(merged.Directives, extension.Directives...)
 
+		merged.Federation1 = merged.Federation1 || extension.Federation1
 		merged.LinkSource = cmp.Or(merged.LinkSource, extension.LinkSource)
 		merged.Roots.Query = cmp.Or(merged.Roots.Query, extension.Roots.Query)
 		merged.Roots.Mutation = cmp.Or(merged.Roots.Mutation, extension.Roots.Mutation)

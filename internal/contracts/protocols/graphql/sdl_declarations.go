@@ -33,30 +33,36 @@ var definitionKinds = map[ast.DefinitionKind]string{
 }
 
 type sdlDeclarations struct {
-	schema          *ast.Schema
-	directives      map[string]string
-	sharedByTheType map[string]*ast.Directive
-	declarations    protocol.Declarations
-	pieces          map[string]*graphqlmodel.Extension
+	schema         *ast.Schema
+	federation     federation
+	directives     map[string]string
+	externalFields map[string]bool
+	declarations   protocol.Declarations
+	pieces         map[string]*graphqlmodel.Extension
 }
 
 // Every type becomes a schema kept in the contract, whether a root field reaches it or not.
 func toDeclarations(schema *ast.Schema, federation federation) protocol.Declarations {
 	converted := &sdlDeclarations{
-		schema:          schema,
-		directives:      federation.countedDirectives(),
-		sharedByTheType: federation.sharedByTheType,
-		declarations:    protocol.Declarations{Formats: []string{formatName}},
-		pieces:          map[string]*graphqlmodel.Extension{},
+		schema:         schema,
+		federation:     federation,
+		directives:     federation.countedDirectives(),
+		externalFields: federation.toExternalFields(schema),
+		declarations:   protocol.Declarations{Formats: []string{formatName}},
+		pieces:         map[string]*graphqlmodel.Extension{},
 	}
 
 	if federation.linkSource != "" {
 		converted.pieceOf(federation.linkSource).LinkSource = federation.linkSource
 	}
 
+	if federation.federation1Source != "" {
+		converted.pieceOf(federation.federation1Source).Federation1 = true
+	}
+
 	for _, name := range slices.Sorted(maps.Keys(schema.Types)) {
 		definition := schema.Types[name]
-		if definition.BuiltIn {
+		if definition.BuiltIn || federation.definesType(name) {
 			continue
 		}
 
@@ -79,29 +85,35 @@ func toDeclarations(schema *ast.Schema, federation federation) protocol.Declarat
 func (this *sdlDeclarations) addDefinition(definition *ast.Definition) {
 	this.addSchema(definition.Position, definition.Name, this.toDefinitionSchema(definition))
 	this.addTypeInfo(definition.Position, definition.Name, definitionKinds[definition.Kind], "")
-	this.addDirectives(definition.Name, this.withoutShareable(definition.Directives))
+	this.addDirectives(definition.Name, this.without(definition.Directives, graphqlmodel.ShareableDirective, graphqlmodel.ExternalDirective))
 
 	for _, value := range definition.EnumValues {
 		this.addDirectives(definition.Name+"."+value.Name, value.Directives)
 	}
 
-	for _, field := range declaredFields(definition) {
+	for _, field := range this.declaredFields(definition) {
 		coordinate := definition.Name + "." + field.Name
 		this.addTypeInfo(field.Position, coordinate, graphqlmodel.FieldKind, field.Type.Name())
-		this.addDirectives(coordinate, field.Directives)
+		this.addDirectives(coordinate, this.without(field.Directives, graphqlmodel.ExternalDirective))
 
-		if shareable := this.sharedByTheType[coordinate]; shareable != nil {
+		if this.externalFields[coordinate] {
+			piece := this.pieceOf(field.Position.Src.Name)
+			piece.Directives = append(piece.Directives, graphqlmodel.Directive{Coordinate: coordinate, Directive: graphqlmodel.ExternalDirective, Resolvable: true})
+		}
+
+		if shareable := this.federation.sharedByTheType[coordinate]; shareable != nil {
 			this.addDirectives(coordinate, ast.DirectiveList{shareable})
 		}
 
-		for _, argument := range field.Arguments {
+		arguments := this.clientArguments(field)
+		for _, argument := range arguments {
 			argumentCoordinate := coordinate + "(" + argument.Name + ":)"
 			this.addTypeInfo(argument.Position, argumentCoordinate, graphqlmodel.ArgumentKind, argument.Type.Name())
 			this.addDirectives(argumentCoordinate, argument.Directives)
 		}
 
-		if len(field.Arguments) > 0 {
-			this.addSchema(field.Position, argumentsSchemaName(definition.Name, field.Name), this.toArgumentsSchema(field.Arguments))
+		if len(arguments) > 0 {
+			this.addSchema(field.Position, argumentsSchemaName(definition.Name, field.Name), this.toArgumentsSchema(arguments))
 		}
 	}
 }
@@ -112,8 +124,8 @@ func (this *sdlDeclarations) addRootFields(root *ast.Definition, operation strin
 		return
 	}
 
-	for _, field := range declaredFields(root) {
-		if len(field.Arguments) == 0 {
+	for _, field := range this.declaredFields(root) {
+		if len(this.clientArguments(field)) == 0 {
 			this.addSchema(field.Position, argumentsSchemaName(root.Name, field.Name), contract.Schema{Type: model.ObjectType})
 		}
 
@@ -185,12 +197,12 @@ func (this *sdlDeclarations) addDirectives(coordinate string, directives ast.Dir
 	}
 }
 
-// A type's @shareable is kept on the fields of the declaration it is written on, never on the type, which gqlparser
-// merges with its extensions.
-func (this *sdlDeclarations) withoutShareable(directives ast.DirectiveList) ast.DirectiveList {
+// A type's @shareable is kept on the fields of the declaration it is written on, and an @external on each field it
+// makes external; neither stays on the type, which gqlparser merges with its extensions.
+func (this *sdlDeclarations) without(directives ast.DirectiveList, dropped ...string) ast.DirectiveList {
 	var kept ast.DirectiveList
 	for _, directive := range directives {
-		if this.directives[directive.Name] != graphqlmodel.ShareableDirective {
+		if counted, counts := this.directives[directive.Name]; !counts || !slices.Contains(dropped, counted) {
 			kept = append(kept, directive)
 		}
 	}
@@ -271,9 +283,9 @@ func (this *sdlDeclarations) toDefinitionSchema(definition *ast.Definition) cont
 
 func (this *sdlDeclarations) toOutputProperties(definition *ast.Definition) map[string]contract.Schema {
 	properties := make(map[string]contract.Schema, len(definition.Fields))
-	for _, field := range declaredFields(definition) {
+	for _, field := range this.declaredFields(definition) {
 		property := this.toOutputSchema(field.Type)
-		if len(field.Arguments) > 0 {
+		if len(this.clientArguments(field)) > 0 {
 			property.Arguments = argumentsSchemaName(definition.Name, field.Name)
 		}
 
@@ -329,15 +341,31 @@ func (this *sdlDeclarations) toTypeSchema(fieldType *ast.Type) contract.Schema {
 }
 
 // The query root also holds the introspection fields, which no SDL declares: a declared name never starts with "__".
-func declaredFields(definition *ast.Definition) ast.FieldList {
+func (this *sdlDeclarations) declaredFields(definition *ast.Definition) ast.FieldList {
 	var fields ast.FieldList
 	for _, field := range definition.Fields {
-		if !strings.HasPrefix(field.Name, "__") {
+		if !strings.HasPrefix(field.Name, "__") && !this.federation.definesField(definition, this.schema, field.Name) {
 			fields = append(fields, field)
 		}
 	}
 
 	return fields
+}
+
+// The router fills an argument marked @fromContext from the context; the client never sends it.
+func (this *sdlDeclarations) clientArguments(field *ast.FieldDefinition) ast.ArgumentDefinitionList {
+	fromContextNames := this.federation.localNamesOf("@fromContext")
+
+	var arguments ast.ArgumentDefinitionList
+	for _, argument := range field.Arguments {
+		if !slices.ContainsFunc(argument.Directives, func(directive *ast.Directive) bool {
+			return slices.Contains(fromContextNames, directive.Name)
+		}) {
+			arguments = append(arguments, argument)
+		}
+	}
+
+	return arguments
 }
 
 // ":" is invalid in a GraphQL name, so a synthesized schema never takes the name of a type.

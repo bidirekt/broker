@@ -19,11 +19,12 @@ const yamlFormat = "yaml"
 
 var yamlExtensions = []string{".yaml", ".yml"}
 
-// FileFormat reads the contract files of its extensions; the error is a read error, answered as the file's own.
-// Its declarations list their schemas in Schemas only: the catalog is built when they are joined with the others.
+// FileFormat reads the contract files of its extensions by what the YAML files of the same contract declare; the
+// error is a read error, answered as the file's own. Its declarations list their schemas in Schemas only: the catalog
+// is built when they are joined with the others.
 type FileFormat interface {
 	Extensions() []string
-	ToDeclarations(files []model.ContractFile) (protocol.Declarations, error)
+	ToDeclarations(files []model.ContractFile, yaml protocol.Declarations) (protocol.Declarations, error)
 }
 
 func HasBlankSource(files []model.ContractFile) bool {
@@ -93,10 +94,28 @@ func (this *Interpreter) ToViolations(files []model.ContractFile) (extensions ma
 	return declarations.Extensions, violations, readErr
 }
 
+// A read error wins over the shape violations of the YAML, so the formats read their files by the YAML files whose
+// shape is valid.
 func (this *Interpreter) toCheckedDeclarations(files []model.ContractFile) (protocol.Declarations, []violation.Violation, error) {
 	fragments, formatFiles, readErr := this.toFragmentsAndFormatFiles(files)
 	if readErr != nil {
 		return protocol.Declarations{}, nil, readErr
+	}
+
+	var shapeViolations []violation.Violation
+	shapedFragments := make([]contract.Fragment, 0, len(fragments))
+	for _, fragment := range contract.SortedBySource(fragments) {
+		fragmentViolations := descriptor.Validate(this.registry.Grammar(), fragment.Document, fragment.Source)
+		if len(fragmentViolations) == 0 {
+			shapedFragments = append(shapedFragments, fragment)
+		}
+
+		shapeViolations = append(shapeViolations, fragmentViolations...)
+	}
+
+	declarations := fragmentmapper.ToDeclarations(shapedFragments, this.registry)
+	if len(fragments) > 0 {
+		declarations.Formats = []string{yamlFormat}
 	}
 
 	formatDeclarations := make([]protocol.Declarations, 0, len(this.formats))
@@ -105,26 +124,16 @@ func (this *Interpreter) toCheckedDeclarations(files []model.ContractFile) (prot
 			continue
 		}
 
-		declarations, readErr := format.ToDeclarations(formatFiles[format])
+		read, readErr := format.ToDeclarations(formatFiles[format], declarations)
 		if readErr != nil {
 			return protocol.Declarations{}, nil, readErr
 		}
 
-		formatDeclarations = append(formatDeclarations, declarations)
-	}
-
-	var shapeViolations []violation.Violation
-	for _, fragment := range contract.SortedBySource(fragments) {
-		shapeViolations = append(shapeViolations, descriptor.Validate(this.registry.Grammar(), fragment.Document, fragment.Source)...)
+		formatDeclarations = append(formatDeclarations, read)
 	}
 
 	if len(shapeViolations) > 0 {
 		return protocol.Declarations{}, shapeViolations, nil
-	}
-
-	declarations := fragmentmapper.ToDeclarations(fragments, this.registry)
-	if len(fragments) > 0 {
-		declarations.Formats = []string{yamlFormat}
 	}
 
 	for _, joined := range formatDeclarations {

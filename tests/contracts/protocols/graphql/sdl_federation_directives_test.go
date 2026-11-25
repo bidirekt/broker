@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/bidirekt/broker/internal/contracts/protocol"
 	graphqlcontracts "github.com/bidirekt/broker/internal/contracts/protocols/graphql"
 	"github.com/bidirekt/broker/internal/model"
 	graphqlmodel "github.com/bidirekt/broker/internal/model/protocols/graphql"
@@ -42,7 +43,7 @@ enum Status {
 func mergedDirectives(t *testing.T, files ...model.ContractFile) graphqlmodel.Extension {
 	t.Helper()
 
-	declarations, err := graphqlcontracts.NewSDLFormat().ToDeclarations(files)
+	declarations, err := graphqlcontracts.NewSDLFormat().ToDeclarations(files, protocol.Declarations{})
 	require.NoError(t, err)
 
 	merged, violations := graphqlcontracts.New().MergeExtensions(declarations.ExtensionPieces["graphql"])
@@ -299,4 +300,138 @@ type Query {
 		[]graphqlmodel.Directive{{Coordinate: "Query.rating", Directive: "override", From: "petstore_api", Resolvable: true}},
 		overriding(`from: "petstore_api", label: "percent(50)"`),
 	)
+}
+
+const externalsLink = `extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key", "@external", "@extends", "@requires", "@shareable"])
+`
+
+func externalCoordinates(t *testing.T, sdl string) []string {
+	t.Helper()
+
+	var coordinates []string
+	for _, directive := range mergedDirectives(t, model.ContractFile{Source: "schema.graphqls", Content: sdl}).Directives {
+		if directive.Directive == "external" {
+			coordinates = append(coordinates, directive.Coordinate)
+		}
+	}
+
+	return coordinates
+}
+
+func TestSDLFormat_Federation_AnExternalFieldTheKeyOfAnExtendTypeSelects_IsNotExternal(t *testing.T) {
+	sdl := externalsLink + `
+type Query {
+  topReviews: [Review!]!
+}
+
+type Review {
+  body: String
+  pet: Pet
+}
+
+type Pet {
+  name: String
+}
+
+extend type Pet @key(fields: "id owner { id }") {
+  id: ID! @external
+  owner: Owner @external
+  weight: Int @external
+  reviews: [Review!]!
+}
+
+type Owner {
+  id: ID! @external
+}
+`
+
+	assert.Equal(t, []string{"Pet.weight"}, externalCoordinates(t, sdl))
+}
+
+func TestSDLFormat_Federation_AnExternalFieldTheKeyOfATypeMarkedExtendsSelects_IsNotExternal(t *testing.T) {
+	sdl := externalsLink + `
+type Query {
+  topReviews: [Review!]!
+}
+
+type Review {
+  pet: Pet
+}
+
+type Pet @extends @key(fields: "id") {
+  id: ID! @external
+  weight: Int @external
+  reviews: [Review!]!
+}
+`
+
+	assert.Equal(t, []string{"Pet.weight"}, externalCoordinates(t, sdl))
+}
+
+func TestSDLFormat_Federation_AnExternalFieldTheKeyOfTheBaseTypeSelects_StaysExternal(t *testing.T) {
+	sdl := externalsLink + `
+type Query {
+  topReviews: [Review!]!
+}
+
+type Review {
+  pet: Pet
+}
+
+type Pet @key(fields: "id") {
+  reviews: [Review!]!
+}
+
+extend type Pet {
+  id: ID! @external
+}
+`
+
+	assert.Equal(t, []string{"Pet.id"}, externalCoordinates(t, sdl))
+}
+
+func TestSDLFormat_Federation_AnExternalType_MakesEveryFieldExternal_ItsExtensionsIncluded(t *testing.T) {
+	sdl := externalsLink + `
+type Query {
+  pet: Pet
+}
+
+type Pet @key(fields: "id") {
+  id: ID!
+  dimensions: Dimensions @external
+  shippingCost: Int @requires(fields: "dimensions { height }")
+}
+
+type Dimensions @external {
+  height: Int
+  width: Int
+}
+
+extend type Dimensions {
+  depth: Int
+}
+`
+
+	merged := mergedDirectives(t, model.ContractFile{Source: "schema.graphqls", Content: sdl})
+
+	assert.Equal(t, []string{"Dimensions.depth", "Dimensions.height", "Dimensions.width", "Pet.dimensions"}, externalCoordinates(t, sdl))
+	assert.NotContains(t, merged.Directives, graphqlmodel.Directive{Coordinate: "Dimensions", Directive: "external", Resolvable: true})
+}
+
+func TestSDLFormat_Federation_AnExternalTypeTheKeyOfAnExtendTypeSelects_StaysExternal(t *testing.T) {
+	sdl := externalsLink + `
+type Query {
+  pet: Pet
+}
+
+type Pet @external {
+  name: String
+}
+
+extend type Pet @key(fields: "id") {
+  id: ID!
+}
+`
+
+	assert.Equal(t, []string{"Pet.id", "Pet.name"}, externalCoordinates(t, sdl))
 }

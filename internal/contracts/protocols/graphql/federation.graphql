@@ -1,22 +1,11 @@
-directive @authenticated on
-    ENUM
-  | FIELD_DEFINITION
-  | INTERFACE
-  | OBJECT
-  | SCALAR
+directive @authenticated on ENUM | FIELD_DEFINITION | INTERFACE | OBJECT | SCALAR
+directive @cacheTag(format: String!) repeatable on OBJECT | FIELD_DEFINITION
 directive @composeDirective(name: String!) repeatable on SCHEMA
-directive @context(name: String!) on OBJECT | INTERFACE | UNION
-directive @cost(weight: Int!) on
-    ARGUMENT_DEFINITION
-  | ENUM
-  | FIELD_DEFINITION
-  | INPUT_FIELD_DEFINITION
-  | OBJECT
-  | SCALAR
+directive @context(name: String!) repeatable on OBJECT | INTERFACE | UNION
+directive @cost(weight: Int!) on ARGUMENT_DEFINITION | ENUM | FIELD_DEFINITION | INPUT_FIELD_DEFINITION | OBJECT | SCALAR
 directive @extends on OBJECT | INTERFACE
-directive @external on OBJECT | FIELD_DEFINITION
+directive @external(reason: String) on OBJECT | FIELD_DEFINITION
 directive @fromContext(field: ContextFieldValue) on ARGUMENT_DEFINITION
-directive @key(fields: FieldSet!, resolvable: Boolean = true) repeatable on OBJECT | INTERFACE
 directive @inaccessible on
   | FIELD_DEFINITION
   | OBJECT
@@ -29,6 +18,7 @@ directive @inaccessible on
   | INPUT_FIELD_DEFINITION
   | ARGUMENT_DEFINITION
 directive @interfaceObject on OBJECT
+directive @key(fields: FieldSet!, resolvable: Boolean = true) repeatable on OBJECT | INTERFACE
 directive @listSize(
   assumedSize: Int
   slicingArguments: [String!]
@@ -36,20 +26,10 @@ directive @listSize(
   requireOneSlicingArgument: Boolean = true
 ) on FIELD_DEFINITION
 directive @override(from: String!, label: String) on FIELD_DEFINITION
-directive @policy(policies: [[Policy!]!]!) on
-    ENUM
-  | FIELD_DEFINITION
-  | INTERFACE
-  | OBJECT
-  | SCALAR
+directive @policy(policies: [[Policy!]!]!) on ENUM | FIELD_DEFINITION | INTERFACE | OBJECT | SCALAR
 directive @provides(fields: FieldSet!) on FIELD_DEFINITION
 directive @requires(fields: FieldSet!) on FIELD_DEFINITION
-directive @requiresScopes(scopes: [[Scope!]!]!) on
-    ENUM
-  | FIELD_DEFINITION
-  | INTERFACE
-  | OBJECT
-  | SCALAR
+directive @requiresScopes(scopes: [[Scope!]!]!) on ENUM | FIELD_DEFINITION | INTERFACE | OBJECT | SCALAR
 directive @shareable repeatable on FIELD_DEFINITION | OBJECT
 directive @tag(name: String!) repeatable on
   | FIELD_DEFINITION
@@ -62,6 +42,7 @@ directive @tag(name: String!) repeatable on
   | ENUM_VALUE
   | INPUT_OBJECT
   | INPUT_FIELD_DEFINITION
+  | SCHEMA
 
 scalar ContextFieldValue
 scalar FieldSet

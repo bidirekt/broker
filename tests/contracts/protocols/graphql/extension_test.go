@@ -38,13 +38,13 @@ func TestMergeExtensions_JoinsTheTypeInfoOfEveryFile_SortedByCoordinate(t *testi
 func TestMergeExtensions_TheSameSDLSplitIntoOtherFiles_MergesTheSame(t *testing.T) {
 	whole, readErr := graphqlcontracts.NewSDLFormat().ToDeclarations([]model.ContractFile{
 		{Source: "schema.graphqls", Content: "type Query {\n  pet(id: ID!): Pet\n}\n\ntype Pet {\n  id: ID!\n}\n"},
-	})
+	}, protocol.Declarations{})
 	require.NoError(t, readErr)
 
 	split, readErr := graphqlcontracts.NewSDLFormat().ToDeclarations([]model.ContractFile{
 		{Source: "a.graphqls", Content: "type Pet {\n  id: ID!\n}\n"},
 		{Source: "b.graphqls", Content: "type Query {\n  pet(id: ID!): Pet\n}\n"},
-	})
+	}, protocol.Declarations{})
 	require.NoError(t, readErr)
 
 	wholeMerged, _ := graphqlcontracts.New().MergeExtensions(whole.ExtensionPieces["graphql"])
@@ -93,7 +93,7 @@ func TestMergeExtensions_TheSourcesStayOutOfTheJSON(t *testing.T) {
 func TestMergeExtensions_TheRootTypes_AreTheOnesTheSchemaDefinitionNames(t *testing.T) {
 	declarations, readErr := graphqlcontracts.NewSDLFormat().ToDeclarations([]model.ContractFile{
 		{Source: "schema.graphqls", Content: "schema {\n  query: RootQuery\n  mutation: RootMutation\n}\n\ntype RootQuery {\n  pet: Int\n}\n\ntype RootMutation {\n  adoptPet: Int\n}\n"},
-	})
+	}, protocol.Declarations{})
 	require.NoError(t, readErr)
 
 	merged, _ := graphqlcontracts.New().MergeExtensions(declarations.ExtensionPieces["graphql"])
@@ -105,7 +105,7 @@ func TestMergeExtensions_WithoutASchemaDefinition_TheRootTypesAreQueryAndMutatio
 	declarations, readErr := graphqlcontracts.NewSDLFormat().ToDeclarations([]model.ContractFile{
 		{Source: "query.graphqls", Content: "type Query {\n  pet: Int\n}\n"},
 		{Source: "mutation.graphqls", Content: "type Mutation {\n  adoptPet: Int\n}\n"},
-	})
+	}, protocol.Declarations{})
 	require.NoError(t, readErr)
 
 	merged, _ := graphqlcontracts.New().MergeExtensions(declarations.ExtensionPieces["graphql"])
@@ -116,7 +116,7 @@ func TestMergeExtensions_WithoutASchemaDefinition_TheRootTypesAreQueryAndMutatio
 func TestMergeExtensions_AnSDLWithoutMutations_HasOnlyAQueryRoot(t *testing.T) {
 	declarations, readErr := graphqlcontracts.NewSDLFormat().ToDeclarations([]model.ContractFile{
 		{Source: "schema.graphqls", Content: "type Query {\n  pet: Int\n}\n"},
-	})
+	}, protocol.Declarations{})
 	require.NoError(t, readErr)
 
 	merged, _ := graphqlcontracts.New().MergeExtensions(declarations.ExtensionPieces["graphql"])

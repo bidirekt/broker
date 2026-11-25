@@ -21,11 +21,12 @@ const (
 
 // Extension is what the SDL keeps that the schemas lose: whether a type is an input, the GraphQL name of a
 // field's or argument's type (ID and String both become string), the types whose fields are the queries and the
-// mutations, the federation directives that compose a graph, and the graph the subgraph belongs to. GraphSource
-// and LinkSource name the files the graph and the federation @link came from; like every source, they stay out
-// of the checksum and are never stored.
+// mutations, the federation directives that compose a graph, the graph the subgraph belongs to, and whether it is a
+// Federation 1 subgraph, one without a federation @link. GraphSource and LinkSource name the files the graph and
+// the federation @link came from; like every source, they stay out of the checksum and are never stored.
 type Extension struct {
 	Graph       string      `json:"graph,omitempty"`
+	Federation1 bool        `json:"federation1,omitempty"`
 	Directives  []Directive `json:"directives,omitempty"`
 	Types       []TypeInfo  `json:"types,omitempty"`
 	Roots       Roots       `json:"roots,omitzero"`
