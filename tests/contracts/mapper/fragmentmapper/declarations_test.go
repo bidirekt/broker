@@ -369,7 +369,7 @@ func TestToDeclarations_UnresolvedSchemaName_StaysInTheBody(t *testing.T) {
 
 	require.Len(t, declarations.Resources, 1)
 	assert.Equal(t, "Ghost", declarations.Resources[0].SchemaName)
-	assert.NotContains(t, declarations.Catalog, "Ghost")
+	assert.NotContains(t, declarations.Catalog[model.YAMLNamespace], "Ghost")
 	assert.Equal(t, []model.ResourceBody{{Source: "ghosts.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Ghost")}}, declarations.Resources[0].Resource.Bodies)
 }
 
