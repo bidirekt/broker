@@ -130,13 +130,18 @@ func (this Node) Declarations() []Declaration {
 }
 
 // Field names the first body's field the node was reached at: "Address.city", "Order.items[].sku",
-// "Pets{}.name", or the schema alone at its root.
+// "Pets{}.name", or the schema alone at its root, unless the graph names its fields.
 func (this Node) Field() string {
 	if !this.Exists() {
 		return ""
 	}
 
 	site := this.declarations[0].site
+	if this.graph.fieldName != nil {
+		if name, named := this.graph.fieldName(site); named {
+			return name
+		}
+	}
 
 	return model.FieldName(site.Schema, site.Path)
 }

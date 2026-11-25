@@ -349,3 +349,21 @@ func TestArgumentsRoot_OfAFieldWithoutArguments_IsAnEmptyObject(t *testing.T) {
 	assert.Empty(t, arguments.Segments())
 	assert.False(t, arguments.Optional())
 }
+
+func TestField_OfAGraphNamingFields_TakesTheNameItGivesAndKeepsTheSchemaNameOfTheRest(t *testing.T) {
+	catalog := model.Schemas{
+		"Order": {
+			"":      {Type: "object"},
+			"total": {Type: "number"},
+			"sku":   {Type: "string"},
+		},
+	}
+	graph := schemagraph.New(map[string]model.Schemas{model.YAMLNamespace: catalog}).NamingFields(func(site schemagraph.Site) (string, bool) {
+		return "order total", site.Path == "total"
+	})
+
+	order := graph.Root([]model.ResourceBody{{Source: "orders.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Order")}}, schemagraph.Readers)
+
+	assert.Equal(t, "order total", order.Child("total").Field())
+	assert.Equal(t, "Order.sku", order.Child("sku").Field())
+}

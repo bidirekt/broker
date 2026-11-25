@@ -62,7 +62,7 @@ const graphqlCheckWebV2Contract = `consumes:
       query:
         orders: {returns: OrderList}
 schemas:
-  PetArgs: {type: object, properties: {id: {type: string}, owner: {type: string}}}
+  PetArgs: {type: object, properties: {owner: {type: string}}}
   MaybePet: {ref: Pet, nullable: true}
   Pet:
     type: object
@@ -144,9 +144,9 @@ func (this *IntegrationSuite) graphqlOnlyCheckPage() string {
 func (this *IntegrationSuite) TestShowCheck_DrawsTheBreaksOfCounterpartsThatBreakOnlyInGraphQL() {
 	body := this.graphqlOnlyCheckPage()
 
-	this.Contains(body, `<div><b>7</b><span>breaks</span></div>`)
+	this.Contains(body, `<div><b>8</b><span>breaks</span></div>`)
 	this.Contains(body, `<div><b>3 of 3</b><span>counterparts break</span></div>`)
-	this.Contains(body, `<div><b>4</b><span>places in the contracts</span></div>`)
+	this.Contains(body, `<div><b>5</b><span>places in the contracts</span></div>`)
 	this.Equal(3, strings.Count(body, `<details class="cp" open>`))
 	this.NotContains(body, `Also compared with, and compatible:`)
 	this.Equal(1, strings.Count(body, graphqlCheckOperationsStylesheet))
@@ -165,7 +165,7 @@ func (this *IntegrationSuite) TestShowCheck_DrawsTheBreaksOfCounterpartsThatBrea
 	this.Contains(body, `<div class="fix self"><span class="side">Fix in <b>petstore_web</b></span><span>keep it until petstore_admin stops calling it</span></div><div class="fix other"><span class="side">or fix in <b>petstore_admin</b></span><span>stop calling it</span></div>`)
 
 	this.Contains(body, `<span class="op-prop">FIELD</span><span>PetArgs.owner</span><span class="badge">1 place</span>`)
-	this.Contains(body, `<li><span class="op-kind">query</span><span>pet</span><span class="at">arguments</span><span>at &#34;$.owner&#34;</span></li>`)
+	this.Contains(body, `<li><span class="op-kind">query</span><span>pet</span><span class="at">arguments</span><span class="at">(argument &#34;owner&#34;)</span></li>`)
 	this.Contains(body, `<span class="op-prop">FIELD</span><span>Pet.age</span><span class="badge">1 place</span>`)
 	this.Contains(body, `<b class="name">petstore_web</b> reads it as <code>string</code>, but <b class="name">petstore_api</b> provides <code>integer</code>`)
 	this.Contains(body, `<li><span class="op-kind">query</span><span>pet</span><span class="at">returns</span><span>at &#34;$.age&#34;</span><span class="cf">(petstore_api: Pet.age)</span></li>`)
@@ -186,6 +186,15 @@ func (this *IntegrationSuite) TestShowCheck_ANestedArgumentBreakUnderReturnsRead
 	this.Contains(body, `<li><span class="op-kind">query</span><span>pet</span><span class="at">returns</span><span>at &#34;$.reviews&#34;</span><span class="at">(argument &#34;first&#34;)</span>`)
 
 	this.NotContains(body, `reads it, but <b class="name">petstore_api</b> doesn&#39;t provide it`)
+}
+
+func (this *IntegrationSuite) TestShowCheck_AnArgumentBreakShowsTheArgumentCoordinate() {
+	body := this.graphqlOnlyCheckPage()
+
+	this.Contains(body, `<span class="op-prop">FIELD</span><span>Query.pet(id:)</span><span class="badge">1 place</span>`)
+	this.Contains(body, `<li><span class="op-kind">query</span><span>pet</span><span class="at">arguments</span><span class="at">(argument &#34;id&#34;)</span><span class="cf">(petstore_api: Query.pet(id:))</span></li>`)
+	this.Contains(body, `<span class="op-prop">FIELD</span><span>Pet.reviews(first:)</span><span class="badge">1 place</span>`)
+	this.NotContains(body, `:arguments`)
 }
 
 func (this *IntegrationSuite) TestShowCheck_ARESTOnlyPageDoesNotLinkTheGraphQLStylesheet() {

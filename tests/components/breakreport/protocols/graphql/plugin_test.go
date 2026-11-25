@@ -44,7 +44,7 @@ func TestToSection_CountsOperationBreaksAndFieldBlocks(t *testing.T) {
 	tree := []byte(`{"query": {
 		"owner": {"returns": [{"reason": "provider_resource_not_found", "role": "consumer"}]},
 		"pet": {
-			"arguments": [{"reason": "property_missing_in_provider", "role": "consumer", "details": {"property": "$.owner", "consumerField": "PetArgs.owner"}}],
+			"arguments": [{"reason": "property_missing_in_provider", "role": "consumer", "details": {"property": "$", "argument": "owner", "consumerField": "PetArgs.owner"}}],
 			"returns": [{"reason": "property_missing_in_provider", "role": "consumer", "details": {"property": "$.reviews", "argument": "first", "consumerField": "ReviewsArgs.first"}}]
 		}
 	}}`)
@@ -60,7 +60,7 @@ func TestToSection_CountsOperationBreaksAndFieldBlocks(t *testing.T) {
 	assert.Equal(t, "petstore_web calls query owner, but petstore_api doesn't provide it", display.Operations[0].Breaks[0].Sentence.String())
 	require.Len(t, display.Fields, 2)
 	assert.Equal(t, "PetArgs.owner", display.Fields[0].Field)
-	assert.Equal(t, []graphqlbreakreport.Place{{Operation: "query", Field: "pet", Interaction: "arguments", Property: `"$.owner"`}}, display.Fields[0].Places)
+	assert.Equal(t, []graphqlbreakreport.Place{{Operation: "query", Field: "pet", Interaction: "arguments", Argument: `"owner"`}}, display.Fields[0].Places)
 	assert.Equal(t, "ReviewsArgs.first", display.Fields[1].Field)
 	assert.Equal(t, "petstore_web sends it, but petstore_api doesn't accept it", display.Fields[1].Sentence.String())
 	assert.Equal(t, []graphqlbreakreport.Place{{Operation: "query", Field: "pet", Interaction: "returns", Property: `"$.reviews"`, Argument: `"first"`}}, display.Fields[1].Places)

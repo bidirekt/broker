@@ -23,7 +23,7 @@
     {{template "fixes" .Fixes}}
     <ul class="op-places">
       {{range .Places}}
-      <li><span class="op-kind">{{.Operation}}</span><span>{{.Field}}</span><span class="at">{{.Interaction}}</span><span>at {{.Property}}</span>{{with .Argument}}<span class="at">(argument {{.}})</span>{{end}}{{with .CounterpartField}}<span class="cf">({{$.Counterpart}}: {{.}})</span>{{end}}</li>
+      <li><span class="op-kind">{{.Operation}}</span><span>{{.Field}}</span><span class="at">{{.Interaction}}</span>{{with .Property}}<span>at {{.}}</span>{{end}}{{with .Argument}}<span class="at">(argument {{.}})</span>{{end}}{{with .CounterpartField}}<span class="cf">({{$.Counterpart}}: {{.}})</span>{{end}}</li>
       {{end}}
     </ul>
   </div>

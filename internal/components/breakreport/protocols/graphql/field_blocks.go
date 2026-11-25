@@ -191,8 +191,10 @@ func toFieldBlock(checked checkedOperation, contractBreak model.ReportBreak) (fi
 		Operation:        checked.operation,
 		Field:            checked.field,
 		Interaction:      checked.interaction,
-		Property:         propertyPathPhrase(property.path),
 		CounterpartField: otherField,
+	}
+	if checked.interaction != graphqlmodel.ArgumentsInteraction {
+		place.Property = propertyPathPhrase(property.path)
 	}
 	if property.argument != "" {
 		place.Argument = strconv.Quote(property.argument)
@@ -200,7 +202,7 @@ func toFieldBlock(checked checkedOperation, contractBreak model.ReportBreak) (fi
 
 	block := fieldBlock{
 		fieldBlockKey: fieldBlockKey{
-			field:        cmp.Or(checkedField, otherField, place.Property),
+			field:        cmp.Or(checkedField, otherField, propertyPathPhrase(property.path)),
 			reason:       reason,
 			consumerType: consumerType,
 			providerType: providerType,

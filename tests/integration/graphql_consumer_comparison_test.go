@@ -95,7 +95,7 @@ schemas:
 		"deployable": false,
 		"participantVersion": "1.0.0",
 		"operations": {"query": {"pet": {"arguments": [
-			{"reason": "property_missing_in_provider", "role": "consumer", "details": {"consumerName": "petstore_admin", "providerName": "petstore_api", "property": "$.tag", "propertyType": "string", "consumerField": "PetArgs.tag"}}
+			{"reason": "property_missing_in_provider", "role": "consumer", "details": {"consumerName": "petstore_admin", "providerName": "petstore_api", "property": "$", "argument": "tag", "propertyType": "string", "consumerField": "PetArgs.tag"}}
 		]}}}
 	}}`)
 }
@@ -145,6 +145,31 @@ schemas:
 		"participantVersion": "1.0.0",
 		"operations": {"query": {"pet": {"returns": [
 			{"reason": "property_missing_in_provider", "role": "consumer", "details": {"consumerName": "petstore_admin", "providerName": "petstore_api", "property": "$.reviews", "argument": "filter.maxStars", "propertyType": "integer", "consumerField": "ReviewFilter.maxStars"}}
+		]}}}
+	}}`)
+}
+
+func (this *IntegrationSuite) TestCanIDeployAndValidate_AGraphQLConsumerSendingANestedArgumentAsAnotherType_NamesItByItsCoordinate() {
+	this.deployComparisonProvider()
+
+	this.assertComparisonResults("petstore_web", `consumes:
+  petstore_api:
+    graphql:
+      query:
+        pet: {arguments: PetArgs, returns: MaybePet}
+schemas:
+  PetArgs: {type: object, properties: {id: {type: string}}}
+  MaybePet: {ref: Pet, nullable: true}
+  Pet:
+    type: object
+    properties:
+      reviews: {type: array, items: {type: string}, arguments: ReviewsArgs}
+  ReviewsArgs: {type: object, properties: {first: {type: string}}}
+`, false, `{"petstore_api": {
+		"deployable": false,
+		"participantVersion": "1.0.0",
+		"operations": {"query": {"pet": {"returns": [
+			{"reason": "property_type_mismatch", "role": "consumer", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$.reviews", "argument": "first", "consumerPropertyType": "string", "providerPropertyType": "integer", "consumerField": "ReviewsArgs.first", "providerField": "Pet.reviews(first:)"}}
 		]}}}
 	}}`)
 }

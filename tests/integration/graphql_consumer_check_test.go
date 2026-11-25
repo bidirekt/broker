@@ -161,7 +161,7 @@ schemas:
 		"deployable": false,
 		"participantVersion": "1.0.0",
 		"operations": {"query": {"pet": {"arguments": [
-			{"reason": "property_missing_in_consumer", "role": "consumer", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$.id", "propertyType": "string", "providerField": "Query:pet:arguments.id"}}
+			{"reason": "property_missing_in_consumer", "role": "consumer", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "argument": "id", "propertyType": "string", "providerField": "Query.pet(id:)"}}
 		]}}}
 	}}`)
 }

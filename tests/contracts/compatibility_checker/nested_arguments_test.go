@@ -168,7 +168,7 @@ func TestNestedArguments_ANewRequiredArgument_BreaksTheConsumerWithoutArguments(
 
 	assertReviewsBreaks(t, consumer, provider, []reviewsBreak{{
 		model.ReasonPropertyMissingInConsumer,
-		reviewsDetails("first", "integer", map[string]string{"provider": "Pet:reviews:arguments.first"}),
+		reviewsDetails("first", "integer", map[string]string{"provider": "Pet.reviews(first:)"}),
 	}})
 }
 

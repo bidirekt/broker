@@ -5,9 +5,11 @@ import (
 	"github.com/bidirekt/broker/internal/model"
 )
 
+// A body of FieldArguments is the arguments of the resource's field: its breaks name the argument, as a nested field's do.
 type BodyReading struct {
-	Rules ReadingRules
-	Join  schemagraph.Join
+	Rules          ReadingRules
+	Join           schemagraph.Join
+	FieldArguments bool
 }
 
 func (this *CompatibilityChecker) checkResources(checked *model.PersistedResource, counterpart *model.PersistedResource) []ContractBreakingChange {
@@ -16,11 +18,17 @@ func (this *CompatibilityChecker) checkResources(checked *model.PersistedResourc
 	reading := hooks.BodyReading(consumer.Body)
 
 	body := compareBodies(checked, counterpart, reading.Rules,
-		schemagraph.New(consumer.Schemas).Root(consumer.Bodies, reading.Join),
-		schemagraph.New(provider.Schemas).Root(provider.Bodies, reading.Join),
+		schemaGraph(hooks, consumer.Schemas).Root(consumer.Bodies, reading.Join),
+		schemaGraph(hooks, provider.Schemas).Root(provider.Bodies, reading.Join),
 	)
 
 	breaks := body.breaks
+	if reading.FieldArguments {
+		for index := range breaks {
+			breaks[index].placeInArgumentsOf("$")
+		}
+	}
+
 	arguments := hooks.BodyReading(model.Input)
 
 	for _, field := range body.argumentFields {
@@ -32,6 +40,15 @@ func (this *CompatibilityChecker) checkResources(checked *model.PersistedResourc
 	}
 
 	return breaks
+}
+
+func schemaGraph(hooks ProtocolHooks, schemas map[string]model.Schemas) *schemagraph.Graph {
+	graph := schemagraph.New(schemas)
+	if namer, names := hooks.(FieldNamer); names {
+		graph.NamingFields(namer.FieldName)
+	}
+
+	return graph
 }
 
 func consumerAndProvider(checked, counterpart *model.PersistedResource) (consumer, provider *model.PersistedResource) {

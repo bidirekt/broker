@@ -1,6 +1,8 @@
 package graphql
 
 import (
+	"strings"
+
 	"github.com/bidirekt/broker/internal/contracts/compatibility_checker"
 	"github.com/bidirekt/broker/internal/contracts/schemagraph"
 	"github.com/bidirekt/broker/internal/model"
@@ -20,7 +22,8 @@ var bodyReadings = map[model.BodyRole]compatibility_checker.BodyReading{
 			Nullable:         model.ReasonPropertyNullableInConsumerNotNullableInProvider,
 			Unknown:          model.ReasonPropertyMissingInProvider,
 		},
-		Join: schemagraph.Senders,
+		Join:           schemagraph.Senders,
+		FieldArguments: true,
 	},
 	model.Output: {
 		Rules: compatibility_checker.ReadingRules{
@@ -35,4 +38,19 @@ var bodyReadings = map[model.BodyRole]compatibility_checker.BodyReading{
 
 func (this Plugin) BodyReading(body model.BodyRole) compatibility_checker.BodyReading {
 	return bodyReadings[body]
+}
+
+// An argument of a schema of arguments is named by its GraphQL coordinate: "Query.pet(id:)", "Pet.reviews(first:)[]".
+func (this Plugin) FieldName(site schemagraph.Site) (string, bool) {
+	typeName, field, ofArguments := argumentsSchemaNameToField(site.Schema)
+	if site.Namespace != graphqlmodel.Namespace || !ofArguments || site.Path == "" {
+		return "", false
+	}
+
+	argumentEnd := strings.IndexAny(site.Path, ".[{")
+	if argumentEnd == -1 {
+		argumentEnd = len(site.Path)
+	}
+
+	return typeName + "." + field + "(" + site.Path[:argumentEnd] + ":)" + site.Path[argumentEnd:], true
 }

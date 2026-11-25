@@ -13,12 +13,20 @@ type Site struct {
 }
 
 type Graph struct {
-	catalog  map[string]model.Schemas
-	segments map[Site]map[string][]string
+	catalog   map[string]model.Schemas
+	segments  map[Site]map[string][]string
+	fieldName func(site Site) (name string, named bool)
 }
 
 func New(catalog map[string]model.Schemas) *Graph {
 	return &Graph{catalog: catalog, segments: map[Site]map[string][]string{}}
+}
+
+// A site fieldName leaves unnamed keeps its schema's name.
+func (this *Graph) NamingFields(fieldName func(site Site) (name string, named bool)) *Graph {
+	this.fieldName = fieldName
+
+	return this
 }
 
 // A `~` body declares nothing, so for senders it leaves the body itself optional.
