@@ -150,6 +150,7 @@
 .t td.acts .actions{justify-content:flex-end}
 .t td .badges{white-space:normal}
 .t td .badges>*{white-space:nowrap}
+.t td .badges>:has(>.badge.cpb){white-space:normal}
 @media (max-width:640px){
   .t.stack thead{display:none}
   .t.stack,.t.stack tbody,.t.stack tr,.t.stack td{display:block;width:100%}
@@ -160,10 +161,9 @@
   .t.stack td.acts{text-align:left;white-space:normal}
   .t.stack td.acts .actions{justify-content:flex-start}
   .t.stack td .badges>*{white-space:normal}
-  .t.stack .badge.cpb{flex-wrap:wrap;white-space:normal;overflow-wrap:anywhere}
 }
 
-/* ---------- badges: never wrap inside, except .cpb in a stacked card ---------- */
+/* ---------- badges: never wrap inside, except .cpb ---------- */
 .badge{display:inline-flex;align-items:center;gap:5px;min-height:22px;padding:1px 8px;border-radius:99px;font-size:12px;font-weight:500;border:1px solid var(--border);background:var(--raised);color:var(--text);max-width:100%;white-space:nowrap;overflow-wrap:normal}
 .badge .v{font-family:var(--mono);font-size:inherit;color:var(--muted)}
 .bk a.badge:hover{text-decoration:none;border-color:currentColor}
@@ -176,7 +176,7 @@
 .badge.rb{background:var(--notice-bg);color:var(--notice-ink);border-color:var(--notice)}
 .badge.quiet{color:var(--muted)}
 .badge.perm{font-family:var(--mono)}
-.badge.cpb{font-family:var(--mono);color:var(--text)}
+.badge.cpb{font-family:var(--mono);color:var(--text);flex-wrap:wrap;white-space:normal;overflow-wrap:anywhere}
 .badge.cpb .v{font-weight:400}
 .badge.cpb.no{color:var(--alert-ink)}
 .badge.cpb.no .v{color:var(--alert-ink)}

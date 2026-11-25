@@ -64,7 +64,7 @@ func (this *composition) composeObject(typeName string, definers []subgraph) {
 			continue
 		}
 
-		this.checkShared(typeName, coordinate, resolvers)
+		this.checkShared(coordinate, resolvers)
 
 		joined, joins := this.joinOutputs(typeName, field, coordinate, resolvers)
 		if !joins {
@@ -80,10 +80,10 @@ func (this *composition) composeObject(typeName string, definers []subgraph) {
 	this.schemas[typeName] = schema
 }
 
-func (this *composition) checkShared(typeName, coordinate string, resolvers []subgraph) {
+func (this *composition) checkShared(coordinate string, resolvers []subgraph) {
 	for index, one := range resolvers {
 		for _, other := range resolvers[index+1:] {
-			if !one.shares(typeName, coordinate) || !other.shares(typeName, coordinate) {
+			if !one.shares(coordinate) || !other.shares(coordinate) {
 				this.addError(coordinate, fmt.Sprintf("%s and %s both resolve %s without @shareable", one.label, other.label, coordinate), one, other)
 			}
 		}

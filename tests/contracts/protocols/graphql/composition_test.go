@@ -101,6 +101,71 @@ func TestToComposedGraph_AFieldTwoSubgraphsResolve_FailsWithoutShareable(t *test
 	assert.Equal(t, []string{"petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.amount without @shareable"}, errors)
 }
 
+const moneyOrdersWithCurrencySDL = `
+type Query {
+  order(id: ID!): Order
+}
+
+type Order @key(fields: "id") {
+  id: ID!
+  total: Money!
+}
+
+type Money @shareable {
+  amount: Int!
+  currency: String!
+}
+`
+
+func TestToComposedGraph_AShareableTypeExtendedWithoutShareable_FailsOnTheFieldsOfTheExtension(t *testing.T) {
+	errors := compositionErrors(
+		compositionMember(t, "petstore_api", "1.4.0", `
+type Query {
+  pet(id: ID!): Pet
+}
+
+type Pet @key(fields: "id") {
+  id: ID!
+  price: Money!
+}
+
+type Money @shareable {
+  amount: Int!
+}
+
+extend type Money {
+  currency: String!
+}
+`),
+		compositionMember(t, "petstore_orders", "1.0.0", moneyOrdersWithCurrencySDL),
+	)
+
+	assert.Equal(t, []string{"petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.currency without @shareable"}, errors)
+}
+
+func TestToComposedGraph_AShareableTypeDeclaredOnce_SharesAllItsFields(t *testing.T) {
+	schemas := composedSchemas(t,
+		compositionMember(t, "petstore_api", "1.4.0", `
+type Query {
+  pet(id: ID!): Pet
+}
+
+type Pet @key(fields: "id") {
+  id: ID!
+  price: Money!
+}
+
+type Money @shareable {
+  amount: Int!
+  currency: String!
+}
+`),
+		compositionMember(t, "petstore_orders", "1.0.0", moneyOrdersWithCurrencySDL),
+	)
+
+	assert.Equal(t, model.Schema{"": {Type: "object"}, "amount": {Type: "integer"}, "currency": {Type: "string"}}, schemas["Money"])
+}
+
 func TestToComposedGraph_AnEntityInTwoSubgraphs_SharesTheFieldsOfItsKey(t *testing.T) {
 	schemas := composedSchemas(t,
 		compositionMember(t, "petstore_api", "1.4.0", "type Query {\n  pet(id: ID!): Pet\n}\n\ntype Pet @key(fields: \"id\") {\n  id: ID!\n  name: String!\n}\n"),
@@ -466,6 +531,19 @@ func TestToComposedGraph_AMutationRootTheSchemaNamesOtherwise_GivesMutations(t *
 
 	assert.Len(t, composed.Resources, 4)
 	assert.Contains(t, composed.Resources, model.Hash("petstore_graph", "graphql", "mutation", "adoptPet", "returns"))
+}
+
+func TestToComposedGraph_AQueryRootThatIsAlsoTheMutationRoot_GivesQueries(t *testing.T) {
+	composed, errors := graphqlcontracts.ToComposedGraph("petstore_graph", []*model.PersistedContract{
+		compositionMember(t, "petstore_api", "1.4.0", "schema {\n  query: Query\n  mutation: Query\n}\n\ntype Query {\n  pet(id: ID!): Pet\n}\n\ntype Pet {\n  id: ID!\n}\n"),
+	})
+	require.Empty(t, errors)
+
+	assert.Len(t, composed.Resources, 2)
+	assert.Contains(t, composed.Resources, model.Hash("petstore_graph", "graphql", "query", "pet", "returns"))
+	assert.Contains(t, composed.Resources, model.Hash("petstore_graph", "graphql", "query", "pet", "arguments"))
+	assert.Contains(t, composed.Schemas["graphql"], "Query")
+	assert.NotContains(t, composed.Schemas["graphql"], "Mutation")
 }
 
 func TestToComposedGraph_ErrorsOnOneCoordinate_AreOrderedBySubgraph(t *testing.T) {

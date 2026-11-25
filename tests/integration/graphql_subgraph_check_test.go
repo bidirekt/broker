@@ -656,3 +656,32 @@ type Pet @key(fields: "id") {
 `},
 	}, true, `{}`)
 }
+
+func (this *IntegrationSuite) TestCanIDeployAndValidate_ASubgraphWhoseQueryRootIsAlsoItsMutationRoot_KeepsItsQueriesInTheGraph() {
+	this.deploySubgraphCheckEnvironment()
+
+	this.assertSubgraphCheck("petstore_api", "1.5.0", []contractFragment{
+		subgraphCheckGraphFile(subgraphCheckGraph),
+		{"api.graphqls", subgraphCheckLink + `
+schema {
+  query: Query
+  mutation: Query
+}
+
+type Query {
+  pet(id: ID!): Pet
+}
+
+type Pet @key(fields: "id") {
+  id: ID!
+  name: String!
+  age: Int
+}
+`},
+	}, true, `{"petstore_web": {"deployable": true, "participantVersion": "3.0.0"}}`)
+
+	this.deployForSubgraphCheck("petstore_api", "1.5.0")
+
+	consumer := this.canIDeployForSubgraphCheck("petstore_web", "3.0.0")
+	this.True(consumer.Deployable, string(consumer.Results))
+}

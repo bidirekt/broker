@@ -142,7 +142,7 @@ type Pet @key(fields: "name") {
 	}, errors)
 }
 
-func TestToComposedGraph_ATypeWithoutAPathFromQuery_CannotBeResolved(t *testing.T) {
+func TestToComposedGraph_AFieldOnlyAnotherSubgraphResolvesOnATypeWithoutAKey_CannotBeResolved(t *testing.T) {
 	errors := satisfiabilityErrors(
 		satisfiabilityMember(t, "petstore_api", "1.4.0", `
 type Query {
@@ -194,4 +194,22 @@ func TestToComposedGraph_AQueryFromARootTheSchemaNamesOtherwise_IsWalkedLikeAnyQ
 	)
 
 	assert.Equal(t, []string{"query pet.reviews can't be resolved: no resolvable @key leads from petstore_api 1.4.0 to petstore_reviews 2.0.0 on Pet"}, errors)
+}
+
+func TestToComposedGraph_ATypeNoQueryReaches_IsNotChecked(t *testing.T) {
+	errors := satisfiabilityErrors(
+		satisfiabilityMember(t, "petstore_api", "1.4.0", satisfiabilityAPISDL+`
+type Owner @key(fields: "id") {
+  id: ID!
+}
+`),
+		satisfiabilityMember(t, "petstore_reviews", "2.0.0", `
+type Owner @key(fields: "id", resolvable: false) {
+  id: ID!
+  email: String!
+}
+`),
+	)
+
+	assert.Empty(t, errors)
 }

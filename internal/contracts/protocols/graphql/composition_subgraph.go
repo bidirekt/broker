@@ -1,6 +1,7 @@
 package graphql
 
 import (
+	"maps"
 	"slices"
 	"strings"
 
@@ -65,12 +66,14 @@ type rootNames map[string]string
 func toRootNames(roots graphqlmodel.Roots) rootNames {
 	names := rootNames{}
 	for _, root := range rootTypes {
-		if declared := root.of(roots); declared != "" && declared != root.typeName {
+		if declared := root.of(roots); declared != "" {
 			if _, named := names[declared]; !named {
 				names[declared] = root.typeName
 			}
 		}
 	}
+
+	maps.DeleteFunc(names, func(declared, typeName string) bool { return declared == typeName })
 
 	return names
 }
@@ -144,11 +147,9 @@ func (this subgraph) resolves(coordinate string) bool {
 	return this.kinds[coordinate] == graphqlmodel.FieldKind && !this.marks(coordinate, graphqlmodel.ExternalDirective) && !this.overridden[coordinate]
 }
 
-// A field counts as @shareable when it, or its type, says so, or when a @key of the subgraph names it.
-func (this subgraph) shares(typeName, coordinate string) bool {
-	return this.marks(coordinate, graphqlmodel.ShareableDirective) ||
-		this.marks(typeName, graphqlmodel.ShareableDirective) ||
-		this.keyFields[coordinate]
+// A field counts as @shareable when it says so, or when a @key of the subgraph names it.
+func (this subgraph) shares(coordinate string) bool {
+	return this.marks(coordinate, graphqlmodel.ShareableDirective) || this.keyFields[coordinate]
 }
 
 // typed is the type of a field or an argument: its model fields from the outermost list down to the named type.
