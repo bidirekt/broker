@@ -20,6 +20,7 @@ const yamlFormat = "yaml"
 var yamlExtensions = []string{".yaml", ".yml"}
 
 // FileFormat reads the contract files of its extensions; the error is a read error, answered as the file's own.
+// Its declarations list their schemas in Schemas only: the catalog is built when they are joined with the others.
 type FileFormat interface {
 	Extensions() []string
 	ToDeclarations(files []model.ContractFile) (protocol.Declarations, error)
@@ -166,30 +167,18 @@ func (this *Interpreter) toFragmentsAndFormatFiles(files []model.ContractFile) (
 	return fragments, formatFiles, nil
 }
 
-// The first schema of a name stays the one the catalog resolves; a later one is left to the duplicate rule.
 func joinDeclarations(declarations, joined protocol.Declarations) protocol.Declarations {
 	declarations.Resources = append(declarations.Resources, joined.Resources...)
-	declarations.Schemas = append(declarations.Schemas, joined.Schemas...)
 	declarations.Formats = append(declarations.Formats, joined.Formats...)
 
-	for namespace, catalog := range joined.Catalog {
-		if declarations.Catalog[namespace] == nil {
-			declarations.Catalog[namespace] = contract.SchemasMap{}
-		}
-
-		for name, schema := range catalog {
-			if _, declared := declarations.Catalog[namespace][name]; !declared {
-				declarations.Catalog[namespace][name] = schema
-			}
-		}
+	for _, schema := range joined.Schemas {
+		declarations.AddSchema(schema)
 	}
 
 	for name, pieces := range joined.ExtensionPieces {
-		if declarations.ExtensionPieces == nil {
-			declarations.ExtensionPieces = map[string][]protocol.ExtensionPiece{}
+		for _, piece := range pieces {
+			declarations.AddExtensionPiece(name, piece)
 		}
-
-		declarations.ExtensionPieces[name] = append(declarations.ExtensionPieces[name], pieces...)
 	}
 
 	return declarations

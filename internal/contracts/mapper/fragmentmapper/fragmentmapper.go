@@ -18,7 +18,7 @@ func ToDeclarations(fragments []contract.Fragment, registry *protocol.Registry) 
 		schemas := fragment.Root().Mapping("schemas")
 
 		for _, name := range schemas.Keys() {
-			addSchema(&declarations, protocol.SchemaDeclaration{
+			declarations.AddSchema(protocol.SchemaDeclaration{
 				Source:    fragment.Source,
 				Namespace: model.YAMLNamespace,
 				Name:      name,
@@ -42,16 +42,11 @@ func ToDeclarations(fragments []contract.Fragment, registry *protocol.Registry) 
 					generated[key] = schema.Schema
 				}
 
-				addSchema(&declarations, schema)
+				declarations.AddSchema(schema)
 			}
 
 			if blockDeclarations.Extension != nil {
-				if declarations.ExtensionPieces == nil {
-					declarations.ExtensionPieces = map[string][]protocol.ExtensionPiece{}
-				}
-
-				name := block.Protocol.String()
-				declarations.ExtensionPieces[name] = append(declarations.ExtensionPieces[name], protocol.ExtensionPiece{
+				declarations.AddExtensionPiece(block.Protocol.String(), protocol.ExtensionPiece{
 					Source: block.Source,
 					Value:  blockDeclarations.Extension,
 				})
@@ -60,19 +55,6 @@ func ToDeclarations(fragments []contract.Fragment, registry *protocol.Registry) 
 	}
 
 	return declarations
-}
-
-// The first declaration of a name is the one the catalog resolves; a later one is left to the duplicate rule.
-func addSchema(declarations *protocol.Declarations, schema protocol.SchemaDeclaration) {
-	declarations.Schemas = append(declarations.Schemas, schema)
-
-	if declarations.Catalog[schema.Namespace] == nil {
-		declarations.Catalog[schema.Namespace] = contract.SchemasMap{}
-	}
-
-	if _, declared := declarations.Catalog[schema.Namespace][schema.Name]; !declared {
-		declarations.Catalog[schema.Namespace][schema.Name] = schema.Schema
-	}
 }
 
 func ToResourceModels(declarations protocol.Declarations) []model.UploadedResource {

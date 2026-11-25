@@ -42,3 +42,28 @@ type SchemaDeclaration struct {
 	Schema        contract.Schema
 	KeepUnreached bool
 }
+
+// AddSchema keeps the first schema of a name as the one the catalog resolves; a later one is left to the duplicate rule.
+func (this *Declarations) AddSchema(schema SchemaDeclaration) {
+	this.Schemas = append(this.Schemas, schema)
+
+	if this.Catalog == nil {
+		this.Catalog = map[string]contract.SchemasMap{}
+	}
+
+	if this.Catalog[schema.Namespace] == nil {
+		this.Catalog[schema.Namespace] = contract.SchemasMap{}
+	}
+
+	if _, declared := this.Catalog[schema.Namespace][schema.Name]; !declared {
+		this.Catalog[schema.Namespace][schema.Name] = schema.Schema
+	}
+}
+
+func (this *Declarations) AddExtensionPiece(protocolName string, piece ExtensionPiece) {
+	if this.ExtensionPieces == nil {
+		this.ExtensionPieces = map[string][]ExtensionPiece{}
+	}
+
+	this.ExtensionPieces[protocolName] = append(this.ExtensionPieces[protocolName], piece)
+}

@@ -40,12 +40,9 @@ type sdlDeclarations struct {
 // Every type becomes a schema kept in the contract, whether a root field reaches it or not.
 func toDeclarations(schema *ast.Schema) protocol.Declarations {
 	converted := &sdlDeclarations{
-		schema: schema,
-		declarations: protocol.Declarations{
-			Catalog: map[string]contract.SchemasMap{graphqlmodel.Namespace: {}},
-			Formats: []string{formatName},
-		},
-		typeInfos: map[string][]graphqlmodel.TypeInfo{},
+		schema:       schema,
+		declarations: protocol.Declarations{Formats: []string{formatName}},
+		typeInfos:    map[string][]graphqlmodel.TypeInfo{},
 	}
 
 	for _, name := range slices.Sorted(maps.Keys(schema.Types)) {
@@ -127,7 +124,6 @@ func (this *sdlDeclarations) addSchema(position *ast.Position, name string, sche
 		Schema:        schema,
 		KeepUnreached: true,
 	})
-	this.declarations.Catalog[graphqlmodel.Namespace][name] = schema
 }
 
 func (this *sdlDeclarations) addTypeInfo(position *ast.Position, coordinate, kind, namedType string) {
@@ -136,13 +132,11 @@ func (this *sdlDeclarations) addTypeInfo(position *ast.Position, coordinate, kin
 }
 
 func (this *sdlDeclarations) addExtensionPieces() {
-	pieces := make([]protocol.ExtensionPiece, 0, len(this.typeInfos))
 	for _, source := range slices.Sorted(maps.Keys(this.typeInfos)) {
-		pieces = append(pieces, protocol.ExtensionPiece{Source: source, Value: graphqlmodel.Extension{Types: this.typeInfos[source]}})
-	}
-
-	if len(pieces) > 0 {
-		this.declarations.ExtensionPieces = map[string][]protocol.ExtensionPiece{graphqlmodel.Protocol.String(): pieces}
+		this.declarations.AddExtensionPiece(graphqlmodel.Protocol.String(), protocol.ExtensionPiece{
+			Source: source,
+			Value:  graphqlmodel.Extension{Types: this.typeInfos[source]},
+		})
 	}
 }
 
