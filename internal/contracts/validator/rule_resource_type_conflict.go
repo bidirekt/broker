@@ -29,9 +29,10 @@ func conflictingPropertyTypes(declarations protocol.Declarations) []violation.Vi
 		}
 
 		conflicts := &typeConflicts{
-			path:     declaration.Path.String(),
-			resource: declaration.Resource.Describe(),
-			compared: map[string]bool{},
+			path:      declaration.Path.String(),
+			resource:  declaration.Resource.Describe(),
+			compared:  map[[2]string]bool{},
+			descended: map[string]bool{},
 		}
 		conflicts.compare(graph.Root(bodies, schemagraph.Readers), "$")
 
@@ -53,30 +54,50 @@ func describedBodies(bodies []model.ResourceBody, catalog map[string]contract.Sc
 	return described
 }
 
-// typeConflicts compares each joined shape once, so a conflict inside a schema used in many places is reported once.
+// The arguments belong to the fields a node is reached through, and the children to the shapes their refs lead to, so
+// each joined shape is compared once per arguments of those fields and descended into once: a conflict inside a schema
+// used in many places is reported once.
 type typeConflicts struct {
 	path       string
 	resource   string
-	compared   map[string]bool
+	compared   map[[2]string]bool
+	descended  map[string]bool
 	violations []violation.Violation
 }
 
 func (this *typeConflicts) compare(node schemagraph.Node, property string) {
+	declarations := node.Declarations()
 	shapes := node.ShapeKey()
-	if this.compared[shapes] {
+
+	fields := [2]string{shapes, argumentsKey(declarations)}
+	if this.compared[fields] {
 		return
 	}
 
-	this.compared[shapes] = true
+	this.compared[fields] = true
 
-	declarations := node.Declarations()
 	for _, declaration := range declarations[1:] {
 		this.compareDeclarations(declarations[0], declaration, property)
 	}
 
+	if this.descended[shapes] {
+		return
+	}
+
+	this.descended[shapes] = true
+
 	for _, segment := range node.Segments() {
 		this.compare(node.Child(segment), model.ChildPath(property, segment))
 	}
+}
+
+func argumentsKey(declarations []schemagraph.Declaration) string {
+	var key strings.Builder
+	for _, declaration := range declarations {
+		key.WriteString("\x00" + declaration.Arguments)
+	}
+
+	return key.String()
 }
 
 func (this *typeConflicts) compareDeclarations(first, other schemagraph.Declaration, property string) {
