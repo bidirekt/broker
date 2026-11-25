@@ -279,6 +279,30 @@ func (this *IntegrationSuite) TestGraphQLFederationDirectives_AKeyRepeatedWithAn
 	this.Equal([]graphqlmodel.Directive{{Coordinate: "Owner", Directive: "key", Fields: "id", Resolvable: true}}, this.storedDirectives())
 }
 
+func (this *IntegrationSuite) TestGraphQLFederationDirectives_TheShareableOfAType_IsStoredOnItsFieldsAndKeepsTheContractInAnyOrder() {
+	this.createDirectivesParticipant()
+	moneyWith := func(directives, amount string) string {
+		return directivesLinkSDL + "\ntype Query {\n  price: Money\n}\n\ntype Money " + directives + " {\n  id: ID!\n  " + amount + "\n}\n\nextend type Money {\n  currency: String\n}\n"
+	}
+
+	this.publishDirectivesSubgraph("1",
+		contractFragment{"graph.yaml", directivesGraphYAML},
+		contractFragment{"schema.graphqls", moneyWith(`@key(fields: "id") @shareable`, "amount: Int")},
+	)
+	this.publishDirectivesSubgraph("2",
+		contractFragment{"graph.yaml", directivesGraphYAML},
+		contractFragment{"schema.graphqls", moneyWith(`@shareable @key(fields: "id")`, "amount: Int @shareable")},
+	)
+
+	this.Equal(1, this.countRows("contracts"))
+	this.Equal(2, this.countRows("contract_versions"))
+	this.Equal([]graphqlmodel.Directive{
+		{Coordinate: "Money", Directive: "key", Fields: "id", Resolvable: true},
+		{Coordinate: "Money.amount", Directive: "shareable", Resolvable: true},
+		{Coordinate: "Money.id", Directive: "shareable", Resolvable: true},
+	}, this.storedDirectives())
+}
+
 func (this *IntegrationSuite) TestGraphQLFederationDirectives_AnOverride_IsStoredWithItsFromAndCountsInTheChecksum() {
 	this.createDirectivesParticipant()
 	overridingFrom := func(from string) string {

@@ -36,12 +36,13 @@ type federationLink struct {
 	localNames map[string]string
 }
 
-// federation is what the @links of an SDL bring: the definitions to read it with, the local name of each element
-// and the file of the first link.
+// federation is what the @links of an SDL bring: the definitions to read it with, the local name of each element,
+// the file of the first link and, by field coordinate, the @shareable of the type declaration that declares the field.
 type federation struct {
-	links       []federationLink
-	definitions *ast.Source
-	linkSource  string
+	links           []federationLink
+	definitions     *ast.Source
+	linkSource      string
+	sharedByTheType map[string]*ast.Directive
 }
 
 func toFederationVersions() []string {
@@ -110,12 +111,34 @@ func toFederation(sources []*ast.Source) (federation, error) {
 	}
 
 	addUndefined(definitions, parseEmbedded(linkDefinitions), defined)
+	found.sharedByTheType = toSharedByTheType(documents, found.localNamesOf("@"+graphqlmodel.ShareableDirective))
 
 	var text bytes.Buffer
 	formatter.NewFormatter(&text).FormatSchemaDocument(definitions)
 	found.definitions = &ast.Source{Name: federationNamespace, Input: text.String(), BuiltIn: true}
 
 	return found, nil
+}
+
+// gqlparser merges a type with its extensions, so only the documents tell which declaration a field and a @shareable
+// come from.
+func toSharedByTheType(documents []*ast.SchemaDocument, shareableNames []string) map[string]*ast.Directive {
+	shared := map[string]*ast.Directive{}
+	for _, document := range documents {
+		for _, declaration := range slices.Concat(document.Definitions, document.Extensions) {
+			for _, directive := range declaration.Directives {
+				if !slices.Contains(shareableNames, directive.Name) {
+					continue
+				}
+
+				for _, field := range declaration.Fields {
+					shared[declaration.Name+"."+field.Name] = directive
+				}
+			}
+		}
+	}
+
+	return shared
 }
 
 func schemaDirectives(document *ast.SchemaDocument) ast.DirectiveList {

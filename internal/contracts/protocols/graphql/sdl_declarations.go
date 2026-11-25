@@ -33,19 +33,21 @@ var definitionKinds = map[ast.DefinitionKind]string{
 }
 
 type sdlDeclarations struct {
-	schema       *ast.Schema
-	directives   map[string]string
-	declarations protocol.Declarations
-	pieces       map[string]*graphqlmodel.Extension
+	schema          *ast.Schema
+	directives      map[string]string
+	sharedByTheType map[string]*ast.Directive
+	declarations    protocol.Declarations
+	pieces          map[string]*graphqlmodel.Extension
 }
 
 // Every type becomes a schema kept in the contract, whether a root field reaches it or not.
 func toDeclarations(schema *ast.Schema, federation federation) protocol.Declarations {
 	converted := &sdlDeclarations{
-		schema:       schema,
-		directives:   federation.countedDirectives(),
-		declarations: protocol.Declarations{Formats: []string{formatName}},
-		pieces:       map[string]*graphqlmodel.Extension{},
+		schema:          schema,
+		directives:      federation.countedDirectives(),
+		sharedByTheType: federation.sharedByTheType,
+		declarations:    protocol.Declarations{Formats: []string{formatName}},
+		pieces:          map[string]*graphqlmodel.Extension{},
 	}
 
 	if federation.linkSource != "" {
@@ -77,7 +79,7 @@ func toDeclarations(schema *ast.Schema, federation federation) protocol.Declarat
 func (this *sdlDeclarations) addDefinition(definition *ast.Definition) {
 	this.addSchema(definition.Position, definition.Name, this.toDefinitionSchema(definition))
 	this.addTypeInfo(definition.Position, definition.Name, definitionKinds[definition.Kind], "")
-	this.addDirectives(definition.Name, definition.Directives)
+	this.addDirectives(definition.Name, this.withoutShareable(definition.Directives))
 
 	for _, value := range definition.EnumValues {
 		this.addDirectives(definition.Name+"."+value.Name, value.Directives)
@@ -87,6 +89,10 @@ func (this *sdlDeclarations) addDefinition(definition *ast.Definition) {
 		coordinate := definition.Name + "." + field.Name
 		this.addTypeInfo(field.Position, coordinate, graphqlmodel.FieldKind, field.Type.Name())
 		this.addDirectives(coordinate, field.Directives)
+
+		if shareable := this.sharedByTheType[coordinate]; shareable != nil {
+			this.addDirectives(coordinate, ast.DirectiveList{shareable})
+		}
 
 		for _, argument := range field.Arguments {
 			argumentCoordinate := coordinate + "(" + argument.Name + ":)"
@@ -177,6 +183,19 @@ func (this *sdlDeclarations) addDirectives(coordinate string, directives ast.Dir
 		piece := this.pieceOf(directive.Position.Src.Name)
 		piece.Directives = append(piece.Directives, kept)
 	}
+}
+
+// A type's @shareable is kept on the fields of the declaration it is written on, never on the type, which gqlparser
+// merges with its extensions.
+func (this *sdlDeclarations) withoutShareable(directives ast.DirectiveList) ast.DirectiveList {
+	var kept ast.DirectiveList
+	for _, directive := range directives {
+		if this.directives[directive.Name] != graphqlmodel.ShareableDirective {
+			kept = append(kept, directive)
+		}
+	}
+
+	return kept
 }
 
 func (this *sdlDeclarations) addRoots() {

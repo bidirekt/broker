@@ -56,7 +56,7 @@ func TestSDLFormat_Federation_TheDirectivesThatCount_AreKeptSortedWithANormalize
 
 	assert.Equal(t, []graphqlmodel.Directive{
 		{Coordinate: "Owner", Directive: "key", Fields: "id", Resolvable: false},
-		{Coordinate: "Owner", Directive: "shareable", Resolvable: true},
+		{Coordinate: "Owner.id", Directive: "shareable", Resolvable: true},
 		{Coordinate: "Pet", Directive: "key", Fields: "id", Resolvable: true},
 		{Coordinate: "Pet", Directive: "key", Fields: "name owner { id }", Resolvable: true},
 		{Coordinate: "Pet.name", Directive: "shareable", Resolvable: true},
@@ -130,7 +130,27 @@ type Pet @primaryKey(fields: "id") {
 	}, merged.Directives)
 }
 
-func TestSDLFormat_Federation_ADirectiveRepeatedOnATypeExtension_IsKeptOnce(t *testing.T) {
+func TestSDLFormat_Federation_TheShareableOfAType_SharesOnlyTheFieldsOfItsOwnDeclaration(t *testing.T) {
+	sdl := directivesLink + `
+type Query {
+  price: Money
+}
+
+type Money @shareable {
+  amount: Int
+}
+
+extend type Money {
+  currency: String
+}
+`
+
+	merged := mergedDirectives(t, model.ContractFile{Source: "schema.graphqls", Content: sdl})
+
+	assert.Equal(t, []graphqlmodel.Directive{{Coordinate: "Money.amount", Directive: "shareable", Resolvable: true}}, merged.Directives)
+}
+
+func TestSDLFormat_Federation_AShareableTypeAndAShareableExtensionOfIt_ShareEachTheirOwnFields(t *testing.T) {
 	sdl := directivesLink + `
 type Query {
   owner: Owner
@@ -147,7 +167,47 @@ extend type Owner @shareable {
 
 	merged := mergedDirectives(t, model.ContractFile{Source: "schema.graphqls", Content: sdl})
 
-	assert.Equal(t, []graphqlmodel.Directive{{Coordinate: "Owner", Directive: "shareable", Resolvable: true}}, merged.Directives)
+	assert.Equal(t, []graphqlmodel.Directive{
+		{Coordinate: "Owner.id", Directive: "shareable", Resolvable: true},
+		{Coordinate: "Owner.name", Directive: "shareable", Resolvable: true},
+	}, merged.Directives)
+}
+
+func TestSDLFormat_Federation_AShareableFieldOfAShareableType_IsKeptOnce(t *testing.T) {
+	sdl := directivesLink + `
+type Query {
+  owner: Owner
+}
+
+type Owner @shareable {
+  id: ID! @shareable
+}
+`
+
+	merged := mergedDirectives(t, model.ContractFile{Source: "schema.graphqls", Content: sdl})
+
+	assert.Equal(t, []graphqlmodel.Directive{{Coordinate: "Owner.id", Directive: "shareable", Resolvable: true}}, merged.Directives)
+}
+
+func TestSDLFormat_Federation_ARenamedShareableOnAType_SharesOnlyTheFieldsOfItsOwnDeclaration(t *testing.T) {
+	sdl := `extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", as: "fed", import: [{name: "@shareable", as: "@shared"}])
+
+type Query {
+  price: Money
+}
+
+type Money @shared {
+  amount: Int
+}
+
+extend type Money {
+  currency: String
+}
+`
+
+	merged := mergedDirectives(t, model.ContractFile{Source: "schema.graphqls", Content: sdl})
+
+	assert.Equal(t, []graphqlmodel.Directive{{Coordinate: "Money.amount", Directive: "shareable", Resolvable: true}}, merged.Directives)
 }
 
 func TestSDLFormat_Federation_TheFileOfTheLink_IsTheLinkSource(t *testing.T) {
