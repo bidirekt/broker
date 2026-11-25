@@ -87,6 +87,25 @@ type Pet @key(fields: "id") {
 }
 `
 
+const showGraphRenamedQueryRootSDL = showGraphLink + `
+schema {
+  query: RootQuery
+}
+
+type RootQuery {
+  pet(id: ID!): Pet
+}
+
+type Query {
+  legacy: Int
+}
+
+type Pet @key(fields: "id") {
+  id: ID!
+  name: String!
+}
+`
+
 const showGraphOverridingReviewsSDL = `extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key", "@override"])
 
 type Pet @key(fields: "id") {
@@ -202,6 +221,21 @@ func (this *IntegrationSuite) TestShowGraph_AGraphThatDoesNotCompose_ListsEveryE
 	this.Contains(production, showGraphMemberRow("petstore_orders", "1.0.0"))
 	this.Contains(production, `<ul class="list">
     <li>petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.amount without @shareable</li><li>petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.currency without @shareable</li>
+  </ul>`)
+}
+
+func (this *IntegrationSuite) TestShowGraph_ASubgraphWhoseRenamedQueryRootLeavesATypeNamedQuery_ShowsApollosError() {
+	this.createForShowGraph([]string{"production"}, []string{"petstore_api", "petstore_reviews"})
+	this.publishSubgraphForShowGraph("petstore_api", "1.4.0", "api.graphqls", showGraphRenamedQueryRootSDL)
+	this.publishSubgraphForShowGraph("petstore_reviews", "2.0.0", "reviews.graphqls", showGraphReviewsSDL)
+	this.deployForShowGraph("petstore_api", "1.4.0", "production")
+	this.deployForShowGraph("petstore_reviews", "2.0.0", "production")
+
+	production := this.environmentSectionForShowGraph(this.graphPageForShowGraph(), "production")
+
+	this.Contains(production, showGraphDoesNotCompose)
+	this.Contains(production, `<ul class="list">
+    <li>petstore_api 1.4.0 has a type named Query, but its query root is RootQuery (ROOT_QUERY_USED)</li>
   </ul>`)
 }
 
