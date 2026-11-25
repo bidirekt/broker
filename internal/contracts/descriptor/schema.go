@@ -18,15 +18,35 @@ func SchemaAt(position string) Node {
 }
 
 func (this Vocabulary) Property() Node {
-	return this.schema(this.PropertyKeys)
+	return this.grammar().property
 }
 
 func (this Vocabulary) SchemaAt(position string) Node {
-	return this.schema(nil, optionalNotAllowedAt(position))
+	schema := this.grammar().schema
+
+	return schema.Rules(append(slices.Clip(schema.rules), optionalNotAllowedAt(position))...)
+}
+
+type schemaGrammar struct {
+	schema   ObjectNode
+	property ObjectNode
+}
+
+func (this Vocabulary) grammar() *schemaGrammar {
+	if this.built != nil {
+		return this.built
+	}
+
+	bound := this
+	bound.built = &schemaGrammar{}
+	bound.built.schema = bound.schema(nil)
+	bound.built.property = bound.schema(bound.PropertyKeys)
+
+	return bound.built
 }
 
 // A key more than one type takes is chosen by the sibling "type"; a key of one type is validated under any type.
-func (this Vocabulary) schema(extraKeys Keys, positionRules ...Rule) Node {
+func (this Vocabulary) schema(extraKeys Keys) ObjectNode {
 	schemaType := this.Type()
 	fields := Fields{
 		"type":        schemaType,
@@ -70,7 +90,7 @@ func (this Vocabulary) schema(extraKeys Keys, positionRules ...Rule) Node {
 		fields[key] = grammar(this)
 	}
 
-	return Object(fields).Rules(append(rules, positionRules...)...)
+	return Object(fields).Rules(rules...)
 }
 
 func schemaRequiresTypeOrRef(schemaType Enum) Rule {

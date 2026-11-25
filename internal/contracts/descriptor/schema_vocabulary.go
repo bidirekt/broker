@@ -8,7 +8,7 @@ import (
 	"github.com/bidirekt/broker/internal/model"
 )
 
-// Keys builds each key's grammar from the vocabulary it belongs to, so a recursive key nests the same vocabulary.
+// Keys builds each key's grammar from the vocabulary it belongs to, so a recursive key nests the same grammar.
 type Keys map[string]func(vocabulary Vocabulary) Node
 
 type TypeVocabulary struct {
@@ -20,6 +20,10 @@ type TypeVocabulary struct {
 type Vocabulary struct {
 	Types        []TypeVocabulary
 	PropertyKeys Keys
+
+	// built is set on the copy handed to the keys, so a recursive key resolves to the grammar
+	// they are building instead of building another one at every validation.
+	built *schemaGrammar
 }
 
 func CoreVocabulary() Vocabulary {
