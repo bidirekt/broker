@@ -40,11 +40,16 @@ func (this Plugin) BodyReading(body model.BodyRole) compatibility_checker.BodyRe
 	return bodyReadings[body]
 }
 
-// An argument of a schema of arguments is named by its GraphQL coordinate: "Query.pet(id:)", "Pet.reviews(first:)[]".
+// A site of a synthesized schema is named by GraphQL coordinates: an argument "Query.pet(id:)", "Pet.reviews(first:)[]",
+// what a field returns "Query.pet", "Query.pets[]", and the arguments as a whole by their field, "Query.pet".
 func (this Plugin) FieldName(site schemagraph.Site) (string, bool) {
-	typeName, field, ofArguments := argumentsSchemaNameToField(site.Schema)
-	if site.Namespace != graphqlmodel.Namespace || !ofArguments || site.Path == "" {
+	typeName, field, interaction, synthesized := synthesizedSchemaNameToField(site.Schema)
+	if site.Namespace != graphqlmodel.Namespace || !synthesized {
 		return "", false
+	}
+
+	if interaction == graphqlmodel.ReturnsInteraction || site.Path == "" {
+		return model.FieldName(typeName+"."+field, site.Path), true
 	}
 
 	argumentEnd := strings.IndexAny(site.Path, ".[{")

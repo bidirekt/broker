@@ -1,6 +1,8 @@
 package graphql
 
 import (
+	"strings"
+
 	"github.com/bidirekt/broker/internal/contracts/contract"
 	"github.com/bidirekt/broker/internal/contracts/protocol"
 	"github.com/bidirekt/broker/internal/contracts/violation"
@@ -9,26 +11,18 @@ import (
 )
 
 func (this Plugin) Rules() []protocol.Rule {
-	return []protocol.Rule{scalarsOutsideGraphQL, argumentsOutsideGraphQL}
+	return []protocol.Rule{graphQLKeysOutsideGraphQL, argumentsNotObject}
 }
 
-func scalarsOutsideGraphQL(declarations protocol.Declarations) []violation.Violation {
+func graphQLKeysOutsideGraphQL(declarations protocol.Declarations) []violation.Violation {
 	var violations []violation.Violation
 
-	for _, reached := range schemasReachedOutsideGraphQL(declarations) {
-		if reached.schema.Type == model.ScalarType {
+	for _, reached := range schemasWithGraphQLKeys(declarations, func(reachedBy model.Protocol) bool { return reachedBy != graphqlmodel.Protocol }) {
+		if reached.scalar {
 			violations = append(violations, reached.violation("schema.scalar_not_allowed", "type"))
 		}
-	}
 
-	return violations
-}
-
-func argumentsOutsideGraphQL(declarations protocol.Declarations) []violation.Violation {
-	var violations []violation.Violation
-
-	for _, reached := range schemasReachedOutsideGraphQL(declarations) {
-		if reached.schema.Arguments != "" {
+		if reached.arguments != "" {
 			violations = append(violations, reached.violation("schema.arguments_not_allowed", argumentsKey))
 		}
 	}
@@ -36,11 +30,79 @@ func argumentsOutsideGraphQL(declarations protocol.Declarations) []violation.Vio
 	return violations
 }
 
-// reachedSchema is a schema, or one nested in it, where it is written, and the first protocol whose body reaches it.
+// A body of arguments is compared argument by argument, never as a whole, so it must name a non-nullable object.
+func argumentsNotObject(declarations protocol.Declarations) []violation.Violation {
+	var violations []violation.Violation
+
+	for _, declaration := range declarations.Resources {
+		if declaration.Resource.Protocol != graphqlmodel.Protocol || declaration.Resource.Body != model.Input || declaration.WithoutSchema {
+			continue
+		}
+
+		if details, refused := toArgumentsRefusal(declarations.Catalog[declaration.Namespace], declaration.SchemaName); refused {
+			violations = append(violations, argumentsNotObjectViolation(declaration.Path.String(), declaration.Source, details))
+		}
+	}
+
+	for _, reached := range schemasWithGraphQLKeys(declarations, func(reachedBy model.Protocol) bool { return reachedBy == graphqlmodel.Protocol }) {
+		if reached.arguments == "" {
+			continue
+		}
+
+		if details, refused := toArgumentsRefusal(declarations.Catalog[reached.namespace], reached.arguments); refused {
+			violations = append(violations, argumentsNotObjectViolation(reached.documentPath+";"+argumentsKey, reached.source, details))
+		}
+	}
+
+	return violations
+}
+
+// The refs from name end on the schema of the arguments; a nullable link anywhere on the way makes them nullable.
+// An undeclared name is left to the unresolved ref rules.
+func toArgumentsRefusal(catalog contract.SchemasMap, name string) (map[string]string, bool) {
+	nullable := false
+	followed := map[string]bool{}
+
+	for current := name; !followed[current]; {
+		schema, declared := catalog[current]
+		if !declared {
+			return nil, false
+		}
+
+		followed[current] = true
+		nullable = nullable || schema.Nullable
+
+		if schema.IsRef() {
+			current = schema.Ref
+
+			continue
+		}
+
+		if schema.Type != model.ObjectType {
+			return map[string]string{"schema": name, "reason": "not_object", "type": schema.Type}, true
+		}
+
+		if nullable {
+			return map[string]string{"schema": name, "reason": "nullable"}, true
+		}
+
+		return nil, false
+	}
+
+	return nil, false
+}
+
+func argumentsNotObjectViolation(path, source string, details map[string]string) violation.Violation {
+	return violation.Violation{ErrorCode: "schema.arguments_not_object", Path: path, Source: source, Details: details}
+}
+
+// reachedSchema is a schema, or one nested in it, holding a GraphQL key, where it is written, and the first protocol whose body reaches it.
 type reachedSchema struct {
 	source       string
+	namespace    string
 	documentPath string
-	schema       contract.Schema
+	scalar       bool
+	arguments    string
 	protocol     model.Protocol
 }
 
@@ -53,51 +115,74 @@ func (this reachedSchema) violation(errorCode, key string) violation.Violation {
 	}
 }
 
-// Each schema is walked once, so a schema many bodies reach is reported once, where it is written.
-func schemasReachedOutsideGraphQL(declarations protocol.Declarations) []reachedSchema {
-	sources := map[[2]string]string{}
+// Each schema a body of an accepted protocol reaches is walked once, so a schema many bodies reach is reported once,
+// where it is written. Only what holds a GraphQL key is kept: the schemas of another protocol mostly hold none.
+func schemasWithGraphQLKeys(declarations protocol.Declarations, reaches func(model.Protocol) bool) []reachedSchema {
+	walk := graphQLKeysWalk{declarations: declarations, sources: map[[2]string]string{}, visited: map[[2]string]bool{}}
 	for _, declaration := range declarations.Schemas {
 		key := [2]string{declaration.Namespace, declaration.Name}
-		if _, declared := sources[key]; !declared {
-			sources[key] = declaration.Source
-		}
-	}
-
-	visited := map[[2]string]bool{}
-
-	var reached []reachedSchema
-
-	var visit func(namespace, name string, reachedBy model.Protocol)
-	var walk func(schema contract.Schema, namespace, source, documentPath string, reachedBy model.Protocol)
-
-	visit = func(namespace, name string, reachedBy model.Protocol) {
-		key := [2]string{namespace, name}
-		schema, declared := declarations.Catalog[namespace][name]
-		if visited[key] || !declared {
-			return
-		}
-
-		visited[key] = true
-		walk(schema, namespace, sources[key], "schemas;"+name, reachedBy)
-	}
-
-	walk = func(schema contract.Schema, namespace, source, documentPath string, reachedBy model.Protocol) {
-		reached = append(reached, reachedSchema{source: source, documentPath: documentPath, schema: schema, protocol: reachedBy})
-
-		if schema.IsRef() {
-			visit(namespace, schema.Ref, reachedBy)
-		}
-
-		for _, child := range schema.Children() {
-			walk(child.Schema, namespace, source, documentPath+";"+child.DocumentPath, reachedBy)
+		if _, declared := walk.sources[key]; !declared {
+			walk.sources[key] = declaration.Source
 		}
 	}
 
 	for _, declaration := range declarations.Resources {
-		if declaration.Resource.Protocol != graphqlmodel.Protocol && !declaration.WithoutSchema {
-			visit(declaration.Namespace, declaration.SchemaName, declaration.Resource.Protocol)
+		if reaches(declaration.Resource.Protocol) && !declaration.WithoutSchema {
+			walk.visit(declaration.Namespace, declaration.SchemaName, declaration.Resource.Protocol)
 		}
 	}
 
-	return reached
+	return walk.reached
+}
+
+type graphQLKeysWalk struct {
+	declarations protocol.Declarations
+	sources      map[[2]string]string
+	visited      map[[2]string]bool
+	reached      []reachedSchema
+}
+
+func (this *graphQLKeysWalk) visit(namespace, name string, reachedBy model.Protocol) {
+	key := [2]string{namespace, name}
+	schema, declared := this.declarations.Catalog[namespace][name]
+	if this.visited[key] || !declared {
+		return
+	}
+
+	this.visited[key] = true
+	this.walk(schema, namespace, this.sources[key], append(make([]string, 0, 16), "schemas", name), reachedBy)
+}
+
+// Children is not used: it sorts and copies every child, and this walk runs on every contract, of every protocol.
+func (this *graphQLKeysWalk) walk(schema contract.Schema, namespace, source string, documentPath []string, reachedBy model.Protocol) {
+	if schema.Type == model.ScalarType || schema.Arguments != "" {
+		this.reached = append(this.reached, reachedSchema{
+			source:       source,
+			namespace:    namespace,
+			documentPath: strings.Join(documentPath, ";"),
+			scalar:       schema.Type == model.ScalarType,
+			arguments:    schema.Arguments,
+			protocol:     reachedBy,
+		})
+	}
+
+	if schema.IsRef() {
+		this.visit(namespace, schema.Ref, reachedBy)
+	}
+
+	for name, property := range schema.Properties {
+		this.walk(property, namespace, source, append(documentPath, "properties", name), reachedBy)
+	}
+
+	for key, member := range schema.UnionMembers {
+		this.walk(member, namespace, source, append(documentPath, "members", key), reachedBy)
+	}
+
+	if schema.Items != nil {
+		this.walk(*schema.Items, namespace, source, append(documentPath, "items"), reachedBy)
+	}
+
+	if schema.Values != nil {
+		this.walk(*schema.Values, namespace, source, append(documentPath, "values"), reachedBy)
+	}
 }

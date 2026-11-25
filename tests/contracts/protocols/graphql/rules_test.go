@@ -8,8 +8,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/bidirekt/broker/internal/contracts/contract"
+	"github.com/bidirekt/broker/internal/contracts/contractfiles"
 	"github.com/bidirekt/broker/internal/contracts/protocol"
 	graphqlcontracts "github.com/bidirekt/broker/internal/contracts/protocols/graphql"
+	restcontracts "github.com/bidirekt/broker/internal/contracts/protocols/rest"
 	"github.com/bidirekt/broker/internal/contracts/violation"
 	"github.com/bidirekt/broker/internal/model"
 	graphqlmodel "github.com/bidirekt/broker/internal/model/protocols/graphql"
@@ -113,4 +115,132 @@ func TestRules_AScalarAtTheTopOfASchema_IsRefusedAtItsType(t *testing.T) {
 	assert.Equal(t, []violation.Violation{
 		{ErrorCode: "schema.scalar_not_allowed", Path: "schemas;BornAt;type", Source: "api.yaml", Details: map[string]string{"protocol": "rest"}},
 	}, rulesViolations(declarations))
+}
+
+func argumentsViolations(t *testing.T, consumer string) []violation.Violation {
+	t.Helper()
+
+	interpreter := contractfiles.NewInterpreter(
+		protocol.NewRegistry([]protocol.Protocol{restcontracts.New(), graphqlcontracts.New()}),
+		[]contractfiles.FileFormat{graphqlcontracts.NewSDLFormat()},
+	)
+
+	violations, readErr := interpreter.ToViolations([]model.ContractFile{{Source: "petstore_web.yaml", Content: consumer}})
+	require.NoError(t, readErr)
+
+	return violations
+}
+
+func TestRules_ArgumentsOfAConsumedFieldNamingAnythingButAnObject_AreRefusedWithTheTypeTheyName(t *testing.T) {
+	cases := map[string]struct {
+		arguments string
+		schemas   string
+		details   map[string]string
+	}{
+		"a string": {
+			arguments: "PetId",
+			schemas:   "  PetId: {type: string}\n",
+			details:   map[string]string{"schema": "PetId", "reason": "not_object", "type": "string"},
+		},
+		"a ref to an array": {
+			arguments: "PetArgs",
+			schemas:   "  PetArgs: {ref: PetIds}\n  PetIds: {type: array, items: {type: string}}\n",
+			details:   map[string]string{"schema": "PetArgs", "reason": "not_object", "type": "array"},
+		},
+		"a nullable object": {
+			arguments: "MaybeArgs",
+			schemas:   "  MaybeArgs: {type: object, nullable: true, properties: {id: {type: string}}}\n",
+			details:   map[string]string{"schema": "MaybeArgs", "reason": "nullable"},
+		},
+		"a nullable ref to an object": {
+			arguments: "MaybeArgs",
+			schemas:   "  MaybeArgs: {ref: PetArgs, nullable: true}\n  PetArgs: {type: object, properties: {id: {type: string}}}\n",
+			details:   map[string]string{"schema": "MaybeArgs", "reason": "nullable"},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			consumer := "consumes:\n  petstore_api:\n    graphql:\n      query:\n        pet: {arguments: " + tc.arguments + ", returns: Pet}\n" +
+				"schemas:\n  Pet: {type: object, properties: {name: {type: string}}}\n" + tc.schemas
+
+			assert.Equal(t, []violation.Violation{{
+				ErrorCode: "schema.arguments_not_object",
+				Path:      "consumes;petstore_api;graphql;query;pet;arguments",
+				Source:    "petstore_web.yaml",
+				Details:   tc.details,
+			}}, argumentsViolations(t, consumer))
+		})
+	}
+}
+
+func TestRules_ArgumentsOfAPropertyNamingAnythingButAnObject_AreRefusedWhereWritten(t *testing.T) {
+	cases := map[string]struct {
+		schemas string
+		details map[string]string
+	}{
+		"an integer": {
+			schemas: "  ReviewsArgs: {type: integer}\n",
+			details: map[string]string{"schema": "ReviewsArgs", "reason": "not_object", "type": "integer"},
+		},
+		"a ref to a nullable object": {
+			schemas: "  ReviewsArgs: {ref: MaybeArgs}\n  MaybeArgs: {type: object, nullable: true, properties: {first: {type: integer}}}\n",
+			details: map[string]string{"schema": "ReviewsArgs", "reason": "nullable"},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			consumer := "consumes:\n  petstore_api:\n    graphql:\n      query:\n        pet: {returns: Pet}\n" +
+				"schemas:\n  Pet:\n    type: object\n    properties:\n      reviews: {type: array, items: {type: string}, arguments: ReviewsArgs}\n" + tc.schemas
+
+			assert.Equal(t, []violation.Violation{{
+				ErrorCode: "schema.arguments_not_object",
+				Path:      "schemas;Pet;properties;reviews;arguments",
+				Source:    "petstore_web.yaml",
+				Details:   tc.details,
+			}}, argumentsViolations(t, consumer))
+		})
+	}
+}
+
+func TestRules_ArgumentsNamingANonNullableObject_AreAllowed(t *testing.T) {
+	assert.Empty(t, argumentsViolations(t, `consumes:
+  petstore_api:
+    graphql:
+      query:
+        pet: {arguments: PetArgs, returns: Pet}
+        pets: {returns: PetList}
+schemas:
+  PetArgs: {ref: IdArgs}
+  IdArgs: {type: object, properties: {id: {type: string}}}
+  PetList: {type: array, items: {ref: Pet}}
+  Pet:
+    type: object
+    properties:
+      reviews: {type: array, items: {type: string}, arguments: ReviewsArgs}
+  ReviewsArgs: {type: object, properties: {first: {type: integer}}}
+`))
+}
+
+func TestRules_ArgumentsAnotherProtocolReaches_AreRefusedAsNotAllowedOnly(t *testing.T) {
+	assert.Equal(t, []violation.Violation{{
+		ErrorCode: "schema.arguments_not_allowed",
+		Path:      "schemas;Pet;properties;reviews;arguments",
+		Source:    "petstore_web.yaml",
+		Details:   map[string]string{"protocol": "rest"},
+	}}, argumentsViolations(t, `consumes:
+  petstore_api:
+    rest:
+      /pets:
+        get:
+          responses:
+            200: Pet
+schemas:
+  Pet:
+    type: object
+    properties:
+      reviews: {type: array, items: {type: string}, arguments: ReviewsArgs}
+  ReviewsArgs: {type: integer}
+`))
 }

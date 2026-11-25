@@ -264,7 +264,7 @@ func TestClosedInput_ANonNullOutputFieldThatBecomesNullable_Breaks(t *testing.T)
 
 	assertClosedInputBreaks(t, "returns", consumer, provider, []closedInputBreak{{
 		model.ReasonPropertyNullableInProviderNotNullableInConsumer,
-		closedInputDetails("$.name", "string", "Pet.name", "Query:pet:returns.name"),
+		closedInputDetails("$.name", "string", "Pet.name", "Query.pet.name"),
 	}})
 }
 

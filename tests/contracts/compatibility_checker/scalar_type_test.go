@@ -118,7 +118,7 @@ func bornAtTypeMismatch(consumerType, providerType string) []bornAtBreak {
 		"consumerPropertyType": consumerType,
 		"providerPropertyType": providerType,
 		"consumerField":        "Pet.bornAt",
-		"providerField":        "Query:pet:returns.bornAt",
+		"providerField":        "Query.pet.bornAt",
 	}}}
 }
 
