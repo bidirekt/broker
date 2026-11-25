@@ -105,3 +105,13 @@ func (this *IntegrationSuite) TestGraphQLFederationPublish_AKeyThatIsNotAFieldSe
 	this.JSONEq(`{"message":"schema.graphqls:7:14: @key(fields: \"id {\") on Product is not a valid field set"}`, body)
 	this.Equal(0, this.countRows("contracts"))
 }
+
+func (this *IntegrationSuite) TestGraphQLFederationPublish_AKeyWhoseOwnDefinitionLacksFieldsIsRefused() {
+	sdl := "extend schema @link(url: \"https://specs.apollo.dev/federation/v2.3\", import: [\"@key\"])\n\ndirective @key repeatable on OBJECT | INTERFACE\n\ntype Query {\n  product: Product\n}\n\ntype Product @key {\n  id: ID!\n}\n"
+
+	status, body := this.publishFederatedSubgraph(sdl)
+
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(`{"message":"schema.graphqls:9:14: @key(fields: \"\") on Product is not a valid field set"}`, body)
+	this.Equal(0, this.countRows("contracts"))
+}

@@ -67,7 +67,7 @@ func NewValidateContractUseCase(
 
 func (this *ValidateContractUseCase) Execute(ctx context.Context, input ValidateContractInput) (ValidateContractOutput, error) {
 	if input.EnvironmentName == "" {
-		return this.validateSyntax(input.Contracts), nil
+		return this.validateSyntax(ctx, input.Contracts), nil
 	}
 
 	participant, exists := this.participantRepository.FindByName(ctx, input.ParticipantName)
@@ -113,14 +113,18 @@ func (this *ValidateContractUseCase) Execute(ctx context.Context, input Validate
 	}, nil
 }
 
-func (this *ValidateContractUseCase) validateSyntax(files []model.ContractFile) ValidateContractOutput {
-	violations, readErr := this.interpreter.ToViolations(files)
+func (this *ValidateContractUseCase) validateSyntax(ctx context.Context, files []model.ContractFile) ValidateContractOutput {
+	extensions, violations, readErr := this.interpreter.ToViolations(files)
 	if readErr != nil {
 		return ValidateContractOutput{Status: ContractFilesUnreadable, ReadError: readErr.Error()}
 	}
 
 	if len(violations) > 0 {
 		return ValidateContractOutput{Status: ContractValidationFailed, Violations: violations}
+	}
+
+	if refusal, refused := this.contractRepository.RefuseContractExtensions(ctx, &model.PersistedContract{Extensions: extensions}); refused {
+		return ValidateContractOutput{Status: ContractValidationFailed, Violations: []violation.Violation{violation.FromRefusal(refusal)}}
 	}
 
 	return ValidateContractOutput{Status: ContractSyntaxValidated}

@@ -68,18 +68,25 @@ func minorOf(version string) int {
 	return minor
 }
 
-// A source that does not parse is left to LoadSchema, which reports it in its own words.
+// A source that does not parse is left to LoadSchema, which reports it in its own words. A definition the SDL
+// already declares, as federation-jvm prints them, is the SDL's own and never injected again.
 func toFederation(sources []*ast.Source) (federation, error) {
 	var found federation
 	definitions := &ast.SchemaDocument{}
 	defined := map[string]bool{}
 
+	var documents []*ast.SchemaDocument
 	for _, source := range sources {
 		document, err := parser.ParseSchema(source)
 		if err != nil {
 			continue
 		}
 
+		documents = append(documents, document)
+		markDefined(document, defined)
+	}
+
+	for _, document := range documents {
 		for _, directive := range schemaDirectives(document) {
 			version, isFederation := federationVersionOf(directive)
 			if !isFederation {
@@ -93,7 +100,7 @@ func toFederation(sources []*ast.Source) (federation, error) {
 
 			found.links = append(found.links, link)
 			if found.linkSource == "" {
-				found.linkSource = source.Name
+				found.linkSource = directive.Position.Src.Name
 			}
 		}
 	}
@@ -102,8 +109,9 @@ func toFederation(sources []*ast.Source) (federation, error) {
 		return federation{}, nil
 	}
 
+	addUndefined(definitions, parseEmbedded(linkDefinitions), defined)
+
 	var text bytes.Buffer
-	text.WriteString(linkDefinitions)
 	formatter.NewFormatter(&text).FormatSchemaDocument(definitions)
 	found.definitions = &ast.Source{Name: federationNamespace, Input: text.String(), BuiltIn: true}
 
@@ -147,10 +155,7 @@ func toFederationLink(directive *ast.Directive, version string, definitions *ast
 		panic(err)
 	}
 
-	specification, err := parser.ParseSchema(&ast.Source{Name: federationNamespace, Input: string(content)})
-	if err != nil {
-		panic(err)
-	}
+	specification := parseEmbedded(string(content))
 
 	namespace := federationNamespace
 	if as := directive.Arguments.ForName("as"); as != nil && as.Value.Kind == ast.StringValue {
@@ -176,10 +181,6 @@ func toFederationLink(directive *ast.Directive, version string, definitions *ast
 
 	for _, definition := range specification.Definitions {
 		definition.Name = localNames[definition.Name]
-		if !defined[definition.Name] {
-			defined[definition.Name] = true
-			definitions.Definitions = append(definitions.Definitions, definition)
-		}
 	}
 
 	for _, definition := range specification.Directives {
@@ -187,14 +188,46 @@ func toFederationLink(directive *ast.Directive, version string, definitions *ast
 		for _, argument := range definition.Arguments {
 			renameTypes(argument.Type, localNames)
 		}
+	}
 
+	addUndefined(definitions, specification, defined)
+
+	return federationLink{localNames: localNames}, nil
+}
+
+func parseEmbedded(content string) *ast.SchemaDocument {
+	document, err := parser.ParseSchema(&ast.Source{Name: federationNamespace, Input: content})
+	if err != nil {
+		panic(err)
+	}
+
+	return document
+}
+
+func markDefined(document *ast.SchemaDocument, defined map[string]bool) {
+	for _, definition := range document.Definitions {
+		defined[definition.Name] = true
+	}
+
+	for _, definition := range document.Directives {
+		defined["@"+definition.Name] = true
+	}
+}
+
+func addUndefined(definitions, from *ast.SchemaDocument, defined map[string]bool) {
+	for _, definition := range from.Definitions {
+		if !defined[definition.Name] {
+			definitions.Definitions = append(definitions.Definitions, definition)
+		}
+	}
+
+	for _, definition := range from.Directives {
 		if !defined["@"+definition.Name] {
-			defined["@"+definition.Name] = true
 			definitions.Directives = append(definitions.Directives, definition)
 		}
 	}
 
-	return federationLink{localNames: localNames}, nil
+	markDefined(from, defined)
 }
 
 type federationImport struct {
@@ -251,7 +284,7 @@ func errorAtDirective(directive *ast.Directive, message string, args ...any) err
 // countedDirectives maps the local name of each directive the composition counts to its federation name.
 func (this federation) countedDirectives() map[string]string {
 	counted := map[string]string{}
-	for _, directive := range []string{graphqlmodel.KeyDirective, graphqlmodel.ShareableDirective, graphqlmodel.InaccessibleDirective, graphqlmodel.ExternalDirective} {
+	for _, directive := range []string{graphqlmodel.KeyDirective, graphqlmodel.ShareableDirective, graphqlmodel.InaccessibleDirective, graphqlmodel.ExternalDirective, graphqlmodel.OverrideDirective} {
 		for _, name := range this.localNamesOf("@" + directive) {
 			counted[name] = directive
 		}

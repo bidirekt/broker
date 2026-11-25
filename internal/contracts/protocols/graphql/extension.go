@@ -34,16 +34,19 @@ func (this Plugin) MergeExtensions(pieces []protocol.ExtensionPiece) (any, []vio
 		merged.Types = append(merged.Types, extension.Types...)
 		merged.Directives = append(merged.Directives, extension.Directives...)
 
-		if merged.LinkSource == "" {
-			merged.LinkSource = extension.LinkSource
-		}
+		merged.LinkSource = cmp.Or(merged.LinkSource, extension.LinkSource)
+		merged.Roots.Query = cmp.Or(merged.Roots.Query, extension.Roots.Query)
+		merged.Roots.Mutation = cmp.Or(merged.Roots.Mutation, extension.Roots.Mutation)
 	}
 
 	slices.SortFunc(merged.Types, func(a, b graphqlmodel.TypeInfo) int {
 		return cmp.Compare(a.Coordinate, b.Coordinate)
 	})
 
-	slices.SortStableFunc(merged.Directives, compareDirectives)
+	// One resolvable @key of a field set makes the type resolvable by it, whatever the order of its repetitions.
+	slices.SortFunc(merged.Directives, func(a, b graphqlmodel.Directive) int {
+		return cmp.Or(compareDirectives(a, b), compareResolvableFirst(a, b))
+	})
 	merged.Directives = slices.CompactFunc(merged.Directives, func(a, b graphqlmodel.Directive) bool {
 		return compareDirectives(a, b) == 0
 	})
@@ -56,5 +59,17 @@ func compareDirectives(a, b graphqlmodel.Directive) int {
 		cmp.Compare(a.Coordinate, b.Coordinate),
 		cmp.Compare(a.Directive, b.Directive),
 		cmp.Compare(a.Fields, b.Fields),
+		cmp.Compare(a.From, b.From),
 	)
+}
+
+func compareResolvableFirst(a, b graphqlmodel.Directive) int {
+	switch {
+	case a.Resolvable == b.Resolvable:
+		return 0
+	case a.Resolvable:
+		return -1
+	default:
+		return 1
+	}
 }

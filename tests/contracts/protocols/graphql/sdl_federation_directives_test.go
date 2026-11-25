@@ -165,3 +165,78 @@ func TestSDLFormat_WithoutALink_KeepsNoDirectiveAndNoLinkSource(t *testing.T) {
 	assert.Empty(t, merged.Directives)
 	assert.Empty(t, merged.LinkSource)
 }
+
+func TestSDLFormat_Federation_AnSDLThatDeclaresTheFederationDefinitions_KeepsTheSameDirectives(t *testing.T) {
+	declared := directivesLink + `
+directive @link(url: String!, as: String, for: link__Purpose, import: [link__Import]) repeatable on SCHEMA
+
+directive @key(fields: FieldSet!, resolvable: Boolean = true) repeatable on OBJECT | INTERFACE
+
+scalar link__Import
+
+enum link__Purpose {
+  SECURITY
+  EXECUTION
+}
+
+scalar FieldSet
+` + directivesSDL[len(directivesLink):]
+
+	assert.Equal(t,
+		mergedDirectives(t, model.ContractFile{Source: "schema.graphqls", Content: directivesSDL}).Directives,
+		mergedDirectives(t, model.ContractFile{Source: "schema.graphqls", Content: declared}).Directives,
+	)
+}
+
+func TestSDLFormat_Federation_AKeyRepeatedWithAndWithoutResolvable_IsKeptResolvableInEitherOrder(t *testing.T) {
+	withResolvable := func(keys string) []graphqlmodel.Directive {
+		return mergedDirectives(t, model.ContractFile{Source: "schema.graphqls", Content: directivesLink + `
+type Query {
+  owner: Owner
+}
+
+type Owner ` + keys + ` {
+  id: ID!
+}
+`}).Directives
+	}
+
+	expected := []graphqlmodel.Directive{{Coordinate: "Owner", Directive: "key", Fields: "id", Resolvable: true}}
+	assert.Equal(t, expected, withResolvable(`@key(fields: "id", resolvable: false) @key(fields: "id")`))
+	assert.Equal(t, expected, withResolvable(`@key(fields: "id") @key(fields: "id", resolvable: false)`))
+}
+
+func TestSDLFormat_Federation_AnOverride_IsKeptWithTheSubgraphItTakesTheFieldFrom(t *testing.T) {
+	merged := mergedDirectives(t, model.ContractFile{Source: "schema.graphqls", Content: `extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key", "@override"])
+
+type Query {
+  pet: Pet
+}
+
+type Pet @key(fields: "id") {
+  id: ID!
+  rating: Int @override(from: "petstore_api")
+}
+`})
+
+	assert.Equal(t, []graphqlmodel.Directive{
+		{Coordinate: "Pet", Directive: "key", Fields: "id", Resolvable: true},
+		{Coordinate: "Pet.rating", Directive: "override", From: "petstore_api", Resolvable: true},
+	}, merged.Directives)
+}
+
+func TestSDLFormat_Federation_TheLabelOfAnOverride_IsReadAndDropped(t *testing.T) {
+	overriding := func(arguments string) []graphqlmodel.Directive {
+		return mergedDirectives(t, model.ContractFile{Source: "schema.graphqls", Content: `extend schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@override"])
+
+type Query {
+  rating: Int @override(` + arguments + `)
+}
+`}).Directives
+	}
+
+	assert.Equal(t,
+		[]graphqlmodel.Directive{{Coordinate: "Query.rating", Directive: "override", From: "petstore_api", Resolvable: true}},
+		overriding(`from: "petstore_api", label: "percent(50)"`),
+	)
+}

@@ -58,6 +58,7 @@ var federatedExtension = graphqlmodel.Extension{
 		{Coordinate: "Pet", Directive: "key", Fields: "id", Resolvable: true},
 		{Coordinate: "Pet", Directive: "key", Fields: "name owner { id }", Resolvable: true},
 		{Coordinate: "Pet.name", Directive: "shareable", Resolvable: true},
+		{Coordinate: "Pet.rating", Directive: "override", From: "petstore_reviews", Resolvable: true},
 	},
 	Types: []graphqlmodel.TypeInfo{
 		{Coordinate: "Owner", Kind: "object"},
@@ -68,6 +69,7 @@ var federatedExtension = graphqlmodel.Extension{
 		{Coordinate: "Pet.owner", Kind: "field", NamedType: "Owner"},
 		{Coordinate: "Query.pet(id:)", Kind: "argument", NamedType: "ID"},
 	},
+	Roots: graphqlmodel.Roots{Query: "RootQuery", Mutation: "RootMutation"},
 }
 
 var plainExtension = graphqlmodel.Extension{
@@ -183,11 +185,12 @@ func (this *PluginSuite) TestInsertContractExtensionStoresARowPerDirectiveAndPer
 		Coordinate string
 		Directive  string
 		Fields     string
+		From       string
 		Resolvable bool
 	}
 
 	rows, err := this.pool.Query(context.Background(),
-		`SELECT coordinate, directive, fields, resolvable FROM graphql_federation_directives WHERE contract_id = $1 ORDER BY coordinate, fields`, federatedContractID)
+		`SELECT coordinate, directive, fields, override_from, resolvable FROM graphql_federation_directives WHERE contract_id = $1 ORDER BY coordinate, fields`, federatedContractID)
 	this.Require().NoError(err)
 	directives, err := pgx.CollectRows(rows, pgx.RowToStructByPos[directiveRow])
 	this.Require().NoError(err)
@@ -201,8 +204,28 @@ func (this *PluginSuite) TestInsertContractExtensionStoresARowPerDirectiveAndPer
 		{Coordinate: "Pet", Directive: "key", Fields: "id", Resolvable: true},
 		{Coordinate: "Pet", Directive: "key", Fields: "name owner { id }", Resolvable: true},
 		{Coordinate: "Pet.name", Directive: "shareable", Fields: "", Resolvable: true},
+		{Coordinate: "Pet.rating", Directive: "override", From: "petstore_reviews", Resolvable: true},
 	}, directives)
 	this.Equal(7, typeInfoRows)
+}
+
+func (this *PluginSuite) TestInsertContractExtensionStoresARowPerRootType() {
+	type rootRow struct {
+		ContractID int64
+		Operation  string
+		TypeName   string
+	}
+
+	rows, err := this.pool.Query(context.Background(),
+		`SELECT contract_id, operation, type_name FROM graphql_root_types ORDER BY contract_id, operation`)
+	this.Require().NoError(err)
+	roots, err := pgx.CollectRows(rows, pgx.RowToStructByPos[rootRow])
+	this.Require().NoError(err)
+
+	this.Equal([]rootRow{
+		{ContractID: federatedContractID, Operation: "mutation", TypeName: "RootMutation"},
+		{ContractID: federatedContractID, Operation: "query", TypeName: "RootQuery"},
+	}, roots)
 }
 
 func (this *PluginSuite) TestInsertContractExtensionStoresTheGraphOnlyWhenThereIsOne() {

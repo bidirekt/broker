@@ -89,3 +89,37 @@ func TestMergeExtensions_TheSourcesStayOutOfTheJSON(t *testing.T) {
 
 	assert.JSONEq(t, `{"graph":"petstore_graph"}`, string(encoded))
 }
+
+func TestMergeExtensions_TheRootTypes_AreTheOnesTheSchemaDefinitionNames(t *testing.T) {
+	declarations, readErr := graphqlcontracts.NewSDLFormat().ToDeclarations([]model.ContractFile{
+		{Source: "schema.graphqls", Content: "schema {\n  query: RootQuery\n  mutation: RootMutation\n}\n\ntype RootQuery {\n  pet: Int\n}\n\ntype RootMutation {\n  adoptPet: Int\n}\n"},
+	})
+	require.NoError(t, readErr)
+
+	merged, _ := graphqlcontracts.New().MergeExtensions(declarations.ExtensionPieces["graphql"])
+
+	assert.Equal(t, graphqlmodel.Roots{Query: "RootQuery", Mutation: "RootMutation"}, merged.(graphqlmodel.Extension).Roots)
+}
+
+func TestMergeExtensions_WithoutASchemaDefinition_TheRootTypesAreQueryAndMutation(t *testing.T) {
+	declarations, readErr := graphqlcontracts.NewSDLFormat().ToDeclarations([]model.ContractFile{
+		{Source: "query.graphqls", Content: "type Query {\n  pet: Int\n}\n"},
+		{Source: "mutation.graphqls", Content: "type Mutation {\n  adoptPet: Int\n}\n"},
+	})
+	require.NoError(t, readErr)
+
+	merged, _ := graphqlcontracts.New().MergeExtensions(declarations.ExtensionPieces["graphql"])
+
+	assert.Equal(t, graphqlmodel.Roots{Query: "Query", Mutation: "Mutation"}, merged.(graphqlmodel.Extension).Roots)
+}
+
+func TestMergeExtensions_AnSDLWithoutMutations_HasOnlyAQueryRoot(t *testing.T) {
+	declarations, readErr := graphqlcontracts.NewSDLFormat().ToDeclarations([]model.ContractFile{
+		{Source: "schema.graphqls", Content: "type Query {\n  pet: Int\n}\n"},
+	})
+	require.NoError(t, readErr)
+
+	merged, _ := graphqlcontracts.New().MergeExtensions(declarations.ExtensionPieces["graphql"])
+
+	assert.Equal(t, graphqlmodel.Roots{Query: "Query"}, merged.(graphqlmodel.Extension).Roots)
+}

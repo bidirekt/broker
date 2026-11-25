@@ -68,6 +68,7 @@ func toDeclarations(schema *ast.Schema, federation federation) protocol.Declarat
 		converted.addRootFields(schema.Mutation, graphqlmodel.MutationOperation)
 	}
 
+	converted.addRoots()
 	converted.addExtensionPieces()
 
 	return converted.declarations
@@ -151,7 +152,8 @@ func (this *sdlDeclarations) addTypeInfo(position *ast.Position, coordinate, kin
 	piece.Types = append(piece.Types, graphqlmodel.TypeInfo{Coordinate: coordinate, Kind: kind, NamedType: namedType})
 }
 
-// Only the directives the composition counts are kept; the others are read and ignored.
+// Only the directives the composition counts are kept; the others, and the label of an @override, are read and
+// ignored.
 func (this *sdlDeclarations) addDirectives(coordinate string, directives ast.DirectiveList) {
 	for _, directive := range directives {
 		counted, counts := this.directives[directive.Name]
@@ -160,15 +162,30 @@ func (this *sdlDeclarations) addDirectives(coordinate string, directives ast.Dir
 		}
 
 		kept := graphqlmodel.Directive{Coordinate: coordinate, Directive: counted, Resolvable: true}
-		if counted == graphqlmodel.KeyDirective {
-			kept.Fields = toNormalizedFieldSet(directive.Arguments.ForName("fields").Value.Raw)
+		switch counted {
+		case graphqlmodel.KeyDirective:
+			kept.Fields = toNormalizedFieldSet(fieldsOf(directive).Raw)
 			if resolvable := directive.Arguments.ForName("resolvable"); resolvable != nil {
 				kept.Resolvable = resolvable.Value.Raw != "false"
+			}
+		case graphqlmodel.OverrideDirective:
+			if from := directive.Arguments.ForName("from"); from != nil {
+				kept.From = from.Value.Raw
 			}
 		}
 
 		piece := this.pieceOf(directive.Position.Src.Name)
 		piece.Directives = append(piece.Directives, kept)
+	}
+}
+
+func (this *sdlDeclarations) addRoots() {
+	if root := this.schema.Query; root != nil {
+		this.pieceOf(root.Position.Src.Name).Roots.Query = root.Name
+	}
+
+	if root := this.schema.Mutation; root != nil {
+		this.pieceOf(root.Position.Src.Name).Roots.Mutation = root.Name
 	}
 }
 

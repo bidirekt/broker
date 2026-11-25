@@ -30,13 +30,22 @@ const (
 			unnest($2::text[], $3::text[], $4::text[]) AS info (coordinate, kind, named_type)
 	`
 
+	insertRootTypesQuery = `
+		INSERT INTO graphql_root_types
+			(contract_id, operation, type_name)
+		SELECT
+			$1, operation, type_name
+		FROM
+			unnest($2::text[], $3::text[]) AS root (operation, type_name)
+	`
+
 	insertDirectivesQuery = `
 		INSERT INTO graphql_federation_directives
-			(contract_id, coordinate, directive, fields, resolvable)
+			(contract_id, coordinate, directive, fields, override_from, resolvable)
 		SELECT
-			$1, coordinate, directive, fields, resolvable
+			$1, coordinate, directive, fields, override_from, resolvable
 		FROM
-			unnest($2::text[], $3::text[], $4::text[], $5::boolean[]) AS kept (coordinate, directive, fields, resolvable)
+			unnest($2::text[], $3::text[], $4::text[], $5::text[], $6::boolean[]) AS kept (coordinate, directive, fields, override_from, resolvable)
 	`
 
 	loadTypeInfoQuery = `
@@ -51,6 +60,17 @@ const (
 			contract_id = ANY($1)
 		ORDER BY
 			contract_id, coordinate COLLATE "C"
+	`
+
+	loadRootTypesQuery = `
+		SELECT
+			contract_id,
+			operation,
+			type_name
+		FROM
+			graphql_root_types
+		WHERE
+			contract_id = ANY($1)
 	`
 
 	loadGraphMembersQuery = `
@@ -69,6 +89,7 @@ const (
 			coordinate,
 			directive,
 			fields,
+			override_from,
 			resolvable
 		FROM
 			graphql_federation_directives
@@ -115,6 +136,7 @@ func (this Plugin) InsertContractExtension(ctx context.Context, q repository.Que
 	}
 
 	this.insertTypeInfo(ctx, q, contractID, graphqlExtension.Types)
+	this.insertRootTypes(ctx, q, contractID, graphqlExtension.Roots)
 	this.insertDirectives(ctx, q, contractID, graphqlExtension.Directives)
 }
 
@@ -138,6 +160,24 @@ func (this Plugin) insertTypeInfo(ctx context.Context, q repository.Querier, con
 	}
 }
 
+func (this Plugin) insertRootTypes(ctx context.Context, q repository.Querier, contractID int64, roots graphqlmodel.Roots) {
+	var operations, typeNames []string
+	for operation, typeName := range map[string]string{graphqlmodel.QueryOperation: roots.Query, graphqlmodel.MutationOperation: roots.Mutation} {
+		if typeName != "" {
+			operations = append(operations, operation)
+			typeNames = append(typeNames, typeName)
+		}
+	}
+
+	if len(operations) == 0 {
+		return
+	}
+
+	if _, err := q.Exec(ctx, insertRootTypesQuery, contractID, operations, typeNames); err != nil {
+		panic(fmt.Errorf("error inserting graphql root types: %w", err))
+	}
+}
+
 func (this Plugin) insertDirectives(ctx context.Context, q repository.Querier, contractID int64, directives []graphqlmodel.Directive) {
 	if len(directives) == 0 {
 		return
@@ -146,16 +186,18 @@ func (this Plugin) insertDirectives(ctx context.Context, q repository.Querier, c
 	coordinates := make([]string, 0, len(directives))
 	names := make([]string, 0, len(directives))
 	fieldSets := make([]string, 0, len(directives))
+	froms := make([]string, 0, len(directives))
 	resolvables := make([]bool, 0, len(directives))
 
 	for _, directive := range directives {
 		coordinates = append(coordinates, directive.Coordinate)
 		names = append(names, directive.Directive)
 		fieldSets = append(fieldSets, directive.Fields)
+		froms = append(froms, directive.From)
 		resolvables = append(resolvables, directive.Resolvable)
 	}
 
-	if _, err := q.Exec(ctx, insertDirectivesQuery, contractID, coordinates, names, fieldSets, resolvables); err != nil {
+	if _, err := q.Exec(ctx, insertDirectivesQuery, contractID, coordinates, names, fieldSets, froms, resolvables); err != nil {
 		panic(fmt.Errorf("error inserting graphql federation directives: %w", err))
 	}
 }
@@ -172,6 +214,7 @@ func (this Plugin) LoadContractExtensions(ctx context.Context, q repository.Quer
 
 	this.loadGraphMembers(ctx, q, contractIDs, extensionOf)
 	this.loadTypeInfo(ctx, q, contractIDs, extensionOf)
+	this.loadRootTypes(ctx, q, contractIDs, extensionOf)
 	this.loadDirectives(ctx, q, contractIDs, extensionOf)
 
 	loaded := make(map[int64]any, len(extensions))
@@ -229,6 +272,34 @@ func (this Plugin) loadTypeInfo(ctx context.Context, q repository.Querier, contr
 	}
 }
 
+func (this Plugin) loadRootTypes(ctx context.Context, q repository.Querier, contractIDs []int64, extensionOf func(int64) *graphqlmodel.Extension) {
+	rows, err := q.Query(ctx, loadRootTypesQuery, contractIDs)
+	if err != nil {
+		panic(fmt.Errorf("error loading graphql root types: %w", err))
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var contractID int64
+		var operation, typeName string
+
+		if err := rows.Scan(&contractID, &operation, &typeName); err != nil {
+			panic(fmt.Errorf("error scanning graphql root type: %w", err))
+		}
+
+		roots := &extensionOf(contractID).Roots
+		if operation == graphqlmodel.QueryOperation {
+			roots.Query = typeName
+		} else {
+			roots.Mutation = typeName
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		panic(fmt.Errorf("error reading graphql root types: %w", err))
+	}
+}
+
 func (this Plugin) loadDirectives(ctx context.Context, q repository.Querier, contractIDs []int64, extensionOf func(int64) *graphqlmodel.Extension) {
 	rows, err := q.Query(ctx, loadDirectivesQuery, contractIDs)
 	if err != nil {
@@ -240,7 +311,7 @@ func (this Plugin) loadDirectives(ctx context.Context, q repository.Querier, con
 		var contractID int64
 		var directive graphqlmodel.Directive
 
-		if err := rows.Scan(&contractID, &directive.Coordinate, &directive.Directive, &directive.Fields, &directive.Resolvable); err != nil {
+		if err := rows.Scan(&contractID, &directive.Coordinate, &directive.Directive, &directive.Fields, &directive.From, &directive.Resolvable); err != nil {
 			panic(fmt.Errorf("error scanning graphql federation directive: %w", err))
 		}
 

@@ -87,10 +87,10 @@ func (this *Interpreter) ToUploadedContract(
 	return uploadedContract, nil, nil, nil
 }
 
-func (this *Interpreter) ToViolations(files []model.ContractFile) ([]violation.Violation, error) {
-	_, violations, readErr := this.toCheckedDeclarations(files)
+func (this *Interpreter) ToViolations(files []model.ContractFile) (extensions map[string]any, violations []violation.Violation, readErr error) {
+	declarations, violations, readErr := this.toCheckedDeclarations(files)
 
-	return violations, readErr
+	return declarations.Extensions, violations, readErr
 }
 
 func (this *Interpreter) toCheckedDeclarations(files []model.ContractFile) (protocol.Declarations, []violation.Violation, error) {

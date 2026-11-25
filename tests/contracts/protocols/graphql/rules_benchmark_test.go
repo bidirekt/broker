@@ -55,7 +55,7 @@ func BenchmarkToViolations_RESTContractOfElevenThousandSchemaNodes(b *testing.B)
 			b.ReportAllocs()
 
 			for b.Loop() {
-				violations, readErr := registration.interpreter.ToViolations(files)
+				_, violations, readErr := registration.interpreter.ToViolations(files)
 				if readErr != nil || len(violations) > 0 {
 					b.Fatal(readErr, violations)
 				}

@@ -88,7 +88,7 @@ func (this *IntegrationSuite) createDirectivesParticipant() {
 
 func (this *IntegrationSuite) storedDirectives() []graphqlmodel.Directive {
 	rows, err := this.Pool.Query(context.Background(), `
-		SELECT coordinate, directive, fields, resolvable
+		SELECT coordinate, directive, fields, override_from, resolvable
 		FROM graphql_federation_directives
 		ORDER BY contract_id, coordinate COLLATE "C", directive, fields COLLATE "C"`)
 	this.Require().NoError(err)
@@ -97,7 +97,7 @@ func (this *IntegrationSuite) storedDirectives() []graphqlmodel.Directive {
 	var directives []graphqlmodel.Directive
 	for rows.Next() {
 		var directive graphqlmodel.Directive
-		this.Require().NoError(rows.Scan(&directive.Coordinate, &directive.Directive, &directive.Fields, &directive.Resolvable))
+		this.Require().NoError(rows.Scan(&directive.Coordinate, &directive.Directive, &directive.Fields, &directive.From, &directive.Resolvable))
 		directives = append(directives, directive)
 	}
 	this.Require().NoError(rows.Err())
@@ -154,6 +154,7 @@ func (this *IntegrationSuite) TestGraphQLFederationDirectives_ALoadedContract_Ca
 		Graph:      "petstore_graph",
 		Directives: directivesStored,
 		Types:      directivesTypeInfo,
+		Roots:      graphqlmodel.Roots{Query: "Query"},
 	}}, contract.Extensions)
 	this.Equal(contract.Extensions, repo.GetContractByIDAndVersion(context.Background(), contract.ID, "1").Extensions)
 }
@@ -233,4 +234,101 @@ func (this *IntegrationSuite) TestGraphQLFederationDirectives_RepublishingTheSam
 	this.Equal(1, this.countRows("contracts"))
 	this.Equal(len(directivesStored), this.countRows("graphql_federation_directives"))
 	this.Equal(len(directivesTypeInfo), this.countRows("graphql_type_info"))
+}
+
+func (this *IntegrationSuite) TestGraphQLFederationDirectives_AnSDLThatDeclaresTheFederationDefinitions_StoresTheSameDirectives() {
+	this.createDirectivesParticipant()
+
+	this.publishDirectivesSubgraph("1",
+		contractFragment{"graph.yaml", directivesGraphYAML},
+		contractFragment{"schema.graphqls", directivesLinkSDL + `
+directive @link(url: String!, as: String, for: link__Purpose, import: [link__Import]) repeatable on SCHEMA
+
+directive @key(fields: FieldSet!, resolvable: Boolean = true) repeatable on OBJECT | INTERFACE
+
+scalar link__Import
+
+enum link__Purpose {
+  SECURITY
+  EXECUTION
+}
+
+scalar FieldSet
+` + directivesTypesSDL},
+	)
+
+	this.Equal(directivesStored, this.storedDirectives())
+}
+
+func (this *IntegrationSuite) TestGraphQLFederationDirectives_AKeyRepeatedWithAndWithoutResolvable_KeepsOneContractInEitherOrder() {
+	this.createDirectivesParticipant()
+	ownerKeyedBy := func(keys string) string {
+		return directivesLinkSDL + "\ntype Query {\n  owner: Owner\n}\n\ntype Owner " + keys + " {\n  id: ID!\n}\n"
+	}
+
+	this.publishDirectivesSubgraph("1",
+		contractFragment{"graph.yaml", directivesGraphYAML},
+		contractFragment{"schema.graphqls", ownerKeyedBy(`@key(fields: "id", resolvable: false) @key(fields: "id")`)},
+	)
+	this.publishDirectivesSubgraph("2",
+		contractFragment{"graph.yaml", directivesGraphYAML},
+		contractFragment{"schema.graphqls", ownerKeyedBy(`@key(fields: "id") @key(fields: "id", resolvable: false)`)},
+	)
+
+	this.Equal(1, this.countRows("contracts"))
+	this.Equal([]graphqlmodel.Directive{{Coordinate: "Owner", Directive: "key", Fields: "id", Resolvable: true}}, this.storedDirectives())
+}
+
+func (this *IntegrationSuite) TestGraphQLFederationDirectives_AnOverride_IsStoredWithItsFromAndCountsInTheChecksum() {
+	this.createDirectivesParticipant()
+	overridingFrom := func(from string) string {
+		return `extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key", "@override"])
+
+type Query {
+  pet: Pet
+}
+
+type Pet @key(fields: "id") {
+  id: ID!
+  rating: Int @override(from: "` + from + `")
+}
+`
+	}
+
+	this.publishDirectivesSubgraph("1", contractFragment{"graph.yaml", directivesGraphYAML}, contractFragment{"schema.graphqls", overridingFrom("petstore_api")})
+	this.publishDirectivesSubgraph("2", contractFragment{"graph.yaml", directivesGraphYAML}, contractFragment{"schema.graphqls", overridingFrom("petstore_api")})
+	this.publishDirectivesSubgraph("3", contractFragment{"graph.yaml", directivesGraphYAML}, contractFragment{"schema.graphqls", overridingFrom("petstore_orders")})
+
+	this.Equal(2, this.countRows("contracts"))
+	this.Equal([]graphqlmodel.Directive{
+		{Coordinate: "Pet", Directive: "key", Fields: "id", Resolvable: true},
+		{Coordinate: "Pet.rating", Directive: "override", From: "petstore_api", Resolvable: true},
+		{Coordinate: "Pet", Directive: "key", Fields: "id", Resolvable: true},
+		{Coordinate: "Pet.rating", Directive: "override", From: "petstore_orders", Resolvable: true},
+	}, this.storedDirectives())
+}
+
+func (this *IntegrationSuite) TestGraphQLFederationDirectives_ALoadedContract_CarriesTheRootTypesTheSchemaDefinitionNames() {
+	this.createDirectivesParticipant()
+	this.publishDirectivesSubgraph("1", contractFragment{"schema.graphqls", "schema {\n  query: RootQuery\n}\n\ntype RootQuery {\n  pet: Int\n}\n"})
+
+	repo := repository.NewContractRepository(this.Pool, repository.Protocols{
+		Tables:     []repository.ProtocolTable{graphqlrepository.New()},
+		Extensions: []repository.ContractExtensionStore{graphqlrepository.New()},
+	})
+	contract, found := repo.GetContractByNameAndVersion(context.Background(), "petstore_api", "1")
+	this.Require().True(found)
+
+	this.Equal(graphqlmodel.Roots{Query: "RootQuery"}, contract.Extensions["graphql"].(graphqlmodel.Extension).Roots)
+}
+
+func (this *IntegrationSuite) TestGraphQLFederationDirectives_AnSDLWithTheDefaultRoots_KeepsItsChecksumAcrossPublishes() {
+	this.createDirectivesParticipant()
+	files := []contractFragment{{"schema.graphqls", "type Query {\n  pet: Int\n}\n\ntype Mutation {\n  adoptPet: Int\n}\n"}}
+
+	this.publishDirectivesSubgraph("1", files...)
+	this.publishDirectivesSubgraph("2", files...)
+
+	this.Equal(1, this.countRows("contracts"))
+	this.Equal(2, this.countRows("graphql_root_types"))
 }

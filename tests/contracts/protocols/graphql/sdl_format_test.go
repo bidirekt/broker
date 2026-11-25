@@ -295,7 +295,7 @@ func TestSDLFormat_OneTypeAsTheQueryAndTheMutationRoot_HasNoDuplicateSchema(t *t
 		[]contractfiles.FileFormat{graphqlcontracts.NewSDLFormat()},
 	)
 
-	violations, readErr := interpreter.ToViolations([]model.ContractFile{{Source: "schema.graphqls", Content: sharedRootSDL}})
+	_, violations, readErr := interpreter.ToViolations([]model.ContractFile{{Source: "schema.graphqls", Content: sharedRootSDL}})
 
 	require.NoError(t, readErr)
 	assert.Empty(t, violations)
@@ -348,7 +348,7 @@ func TestSDLFormat_KindsAndNamedTypes_AreTheGraphQLPieceOfEachFile(t *testing.T)
 			{Coordinate: "Query.pet", Kind: "field", NamedType: "Pet"},
 			{Coordinate: "Query.pet(id:)", Kind: "argument", NamedType: "ID"},
 			{Coordinate: "Query.pet(name:)", Kind: "argument", NamedType: "String"},
-		}}},
+		}, Roots: graphqlmodel.Roots{Query: "Query"}}},
 	}}, declarations.ExtensionPieces)
 }
 
@@ -512,7 +512,7 @@ func TestSDLFormat_GraphQLFilesReachTheFormat_NextToYAMLFiles(t *testing.T) {
 		[]contractfiles.FileFormat{graphqlcontracts.NewSDLFormat()},
 	)
 
-	violations, readErr := interpreter.ToViolations([]model.ContractFile{
+	_, violations, readErr := interpreter.ToViolations([]model.ContractFile{
 		{Source: "schema.graphqls", Content: "type Query {\n  pet(id: ID!): Pet\n}\n"},
 		{Source: "pet.graphql", Content: "type Pet {\n  id: ID!\n  owner: Owner\n}\n"},
 		{Source: "owner.gql", Content: "type Owner {\n  name: String!\n}\n"},

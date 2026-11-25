@@ -206,3 +206,12 @@ func TestSDLFormat_Federation_WithoutALinkAFederationDirectiveIsUndefined(t *tes
 	require.Error(t, err)
 	assert.Equal(t, `schema.graphqls:1:15: Undefined directive key.`, err.Error())
 }
+
+func TestSDLFormat_Federation_AKeyWhoseOwnDefinitionLacksFieldsIsNotAFieldSet(t *testing.T) {
+	sdl := "extend schema @link(url: \"https://specs.apollo.dev/federation/v2.3\", import: [\"@key\"])\n\ndirective @key repeatable on OBJECT | INTERFACE\n\ntype Query {\n  product: Product\n}\n\ntype Product @key {\n  id: ID!\n}\n"
+
+	_, err := readFederatedSDL(model.ContractFile{Source: "schema.graphqls", Content: sdl})
+
+	require.Error(t, err)
+	assert.Equal(t, `schema.graphqls:9:14: @key(fields: "") on Product is not a valid field set`, err.Error())
+}

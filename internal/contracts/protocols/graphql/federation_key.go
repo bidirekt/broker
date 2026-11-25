@@ -54,10 +54,10 @@ func sourceIndex(sources []*ast.Source, source *ast.Source) int {
 }
 
 func checkKey(schema *ast.Schema, use keyUse) error {
-	fields := use.directive.Arguments.ForName("fields")
-	fieldSet := fields.Value.Raw
+	fields := fieldsOf(use.directive)
+	fieldSet := fields.Raw
 
-	selections, valid := toFieldSet(fields.Value)
+	selections, valid := toFieldSet(fields)
 	if !valid {
 		return errorAtDirective(use.directive, "@%s(fields: %q) on %s is not a valid field set", use.directive.Name, fieldSet, use.definition.Name)
 	}
@@ -67,6 +67,15 @@ func checkKey(schema *ast.Schema, use keyUse) error {
 	}
 
 	return nil
+}
+
+// A @key whose definition, the user's own, lacks the fields argument has an empty field set.
+func fieldsOf(directive *ast.Directive) *ast.Value {
+	if fields := directive.Arguments.ForName("fields"); fields != nil {
+		return fields.Value
+	}
+
+	return &ast.Value{Kind: ast.StringValue}
 }
 
 func toFieldSet(value *ast.Value) (ast.SelectionSet, bool) {

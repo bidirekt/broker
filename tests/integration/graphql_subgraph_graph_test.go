@@ -150,6 +150,26 @@ func (this *IntegrationSuite) TestGraphQLSubgraphGraph_Validate_AnswersTheSameNa
 		`]}`, body)
 }
 
+func (this *IntegrationSuite) TestGraphQLSubgraphGraph_ValidateWithoutParticipantAndEnvironment_AnswersTheSameNameTaken() {
+	this.createSubgraphParticipant("petstore_web")
+	requestBody, err := json.Marshal(struct {
+		Contracts []contractFragment `json:"contracts"`
+	}{[]contractFragment{
+		{"graph.yaml", "provides:\n  graphql:\n    graph: petstore_web\n"},
+		{"schema.graphqls", subgraphSDL},
+	}})
+	this.Require().NoError(err)
+
+	status, body := this.post("/api/contracts/validate", string(requestBody))
+
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"graph.name_taken","path":"provides;graphql;graph","source":"graph.yaml","details":{"graph":"petstore_web"}}`+
+		`]}`, body)
+	this.Equal(0, this.countRows("contracts"))
+	this.Equal(0, this.countRows("graphql_graph_members"))
+}
+
 func (this *IntegrationSuite) TestGraphQLSubgraphGraph_Publish_WritesTheContractGraph() {
 	this.createSubgraphParticipant("petstore_api")
 
