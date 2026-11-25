@@ -108,7 +108,7 @@ func (this *IntegrationSuite) TestShowContractVersion_ShowsTheFilesExactlyAsPubl
 	this.Equal("no-store", header.Get("Cache-Control"))
 	this.Contains(body, `<h1><span class="name">version_web</span> <span class="ver">release/2.0</span></h1>`)
 	this.Contains(body, `<p class="sub">Published <time class="time" datetime="`)
-	this.Regexp(`<p class="sub">Published <time class="time" datetime="[^"]+Z" title="\d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC">\d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC · just now</time></p>`, body)
+	this.Regexp(`<p class="sub">Published <time class="time" datetime="[^"]+Z" title="\d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC">\d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC</time> <span class="time">· just now</span></p>`, body)
 	this.Contains(body, `Exactly as published · 2 files`)
 
 	this.Contains(body, `<span class="path">`+contractVersionConsumesSource+`</span><span class="muted">13 lines · select the text to copy</span>`)
@@ -163,7 +163,7 @@ func (this *IntegrationSuite) TestShowContractVersion_ShowsDeployedNowAndTheDepl
 
 	_, _, body := this.getPage(contractVersionPath, this.signInAsAdmin())
 
-	this.Regexp(`(?s)<h2 class="h2">Deployed now</h2>.*?<li>`+production+`<span class="muted">since <time class="time" datetime="[^"]+" title="[^"]+ UTC">[^<]+ UTC · just now</time></span></li>\s*<li>`+staging, body)
+	this.Regexp(`(?s)<h2 class="h2">Deployed now</h2>.*?<li>`+production+`<span class="muted">since <time class="time" datetime="[^"]+" title="[^"]+ UTC">[^<]+ UTC</time> <span class="time">· just now</span></span></li>\s*<li>`+staging, body)
 
 	history := body[strings.Index(body, `Deployment history`):strings.Index(body, `All checks`)]
 	this.Equal(3, strings.Count(history, `<tr>`)-1)
@@ -172,7 +172,7 @@ func (this *IntegrationSuite) TestShowContractVersion_ShowsDeployedNowAndTheDepl
 	this.Contains(rows[0], production+`<span class="badge rb">`)
 	this.Contains(rows[1], production+`</span>`)
 	this.Contains(rows[2], staging+`</span>`)
-	this.Contains(rows[0], ` UTC · just now</time>`)
+	this.Contains(rows[0], ` UTC</time> <span class="time">· just now</span>`)
 }
 
 func (this *IntegrationSuite) TestShowContractVersion_SaysWhenNotDeployedNorChecked() {
@@ -211,7 +211,7 @@ func (this *IntegrationSuite) TestShowContractVersion_ShowsTheLatestCheckPerEnvi
 
 	latest := body[strings.Index(body, `Latest check per environment`):strings.Index(body, `<h2 class="h2">Contract</h2>`)]
 	this.Equal(2, strings.Count(latest, `<li>`))
-	this.Regexp(`<li>`+productionBadge+`<span class="badge no">.*?no · `+productionBreaks+`</span><a href="/checks/`+production+`">check #`+production+`</a><span class="muted"><time class="time" datetime="[^"]+" title="[^"]+ UTC">[^<]+ UTC · just now</time></span></li>`, latest)
+	this.Regexp(`<li>`+productionBadge+`<span class="badge no">.*?no · `+productionBreaks+`</span><a href="/checks/`+production+`">check #`+production+`</a><span class="muted"><time class="time" datetime="[^"]+" title="[^"]+ UTC">[^<]+ UTC</time> <span class="time">· just now</span></span></li>`, latest)
 	this.Regexp(`<li>`+stagingBadge+`<span class="badge no">.*?no · `+stagingBreaks+`</span><a href="/checks/`+staging+`">check #`+staging+`</a>`, latest)
 	this.Less(strings.Index(latest, `production`), strings.Index(latest, `staging`))
 
