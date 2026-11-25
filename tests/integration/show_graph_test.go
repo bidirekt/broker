@@ -58,6 +58,43 @@ type Money @shareable {
 }
 `
 
+const showGraphFederationJVMSDL = `extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key"])
+
+schema {
+  query: RootQuery
+}
+
+directive @link(url: String!, as: String, for: link__Purpose, import: [link__Import]) repeatable on SCHEMA
+
+directive @key(fields: FieldSet!, resolvable: Boolean = true) repeatable on OBJECT | INTERFACE
+
+scalar link__Import
+
+enum link__Purpose {
+  SECURITY
+  EXECUTION
+}
+
+scalar FieldSet
+
+type RootQuery {
+  pet(id: ID!): Pet
+}
+
+type Pet @key(fields: "id") {
+  id: ID!
+  rating: Int
+}
+`
+
+const showGraphOverridingReviewsSDL = `extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key", "@override"])
+
+type Pet @key(fields: "id") {
+  id: ID!
+  rating: Int @override(from: "petstore_api")
+}
+`
+
 const (
 	showGraphComposes       = `<span class="badge yes">`
 	showGraphDoesNotCompose = `<span class="badge no">`
@@ -166,6 +203,24 @@ func (this *IntegrationSuite) TestShowGraph_AGraphThatDoesNotCompose_ListsEveryE
 	this.Contains(production, `<ul class="list">
     <li>petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.amount without @shareable</li><li>petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.currency without @shareable</li>
   </ul>`)
+}
+
+func (this *IntegrationSuite) TestShowGraph_MembersWithAnOverrideACustomRootAndDeclaredFederationDefinitions_Compose() {
+	this.createForShowGraph([]string{"production"}, []string{"petstore_api", "petstore_reviews"})
+	this.publishSubgraphForShowGraph("petstore_api", "1.4.0", "api.graphqls", showGraphFederationJVMSDL)
+	this.publishSubgraphForShowGraph("petstore_reviews", "2.0.0", "reviews.graphqls", showGraphOverridingReviewsSDL)
+	this.deployForShowGraph("petstore_api", "1.4.0", "production")
+	this.deployForShowGraph("petstore_reviews", "2.0.0", "production")
+
+	production := this.environmentSectionForShowGraph(this.graphPageForShowGraph(), "production")
+
+	this.Contains(production, showGraphComposes)
+	this.NotContains(production, `<ul class="list">`)
+	this.Contains(production, showGraphMemberRow("petstore_api", "1.4.0"))
+	this.Contains(production, showGraphMemberRow("petstore_reviews", "2.0.0"))
+	for _, definition := range []string{"FieldSet", "link__Import", "link__Purpose", "RootQuery"} {
+		this.NotContains(production, definition)
+	}
 }
 
 func (this *IntegrationSuite) TestShowGraph_ANameWithoutPublishedSubgraphsIsNotFound() {

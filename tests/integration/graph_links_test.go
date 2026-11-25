@@ -81,7 +81,7 @@ func (this *IntegrationSuite) TestGraphLinks_TheSubgraphPageLinksTheGraphOfEachE
 
 	this.Contains(body, `<a class="badge" href="/graphs/petstore_graph">graph petstore_graph in development</a>`+
 		`<a class="badge" href="/graphs/petstore_graph">graph petstore_graph in production</a>`+
-		`<a class="badge" href="/graphs/petstore_legacy_graph">graph petstore_legacy_graph in staging</a>`+"\n    </div>")
+		`<a class="badge" href="/graphs/petstore_legacy_graph">graph petstore_legacy_graph in staging</a></div></div>`)
 	this.Equal(3, strings.Count(body, `<a class="badge" href="/graphs/`))
 }
 

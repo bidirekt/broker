@@ -11,7 +11,7 @@
     <div class="sub badges">
       <span>Latest {{if .LatestURL}}<a class="ver" href="{{.LatestURL}}">{{.Header.LatestVersion.String}}</a>{{else}}<span class="ver">{{.Header.LatestVersion.String}}</span>{{end}}</span>
       <span aria-hidden="true">·</span>
-      {{range .Header.DeployedNow}}<a class="badge env" href="/environments/{{.Environment.ID}}">{{.Environment.Name}} <span class="v">{{.Version}}</span></a>{{else}}<span class="badge quiet">not deployed</span>{{end}}{{range .Links}}<a class="badge" href="{{.URL}}">{{.Label}}</a>{{end}}
+      {{range .Header.DeployedNow}}<a class="badge env" href="/environments/{{.Environment.ID}}">{{.Environment.Name}} <span class="v">{{.Version}}</span></a>{{else}}<span class="badge quiet">not deployed</span>{{end}}
     </div>
     {{else}}
     <p class="sub">never published</p>
@@ -25,6 +25,7 @@
   <a href="{{.ParticipantURL}}/relations">Relations <span class="count">{{.Header.RelationCount}}</span></a>
 </nav>
 <section class="sheet">
+  {{if .Links}}<div class="sheet-head"><div class="badges">{{range .Links}}<a class="badge" href="{{.URL}}">{{.Label}}</a>{{end}}</div></div>{{end}}
   {{if .Versions}}
   <div class="scroll"><table class="t stack">
     <thead>
