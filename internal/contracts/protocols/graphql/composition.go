@@ -2,6 +2,7 @@ package graphql
 
 import (
 	"cmp"
+	"fmt"
 	"maps"
 	"slices"
 	"strings"
@@ -12,12 +13,14 @@ import (
 	graphqlmodel "github.com/bidirekt/broker/internal/model/protocols/graphql"
 )
 
+// The query root comes first: a type that is both roots is the query root, as the SDL reads it.
 var rootTypes = []struct {
 	operation string
 	typeName  string
+	of        func(graphqlmodel.Roots) string
 }{
-	{graphqlmodel.QueryOperation, "Query"},
-	{graphqlmodel.MutationOperation, "Mutation"},
+	{graphqlmodel.QueryOperation, "Query", func(roots graphqlmodel.Roots) string { return roots.Query }},
+	{graphqlmodel.MutationOperation, "Mutation", func(roots graphqlmodel.Roots) string { return roots.Mutation }},
 }
 
 type composition struct {
@@ -46,6 +49,7 @@ type compositionError struct {
 // ordered by coordinate and then by subgraph.
 func ToComposedGraph(graph string, subgraphs []*model.PersistedContract) (*model.PersistedContract, []string) {
 	composing := newComposition(subgraphs)
+	composing.takeOverrides()
 	composing.composeTypes()
 
 	if len(composing.errors) == 0 {
@@ -108,6 +112,42 @@ func ownerOf(coordinate string) string {
 	owner, _, _ := strings.Cut(coordinate, ".")
 
 	return owner
+}
+
+// takeOverrides leaves each field a subgraph takes over with @override to that subgraph alone. An @override from a
+// subgraph that is not a member changes nothing.
+func (this *composition) takeOverrides() {
+	for _, member := range this.subgraphs {
+		for _, coordinate := range slices.Sorted(maps.Keys(member.directives)) {
+			for _, directive := range member.directives[coordinate] {
+				if directive.Directive == graphqlmodel.OverrideDirective {
+					this.takeOverride(member, coordinate, directive.From)
+				}
+			}
+		}
+	}
+}
+
+func (this *composition) takeOverride(member subgraph, coordinate, from string) {
+	if from == member.name {
+		this.addError(coordinate, fmt.Sprintf("%s overrides %s from itself", member.label, coordinate), member)
+
+		return
+	}
+
+	index := slices.IndexFunc(this.subgraphs, func(other subgraph) bool { return other.name == from })
+	if index < 0 {
+		return
+	}
+
+	origin := this.subgraphs[index]
+	if origin.marks(coordinate, graphqlmodel.OverrideDirective) {
+		this.addError(coordinate, fmt.Sprintf("%s overrides %s from %s, which overrides it too", member.label, coordinate, origin.name), member, origin)
+
+		return
+	}
+
+	origin.overridden[coordinate] = true
 }
 
 func (this *composition) addError(coordinate, message string, subgraphs ...subgraph) {

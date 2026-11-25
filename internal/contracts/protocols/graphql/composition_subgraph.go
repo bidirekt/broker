@@ -11,7 +11,8 @@ import (
 )
 
 // subgraph is a member of a graph as the composition reads it: its schemas, the kind and named type of each
-// coordinate, its federation directives and the coordinates its @key field sets name.
+// coordinate, its federation directives, the coordinates its @key field sets name and the fields another subgraph
+// takes over with @override.
 type subgraph struct {
 	name       string
 	label      string
@@ -20,27 +21,32 @@ type subgraph struct {
 	namedTypes map[string]string
 	directives map[string][]graphqlmodel.Directive
 	keyFields  map[string]bool
+	overridden map[string]bool
 }
 
 func toSubgraph(contract *model.PersistedContract) subgraph {
 	extension, _ := contract.Extensions[graphqlmodel.Protocol.String()].(graphqlmodel.Extension)
+	roots := toRootNames(extension.Roots)
 
 	member := subgraph{
 		name:       contract.ParticipantName,
 		label:      contract.ParticipantName + " " + contract.Version,
-		schemas:    contract.Schemas[graphqlmodel.Namespace],
+		schemas:    roots.toSchemas(contract.Schemas[graphqlmodel.Namespace]),
 		kinds:      make(map[string]string, len(extension.Types)),
 		namedTypes: make(map[string]string, len(extension.Types)),
 		directives: map[string][]graphqlmodel.Directive{},
 		keyFields:  map[string]bool{},
+		overridden: map[string]bool{},
 	}
 
 	for _, info := range extension.Types {
-		member.kinds[info.Coordinate] = info.Kind
-		member.namedTypes[info.Coordinate] = info.NamedType
+		coordinate := roots.toCoordinate(info.Coordinate)
+		member.kinds[coordinate] = info.Kind
+		member.namedTypes[coordinate] = roots.toTypeName(info.NamedType)
 	}
 
 	for _, directive := range extension.Directives {
+		directive.Coordinate = roots.toCoordinate(directive.Coordinate)
 		member.directives[directive.Coordinate] = append(member.directives[directive.Coordinate], directive)
 
 		if directive.Directive == graphqlmodel.KeyDirective {
@@ -50,6 +56,67 @@ func toSubgraph(contract *model.PersistedContract) subgraph {
 	}
 
 	return member
+}
+
+// rootNames maps each root type a subgraph names otherwise to the name the graph gives it, Query or Mutation, so
+// the roots of every subgraph join whatever their SDL calls them.
+type rootNames map[string]string
+
+func toRootNames(roots graphqlmodel.Roots) rootNames {
+	names := rootNames{}
+	for _, root := range rootTypes {
+		if declared := root.of(roots); declared != "" && declared != root.typeName {
+			if _, named := names[declared]; !named {
+				names[declared] = root.typeName
+			}
+		}
+	}
+
+	return names
+}
+
+// A schema the protocol synthesizes for a root field, "RootQuery:pet:arguments", takes the root's new name too.
+func (this rootNames) toTypeName(name string) string {
+	typeName, synthesized, isSynthesized := strings.Cut(name, ":")
+	renamed, isRoot := this[typeName]
+	if !isRoot {
+		return name
+	}
+
+	if isSynthesized {
+		return renamed + ":" + synthesized
+	}
+
+	return renamed
+}
+
+func (this rootNames) toCoordinate(coordinate string) string {
+	typeName, member, isMember := strings.Cut(coordinate, ".")
+	if !isMember {
+		return this.toTypeName(typeName)
+	}
+
+	return this.toTypeName(typeName) + "." + member
+}
+
+func (this rootNames) toSchemas(schemas model.Schemas) model.Schemas {
+	if len(this) == 0 {
+		return schemas
+	}
+
+	renamed := make(model.Schemas, len(schemas))
+	for name, schema := range schemas {
+		fields := make(model.Schema, len(schema))
+		for path, field := range schema {
+			field.Ref = this.toTypeName(field.Ref)
+			field.Arguments = this.toTypeName(field.Arguments)
+			fields[path] = field
+		}
+
+		renamed[this.toTypeName(name)] = fields
+	}
+
+	return renamed
 }
 
 func (this subgraph) addKeyFields(typeName string, selections ast.SelectionSet) {
@@ -74,7 +141,7 @@ func (this subgraph) definesType(typeName string) bool {
 }
 
 func (this subgraph) resolves(coordinate string) bool {
-	return this.kinds[coordinate] == graphqlmodel.FieldKind && !this.marks(coordinate, graphqlmodel.ExternalDirective)
+	return this.kinds[coordinate] == graphqlmodel.FieldKind && !this.marks(coordinate, graphqlmodel.ExternalDirective) && !this.overridden[coordinate]
 }
 
 // A field counts as @shareable when it, or its type, says so, or when a @key of the subgraph names it.

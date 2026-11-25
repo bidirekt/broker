@@ -439,3 +439,45 @@ func TestToComposedGraph_SubgraphsThatBothDeclareTheFederationDefinitions_Compos
 	assert.Len(t, composed.Resources, 4)
 	assert.Equal(t, model.Schema{"": {Type: "object"}, "amount": {Type: "integer"}}, composed.Schemas["graphql"]["Money"])
 }
+
+func TestToComposedGraph_ARootTypeTheSchemaNamesOtherwise_JoinsTheQueryRoot(t *testing.T) {
+	composed, errors := graphqlcontracts.ToComposedGraph("petstore_graph", []*model.PersistedContract{
+		compositionMember(t, "petstore_api", "1.4.0", "schema {\n  query: RootQuery\n}\n\ntype RootQuery {\n  pet(id: ID!): Pet\n}\n\ntype Pet @key(fields: \"id\") {\n  id: ID!\n  name: String!\n}\n"),
+		compositionMember(t, "petstore_reviews", "2.0.0", "type Query {\n  reviews: [Review!]!\n}\n\ntype Review {\n  body: String!\n}\n"),
+	})
+	require.Empty(t, errors)
+
+	assert.Len(t, composed.Resources, 4)
+	assert.NotContains(t, composed.Schemas["graphql"], "RootQuery")
+
+	arguments := composed.Resources[model.Hash("petstore_graph", "graphql", "query", "pet", "arguments")]
+	assert.Equal(t, "Query:pet:arguments", arguments.Bodies[0].SchemaName.String)
+	assert.Equal(t, model.Schema{"": {Type: "object"}, "id": {Type: "string"}}, arguments.Schemas["graphql"]["Query:pet:arguments"])
+
+	returns := composed.Resources[model.Hash("petstore_graph", "graphql", "query", "pet", "returns")]
+	assert.Equal(t, model.Schema{"": {Ref: "Pet", Nullable: true}}, returns.Schemas["graphql"]["Query:pet:returns"])
+}
+
+func TestToComposedGraph_AMutationRootTheSchemaNamesOtherwise_GivesMutations(t *testing.T) {
+	composed, errors := graphqlcontracts.ToComposedGraph("petstore_graph", []*model.PersistedContract{
+		compositionMember(t, "petstore_api", "1.4.0", "schema {\n  query: RootQuery\n  mutation: RootMutation\n}\n\ntype RootQuery {\n  pet(id: ID!): Pet\n}\n\ntype RootMutation {\n  adoptPet(id: ID!): Pet!\n}\n\ntype Pet {\n  id: ID!\n}\n"),
+	})
+	require.Empty(t, errors)
+
+	assert.Len(t, composed.Resources, 4)
+	assert.Contains(t, composed.Resources, model.Hash("petstore_graph", "graphql", "mutation", "adoptPet", "returns"))
+}
+
+func TestToComposedGraph_ErrorsOnOneCoordinate_AreOrderedBySubgraph(t *testing.T) {
+	errors := compositionErrors(
+		compositionMember(t, "petstore_reviews", "2.0.0", "type Review {\n  price: Money!\n}\n\ntype Money {\n  amount: Int!\n}\n"),
+		compositionMember(t, "petstore_orders", "1.0.0", "type Query {\n  order(id: ID!): Order\n}\n\ntype Order @key(fields: \"id\") {\n  id: ID!\n  total: Money!\n}\n\ntype Money @shareable {\n  amount: String!\n}\n"),
+		compositionMember(t, "petstore_api", "1.4.0", fmt.Sprintf(moneyAPISDL, "@shareable")),
+	)
+
+	assert.Equal(t, []string{
+		"petstore_api 1.4.0 resolves Money.amount as Int!, but petstore_orders 1.0.0 as String!",
+		"petstore_api 1.4.0 and petstore_reviews 2.0.0 both resolve Money.amount without @shareable",
+		"petstore_orders 1.0.0 and petstore_reviews 2.0.0 both resolve Money.amount without @shareable",
+	}, errors)
+}

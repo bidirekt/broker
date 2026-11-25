@@ -186,3 +186,12 @@ type Pet @key(fields: "id") {
 
 	assert.Empty(t, errors)
 }
+
+func TestToComposedGraph_AQueryFromARootTheSchemaNamesOtherwise_IsWalkedLikeAnyQuery(t *testing.T) {
+	errors := satisfiabilityErrors(
+		satisfiabilityMember(t, "petstore_api", "1.4.0", "schema {\n  query: RootQuery\n}\n\ntype RootQuery {\n  pet(id: ID!): Pet\n}\n\ntype Pet @key(fields: \"id\") {\n  id: ID!\n  name: String!\n}\n"),
+		satisfiabilityMember(t, "petstore_reviews", "2.0.0", fmt.Sprintf(satisfiabilityReviewsSDL, ", resolvable: false")),
+	)
+
+	assert.Equal(t, []string{"query pet.reviews can't be resolved: no resolvable @key leads from petstore_api 1.4.0 to petstore_reviews 2.0.0 on Pet"}, errors)
+}

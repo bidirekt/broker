@@ -109,7 +109,9 @@ func (this CheckerHooks) affectedGraphs(ctx context.Context, contract *model.Per
 
 // Each deployed consumer of the graph, other than the participant under check, is compared with the candidate
 // composition, and only the breaks the base composition does not have count: a break already there is the
-// consumer's to see in its own check.
+// consumer's to see in its own check. When the deployed graph does not compose, the base is the graph without the
+// participant, so the candidate answers only for what it brings; when that does not compose either, the consumer
+// is not compared.
 func (this CheckerHooks) toGraphConsumerPairs(ctx context.Context, graphs *graphsInCheck, graph string) []compatibility_checker.ExtraPair {
 	var pairs []compatibility_checker.ExtraPair
 
@@ -139,13 +141,19 @@ func (this CheckerHooks) toGraphConsumerPairs(ctx context.Context, graphs *graph
 				ReadyBreak:  candidate.notComposable(),
 			})
 		case candidate.contract != nil:
-			pairs = append(pairs, compatibility_checker.ExtraPair{
-				Resources:   consumedFrom(consumer, graph),
-				Contract:    candidate.contract,
-				Counterpart: counterpart,
-				Base:        base.contract,
-				Details:     map[string]string{graphqlmodel.GraphKey: graph},
-			})
+			if base.contract == nil {
+				base = graphs.withoutParticipant(ctx, graph)
+			}
+
+			if base.contract != nil {
+				pairs = append(pairs, compatibility_checker.ExtraPair{
+					Resources:   consumedFrom(consumer, graph),
+					Contract:    candidate.contract,
+					Counterpart: counterpart,
+					Base:        base.contract,
+					Details:     map[string]string{graphqlmodel.GraphKey: graph},
+				})
+			}
 		}
 	}
 
@@ -161,6 +169,7 @@ type graphsInCheck struct {
 	deployed    map[string][]*model.PersistedContract
 	candidates  map[string]composedGraph
 	bases       map[string]composedGraph
+	without     map[string]composedGraph
 }
 
 func newGraphsInCheck(hooks CheckerHooks, contract *model.PersistedContract, environment *model.Environment) *graphsInCheck {
@@ -171,6 +180,7 @@ func newGraphsInCheck(hooks CheckerHooks, contract *model.PersistedContract, env
 		deployed:    map[string][]*model.PersistedContract{},
 		candidates:  map[string]composedGraph{},
 		bases:       map[string]composedGraph{},
+		without:     map[string]composedGraph{},
 	}
 }
 
@@ -181,9 +191,7 @@ func (this *graphsInCheck) candidate(ctx context.Context, graph string) composed
 		return composed
 	}
 
-	members := slices.DeleteFunc(slices.Clone(this.deployedMembers(ctx, graph)), func(member *model.PersistedContract) bool {
-		return member.ParticipantID == this.contract.ParticipantID
-	})
+	members := this.deployedOthers(ctx, graph)
 
 	if graphOf(this.contract) == graph {
 		candidate := *this.contract
@@ -208,6 +216,22 @@ func (this *graphsInCheck) base(ctx context.Context, graph string) composedGraph
 	this.bases[graph] = toComposedGraph(graph, this.deployedMembers(ctx, graph))
 
 	return this.bases[graph]
+}
+
+func (this *graphsInCheck) withoutParticipant(ctx context.Context, graph string) composedGraph {
+	if composed, done := this.without[graph]; done {
+		return composed
+	}
+
+	this.without[graph] = toComposedGraph(graph, this.deployedOthers(ctx, graph))
+
+	return this.without[graph]
+}
+
+func (this *graphsInCheck) deployedOthers(ctx context.Context, graph string) []*model.PersistedContract {
+	return slices.DeleteFunc(slices.Clone(this.deployedMembers(ctx, graph)), func(member *model.PersistedContract) bool {
+		return member.ParticipantID == this.contract.ParticipantID
+	})
 }
 
 func (this *graphsInCheck) deployedMembers(ctx context.Context, graph string) []*model.PersistedContract {

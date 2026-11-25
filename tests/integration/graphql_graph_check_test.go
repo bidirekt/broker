@@ -169,6 +169,36 @@ func (this *IntegrationSuite) TestCanIDeployAndValidate_AConsumerOfAGraph_IsComp
 	}}`)
 }
 
+func (this *IntegrationSuite) TestCanIDeployAndValidate_ASubgraphWhoseSchemaNamesItsQueryRoot_GivesTheGraphItsQueries() {
+	this.setUpGraphCheck("petstore_api", "petstore_reviews", "petstore_web")
+	this.publishForGraphCheck("petstore_api", "1.4.0", contractFragment{"graph.yaml", graphCheckGraphYAML}, contractFragment{"api.graphqls", graphCheckLink + `
+schema {
+  query: RootQuery
+}
+
+type RootQuery {
+  pet(id: ID!): Pet
+}
+
+type Pet @key(fields: "id") {
+  id: ID!
+  name: String!
+  age: Int
+}
+`})
+	this.publishForGraphCheck("petstore_reviews", "2.0.0", contractFragment{"graph.yaml", graphCheckGraphYAML}, contractFragment{"reviews.graphqls", graphCheckReviewsSDL})
+	this.deployForGraphCheck("petstore_api", "1.4.0", "production")
+	this.deployForGraphCheck("petstore_reviews", "2.0.0", "production")
+
+	this.assertWebGraphCheck(graphCheckWebReadingAgeAsText, "production", false, `{"petstore_graph": {
+		"deployable": false,
+		"members": {"petstore_api": "1.4.0", "petstore_reviews": "2.0.0"},
+		"operations": {"query": {"pet": {"returns": [
+			{"reason": "property_type_mismatch", "role": "consumer", "details": {"consumerName": "petstore_web", "providerName": "petstore_graph", "property": "$.age", "consumerPropertyType": "String", "providerPropertyType": "Int", "consumerField": "Pet.age", "providerField": "Pet.age"}}
+		]}}}
+	}}`)
+}
+
 func (this *IntegrationSuite) TestCanIDeploy_AConsumerOfAGraph_RecordsTheGraphWithItsMembersAndNoVerdict() {
 	this.setUpGraphCheck("petstore_api", "petstore_reviews", "petstore_web")
 	this.deployGraphCheckSubgraphs("production")

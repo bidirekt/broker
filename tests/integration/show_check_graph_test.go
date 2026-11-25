@@ -2,6 +2,7 @@ package integration_test
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strconv"
 )
@@ -164,4 +165,56 @@ func (this *IntegrationSuite) TestShowCheck_ASubgraphThatMakesItsGraphFailToComp
 	this.Contains(body, `<div class="fix self only"><span class="side">Fix in <b>petstore_reviews</b></span><span>make petstore_graph compose</span></div>`)
 	this.Contains(body, graphPageGraphLink)
 	this.NotContains(body, `provider_graph_not_composable`)
+}
+
+func (this *IntegrationSuite) TestCanIDeployAndShowCheck_AFieldReadDirectlyAndThroughTheGraph_BreaksInBothWhenRemoved() {
+	this.setUpGraphPage("petstore_api", "petstore_web")
+	this.publishForGraphPage("petstore_api", "1.4.0", graphPageGraphFile(), contractFragment{"api.graphqls", graphPageAPISDL})
+	this.publishForGraphPage("petstore_web", "3.0.0", contractFragment{"web.yaml", `consumes:
+  petstore_api:
+    graphql:
+      query:
+        pet: {arguments: PetArgs, returns: MaybePet}
+  petstore_graph:
+    graphql:
+      query:
+        pet: {arguments: PetArgs, returns: MaybePet}
+schemas:
+  PetArgs: {type: object, properties: {id: {type: string}}}
+  MaybePet: {ref: Pet, nullable: true}
+  Pet: {type: object, properties: {id: {type: string}}}
+`})
+	this.deployForGraphPage("petstore_api", "1.4.0")
+	this.deployForGraphPage("petstore_web", "3.0.0")
+	this.publishForGraphPage("petstore_api", "1.5.0", graphPageGraphFile(), contractFragment{"api.graphqls", graphPageLink + `
+type Query {
+  owner(id: ID!): String
+}
+`})
+
+	results := `{"petstore_web": {
+		"deployable": false,
+		"participantVersion": "3.0.0",
+		"operations": {"query": {"pet": {"returns": [
+			{"reason": "provider_resource_removed_but_still_consumed", "role": "provider"},
+			{"reason": "provider_resource_removed_but_still_consumed", "role": "provider", "details": {"graph": "petstore_graph"}}
+		]}}}
+	}}`
+
+	status, response := this.post("/api/can-i-deploy", `{"participant":"petstore_api","version":"1.5.0","environment":"production"}`)
+	this.Require().Equal(http.StatusOK, status, response)
+
+	var canIDeploy struct {
+		Results json.RawMessage `json:"results"`
+	}
+	this.Require().NoError(json.Unmarshal([]byte(response), &canIDeploy))
+	this.JSONEq(results, string(canIDeploy.Results))
+
+	body := this.checkPageForGraphPage("petstore_api", "1.5.0")
+
+	var report string
+	this.Require().NoError(this.Pool.QueryRow(context.Background(), `SELECT report::text FROM compatibility_checks ORDER BY id DESC LIMIT 1`).Scan(&report))
+	this.JSONEq(results, report)
+	this.Contains(body, `<span><b class="name">petstore_api</b> removed <code>query pet</code>, but <b class="name">petstore_web</b> still calls it</span>`)
+	this.Contains(body, `<span><b class="name">petstore_api</b> (via petstore_graph) removed <code>query pet</code>, but <b class="name">petstore_web</b> still calls it</span>`)
 }

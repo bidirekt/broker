@@ -525,3 +525,134 @@ type Pet @key(fields: "id") {
 	this.False(validate.Deployable)
 	this.JSONEq(results("candidate"), string(validate.Results))
 }
+
+const subgraphCheckAPIWithMoneyNotShareable = subgraphCheckLink + `
+type Query {
+  pet(id: ID!): Pet
+}
+
+type Pet @key(fields: "id") {
+  id: ID!
+  name: String! @shareable
+  age: Int
+  price: Money!
+}
+
+type Money {
+  amount: Int!
+}
+`
+
+const subgraphCheckOrdersWithMoney = subgraphCheckLink + `
+type Query {
+  order(id: ID!): Order
+}
+
+type Order @key(fields: "id") {
+  id: ID!
+  total: Money!
+}
+
+type Money @shareable {
+  amount: Int!
+}
+`
+
+const subgraphCheckWebReadingNameAndAgeAsText = `consumes:
+  petstore_graph:
+    graphql:
+      query:
+        pet: {arguments: PetArgs, returns: MaybePet}
+schemas:
+  PetArgs: {type: object, properties: {id: {type: string}}}
+  MaybePet: {ref: Pet, nullable: true}
+  Pet: {type: object, properties: {name: {type: string}, age: {type: string, nullable: true}}}
+`
+
+func (this *IntegrationSuite) deployGraphThatDoesNotComposeForSubgraphCheck() {
+	this.setUpSubgraphCheck("petstore_api", "petstore_orders", "petstore_web")
+	this.publishForSubgraphCheck("petstore_api", "1.4.0", subgraphCheckGraphFile(subgraphCheckGraph), contractFragment{"api.graphqls", subgraphCheckAPIWithMoneyNotShareable})
+	this.publishForSubgraphCheck("petstore_orders", "1.0.0", subgraphCheckGraphFile(subgraphCheckGraph), contractFragment{"orders.graphqls", subgraphCheckOrdersWithMoney})
+	this.publishForSubgraphCheck("petstore_web", "3.0.0", contractFragment{"web.yaml", subgraphCheckWebReadingNameAndAgeAsText})
+	for _, deployment := range [][2]string{{"petstore_api", "1.4.0"}, {"petstore_orders", "1.0.0"}, {"petstore_web", "3.0.0"}} {
+		this.deployForSubgraphCheck(deployment[0], deployment[1])
+	}
+}
+
+func (this *IntegrationSuite) TestCanIDeployAndValidate_ASubgraphFixingAGraphThatDoesNotCompose_IsNotBlamedForTheBreaksOfTheOthers() {
+	this.deployGraphThatDoesNotComposeForSubgraphCheck()
+
+	this.assertSubgraphCheck("petstore_orders", "1.1.0", []contractFragment{
+		subgraphCheckGraphFile(subgraphCheckGraph),
+		{"orders.graphqls", subgraphCheckLink + `
+type Query {
+  order(id: ID!): Order
+}
+
+type Order @key(fields: "id") {
+  id: ID!
+}
+`},
+	}, true, `{"petstore_web": {"deployable": true, "participantVersion": "3.0.0"}}`)
+}
+
+func (this *IntegrationSuite) TestCanIDeployAndValidate_ASubgraphFixingAGraphThatDoesNotCompose_AnswersForTheBreaksItBrings() {
+	this.deployGraphThatDoesNotComposeForSubgraphCheck()
+
+	this.assertSubgraphCheck("petstore_orders", "1.1.0", []contractFragment{
+		subgraphCheckGraphFile(subgraphCheckGraph),
+		{"orders.graphqls", subgraphCheckLink + `
+type Query {
+  order(id: ID!): Order
+}
+
+type Order @key(fields: "id") {
+  id: ID!
+}
+
+type Pet @key(fields: "id") {
+  id: ID!
+  name: String @shareable
+}
+`},
+	}, false, `{"petstore_web": {
+		"deployable": false,
+		"participantVersion": "3.0.0",
+		"operations": {"query": {"pet": {"returns": [
+			{"reason": "property_nullable_in_provider_not_nullable_in_consumer", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_graph", "property": "$.name", "propertyType": "String!", "consumerField": "Pet.name", "providerField": "Pet.name", "graph": "petstore_graph"}}
+		]}}}
+	}}`)
+}
+
+func (this *IntegrationSuite) TestCanIDeployAndValidate_ASubgraphEnteringAGraphThatComposesOnlyWithIt_IsNotComparedWithItsConsumers() {
+	this.setUpSubgraphCheck("petstore_api", "petstore_reviews", "petstore_orders", "petstore_web")
+	this.publishForSubgraphCheck("petstore_api", "1.4.0", subgraphCheckGraphFile(subgraphCheckGraph), contractFragment{"api.graphqls", subgraphCheckAPISDL})
+	this.publishForSubgraphCheck("petstore_reviews", "2.0.0", subgraphCheckGraphFile(subgraphCheckGraph), contractFragment{"reviews.graphqls", subgraphCheckLink + `
+type Pet @key(fields: "id", resolvable: false) {
+  id: ID!
+  rating: Int @shareable
+}
+`})
+	this.publishForSubgraphCheck("petstore_web", "3.0.0", contractFragment{"web.yaml", subgraphCheckWebReadingNameAndAgeAsText})
+	for _, deployment := range [][2]string{{"petstore_api", "1.4.0"}, {"petstore_reviews", "2.0.0"}, {"petstore_web", "3.0.0"}} {
+		this.deployForSubgraphCheck(deployment[0], deployment[1])
+	}
+
+	this.assertSubgraphCheck("petstore_orders", "1.0.0", []contractFragment{
+		subgraphCheckGraphFile(subgraphCheckGraph),
+		{"orders.graphqls", subgraphCheckLink + `
+type Query {
+  order(id: ID!): Order
+}
+
+type Order @key(fields: "id") {
+  id: ID!
+}
+
+type Pet @key(fields: "id") {
+  id: ID!
+  rating: Int @shareable
+}
+`},
+	}, true, `{}`)
+}
