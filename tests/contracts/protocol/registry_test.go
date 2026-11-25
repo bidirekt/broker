@@ -135,13 +135,13 @@ func TestGrammar_EachSideTakesTheProtocolGrammarOfItsSide(t *testing.T) {
 			ErrorCode: "key.unknown",
 			Path:      "consumes;pets_api;sided;graph",
 			Source:    "api.yaml",
-			Details:   map[string]string{"key": "graph"},
+			Details:   map[string]any{"key": "graph"},
 		},
 		{
 			ErrorCode: "key.unknown",
 			Path:      "provides;sided;query",
 			Source:    "api.yaml",
-			Details:   map[string]string{"key": "query"},
+			Details:   map[string]any{"key": "query"},
 		},
 	}, descriptor.Validate(registry.Grammar(), document, "api.yaml"))
 }
@@ -174,13 +174,13 @@ func TestGrammar_TwoRegistriesInOneProcess_EachValidatesSchemasWithItsOwnVocabul
 			ErrorCode: "key.unknown",
 			Path:      "schemas;DateTime;name",
 			Source:    "api.yaml",
-			Details:   map[string]string{"key": "name"},
+			Details:   map[string]any{"key": "name"},
 		},
 		{
 			ErrorCode: "schema.invalid_type",
 			Path:      "schemas;DateTime;type",
 			Source:    "api.yaml",
-			Details: map[string]string{
+			Details: map[string]any{
 				"value":   "scalar",
 				"allowed": "object, array, map, string, integer, float, number, boolean, enum, union",
 			},

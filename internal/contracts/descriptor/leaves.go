@@ -45,7 +45,7 @@ func (this Text) validate(value any, path string) []violation.Violation {
 	return []violation.Violation{{
 		ErrorCode: this.ErrorCode,
 		Path:      path,
-		Details:   map[string]string{"value": text, "error": err.Error()},
+		Details:   map[string]any{"value": text, "error": err.Error()},
 	}}
 }
 
@@ -85,7 +85,7 @@ func (this Enum) validate(value any, path string) []violation.Violation {
 	return []violation.Violation{{
 		ErrorCode: this.ErrorCode,
 		Path:      path,
-		Details: map[string]string{
+		Details: map[string]any{
 			"value":   text,
 			"allowed": strings.Join(this.Allowed, ", "),
 		},

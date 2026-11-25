@@ -59,7 +59,7 @@ func argumentsNotObject(declarations protocol.Declarations) []violation.Violatio
 
 // The refs from name end on the schema of the arguments; a nullable link anywhere on the way makes them nullable.
 // An undeclared name is left to the unresolved ref rules.
-func toArgumentsRefusal(catalog contract.SchemasMap, name string) (map[string]string, bool) {
+func toArgumentsRefusal(catalog contract.SchemasMap, name string) (map[string]any, bool) {
 	nullable := false
 	followed := map[string]bool{}
 
@@ -79,11 +79,11 @@ func toArgumentsRefusal(catalog contract.SchemasMap, name string) (map[string]st
 		}
 
 		if schema.Type != model.ObjectType {
-			return map[string]string{"schema": name, "reason": "not_object", "type": schema.Type}, true
+			return map[string]any{"schema": name, "reason": "not_object", "type": schema.Type}, true
 		}
 
 		if nullable {
-			return map[string]string{"schema": name, "reason": "nullable"}, true
+			return map[string]any{"schema": name, "reason": "nullable"}, true
 		}
 
 		return nil, false
@@ -92,7 +92,7 @@ func toArgumentsRefusal(catalog contract.SchemasMap, name string) (map[string]st
 	return nil, false
 }
 
-func argumentsNotObjectViolation(path, source string, details map[string]string) violation.Violation {
+func argumentsNotObjectViolation(path, source string, details map[string]any) violation.Violation {
 	return violation.Violation{ErrorCode: "schema.arguments_not_object", Path: path, Source: source, Details: details}
 }
 
@@ -111,7 +111,7 @@ func (this reachedSchema) violation(errorCode, key string) violation.Violation {
 		ErrorCode: errorCode,
 		Path:      this.documentPath + ";" + key,
 		Source:    this.source,
-		Details:   map[string]string{"protocol": this.protocol.String()},
+		Details:   map[string]any{"protocol": this.protocol.String()},
 	}
 }
 

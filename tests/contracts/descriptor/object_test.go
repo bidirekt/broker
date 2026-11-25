@@ -32,7 +32,7 @@ func TestObject_RejeitaChaveDesconhecida(t *testing.T) {
 	assert.Equal(t, "key.unknown", violations[0].ErrorCode)
 	assert.Equal(t, "patch", violations[0].Path)
 	assert.Equal(t, "api.yaml", violations[0].Source)
-	assert.Equal(t, map[string]string{"key": "patch"}, violations[0].Details)
+	assert.Equal(t, map[string]any{"key": "patch"}, violations[0].Details)
 }
 
 func TestObject_AcumulaChavesDesconhecidasEmOrdemEstavel(t *testing.T) {
@@ -88,7 +88,7 @@ func TestObject_RejeitaEscalarComoKind(t *testing.T) {
 
 	require.Len(t, violations, 1)
 	assert.Equal(t, "value.invalid_kind", violations[0].ErrorCode)
-	assert.Equal(t, map[string]string{"expected": "mapping", "got": "string"}, violations[0].Details)
+	assert.Equal(t, map[string]any{"expected": "mapping", "got": "string"}, violations[0].Details)
 }
 
 func TestObject_CampoComValorNuloNaoContaComoEscrito(t *testing.T) {

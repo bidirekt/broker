@@ -66,10 +66,10 @@ consumes:
 `)
 
 	assert.Equal(t, []violation.Violation{
-		{ErrorCode: "key.unknown", Path: "consumes;petstore_api;graphql;graph", Source: "web.yaml", Details: map[string]string{"key": "graph"}},
-		{ErrorCode: "key.unknown", Path: "consumes;petstore_api;graphql;subscription", Source: "web.yaml", Details: map[string]string{"key": "subscription"}},
-		{ErrorCode: "key.unknown", Path: "provides;graphql;mutation", Source: "web.yaml", Details: map[string]string{"key": "mutation"}},
-		{ErrorCode: "key.unknown", Path: "provides;graphql;query", Source: "web.yaml", Details: map[string]string{"key": "query"}},
+		{ErrorCode: "key.unknown", Path: "consumes;petstore_api;graphql;graph", Source: "web.yaml", Details: map[string]any{"key": "graph"}},
+		{ErrorCode: "key.unknown", Path: "consumes;petstore_api;graphql;subscription", Source: "web.yaml", Details: map[string]any{"key": "subscription"}},
+		{ErrorCode: "key.unknown", Path: "provides;graphql;mutation", Source: "web.yaml", Details: map[string]any{"key": "mutation"}},
+		{ErrorCode: "key.unknown", Path: "provides;graphql;query", Source: "web.yaml", Details: map[string]any{"key": "query"}},
 	}, violations)
 }
 
@@ -85,9 +85,9 @@ func TestGrammar_AFieldWithoutReturns_IsRefusedAtTheField(t *testing.T) {
 `)
 
 	assert.Equal(t, []violation.Violation{
-		{ErrorCode: "returns.required", Path: "consumes;petstore_api;graphql;mutation;adoptPet", Source: "web.yaml", Details: map[string]string{}},
-		{ErrorCode: "returns.required", Path: "consumes;petstore_api;graphql;query;pet", Source: "web.yaml", Details: map[string]string{}},
-		{ErrorCode: "returns.required", Path: "consumes;petstore_api;graphql;query;pets", Source: "web.yaml", Details: map[string]string{}},
+		{ErrorCode: "returns.required", Path: "consumes;petstore_api;graphql;mutation;adoptPet", Source: "web.yaml", Details: map[string]any{}},
+		{ErrorCode: "returns.required", Path: "consumes;petstore_api;graphql;query;pet", Source: "web.yaml", Details: map[string]any{}},
+		{ErrorCode: "returns.required", Path: "consumes;petstore_api;graphql;query;pets", Source: "web.yaml", Details: map[string]any{}},
 	}, violations)
 }
 
@@ -103,9 +103,9 @@ func TestGrammar_AFieldNameOutsideTheGraphQLName_IsRefusedAtTheKey(t *testing.T)
 `)
 
 	assert.Equal(t, []violation.Violation{
-		{ErrorCode: "operation.name_syntax", Path: "consumes;petstore_api;graphql;mutation;adopt-pet", Source: "web.yaml", Details: map[string]string{"name": "adopt-pet"}},
-		{ErrorCode: "operation.name_syntax", Path: "consumes;petstore_api;graphql;query;1pet", Source: "web.yaml", Details: map[string]string{"name": "1pet"}},
-		{ErrorCode: "operation.name_syntax", Path: "consumes;petstore_api;graphql;query;pets(first: 10)", Source: "web.yaml", Details: map[string]string{"name": "pets(first: 10)"}},
+		{ErrorCode: "operation.name_syntax", Path: "consumes;petstore_api;graphql;mutation;adopt-pet", Source: "web.yaml", Details: map[string]any{"name": "adopt-pet"}},
+		{ErrorCode: "operation.name_syntax", Path: "consumes;petstore_api;graphql;query;1pet", Source: "web.yaml", Details: map[string]any{"name": "1pet"}},
+		{ErrorCode: "operation.name_syntax", Path: "consumes;petstore_api;graphql;query;pets(first: 10)", Source: "web.yaml", Details: map[string]any{"name": "pets(first: 10)"}},
 	}, violations)
 }
 

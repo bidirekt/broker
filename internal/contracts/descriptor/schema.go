@@ -101,7 +101,7 @@ func schemaRequiresTypeOrRef(schemaType Enum) Rule {
 
 		return &violation.Violation{
 			ErrorCode: schemaType.ErrorCode,
-			Details: map[string]string{
+			Details: map[string]any{
 				"value":   "",
 				"allowed": strings.Join(schemaType.Allowed, ", "),
 			},
@@ -141,7 +141,7 @@ func keyBelongsTo(key string, schemaType Enum, owners ...string) Rule {
 func keyNotAllowed(key string, schemaType string) *violation.Violation {
 	return &violation.Violation{
 		ErrorCode: "schema.key_not_allowed",
-		Details:   map[string]string{"key": key, "type": schemaType},
+		Details:   map[string]any{"key": key, "type": schemaType},
 	}
 }
 
@@ -182,7 +182,7 @@ func membersRequired(schemaType string) Rule {
 
 		return &violation.Violation{
 			ErrorCode: "members.required",
-			Details:   map[string]string{"type": schemaType},
+			Details:   map[string]any{"type": schemaType},
 		}
 	}
 }
@@ -195,7 +195,7 @@ func optionalNotAllowedAt(position string) Rule {
 
 		return &violation.Violation{
 			ErrorCode: "schema.optional_not_allowed",
-			Details:   map[string]string{"position": position},
+			Details:   map[string]any{"position": position},
 		}
 	}
 }

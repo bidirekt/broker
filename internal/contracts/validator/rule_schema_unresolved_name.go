@@ -21,7 +21,7 @@ func unresolvedSchemaNames(declarations protocol.Declarations) []violation.Viola
 			ErrorCode: "schema.unresolved_name",
 			Path:      declaration.Path.String(),
 			Source:    declaration.Source,
-			Details: map[string]string{
+			Details: map[string]any{
 				"schema":   declaration.SchemaName,
 				"resource": declaration.Resource.Describe(),
 			},

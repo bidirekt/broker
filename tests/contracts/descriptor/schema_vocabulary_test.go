@@ -46,13 +46,13 @@ func TestContract_TwoVocabulariesInOneProcess_EachValidatesWithItsOwn(t *testing
 			ErrorCode: "key.unknown",
 			Path:      "schemas;Pet;properties;owner;properties;bornAt;name",
 			Source:    "api.yaml",
-			Details:   map[string]string{"key": "name"},
+			Details:   map[string]any{"key": "name"},
 		},
 		{
 			ErrorCode: "schema.invalid_type",
 			Path:      "schemas;Pet;properties;owner;properties;bornAt;type",
 			Source:    "api.yaml",
-			Details: map[string]string{
+			Details: map[string]any{
 				"value":   "scalar",
 				"allowed": "object, array, map, string, integer, float, number, boolean, enum, union",
 			},
@@ -61,7 +61,7 @@ func TestContract_TwoVocabulariesInOneProcess_EachValidatesWithItsOwn(t *testing
 			ErrorCode: "key.unknown",
 			Path:      "schemas;Pet;properties;owner;properties;reviews;arguments",
 			Source:    "api.yaml",
-			Details:   map[string]string{"key": "arguments"},
+			Details:   map[string]any{"key": "arguments"},
 		},
 	}, descriptor.Validate(coreGrammar, nestedScalarDocument, "api.yaml"))
 }
@@ -84,7 +84,7 @@ func TestContract_TypeAddedByAVocabulary_BringsItsKeysAndRules(t *testing.T) {
 			ErrorCode: "schema.key_not_allowed",
 			Path:      "schemas;Name",
 			Source:    "api.yaml",
-			Details:   map[string]string{"key": "name", "type": "string"},
+			Details:   map[string]any{"key": "name", "type": "string"},
 		},
 	}, violations)
 }
@@ -101,7 +101,7 @@ func TestContract_PropertyKeyAddedByAVocabulary_NotTakenOutsideAProperty(t *test
 			ErrorCode: "key.unknown",
 			Path:      "schemas;Pets;items;arguments",
 			Source:    "api.yaml",
-			Details:   map[string]string{"key": "arguments"},
+			Details:   map[string]any{"key": "arguments"},
 		},
 	}, violations)
 }

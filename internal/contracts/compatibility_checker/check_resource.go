@@ -1,6 +1,8 @@
 package compatibility_checker
 
 import (
+	"slices"
+
 	"github.com/bidirekt/broker/internal/contracts/schemagraph"
 	"github.com/bidirekt/broker/internal/model"
 )
@@ -59,11 +61,28 @@ func consumerAndProvider(checked, counterpart *model.PersistedResource) (consume
 	return counterpart, checked
 }
 
-func acceptsType(reader, producer schemagraph.Node) bool {
+func acceptsType(reader, producer schemagraph.Node, rules ReadingRules) bool {
 	if reader.Type() == producer.Type() {
-		return reader.Scalar() == producer.Scalar()
+		return reader.Type() != model.ScalarType || reader.Scalar() == producer.Scalar()
 	}
 
 	return (reader.Type() == model.NumberType && (producer.Type() == model.IntegerType || producer.Type() == model.FloatType)) ||
-		(reader.Type() == model.StringType && producer.Type() == model.EnumType)
+		(reader.Type() == model.StringType && producer.Type() == model.EnumType) ||
+		(reader.Type() == model.ObjectType && producer.Type() == model.UnionType && (declaresFields(producer) || readsOnly(reader, rules.ImplicitFields))) ||
+		slices.Contains(rules.Widenings, Widening{Reader: schemaTypeOf(reader), Producer: schemaTypeOf(producer)})
+}
+
+// A union may declare the fields every member has; read as an object, it is read by them.
+func declaresFields(union schemagraph.Node) bool {
+	return slices.ContainsFunc(union.Segments(), func(segment string) bool { return !model.IsMemberSegment(segment) })
+}
+
+func readsOnly(reader schemagraph.Node, fields []string) bool {
+	segments := reader.Segments()
+
+	return len(segments) > 0 && !slices.ContainsFunc(segments, func(segment string) bool { return !slices.Contains(fields, segment) })
+}
+
+func schemaTypeOf(node schemagraph.Node) SchemaType {
+	return SchemaType{Type: node.Type(), Scalar: node.Scalar()}
 }

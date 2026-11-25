@@ -21,19 +21,31 @@ var bodyReadings = map[model.BodyRole]compatibility_checker.BodyReading{
 			Optional:         model.ReasonPropertyOptionalInConsumerRequiredInProvider,
 			Nullable:         model.ReasonPropertyNullableInConsumerNotNullableInProvider,
 			Unknown:          model.ReasonPropertyMissingInProvider,
+			Widenings: []compatibility_checker.Widening{
+				{Reader: compatibility_checker.SchemaType{Type: model.FloatType}, Producer: compatibility_checker.SchemaType{Type: model.IntegerType}},
+				{Reader: compatibility_checker.SchemaType{Type: model.FloatType}, Producer: compatibility_checker.SchemaType{Type: model.NumberType}},
+				{Reader: compatibility_checker.SchemaType{Type: model.StringType, Scalar: "ID"}, Producer: compatibility_checker.SchemaType{Type: model.IntegerType}},
+			},
 		},
 		Join:           schemagraph.Senders,
 		FieldArguments: true,
 	},
 	model.Output: {
 		Rules: compatibility_checker.ReadingRules{
-			ReaderIsConsumer: true,
-			Missing:          model.ReasonPropertyMissingInProvider,
-			Optional:         model.ReasonPropertyOptionalInProviderRequiredInConsumer,
-			Nullable:         model.ReasonPropertyNullableInProviderNotNullableInConsumer,
+			ReaderIsConsumer:  true,
+			Missing:           model.ReasonPropertyMissingInProvider,
+			Optional:          model.ReasonPropertyOptionalInProviderRequiredInConsumer,
+			Nullable:          model.ReasonPropertyNullableInProviderNotNullableInConsumer,
+			OptionalMustExist: true,
+			ImplicitFields:    []string{"__typename"},
 		},
 		Join: schemagraph.Readers,
 	},
+}
+
+// A root field starting with "__" is an introspection field, which every GraphQL schema serves without declaring it.
+func (this Plugin) ProvidesImplicitly(identity model.ResourceIdentity) bool {
+	return strings.HasPrefix(identity.(graphqlmodel.Identity).Field, "__")
 }
 
 func (this Plugin) BodyReading(body model.BodyRole) compatibility_checker.BodyReading {

@@ -15,7 +15,7 @@ func TestViolation_SerializaEmCamelCase(t *testing.T) {
 		ErrorCode: "key.unknown",
 		Path:      "provides;rest;/pets;patch",
 		Source:    "api.yaml",
-		Details:   map[string]string{"key": "patch"},
+		Details:   map[string]any{"key": "patch"},
 	}
 
 	raw, err := json.Marshal(subject)

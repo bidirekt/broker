@@ -9,12 +9,20 @@ import (
 
 // Unknown is the break of a field only the producer declares; left empty, the reader ignores the field.
 type ReadingRules struct {
-	ReaderIsConsumer bool
-	Missing          model.BreakingReason
-	Optional         model.BreakingReason
-	Nullable         model.BreakingReason
-	Unknown          model.BreakingReason
+	ReaderIsConsumer  bool
+	Missing           model.BreakingReason
+	Optional          model.BreakingReason
+	Nullable          model.BreakingReason
+	Unknown           model.BreakingReason
+	OptionalMustExist bool
+	Widenings         []Widening
+	ImplicitFields    []string
 }
+
+type SchemaType struct{ Type, Scalar string }
+
+// A Widening lets a reader take a producer type beyond the ones every protocol accepts.
+type Widening struct{ Reader, Producer SchemaType }
 
 // Optional and nullable belong to the fields a node is reached through, so each pair of them is compared once;
 // the type and the children belong to the shapes the refs lead to, so each pair of shapes is compared once.
@@ -65,7 +73,7 @@ func (this *bodyComparison) compareRead(reader, producer schemagraph.Node, path 
 	}
 
 	if !producer.Exists() {
-		if !reader.Optional() {
+		if !reader.Optional() || this.rules.OptionalMustExist {
 			this.breakAt(this.rules.Missing, path, reader, producer)
 		}
 
@@ -86,7 +94,7 @@ func (this *bodyComparison) compareRead(reader, producer schemagraph.Node, path 
 
 	shapes := [2]string{reader.ShapeKey(), producer.ShapeKey()}
 
-	if !acceptsType(reader, producer) {
+	if !acceptsType(reader, producer, this.rules) {
 		if !this.comparedShapes[shapes] {
 			this.comparedShapes[shapes] = true
 			this.breakAt(model.ReasonPropertyTypeMismatch, path, reader, producer)
@@ -118,6 +126,10 @@ func (this *bodyComparison) compareRead(reader, producer schemagraph.Node, path 
 	this.compareEnumValues(reader, producer, path)
 
 	for _, segment := range reader.Segments() {
+		if slices.Contains(this.rules.ImplicitFields, segment) && !producer.Child(segment).Exists() {
+			continue
+		}
+
 		this.compareRead(reader.Child(segment), producer.Child(segment), model.ChildPath(path, segment))
 	}
 

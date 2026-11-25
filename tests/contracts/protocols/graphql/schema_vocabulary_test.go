@@ -67,7 +67,7 @@ func TestSchemaVocabulary_ANameOnAnotherType_IsNotAllowed(t *testing.T) {
 	violations := vocabularyViolations(t, "schemas:\n  Pet: {type: string, name: DateTime}\n")
 
 	assert.Equal(t, []violation.Violation{
-		{ErrorCode: "schema.key_not_allowed", Path: "schemas;Pet", Source: "web.yaml", Details: map[string]string{"key": "name", "type": "string"}},
+		{ErrorCode: "schema.key_not_allowed", Path: "schemas;Pet", Source: "web.yaml", Details: map[string]any{"key": "name", "type": "string"}},
 	}, violations)
 }
 
@@ -80,7 +80,7 @@ func TestSchemaVocabulary_ArgumentsOutsideAProperty_IsUnknown(t *testing.T) {
 `)
 
 	assert.Equal(t, []violation.Violation{
-		{ErrorCode: "key.unknown", Path: "schemas;Pets;arguments", Source: "web.yaml", Details: map[string]string{"key": "arguments"}},
-		{ErrorCode: "key.unknown", Path: "schemas;Pets;items;arguments", Source: "web.yaml", Details: map[string]string{"key": "arguments"}},
+		{ErrorCode: "key.unknown", Path: "schemas;Pets;arguments", Source: "web.yaml", Details: map[string]any{"key": "arguments"}},
+		{ErrorCode: "key.unknown", Path: "schemas;Pets;items;arguments", Source: "web.yaml", Details: map[string]any{"key": "arguments"}},
 	}, violations)
 }

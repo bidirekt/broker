@@ -213,3 +213,34 @@ func (this *IntegrationSuite) TestShowCheck_ARESTOnlyPageDoesNotLinkTheGraphQLSt
 	this.NotContains(body, `/assets/protocols/operations.css`)
 	this.NotContains(body, `<p class="group-label">Operations</p>`)
 }
+
+func (this *IntegrationSuite) TestShowCheck_AFieldTheGraphQLProviderLacksIsFixedWithoutMarkingItOptional() {
+	this.mustPostForGraphQLCheck("/api/environments", `{"environment":"production"}`)
+	for _, participant := range []string{"petstore_api", "petstore_web"} {
+		this.mustPostForGraphQLCheck("/api/participants", `{"participant":"`+participant+`"}`)
+	}
+	this.publishForGraphQLCheck("petstore_api", "1.4.0", contractFragment{"schema.graphqls", graphqlCheckAPISDL})
+	this.deployForGraphQLCheck("petstore_api", "1.4.0")
+	this.publishForGraphQLCheck("petstore_web", "2.0.0", contractFragment{"web.yaml", `consumes:
+  petstore_api:
+    graphql:
+      query:
+        pet: {arguments: PetArgs, returns: MaybePet}
+schemas:
+  PetArgs: {type: object, properties: {id: {type: string}}}
+  MaybePet: {ref: Pet, nullable: true}
+  Pet:
+    type: object
+    properties:
+      id: {type: string}
+      bornAt: {type: string, optional: true}
+`})
+
+	status, _, body := this.getPage(this.checkPathForGraphQLCheck("petstore_web", "2.0.0"), this.signInAsAdmin())
+
+	this.Require().Equal(http.StatusOK, status, body)
+	this.Contains(body, `<span class="op-prop">FIELD</span><span>Pet.bornAt</span><span class="badge">1 place</span>`)
+	this.Contains(body, `<b class="name">petstore_web</b> reads it, but <b class="name">petstore_api</b> doesn&#39;t provide it`)
+	this.Contains(body, `<div class="fix self"><span class="side">Fix in <b>petstore_web</b></span><span>stop reading it</span></div><div class="fix other"><span class="side">or fix in <b>petstore_api</b></span><span>provide it</span></div>`)
+	this.NotContains(body, `mark it optional`)
+}

@@ -146,13 +146,13 @@ func TestToUploadedContract_ShapeViolations_SortedBySourceWithoutContract(t *tes
 			ErrorCode: "status.out_of_range",
 			Path:      "provides;rest;/pets;get;responses;999",
 			Source:    "a.yaml",
-			Details:   map[string]string{"key": "999", "error": "must be between 100 and 599"},
+			Details:   map[string]any{"key": "999", "error": "must be between 100 and 599"},
 		},
 		{
 			ErrorCode: "status.out_of_range",
 			Path:      "provides;rest;/pets;get;responses;999",
 			Source:    "b.yaml",
-			Details:   map[string]string{"key": "999", "error": "must be between 100 and 599"},
+			Details:   map[string]any{"key": "999", "error": "must be between 100 and 599"},
 		},
 	}, violations)
 }
@@ -202,7 +202,7 @@ func TestToUploadedContract_RuleViolations_ReturnedWithoutContract(t *testing.T)
 			ErrorCode: "schema.unresolved_name",
 			Path:      "provides;rest;/pets;get;responses;200",
 			Source:    "endpoints.yaml",
-			Details:   map[string]string{"schema": "Pet", "resource": "provides GET /pets 200"},
+			Details:   map[string]any{"schema": "Pet", "resource": "provides GET /pets 200"},
 		},
 	}, violations)
 }
@@ -246,7 +246,7 @@ func TestToViolations_UnresolvedSchemaName_SameViolationsAsToUploadedContract(t 
 			ErrorCode: "schema.unresolved_name",
 			Path:      "provides;rest;/pets;get;responses;200",
 			Source:    "endpoints.yaml",
-			Details:   map[string]string{"schema": "Pet", "resource": "provides GET /pets 200"},
+			Details:   map[string]any{"schema": "Pet", "resource": "provides GET /pets 200"},
 		},
 	}, violations)
 	assert.Equal(t, uploadedContractViolations, violations)
@@ -270,7 +270,7 @@ func TestToViolations_SchemaDeclaredInTwoFiles_SameViolationsAsToUploadedContrac
 			ErrorCode: "schema.duplicate",
 			Path:      "schemas;Pet",
 			Source:    "schemas.yaml",
-			Details:   map[string]string{"schema": "Pet", "declaredIn": "pets.yaml"},
+			Details:   map[string]any{"schema": "Pet", "declaredIn": "pets.yaml"},
 		},
 	}, violations)
 	assert.Equal(t, uploadedContractViolations, violations)

@@ -86,9 +86,9 @@ func TestRules_ScalarsAndArgumentsAnotherProtocolReaches_AreRefusedWhereWritten(
 	)
 
 	assert.Equal(t, []violation.Violation{
-		{ErrorCode: "schema.scalar_not_allowed", Path: "schemas;Owner;properties;since;type", Source: "schemas.yaml", Details: map[string]string{"protocol": "rest"}},
-		{ErrorCode: "schema.scalar_not_allowed", Path: "schemas;Pet;properties;bornAt;type", Source: "schemas.yaml", Details: map[string]string{"protocol": "rest"}},
-		{ErrorCode: "schema.arguments_not_allowed", Path: "schemas;Pet;properties;reviews;arguments", Source: "schemas.yaml", Details: map[string]string{"protocol": "rest"}},
+		{ErrorCode: "schema.scalar_not_allowed", Path: "schemas;Owner;properties;since;type", Source: "schemas.yaml", Details: map[string]any{"protocol": "rest"}},
+		{ErrorCode: "schema.scalar_not_allowed", Path: "schemas;Pet;properties;bornAt;type", Source: "schemas.yaml", Details: map[string]any{"protocol": "rest"}},
+		{ErrorCode: "schema.arguments_not_allowed", Path: "schemas;Pet;properties;reviews;arguments", Source: "schemas.yaml", Details: map[string]any{"protocol": "rest"}},
 	}, rulesViolations(declarations))
 }
 
@@ -113,7 +113,7 @@ func TestRules_AScalarAtTheTopOfASchema_IsRefusedAtItsType(t *testing.T) {
 	}
 
 	assert.Equal(t, []violation.Violation{
-		{ErrorCode: "schema.scalar_not_allowed", Path: "schemas;BornAt;type", Source: "api.yaml", Details: map[string]string{"protocol": "rest"}},
+		{ErrorCode: "schema.scalar_not_allowed", Path: "schemas;BornAt;type", Source: "api.yaml", Details: map[string]any{"protocol": "rest"}},
 	}, rulesViolations(declarations))
 }
 
@@ -135,27 +135,27 @@ func TestRules_ArgumentsOfAConsumedFieldNamingAnythingButAnObject_AreRefusedWith
 	cases := map[string]struct {
 		arguments string
 		schemas   string
-		details   map[string]string
+		details   map[string]any
 	}{
 		"a string": {
 			arguments: "PetId",
 			schemas:   "  PetId: {type: string}\n",
-			details:   map[string]string{"schema": "PetId", "reason": "not_object", "type": "string"},
+			details:   map[string]any{"schema": "PetId", "reason": "not_object", "type": "string"},
 		},
 		"a ref to an array": {
 			arguments: "PetArgs",
 			schemas:   "  PetArgs: {ref: PetIds}\n  PetIds: {type: array, items: {type: string}}\n",
-			details:   map[string]string{"schema": "PetArgs", "reason": "not_object", "type": "array"},
+			details:   map[string]any{"schema": "PetArgs", "reason": "not_object", "type": "array"},
 		},
 		"a nullable object": {
 			arguments: "MaybeArgs",
 			schemas:   "  MaybeArgs: {type: object, nullable: true, properties: {id: {type: string}}}\n",
-			details:   map[string]string{"schema": "MaybeArgs", "reason": "nullable"},
+			details:   map[string]any{"schema": "MaybeArgs", "reason": "nullable"},
 		},
 		"a nullable ref to an object": {
 			arguments: "MaybeArgs",
 			schemas:   "  MaybeArgs: {ref: PetArgs, nullable: true}\n  PetArgs: {type: object, properties: {id: {type: string}}}\n",
-			details:   map[string]string{"schema": "MaybeArgs", "reason": "nullable"},
+			details:   map[string]any{"schema": "MaybeArgs", "reason": "nullable"},
 		},
 	}
 
@@ -177,15 +177,15 @@ func TestRules_ArgumentsOfAConsumedFieldNamingAnythingButAnObject_AreRefusedWith
 func TestRules_ArgumentsOfAPropertyNamingAnythingButAnObject_AreRefusedWhereWritten(t *testing.T) {
 	cases := map[string]struct {
 		schemas string
-		details map[string]string
+		details map[string]any
 	}{
 		"an integer": {
 			schemas: "  ReviewsArgs: {type: integer}\n",
-			details: map[string]string{"schema": "ReviewsArgs", "reason": "not_object", "type": "integer"},
+			details: map[string]any{"schema": "ReviewsArgs", "reason": "not_object", "type": "integer"},
 		},
 		"a ref to a nullable object": {
 			schemas: "  ReviewsArgs: {ref: MaybeArgs}\n  MaybeArgs: {type: object, nullable: true, properties: {first: {type: integer}}}\n",
-			details: map[string]string{"schema": "ReviewsArgs", "reason": "nullable"},
+			details: map[string]any{"schema": "ReviewsArgs", "reason": "nullable"},
 		},
 	}
 
@@ -228,7 +228,7 @@ func TestRules_ArgumentsAnotherProtocolReaches_AreRefusedAsNotAllowedOnly(t *tes
 		ErrorCode: "schema.arguments_not_allowed",
 		Path:      "schemas;Pet;properties;reviews;arguments",
 		Source:    "petstore_web.yaml",
-		Details:   map[string]string{"protocol": "rest"},
+		Details:   map[string]any{"protocol": "rest"},
 	}}, argumentsViolations(t, `consumes:
   petstore_api:
     rest:

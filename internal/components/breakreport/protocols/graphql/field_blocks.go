@@ -104,7 +104,7 @@ func toFieldBlock(checked checkedOperation, contractBreak model.ReportBreak) (fi
 		phrases = propertyBreakPhrases{
 			consumerChecked: breakreport.Phrase{breakreport.Name(consumer), breakreport.Plain(" reads it, but "), breakreport.Name(provider), breakreport.Plain(" doesn't provide it")},
 			providerChecked: breakreport.Phrase{breakreport.Name(provider), breakreport.Plain(" doesn't provide it, but "), breakreport.Name(consumer), breakreport.Plain(" reads it")},
-			consumerFix:     "stop reading it, or handle its absence in the code and mark it optional",
+			consumerFix:     "stop reading it",
 			providerFix:     "provide it",
 		}
 	case reason == model.ReasonPropertyOptionalInProviderRequiredInConsumer && onReturns:

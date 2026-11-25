@@ -49,7 +49,7 @@ func (this ObjectNode) validateFields(mapping map[string]any, path string) []vio
 			violations = append(violations, violation.Violation{
 				ErrorCode: "key.unknown",
 				Path:      joinPath(path, key),
-				Details:   map[string]string{"key": key},
+				Details:   map[string]any{"key": key},
 			})
 
 			continue

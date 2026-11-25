@@ -16,8 +16,8 @@ var fieldNamePattern = regexp.MustCompile(`^[_A-Za-z][_0-9A-Za-z]*$`)
 var FieldName = descriptor.Key{
 	ErrorCode: "operation.name_syntax",
 	Check:     checkFieldName,
-	Details: func(key string) map[string]string {
-		return map[string]string{"name": key}
+	Details: func(key string) map[string]any {
+		return map[string]any{"name": key}
 	},
 }
 
@@ -51,5 +51,5 @@ func returnsRequired(present descriptor.PresentFields) *violation.Violation {
 		return nil
 	}
 
-	return &violation.Violation{ErrorCode: "returns.required", Details: map[string]string{}}
+	return &violation.Violation{ErrorCode: "returns.required", Details: map[string]any{}}
 }
