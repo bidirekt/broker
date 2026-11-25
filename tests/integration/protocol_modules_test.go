@@ -43,7 +43,7 @@ func (this *IntegrationSuite) TestRunWith_OnlyREST_AGraphQLFileIsAnUnsupportedCo
 	status, _ := this.post("/api/participants", protocolModulesParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
-	for _, source := range []string{"schema.graphql", "schema.graphqls"} {
+	for _, source := range []string{"schema.graphql", "schema.graphqls", "schema.gql"} {
 		status, body := this.post("/api/contracts", this.publishBody("pets_service", "1", contractFragment{source, protocolModulesSDL}))
 		this.Equal(http.StatusBadRequest, status, source)
 		this.JSONEq(`{"message":"unsupported contract file: `+source+` (expected .yaml or .yml)"}`, body, source)

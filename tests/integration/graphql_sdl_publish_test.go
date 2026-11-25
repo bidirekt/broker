@@ -104,6 +104,20 @@ type Owner {
 }
 `
 
+const sdlPublishOneOfSDL = `type Query {
+  pet(by: PetBy!): Pet
+}
+
+input PetBy @oneOf {
+  id: ID
+  name: String
+}
+
+type Pet {
+  id: ID!
+}
+`
+
 func (this *IntegrationSuite) createSDLPublishParticipant() {
 	status, body := this.post("/api/participants", `{"participant":"`+sdlPublishParticipant+`"}`)
 	this.Require().Equal(http.StatusOK, status, body)
@@ -347,7 +361,7 @@ func (this *IntegrationSuite) TestPublishSDL_ASecondVersionThatChangesTheSDL_IsA
 		"query pets arguments",
 		"query pets returns",
 	}, sdlPublishResources(first))
-	this.Equal(model.Schema{"": {Type: "object"}, "id": {Type: "string"}}, first.Schemas[graphqlmodel.Namespace]["Pet"])
+	this.Equal(model.Schema{"": {Type: "object"}, "id": {Type: "string", Scalar: "ID"}}, first.Schemas[graphqlmodel.Namespace]["Pet"])
 
 	second, found := repo.GetContractByNameAndVersion(context.Background(), sdlPublishParticipant, "2")
 	this.Require().True(found)
@@ -359,7 +373,25 @@ func (this *IntegrationSuite) TestPublishSDL_ASecondVersionThatChangesTheSDL_IsA
 		"query pets arguments removed",
 		"query pets returns removed",
 	}, sdlPublishResources(second))
-	this.Equal(model.Schema{"": {Type: "object"}, "id": {Type: "string", Nullable: true}}, second.Schemas[graphqlmodel.Namespace]["Pet"])
+	this.Equal(model.Schema{"": {Type: "object"}, "id": {Type: "string", Scalar: "ID", Nullable: true}}, second.Schemas[graphqlmodel.Namespace]["Pet"])
+}
+
+func (this *IntegrationSuite) TestPublishSDL_AOneOfInput_IsPublishedAsAnInputOfOptionalFields() {
+	this.createSDLPublishParticipant()
+
+	status, body := this.publishSDL("1", contractFragment{"schema.graphqls", sdlPublishOneOfSDL})
+
+	this.Require().Equal(http.StatusOK, status, body)
+	this.JSONEq(`{"message":"contract publish successful"}`, body)
+
+	repo := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{graphqlrepository.New()})
+	published, found := repo.GetContractByNameAndVersion(context.Background(), sdlPublishParticipant, "1")
+	this.Require().True(found)
+	this.Equal(model.Schema{
+		"":     {Type: "object"},
+		"id":   {Type: "string", Scalar: "ID", Optional: true, Nullable: true},
+		"name": {Type: "string", Optional: true, Nullable: true},
+	}, published.Schemas[graphqlmodel.Namespace]["PetBy"])
 }
 
 func (this *IntegrationSuite) TestPublishSDL_AnInvalidSDL_IsA400WithTheParserTextAndNothingStored() {
@@ -369,6 +401,19 @@ func (this *IntegrationSuite) TestPublishSDL_AnInvalidSDL_IsA400WithTheParserTex
 
 	this.Equal(http.StatusBadRequest, status)
 	this.JSONEq(`{"message":"schema.graphqls:12:10: Undefined type Owner."}`, body)
+	this.assertNothingPublishedFromSDL()
+}
+
+func (this *IntegrationSuite) TestPublishSDL_AnExtendOfATypeNoFileDefines_IsA400WithTheGraphQLJSTextAndNothingStored() {
+	this.createSDLPublishParticipant()
+
+	status, body := this.publishSDL("1",
+		contractFragment{"graph/types.graphqls", sdlPublishTypesSDL},
+		contractFragment{"graph/query.graphqls", "extend type Query {\n  pet(id: ID!): Pet\n}\n"},
+	)
+
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(`{"message":"graph/query.graphqls:1:13: Cannot extend type \"Query\" because it is not defined."}`, body)
 	this.assertNothingPublishedFromSDL()
 }
 

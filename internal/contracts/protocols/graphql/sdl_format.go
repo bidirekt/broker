@@ -5,6 +5,7 @@ import (
 
 	"github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
+	"github.com/vektah/gqlparser/v2/gqlerror"
 	"github.com/vektah/gqlparser/v2/parser"
 
 	"github.com/bidirekt/broker/internal/contracts/protocol"
@@ -20,7 +21,7 @@ func NewSDLFormat() SDLFormat {
 }
 
 func (this SDLFormat) Extensions() []string {
-	return []string{".graphql", ".graphqls"}
+	return []string{".graphql", ".graphqls", ".gql"}
 }
 
 // All the files are one schema: a type defined in one file may be used or extended in another.
@@ -41,7 +42,32 @@ func (this SDLFormat) ToDeclarations(files []model.ContractFile) (protocol.Decla
 		return protocol.Declarations{}, err
 	}
 
+	if err := checkExtendedTypesDefined(sources); err != nil {
+		return protocol.Declarations{}, err
+	}
+
 	return toDeclarations(schema), nil
+}
+
+// gqlparser takes the extension of a type no file defines as its definition; graphql-js refuses it.
+func checkExtendedTypesDefined(sources []*ast.Source) error {
+	document, err := parser.ParseSchemas(sources...)
+	if err != nil {
+		return err
+	}
+
+	defined := map[string]bool{}
+	for _, definition := range document.Definitions {
+		defined[definition.Name] = true
+	}
+
+	for _, extension := range document.Extensions {
+		if !defined[extension.Name] {
+			return gqlerror.ErrorPosf(extension.Position, "Cannot extend type %q because it is not defined.", extension.Name)
+		}
+	}
+
+	return nil
 }
 
 func holdsOperations(source *ast.Source) bool {

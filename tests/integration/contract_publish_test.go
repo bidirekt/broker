@@ -332,7 +332,7 @@ func (this *IntegrationSuite) TestPublishContract_UnsupportedExtension() {
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1", contractFragment{"notes.txt", contractBody}))
 	this.Equal(http.StatusBadRequest, status)
-	this.JSONEq(`{"message":"unsupported contract file: notes.txt (expected .yaml, .yml, .graphql or .graphqls)"}`, body)
+	this.JSONEq(`{"message":"unsupported contract file: notes.txt (expected .yaml, .yml, .graphql, .graphqls or .gql)"}`, body)
 
 	this.Equal(0, this.countRows("contracts"))
 }
@@ -354,7 +354,7 @@ func (this *IntegrationSuite) TestPublishContract_JSONExtensionRejected() {
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1", contractFragment{"broken.json", contractBody}))
 	this.Equal(http.StatusBadRequest, status)
-	this.JSONEq(`{"message":"unsupported contract file: broken.json (expected .yaml, .yml, .graphql or .graphqls)"}`, body)
+	this.JSONEq(`{"message":"unsupported contract file: broken.json (expected .yaml, .yml, .graphql, .graphqls or .gql)"}`, body)
 
 	this.Equal(0, this.countRows("contracts"))
 }

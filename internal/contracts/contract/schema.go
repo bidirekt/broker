@@ -84,20 +84,10 @@ type SchemaChild struct {
 func (this *Schema) Children() []SchemaChild {
 	switch {
 	case this.IsObject():
-		children := make([]SchemaChild, 0, len(this.Properties))
-		for _, name := range slices.Sorted(maps.Keys(this.Properties)) {
-			children = append(children, SchemaChild{DocumentPath: "properties;" + name, Segment: name, Schema: this.Properties[name]})
-		}
-
-		return children
+		return this.propertyChildren()
 
 	case this.IsUnion():
-		children := make([]SchemaChild, 0, len(this.UnionMembers))
-		for _, key := range slices.Sorted(maps.Keys(this.UnionMembers)) {
-			children = append(children, SchemaChild{DocumentPath: "members;" + key, Segment: model.MemberSegment(key), Schema: this.UnionMembers[key]})
-		}
-
-		return children
+		return append(this.propertyChildren(), this.memberChildren()...)
 
 	case this.IsArray() && this.Items != nil:
 		return []SchemaChild{{DocumentPath: "items", Segment: model.ItemsSegment, Schema: *this.Items}}
@@ -108,6 +98,24 @@ func (this *Schema) Children() []SchemaChild {
 	default:
 		return nil
 	}
+}
+
+func (this *Schema) propertyChildren() []SchemaChild {
+	children := make([]SchemaChild, 0, len(this.Properties))
+	for _, name := range slices.Sorted(maps.Keys(this.Properties)) {
+		children = append(children, SchemaChild{DocumentPath: "properties;" + name, Segment: name, Schema: this.Properties[name]})
+	}
+
+	return children
+}
+
+func (this *Schema) memberChildren() []SchemaChild {
+	children := make([]SchemaChild, 0, len(this.UnionMembers))
+	for _, key := range slices.Sorted(maps.Keys(this.UnionMembers)) {
+		children = append(children, SchemaChild{DocumentPath: "members;" + key, Segment: model.MemberSegment(key), Schema: this.UnionMembers[key]})
+	}
+
+	return children
 }
 
 func (this *Schema) IsObject() bool {

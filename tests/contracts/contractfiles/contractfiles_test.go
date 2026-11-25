@@ -19,7 +19,7 @@ var interpreter = contractfiles.NewInterpreter(
 	[]contractfiles.FileFormat{graphqlcontracts.NewSDLFormat()},
 )
 
-const unsupportedNotesError = "unsupported contract file: notes.txt (expected .yaml, .yml, .graphql or .graphqls)"
+const unsupportedNotesError = "unsupported contract file: notes.txt (expected .yaml, .yml, .graphql, .graphqls or .gql)"
 
 var participant = &model.Participant{ID: 7, Name: "pets_service"}
 

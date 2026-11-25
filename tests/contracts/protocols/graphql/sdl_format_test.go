@@ -52,8 +52,8 @@ func sdlSchemaNames(declarations protocol.Declarations) []string {
 	return names
 }
 
-func TestSDLFormat_ReadsGraphQLAndGraphQLSFiles(t *testing.T) {
-	assert.Equal(t, []string{".graphql", ".graphqls"}, graphqlcontracts.NewSDLFormat().Extensions())
+func TestSDLFormat_ReadsGraphQLGraphQLSAndGQLFiles(t *testing.T) {
+	assert.Equal(t, []string{".graphql", ".graphqls", ".gql"}, graphqlcontracts.NewSDLFormat().Extensions())
 }
 
 func TestSDLFormat_ToDeclarations_DeclaresTheGraphQLFormat(t *testing.T) {
@@ -64,12 +64,27 @@ func TestSDLFormat_BuiltInScalars_BecomeTheModelPrimitives(t *testing.T) {
 	declarations := sdlDeclarations(t, "type Query {\n  pet: Pet!\n}\n\ntype Pet {\n  id: ID!\n  name: String!\n  age: Int!\n  weight: Float!\n  vaccinated: Boolean!\n}\n")
 
 	assert.Equal(t, contract.Schema{Type: "object", Properties: map[string]contract.Schema{
-		"id":         {Type: "string"},
+		"id":         {Type: "string", Scalar: "ID"},
 		"name":       {Type: "string"},
 		"age":        {Type: "integer"},
 		"weight":     {Type: "float"},
 		"vaccinated": {Type: "boolean"},
 	}}, sdlSchema(t, declarations, "Pet"))
+}
+
+func TestSDLFormat_AnIDFieldArgumentOrInputField_IsAStringNamedID(t *testing.T) {
+	declarations := sdlDeclarations(t, "type Query {\n  pet(id: ID!): Pet\n}\n\ntype Pet {\n  id: ID!\n  tagIDs: [ID!]!\n}\n\ninput PetFilter {\n  ownerID: ID\n}\n")
+
+	assert.Equal(t, contract.Schema{Type: "object", Properties: map[string]contract.Schema{
+		"id":     {Type: "string", Scalar: "ID"},
+		"tagIDs": {Type: "array", Items: &contract.Schema{Type: "string", Scalar: "ID"}},
+	}}, sdlSchema(t, declarations, "Pet"))
+	assert.Equal(t, contract.Schema{Type: "object", Properties: map[string]contract.Schema{
+		"id": {Type: "string", Scalar: "ID"},
+	}}, sdlSchema(t, declarations, "Query:pet:arguments"))
+	assert.Equal(t, contract.Schema{Type: "object", Properties: map[string]contract.Schema{
+		"ownerID": {Type: "string", Scalar: "ID", Optional: true, Nullable: true},
+	}}, sdlSchema(t, declarations, "PetFilter"))
 }
 
 func TestSDLFormat_ACustomScalar_IsAScalarOfItsName(t *testing.T) {
@@ -103,13 +118,54 @@ func TestSDLFormat_AUnion_IsAUnionKeyedByTypeName(t *testing.T) {
 	}}, sdlSchema(t, declarations, "Pet"))
 }
 
-func TestSDLFormat_AnInterface_IsAUnionOfItsImplementations(t *testing.T) {
-	declarations := sdlDeclarations(t, "type Query {\n  pet: Pet!\n}\n\ninterface Pet {\n  name: String!\n}\n\ntype Dog implements Pet {\n  name: String!\n}\n\ntype Cat implements Pet {\n  name: String!\n}\n")
+const nodeSDL = "type Query {\n  node(id: ID!): Node\n}\n\ninterface Node {\n  id: ID!\n}\n\ntype Person implements Node {\n  id: ID!\n  name: String!\n}\n\ntype Org implements Node {\n  id: ID!\n}\n"
 
-	assert.Equal(t, contract.Schema{Type: "union", UnionMembers: map[string]contract.Schema{
-		"Dog": {Ref: "Dog"},
-		"Cat": {Ref: "Cat"},
-	}}, sdlSchema(t, declarations, "Pet"))
+func TestSDLFormat_AnInterface_IsAUnionOfItsImplementationsWithItsOwnFields(t *testing.T) {
+	declarations := sdlDeclarations(t, nodeSDL)
+
+	assert.Equal(t, contract.Schema{
+		Type:         "union",
+		Properties:   map[string]contract.Schema{"id": {Type: "string", Scalar: "ID"}},
+		UnionMembers: map[string]contract.Schema{"Person": {Ref: "Person"}, "Org": {Ref: "Org"}},
+	}, sdlSchema(t, declarations, "Node"))
+}
+
+func TestSDLFormat_AnInterfaceFieldWithArguments_PointsAtItsArgumentsSchema(t *testing.T) {
+	declarations := sdlDeclarations(t, "type Query {\n  node: Node\n}\n\ninterface Node {\n  friends(first: Int): [Node!]!\n}\n\ntype Person implements Node {\n  friends(first: Int): [Node!]!\n}\n")
+
+	assert.Equal(t, contract.Schema{
+		Type: "union",
+		Properties: map[string]contract.Schema{
+			"friends": {Type: "array", Items: &contract.Schema{Ref: "Node"}, Arguments: "Node:friends:arguments"},
+		},
+		UnionMembers: map[string]contract.Schema{"Person": {Ref: "Person"}},
+	}, sdlSchema(t, declarations, "Node"))
+	assert.Equal(t, contract.Schema{Type: "object", Properties: map[string]contract.Schema{
+		"first": {Type: "integer", Optional: true, Nullable: true},
+	}}, sdlSchema(t, declarations, "Node:friends:arguments"))
+}
+
+func TestSDLFormat_AnInterface_IsStoredWithItsFieldsAndItsMembers(t *testing.T) {
+	interpreter := contractfiles.NewInterpreter(
+		protocol.NewRegistry([]protocol.Protocol{graphqlcontracts.New()}),
+		[]contractfiles.FileFormat{graphqlcontracts.NewSDLFormat()},
+	)
+
+	uploaded, violations, readErr, err := interpreter.ToUploadedContract(
+		[]model.ContractFile{{Source: "schema.graphqls", Content: nodeSDL}},
+		&model.Participant{ID: 1, Name: "pets_api"},
+		"1.0.0",
+	)
+	require.NoError(t, err)
+	require.NoError(t, readErr)
+	require.Empty(t, violations)
+
+	assert.Equal(t, model.Schema{
+		"":         {Type: "union"},
+		"id":       {Type: "string", Scalar: "ID"},
+		"(Org)":    {Ref: "Org"},
+		"(Person)": {Ref: "Person"},
+	}, uploaded.Schemas["graphql"]["Node"])
 }
 
 func TestSDLFormat_AnOutputFieldWithoutBang_IsNullableNeverOptional(t *testing.T) {
@@ -158,7 +214,7 @@ func TestSDLFormat_ARootField_HasItsArgumentsAndReturnsSchemas(t *testing.T) {
 	declarations := sdlDeclarations(t, petsSDL)
 
 	assert.Equal(t, contract.Schema{Type: "object", Properties: map[string]contract.Schema{
-		"id": {Type: "string"},
+		"id": {Type: "string", Scalar: "ID"},
 	}}, sdlSchema(t, declarations, "Query:pet:arguments"))
 	assert.Equal(t, contract.Schema{Ref: "Pet", Nullable: true}, sdlSchema(t, declarations, "Query:pet:returns"))
 }
@@ -209,7 +265,7 @@ func TestSDLFormat_ATypePointingAtTheSubscriptionRoot_IsPublishedWithTheRootAsAS
 	require.Empty(t, violations)
 
 	assert.Equal(t, model.Schema{"": {Type: "object"}, "petAdded": {Ref: "Pet"}}, uploaded.Schemas["graphql"]["Subscription"])
-	assert.Equal(t, model.Schema{"": {Type: "object"}, "id": {Type: "string"}, "updates": {Ref: "Subscription", Nullable: true}}, uploaded.Schemas["graphql"]["Pet"])
+	assert.Equal(t, model.Schema{"": {Type: "object"}, "id": {Type: "string", Scalar: "ID"}, "updates": {Ref: "Subscription", Nullable: true}}, uploaded.Schemas["graphql"]["Pet"])
 	assert.Len(t, uploaded.Resources, 2)
 }
 
@@ -348,6 +404,15 @@ func TestSDLFormat_AnInvalidSDL_IsAReadErrorWithTheParserText(t *testing.T) {
 	assert.EqualError(t, readErr, "schema.graphqls:6:10: Undefined type Owner.")
 }
 
+func TestSDLFormat_AnExtendOfATypeNoFileDefines_IsAReadErrorWithTheGraphQLJSText(t *testing.T) {
+	_, readErr := graphqlcontracts.NewSDLFormat().ToDeclarations([]model.ContractFile{
+		{Source: "pet.graphqls", Content: "type Pet {\n  id: ID!\n}\n"},
+		{Source: "query.graphqls", Content: "extend type Query {\n  pets: [Pet!]!\n}\n"},
+	})
+
+	assert.EqualError(t, readErr, `query.graphqls:1:13: Cannot extend type "Query" because it is not defined.`)
+}
+
 func TestSDLFormat_ADocumentOfOperations_IsAReadError(t *testing.T) {
 	_, readErr := graphqlcontracts.NewSDLFormat().ToDeclarations([]model.ContractFile{
 		{Source: "schema.graphqls", Content: petsSDL},
@@ -384,7 +449,8 @@ func TestSDLFormat_GraphQLFilesReachTheFormat_NextToYAMLFiles(t *testing.T) {
 
 	violations, readErr := interpreter.ToViolations([]model.ContractFile{
 		{Source: "schema.graphqls", Content: "type Query {\n  pet(id: ID!): Pet\n}\n"},
-		{Source: "pet.graphql", Content: "type Pet {\n  id: ID!\n}\n"},
+		{Source: "pet.graphql", Content: "type Pet {\n  id: ID!\n  owner: Owner\n}\n"},
+		{Source: "owner.gql", Content: "type Owner {\n  name: String!\n}\n"},
 		{Source: "api.yaml", Content: "provides:\n  rest:\n    /pets:\n      get:\n        responses:\n          200: ~\n"},
 	})
 

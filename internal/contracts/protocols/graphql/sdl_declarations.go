@@ -14,12 +14,13 @@ import (
 	"github.com/guregu/null"
 )
 
-var builtInScalarTypes = map[string]string{
-	"ID":      model.StringType,
-	"String":  model.StringType,
-	"Int":     model.IntegerType,
-	"Float":   model.FloatType,
-	"Boolean": model.BooleanType,
+// An ID is serialized as a string, but as an input it also takes an integer, so it keeps its name.
+var builtInScalarSchemas = map[string]contract.Schema{
+	"ID":      {Type: model.StringType, Scalar: "ID"},
+	"String":  {Type: model.StringType},
+	"Int":     {Type: model.IntegerType},
+	"Float":   {Type: model.FloatType},
+	"Boolean": {Type: model.BooleanType},
 }
 
 var definitionKinds = map[ast.DefinitionKind]string{
@@ -78,7 +79,7 @@ func (this *sdlDeclarations) addDefinition(definition *ast.Definition) {
 			this.addTypeInfo(argument.Position, coordinate+"("+argument.Name+":)", graphqlmodel.ArgumentKind, argument.Type.Name())
 		}
 
-		if definition.Kind == ast.Object && len(field.Arguments) > 0 {
+		if len(field.Arguments) > 0 {
 			this.addSchema(field.Position, argumentsSchemaName(definition.Name, field.Name), this.toArgumentsSchema(field.Arguments))
 		}
 	}
@@ -148,17 +149,7 @@ func (this *sdlDeclarations) addExtensionPieces() {
 func (this *sdlDeclarations) toDefinitionSchema(definition *ast.Definition) contract.Schema {
 	switch definition.Kind {
 	case ast.Object:
-		properties := make(map[string]contract.Schema, len(definition.Fields))
-		for _, field := range declaredFields(definition) {
-			property := this.toOutputSchema(field.Type)
-			if len(field.Arguments) > 0 {
-				property.Arguments = argumentsSchemaName(definition.Name, field.Name)
-			}
-
-			properties[field.Name] = property
-		}
-
-		return contract.Schema{Type: model.ObjectType, Properties: properties}
+		return contract.Schema{Type: model.ObjectType, Properties: this.toOutputProperties(definition)}
 
 	case ast.InputObject:
 		properties := make(map[string]contract.Schema, len(definition.Fields))
@@ -176,7 +167,7 @@ func (this *sdlDeclarations) toDefinitionSchema(definition *ast.Definition) cont
 			}
 		}
 
-		return contract.Schema{Type: model.UnionType, UnionMembers: members}
+		return contract.Schema{Type: model.UnionType, Properties: this.toOutputProperties(definition), UnionMembers: members}
 
 	case ast.Union:
 		members := make(map[string]contract.Schema, len(definition.Types))
@@ -197,6 +188,20 @@ func (this *sdlDeclarations) toDefinitionSchema(definition *ast.Definition) cont
 	default:
 		return contract.Schema{Type: model.ScalarType, Scalar: definition.Name}
 	}
+}
+
+func (this *sdlDeclarations) toOutputProperties(definition *ast.Definition) map[string]contract.Schema {
+	properties := make(map[string]contract.Schema, len(definition.Fields))
+	for _, field := range declaredFields(definition) {
+		property := this.toOutputSchema(field.Type)
+		if len(field.Arguments) > 0 {
+			property.Arguments = argumentsSchemaName(definition.Name, field.Name)
+		}
+
+		properties[field.Name] = property
+	}
+
+	return properties
 }
 
 func (this *sdlDeclarations) toArgumentsSchema(arguments ast.ArgumentDefinitionList) contract.Schema {
@@ -233,8 +238,8 @@ func (this *sdlDeclarations) toTypeSchema(fieldType *ast.Type) contract.Schema {
 		return contract.Schema{Type: model.ArrayType, Items: &items}
 	}
 
-	if builtIn, isBuiltIn := builtInScalarTypes[fieldType.NamedType]; isBuiltIn {
-		return contract.Schema{Type: builtIn}
+	if builtIn, isBuiltIn := builtInScalarSchemas[fieldType.NamedType]; isBuiltIn {
+		return builtIn
 	}
 
 	if this.schema.Types[fieldType.NamedType].Kind == ast.Scalar {
