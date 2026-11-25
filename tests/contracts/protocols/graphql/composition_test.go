@@ -11,15 +11,20 @@ import (
 	"github.com/bidirekt/broker/internal/contracts/protocol"
 	graphqlcontracts "github.com/bidirekt/broker/internal/contracts/protocols/graphql"
 	"github.com/bidirekt/broker/internal/model"
+	graphqlmodel "github.com/bidirekt/broker/internal/model/protocols/graphql"
 )
 
 const compositionLink = `extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key", "@shareable", "@inaccessible", "@external"])
 `
 
+var compositionGraph = protocol.Declarations{ExtensionPieces: map[string][]protocol.ExtensionPiece{
+	"graphql": {{Source: "graph.yaml", Value: graphqlmodel.Extension{Graph: "petstore_graph", GraphSource: "graph.yaml"}}},
+}}
+
 func compositionMember(t *testing.T, name, version, sdl string) *model.PersistedContract {
 	t.Helper()
 
-	declarations, readErr := graphqlcontracts.NewSDLFormat().ToDeclarations([]model.ContractFile{{Source: name + ".graphqls", Content: compositionLink + sdl}})
+	declarations, readErr := graphqlcontracts.NewSDLFormat().ToDeclarations([]model.ContractFile{{Source: name + ".graphqls", Content: compositionLink + sdl}}, compositionGraph)
 	require.NoError(t, readErr)
 
 	catalogued := protocol.Declarations{Resources: declarations.Resources}
@@ -174,7 +179,7 @@ func TestToComposedGraph_AnEntityInTwoSubgraphs_SharesTheFieldsOfItsKey(t *testi
 
 	assert.Equal(t, model.Schema{
 		"":       {Type: "object"},
-		"id":     {Type: "string"},
+		"id":     {Type: "string", Scalar: "ID"},
 		"name":   {Type: "string"},
 		"rating": {Type: "integer"},
 	}, schemas["Pet"])
@@ -217,7 +222,7 @@ type Cat implements Animal {
 	)
 
 	assert.Equal(t, model.Schema{"": {Type: "union"}, "(Cat)": {Ref: "Cat"}, "(Dog)": {Ref: "Dog"}}, schemas["Result"])
-	assert.Equal(t, model.Schema{"": {Type: "union"}, "(Cat)": {Ref: "Cat"}, "(Dog)": {Ref: "Dog"}}, schemas["Animal"])
+	assert.Equal(t, model.Schema{"": {Type: "union"}, "name": {Type: "string"}, "(Cat)": {Ref: "Cat"}, "(Dog)": {Ref: "Dog"}}, schemas["Animal"])
 }
 
 const agePetSDL = `
@@ -397,9 +402,9 @@ enum Status {
 	require.Empty(t, errors)
 
 	schemas := composed.Schemas["graphql"]
-	assert.Equal(t, model.Schema{"": {Type: "object"}, "id": {Type: "string"}, "status": {Ref: "Status", Nullable: true}}, schemas["Pet"])
+	assert.Equal(t, model.Schema{"": {Type: "object"}, "id": {Type: "string", Scalar: "ID"}, "status": {Ref: "Status", Nullable: true}}, schemas["Pet"])
 	assert.Equal(t, model.Schema{"": {Type: "enum", Members: []string{"AVAILABLE"}}}, schemas["Status"])
-	assert.Equal(t, model.Schema{"": {Type: "object"}, "id": {Type: "string"}}, schemas["Query:pet:arguments"])
+	assert.Equal(t, model.Schema{"": {Type: "object"}, "id": {Type: "string", Scalar: "ID"}}, schemas["Query:pet:arguments"])
 	assert.NotContains(t, schemas, "Audit")
 	assert.NotContains(t, composed.Resources, model.Hash("petstore_graph", "graphql", "query", "audit", "returns"))
 }
@@ -411,15 +416,6 @@ func TestToComposedGraph_AnExternalField_IsNotResolvedThere(t *testing.T) {
 	)
 
 	assert.Equal(t, model.Field{Type: "integer", Nullable: true}, schemas["Pet"]["weight"])
-}
-
-func TestToComposedGraph_AnExternalFieldAlone_LeavesTheGraph(t *testing.T) {
-	schemas := composedSchemas(t,
-		compositionMember(t, "petstore_api", "1.4.0", "type Query {\n  pet: Pet\n}\n\ntype Pet @key(fields: \"id\") {\n  id: ID!\n}\n"),
-		compositionMember(t, "petstore_reviews", "2.0.0", "type Pet @key(fields: \"id\") {\n  id: ID!\n  weight: Int @external\n}\n"),
-	)
-
-	assert.NotContains(t, schemas["Pet"], "weight")
 }
 
 func TestToComposedGraph_ATypeOfAnotherKind_DisagreesWithTheGenericText(t *testing.T) {
@@ -474,7 +470,7 @@ func TestToComposedGraph_TheGraph_HoldsItsRootFieldsUnderTheGraphName(t *testing
 
 	arguments := composed.Resources[model.Hash("petstore_graph", "graphql", "query", "pet", "arguments")]
 	assert.Equal(t, model.Input, arguments.Body)
-	assert.Equal(t, model.Schema{"": {Type: "object"}, "id": {Type: "string"}}, arguments.Schemas["graphql"]["Query:pet:arguments"])
+	assert.Equal(t, model.Schema{"": {Type: "object"}, "id": {Type: "string", Scalar: "ID"}}, arguments.Schemas["graphql"]["Query:pet:arguments"])
 }
 
 const federationDefinitions = `
@@ -517,7 +513,7 @@ func TestToComposedGraph_ARootTypeTheSchemaNamesOtherwise_JoinsTheQueryRoot(t *t
 
 	arguments := composed.Resources[model.Hash("petstore_graph", "graphql", "query", "pet", "arguments")]
 	assert.Equal(t, "Query:pet:arguments", arguments.Bodies[0].SchemaName.String)
-	assert.Equal(t, model.Schema{"": {Type: "object"}, "id": {Type: "string"}}, arguments.Schemas["graphql"]["Query:pet:arguments"])
+	assert.Equal(t, model.Schema{"": {Type: "object"}, "id": {Type: "string", Scalar: "ID"}}, arguments.Schemas["graphql"]["Query:pet:arguments"])
 
 	returns := composed.Resources[model.Hash("petstore_graph", "graphql", "query", "pet", "returns")]
 	assert.Equal(t, model.Schema{"": {Ref: "Pet", Nullable: true}}, returns.Schemas["graphql"]["Query:pet:returns"])

@@ -34,7 +34,7 @@ func (this reach) key() string {
 // A type reached from the same subgraphs is walked once, so recursion ends.
 func (this *composition) checkSatisfiability() {
 	var queue []reach
-	for _, root := range rootTypes {
+	for _, root := range this.roots() {
 		for _, field := range this.fields[root.typeName] {
 			coordinate := root.typeName + "." + field
 			queue = append(queue, reach{typeName: this.namedTypes[coordinate], at: this.resolversOf(coordinate), operation: root.operation, path: []string{field}})
@@ -120,11 +120,11 @@ func (this *composition) enteredFrom(typeName string, at []subgraph) []subgraph 
 		grown = false
 
 		for _, member := range this.subgraphs {
-			if containsSubgraph(entered, member) || !member.definesType(typeName) {
+			if containsSubgraph(entered, member) {
 				continue
 			}
 
-			if slices.ContainsFunc(member.directives[typeName], func(key graphqlmodel.Directive) bool {
+			if slices.ContainsFunc(this.keysAt(member, typeName), func(key graphqlmodel.Directive) bool {
 				selections, _ := parseFieldSet(key.Fields)
 
 				return key.Directive == graphqlmodel.KeyDirective && key.Resolvable && slices.ContainsFunc(entered, func(from subgraph) bool {
@@ -138,6 +138,23 @@ func (this *composition) enteredFrom(typeName string, at []subgraph) []subgraph 
 	}
 
 	return entered
+}
+
+// keysAt are the directives whose @keys enter a subgraph at a type: the type's own, or, at an implementation of an
+// interface the subgraph marks @interfaceObject, the interface's.
+func (this *composition) keysAt(member subgraph, typeName string) []graphqlmodel.Directive {
+	if member.definesType(typeName) {
+		return member.directives[typeName]
+	}
+
+	var keys []graphqlmodel.Directive
+	for coordinate, directives := range member.directives {
+		if _, implements := this.schemas[coordinate][model.MemberSegment(typeName)]; implements && member.marks(coordinate, graphqlmodel.InterfaceObjectDirective) {
+			keys = append(keys, directives...)
+		}
+	}
+
+	return keys
 }
 
 func (this subgraph) resolvesAll(typeName string, selections ast.SelectionSet) bool {
@@ -161,7 +178,7 @@ func (this *composition) resolversOf(coordinate string) []subgraph {
 		}
 	}
 
-	return resolvers
+	return append(resolvers, this.interfaceObjectResolvers[coordinate]...)
 }
 
 func containsSubgraph(subgraphs []subgraph, member subgraph) bool {

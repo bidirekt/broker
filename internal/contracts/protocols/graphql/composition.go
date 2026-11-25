@@ -13,24 +13,27 @@ import (
 	graphqlmodel "github.com/bidirekt/broker/internal/model/protocols/graphql"
 )
 
-// The query root comes first: a type that is both roots is the query root, as the SDL reads it.
-var rootTypes = []struct {
+type rootType struct {
 	operation string
 	typeName  string
 	of        func(graphqlmodel.Roots) string
-}{
+}
+
+// The query root comes first: a type that is both roots is the query root, as the SDL reads it.
+var rootTypes = []rootType{
 	{graphqlmodel.QueryOperation, "Query", func(roots graphqlmodel.Roots) string { return roots.Query }},
 	{graphqlmodel.MutationOperation, "Mutation", func(roots graphqlmodel.Roots) string { return roots.Mutation }},
 }
 
 type composition struct {
-	subgraphs  []subgraph
-	enumUses   map[string]enumUse
-	schemas    model.Schemas
-	kinds      map[string]string
-	fields     map[string][]string
-	namedTypes map[string]string
-	errors     []compositionError
+	subgraphs                []subgraph
+	enumUses                 map[string]enumUse
+	schemas                  model.Schemas
+	kinds                    map[string]string
+	fields                   map[string][]string
+	namedTypes               map[string]string
+	interfaceObjectResolvers map[string][]subgraph
+	errors                   []compositionError
 }
 
 type enumUse struct {
@@ -49,11 +52,12 @@ type compositionError struct {
 // ordered by coordinate and then by subgraph.
 func ToComposedGraph(graph string, subgraphs []*model.PersistedContract) (*model.PersistedContract, []string) {
 	composing := newComposition(subgraphs)
-	composing.takeOverrides()
-	composing.composeTypes()
 
-	if len(composing.errors) == 0 {
-		composing.checkSatisfiability()
+	// A step runs only when the ones before it found no error: a root that takes a type's name garbles the schemas.
+	for _, step := range []func(){composing.checkRootNames, composing.compose, composing.checkSatisfiability} {
+		if len(composing.errors) == 0 {
+			step()
+		}
 	}
 
 	if len(composing.errors) > 0 {
@@ -61,6 +65,30 @@ func ToComposedGraph(graph string, subgraphs []*model.PersistedContract) (*model
 	}
 
 	return composing.toContract(graph), nil
+}
+
+func (this *composition) compose() {
+	this.takeOverrides()
+	this.composeTypes()
+	this.addInterfaceObjectFields()
+	this.checkReferences()
+}
+
+// A root the SDL names otherwise next to a type of its own with the root's default name would join that type.
+func (this *composition) checkRootNames() {
+	for _, member := range this.subgraphs {
+		for _, root := range member.usedRoots {
+			this.addError(root.typeName, fmt.Sprintf("%s has a type named %s, but its %s root is %s (ROOT_%s_USED)",
+				member.label, root.typeName, root.operation, root.of(member.roots), strings.ToUpper(root.operation)), member)
+		}
+	}
+}
+
+// The graph has the roots some subgraph declares: a type named Mutation is no mutation root on its own.
+func (this *composition) roots() []rootType {
+	return slices.DeleteFunc(slices.Clone(rootTypes), func(root rootType) bool {
+		return !slices.ContainsFunc(this.subgraphs, func(member subgraph) bool { return root.of(member.roots) != "" })
+	})
 }
 
 func newComposition(contracts []*model.PersistedContract) *composition {
@@ -74,12 +102,13 @@ func newComposition(contracts []*model.PersistedContract) *composition {
 	})
 
 	return &composition{
-		subgraphs:  subgraphs,
-		enumUses:   toEnumUses(subgraphs),
-		schemas:    model.Schemas{},
-		kinds:      map[string]string{},
-		fields:     map[string][]string{},
-		namedTypes: map[string]string{},
+		subgraphs:                subgraphs,
+		enumUses:                 toEnumUses(subgraphs),
+		schemas:                  model.Schemas{},
+		kinds:                    map[string]string{},
+		fields:                   map[string][]string{},
+		namedTypes:               map[string]string{},
+		interfaceObjectResolvers: map[string][]subgraph{},
 	}
 }
 
@@ -115,7 +144,8 @@ func ownerOf(coordinate string) string {
 }
 
 // takeOverrides leaves each field a subgraph takes over with @override to that subgraph alone. An @override from a
-// subgraph that is not a member changes nothing.
+// subgraph that is not a member, as one named after the subgraph's name in Apollo, takes the field from every other
+// member that resolves it without overriding it too.
 func (this *composition) takeOverrides() {
 	for _, member := range this.subgraphs {
 		for _, coordinate := range slices.Sorted(maps.Keys(member.directives)) {
@@ -137,6 +167,12 @@ func (this *composition) takeOverride(member subgraph, coordinate, from string) 
 
 	index := slices.IndexFunc(this.subgraphs, func(other subgraph) bool { return other.name == from })
 	if index < 0 {
+		for _, other := range this.subgraphs {
+			if other.name != member.name && !other.marks(coordinate, graphqlmodel.OverrideDirective) {
+				other.overridden[coordinate] = true
+			}
+		}
+
 		return
 	}
 
@@ -186,7 +222,7 @@ func (this *composition) toContract(graph string) *model.PersistedContract {
 		Schemas:         map[string]model.Schemas{graphqlmodel.Namespace: this.schemas},
 	}
 
-	for _, root := range rootTypes {
+	for _, root := range this.roots() {
 		for _, field := range this.fields[root.typeName] {
 			arguments := argumentsSchemaName(root.typeName, field)
 			if _, taken := this.schemas[arguments]; !taken {

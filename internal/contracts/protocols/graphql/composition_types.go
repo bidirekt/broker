@@ -2,7 +2,9 @@ package graphql
 
 import (
 	"fmt"
+	"maps"
 	"slices"
+	"strings"
 
 	"github.com/bidirekt/broker/internal/model"
 	graphqlmodel "github.com/bidirekt/broker/internal/model/protocols/graphql"
@@ -17,18 +19,25 @@ func (this *composition) composeTypes() {
 
 		kind := definers[0].kinds[typeName]
 		this.kinds[typeName] = kind
+		errorsBefore := len(this.errors)
 
 		switch kind {
 		case graphqlmodel.ObjectKind:
 			this.composeObject(typeName, definers)
 		case graphqlmodel.InputKind:
 			this.schemas[typeName] = this.intersectInputs(typeName, func(field string) string { return typeName + "." + field }, definers)
-		case graphqlmodel.InterfaceKind, graphqlmodel.UnionKind:
-			this.composeMembers(typeName, definers)
+		case graphqlmodel.InterfaceKind:
+			this.composeInterface(typeName, definers)
+		case graphqlmodel.UnionKind:
+			this.schemas[typeName] = this.composeMembers(typeName, definers)
 		case graphqlmodel.EnumKind:
 			this.composeEnum(typeName, definers)
 		default:
 			this.schemas[typeName] = definers[0].schemas[typeName]
+		}
+
+		if len(this.errors) == errorsBefore {
+			this.checkNotEmpty(typeName, kind, definers)
 		}
 	}
 }
@@ -53,31 +62,142 @@ func (this *composition) disagree(coordinate string, one, other subgraph, oneDec
 		one.label, other.label, coordinate, oneDeclares, one.name, otherDeclares, other.name), one, other)
 }
 
-// The fields of an object join; a field no subgraph resolves, only declares @external, is left out.
+// The fields of an object join; a field no subgraph resolves, only declares @external, is an error unless it is
+// @inaccessible.
 func (this *composition) composeObject(typeName string, definers []subgraph) {
 	schema := model.Schema{"": {Type: model.ObjectType}}
 
 	for _, field := range propertiesAcross(typeName, definers) {
 		coordinate := typeName + "." + field
 		resolvers := slices.DeleteFunc(slices.Clone(definers), func(member subgraph) bool { return !member.resolves(coordinate) })
-		if this.inaccessible(coordinate) || len(resolvers) == 0 {
+		if this.inaccessible(coordinate) {
+			continue
+		}
+
+		if len(resolvers) == 0 {
+			this.requireResolver(coordinate, definers)
+
 			continue
 		}
 
 		this.checkShared(coordinate, resolvers)
-
-		joined, joins := this.joinOutputs(typeName, field, coordinate, resolvers)
-		if !joins {
-			continue
-		}
-
-		joined.levels[0].Arguments = this.composeArguments(typeName, field, resolvers)
-		writeLevels(schema, field, joined.levels)
-		this.fields[typeName] = append(this.fields[typeName], field)
-		this.namedTypes[coordinate] = joined.named
+		this.composeField(schema, typeName, field, resolvers)
 	}
 
 	this.schemas[typeName] = schema
+}
+
+func (this *composition) requireResolver(coordinate string, definers []subgraph) {
+	for _, member := range definers {
+		if member.marks(coordinate, graphqlmodel.ExternalDirective) {
+			this.addError(coordinate, fmt.Sprintf("%s marks %s @external, but no subgraph resolves it", member.label, coordinate), member)
+		}
+	}
+}
+
+// The fields of an interface join with no @shareable needed, and so do its implementations.
+func (this *composition) composeInterface(typeName string, definers []subgraph) {
+	schema := this.composeMembers(typeName, definers)
+
+	for _, field := range propertiesAcross(typeName, definers) {
+		coordinate := typeName + "." + field
+		declarers := slices.DeleteFunc(slices.Clone(definers), func(member subgraph) bool { return member.kinds[coordinate] != graphqlmodel.FieldKind })
+		if !this.inaccessible(coordinate) {
+			this.composeField(schema, typeName, field, declarers)
+		}
+	}
+
+	this.schemas[typeName] = schema
+}
+
+// An implementation of an interface takes each field of the interface it lacks that an @interfaceObject resolves:
+// that subgraph resolves it for every implementation, as Apollo does.
+func (this *composition) addInterfaceObjectFields() {
+	for _, interfaceName := range slices.Sorted(maps.Keys(this.kinds)) {
+		if this.kinds[interfaceName] != graphqlmodel.InterfaceKind {
+			continue
+		}
+
+		for _, field := range this.fields[interfaceName] {
+			resolvers := slices.DeleteFunc(slices.Clone(this.subgraphs), func(member subgraph) bool {
+				return !member.marks(interfaceName, graphqlmodel.InterfaceObjectDirective) || !member.resolves(interfaceName+"."+field)
+			})
+			if len(resolvers) == 0 {
+				continue
+			}
+
+			for _, implementation := range this.implementationsOf(interfaceName) {
+				if _, declared := this.schemas[implementation][field]; !declared {
+					this.addInterfaceObjectField(implementation, interfaceName, field, resolvers)
+				}
+			}
+		}
+	}
+}
+
+func (this *composition) addInterfaceObjectField(implementation, interfaceName, field string, resolvers []subgraph) {
+	coordinate := implementation + "." + field
+
+	for path := field; ; path += model.ItemsSegment {
+		level, declared := this.schemas[interfaceName][path]
+		if !declared {
+			break
+		}
+
+		this.schemas[implementation][path] = level
+	}
+
+	this.fields[implementation] = append(this.fields[implementation], field)
+	this.namedTypes[coordinate] = this.namedTypes[interfaceName+"."+field]
+	this.interfaceObjectResolvers[coordinate] = resolvers
+}
+
+func (this *composition) implementationsOf(interfaceName string) []string {
+	var implementations []string
+	for _, segment := range slices.Sorted(maps.Keys(this.schemas[interfaceName])) {
+		if model.IsMemberSegment(segment) && this.kinds[model.MemberKey(segment)] == graphqlmodel.ObjectKind {
+			implementations = append(implementations, model.MemberKey(segment))
+		}
+	}
+
+	return implementations
+}
+
+func (this *composition) composeField(schema model.Schema, typeName, field string, resolvers []subgraph) {
+	coordinate := typeName + "." + field
+
+	joined, joins := this.joinOutputs(typeName, field, coordinate, resolvers)
+	if !joins {
+		return
+	}
+
+	joined.levels[0].Arguments = this.composeArguments(typeName, field, resolvers)
+	writeLevels(schema, field, joined.levels)
+	this.fields[typeName] = append(this.fields[typeName], field)
+	this.namedTypes[coordinate] = joined.named
+}
+
+// An object, an input or an enum left with no field or value, all @inaccessible or not shared, is no type GraphQL
+// allows.
+func (this *composition) checkNotEmpty(typeName, kind string, definers []subgraph) {
+	schema := this.schemas[typeName]
+
+	var element string
+	switch {
+	case (kind == graphqlmodel.ObjectKind || kind == graphqlmodel.InputKind) && len(propertiesOf(schema)) == 0:
+		element = "field"
+	case kind == graphqlmodel.EnumKind && len(schema[""].Members) == 0:
+		element = "value"
+	default:
+		return
+	}
+
+	labels := make([]string, 0, len(definers))
+	for _, member := range definers {
+		labels = append(labels, member.label)
+	}
+
+	this.addError(typeName, fmt.Sprintf("%s has no %s left in the graph of %s", typeName, element, strings.Join(labels, " and ")), definers...)
 }
 
 func (this *composition) checkShared(coordinate string, resolvers []subgraph) {
@@ -134,9 +254,6 @@ func (this *composition) intersectInputs(schemaName string, coordinateOf func(st
 
 	for _, input := range propertiesAcross(schemaName, definers) {
 		coordinate := coordinateOf(input)
-		if this.inaccessible(coordinate) {
-			continue
-		}
 
 		declared := make([]typed, len(definers))
 		var missing []subgraph
@@ -147,6 +264,12 @@ func (this *composition) intersectInputs(schemaName string, coordinateOf func(st
 			}
 		}
 
+		if this.inaccessible(coordinate) {
+			this.requireAccessible(coordinate, definers, declared)
+
+			continue
+		}
+
 		if len(missing) > 0 {
 			this.requireDeclared(coordinate, definers, declared, missing)
 
@@ -155,10 +278,20 @@ func (this *composition) intersectInputs(schemaName string, coordinateOf func(st
 
 		if met, meets := this.meetInputs(coordinate, definers, declared); meets {
 			writeLevels(schema, input, met.levels)
+			this.namedTypes[coordinate] = met.named
 		}
 	}
 
 	return schema
+}
+
+// An argument or input field the client must send can't be left out of the graph.
+func (this *composition) requireAccessible(coordinate string, definers []subgraph, declared []typed) {
+	for index, member := range definers {
+		if len(declared[index].levels) > 0 && !declared[index].levels[0].Optional {
+			this.addError(coordinate, fmt.Sprintf("%s requires %s, which is @inaccessible", member.label, coordinate), member)
+		}
+	}
 }
 
 func (this *composition) requireDeclared(coordinate string, definers []subgraph, declared []typed, missing []subgraph) {
@@ -196,18 +329,18 @@ func (this *composition) meetInputs(coordinate string, definers []subgraph, decl
 }
 
 // Every subgraph's members of a union or an interface join, with no @shareable needed.
-func (this *composition) composeMembers(typeName string, definers []subgraph) {
+func (this *composition) composeMembers(typeName string, definers []subgraph) model.Schema {
 	schema := model.Schema{"": {Type: model.UnionType}}
 
 	for _, member := range definers {
 		for path, field := range member.schemas[typeName] {
-			if path != "" && !this.inaccessible(field.Ref) {
+			if model.IsMemberSegment(path) && !this.inaccessible(field.Ref) {
 				schema[path] = field
 			}
 		}
 	}
 
-	this.schemas[typeName] = schema
+	return schema
 }
 
 // An output-only enum takes every subgraph's values, an input-only one the values all of them share, and one used both
@@ -241,6 +374,22 @@ func (this *composition) composeEnum(typeName string, definers []subgraph) {
 	}
 
 	this.schemas[typeName] = model.Schema{"": {Type: model.EnumType, Members: composed}}
+}
+
+// A field, argument or input field left in the graph can't have a type that is out of it.
+func (this *composition) checkReferences() {
+	for _, coordinate := range slices.Sorted(maps.Keys(this.namedTypes)) {
+		named := this.namedTypes[coordinate]
+		if !this.inaccessible(named) {
+			continue
+		}
+
+		for _, member := range this.subgraphs {
+			if member.namedTypes[coordinate] == named {
+				this.addError(coordinate, fmt.Sprintf("%s declares %s as %s, which is @inaccessible", member.label, coordinate, named), member)
+			}
+		}
+	}
 }
 
 func propertiesAcross(schemaName string, definers []subgraph) []string {

@@ -427,3 +427,141 @@ type Money {
 		]}}}
 	}}`, string(validate.Results))
 }
+
+func (this *IntegrationSuite) TestCanIDeployAndValidate_ASubgraphWhoseRenamedQueryRootLeavesATypeNamedQuery_MakesTheGraphNotComposable() {
+	this.setUpGraphCheck("petstore_api", "petstore_reviews", "petstore_web")
+	this.publishForGraphCheck("petstore_api", "1.4.0", contractFragment{"graph.yaml", graphCheckGraphYAML}, contractFragment{"api.graphqls", graphCheckLink + `
+schema {
+  query: RootQuery
+}
+
+type RootQuery {
+  pet(id: ID!): Pet
+}
+
+type Query {
+  legacy: Int
+}
+
+type Pet @key(fields: "id") {
+  id: ID!
+  age: Int
+}
+`})
+	this.publishForGraphCheck("petstore_reviews", "2.0.0", contractFragment{"graph.yaml", graphCheckGraphYAML}, contractFragment{"reviews.graphqls", graphCheckReviewsSDL})
+	this.deployForGraphCheck("petstore_api", "1.4.0", "production")
+	this.deployForGraphCheck("petstore_reviews", "2.0.0", "production")
+
+	this.assertWebGraphCheck(graphCheckWebReadingAgeAsText, "production", false, `{"petstore_graph": {
+		"deployable": false,
+		"members": {"petstore_api": "1.4.0", "petstore_reviews": "2.0.0"},
+		"operations": {"query": {"pet": {"returns": [
+			{"reason": "provider_graph_not_composable", "role": "consumer", "details": {"graph": "petstore_graph", "cause": "petstore_api 1.4.0 has a type named Query, but its query root is RootQuery (ROOT_QUERY_USED)"}}
+		]}}}
+	}}`)
+}
+
+func (this *IntegrationSuite) TestCanIDeployAndValidate_AnEntityExtendedWithItsKeyMarkedExternal_GivesTheGraphItsFields() {
+	this.setUpGraphCheck("petstore_api", "petstore_reviews", "petstore_web")
+	this.publishForGraphCheck("petstore_api", "1.4.0", contractFragment{"graph.yaml", graphCheckGraphYAML}, contractFragment{"api.graphqls", graphCheckAPISDL})
+	this.publishForGraphCheck("petstore_reviews", "2.0.0", contractFragment{"graph.yaml", graphCheckGraphYAML}, contractFragment{"reviews.graphqls", `extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key", "@external"])
+
+type Query {
+  reviews: [Review!]!
+}
+
+type Review {
+  body: String!
+  pet: Pet
+}
+
+extend type Pet @key(fields: "id") {
+  id: ID! @external
+  reviews: [Review!]!
+}
+`})
+	this.deployForGraphCheck("petstore_api", "1.4.0", "production")
+	this.deployForGraphCheck("petstore_reviews", "2.0.0", "production")
+
+	this.assertWebGraphCheck(`consumes:
+  petstore_graph:
+    graphql:
+      query:
+        pet: {arguments: PetArgs, returns: MaybePet}
+schemas:
+  PetArgs: {type: object, properties: {id: {type: string}}}
+  MaybePet: {ref: Pet, nullable: true}
+  Pet: {type: object, properties: {id: {type: string}, reviews: {type: array, items: {ref: Review}}}}
+  Review: {type: object, properties: {body: {type: string}}}
+`, "production", true, `{"petstore_graph": {
+		"deployable": true,
+		"members": {"petstore_api": "1.4.0", "petstore_reviews": "2.0.0"}
+	}}`)
+}
+
+const interfaceObjectAPISDL = `
+type Query {
+  animals: [Animal!]!
+}
+
+interface Animal @key(fields: "id") {
+  id: ID!
+  name: String!
+}
+
+type Dog implements Animal @key(fields: "id") {
+  id: ID!
+  name: String!
+}
+`
+
+const interfaceObjectReviewsSDL = `extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key", "@interfaceObject"])
+
+type Animal @key(fields: "id") @interfaceObject {
+  id: ID!
+  reviews: [String!]!
+}
+`
+
+func (this *IntegrationSuite) deployInterfaceObjectGraph() {
+	this.setUpGraphCheck("petstore_api", "petstore_reviews", "petstore_web")
+	this.publishForGraphCheck("petstore_api", "1.4.0", contractFragment{"graph.yaml", graphCheckGraphYAML}, contractFragment{"api.graphqls", graphCheckLink + interfaceObjectAPISDL})
+	this.publishForGraphCheck("petstore_reviews", "2.0.0", contractFragment{"graph.yaml", graphCheckGraphYAML}, contractFragment{"reviews.graphqls", interfaceObjectReviewsSDL})
+	this.deployForGraphCheck("petstore_api", "1.4.0", "production")
+	this.deployForGraphCheck("petstore_reviews", "2.0.0", "production")
+}
+
+func (this *IntegrationSuite) TestCanIDeployAndValidate_AnInterfaceObject_AddsItsFieldsToTheInterface() {
+	this.deployInterfaceObjectGraph()
+
+	this.assertWebGraphCheck(`consumes:
+  petstore_graph:
+    graphql:
+      query:
+        animals: {returns: Animals}
+schemas:
+  Animals: {type: array, items: {ref: Animal}}
+  Animal: {type: object, properties: {name: {type: string}, reviews: {type: array, items: {type: string}}}}
+`, "production", true, `{"petstore_graph": {
+		"deployable": true,
+		"members": {"petstore_api": "1.4.0", "petstore_reviews": "2.0.0"}
+	}}`)
+}
+
+func (this *IntegrationSuite) TestCanIDeployAndValidate_AnInterfaceObject_AddsItsFieldsToEveryImplementation() {
+	this.deployInterfaceObjectGraph()
+
+	this.assertWebGraphCheck(`consumes:
+  petstore_graph:
+    graphql:
+      query:
+        animals: {returns: Animals}
+schemas:
+  Animals: {type: array, items: {ref: Animal}}
+  Animal: {type: union, members: {Dog: {ref: Dog}}}
+  Dog: {type: object, properties: {name: {type: string}, reviews: {type: array, items: {type: string}}}}
+`, "production", true, `{"petstore_graph": {
+		"deployable": true,
+		"members": {"petstore_api": "1.4.0", "petstore_reviews": "2.0.0"}
+	}}`)
+}

@@ -11,15 +11,20 @@ import (
 	"github.com/bidirekt/broker/internal/contracts/protocol"
 	graphqlcontracts "github.com/bidirekt/broker/internal/contracts/protocols/graphql"
 	"github.com/bidirekt/broker/internal/model"
+	graphqlmodel "github.com/bidirekt/broker/internal/model/protocols/graphql"
 )
 
 const satisfiabilityLink = `extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key", "@shareable"])
 `
 
+var satisfiabilityGraph = protocol.Declarations{ExtensionPieces: map[string][]protocol.ExtensionPiece{
+	"graphql": {{Source: "graph.yaml", Value: graphqlmodel.Extension{Graph: "petstore_graph", GraphSource: "graph.yaml"}}},
+}}
+
 func satisfiabilityMember(t *testing.T, name, version, sdl string) *model.PersistedContract {
 	t.Helper()
 
-	declarations, readErr := graphqlcontracts.NewSDLFormat().ToDeclarations([]model.ContractFile{{Source: name + ".graphqls", Content: satisfiabilityLink + sdl}})
+	declarations, readErr := graphqlcontracts.NewSDLFormat().ToDeclarations([]model.ContractFile{{Source: name + ".graphqls", Content: satisfiabilityLink + sdl}}, satisfiabilityGraph)
 	require.NoError(t, readErr)
 
 	catalogued := protocol.Declarations{Resources: declarations.Resources}

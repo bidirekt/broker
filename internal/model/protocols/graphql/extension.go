@@ -12,12 +12,13 @@ const (
 )
 
 const (
-	KeyDirective          = "key"
-	ShareableDirective    = "shareable"
-	InaccessibleDirective = "inaccessible"
-	ExternalDirective     = "external"
-	OverrideDirective     = "override"
-	ProvidesDirective     = "provides"
+	KeyDirective             = "key"
+	ShareableDirective       = "shareable"
+	InaccessibleDirective    = "inaccessible"
+	ExternalDirective        = "external"
+	OverrideDirective        = "override"
+	ProvidesDirective        = "provides"
+	InterfaceObjectDirective = "interfaceObject"
 )
 
 // Extension is what the SDL keeps that the schemas lose: whether a type is an input, the GraphQL name of a

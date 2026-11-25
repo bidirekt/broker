@@ -12,17 +12,21 @@ import (
 )
 
 // subgraph is a member of a graph as the composition reads it: its schemas, the kind and named type of each
-// coordinate, its federation directives, the coordinates its @key field sets name and the fields another subgraph
-// takes over with @override.
+// coordinate, its federation directives, the coordinates its @key field sets name, the fields another subgraph
+// takes over with @override, its roots, the roots it names otherwise while a type of its own takes their default
+// name, and whether it is a Federation 1 subgraph.
 type subgraph struct {
-	name       string
-	label      string
-	schemas    model.Schemas
-	kinds      map[string]string
-	namedTypes map[string]string
-	directives map[string][]graphqlmodel.Directive
-	keyFields  map[string]bool
-	overridden map[string]bool
+	name        string
+	label       string
+	schemas     model.Schemas
+	kinds       map[string]string
+	namedTypes  map[string]string
+	directives  map[string][]graphqlmodel.Directive
+	keyFields   map[string]bool
+	overridden  map[string]bool
+	roots       graphqlmodel.Roots
+	usedRoots   []rootType
+	federation1 bool
 }
 
 func toSubgraph(contract *model.PersistedContract) subgraph {
@@ -30,14 +34,17 @@ func toSubgraph(contract *model.PersistedContract) subgraph {
 	roots := toRootNames(extension.Roots)
 
 	member := subgraph{
-		name:       contract.ParticipantName,
-		label:      contract.ParticipantName + " " + contract.Version,
-		schemas:    roots.toSchemas(contract.Schemas[graphqlmodel.Namespace]),
-		kinds:      make(map[string]string, len(extension.Types)),
-		namedTypes: make(map[string]string, len(extension.Types)),
-		directives: map[string][]graphqlmodel.Directive{},
-		keyFields:  map[string]bool{},
-		overridden: map[string]bool{},
+		name:        contract.ParticipantName,
+		label:       contract.ParticipantName + " " + contract.Version,
+		schemas:     roots.toSchemas(contract.Schemas[graphqlmodel.Namespace]),
+		kinds:       make(map[string]string, len(extension.Types)),
+		namedTypes:  make(map[string]string, len(extension.Types)),
+		directives:  map[string][]graphqlmodel.Directive{},
+		keyFields:   map[string]bool{},
+		overridden:  map[string]bool{},
+		roots:       extension.Roots,
+		usedRoots:   toUsedRoots(extension),
+		federation1: extension.Federation1,
 	}
 
 	for _, info := range extension.Types {
@@ -56,7 +63,28 @@ func toSubgraph(contract *model.PersistedContract) subgraph {
 		}
 	}
 
+	// An @interfaceObject is the interface, seen from a subgraph that doesn't know its implementations.
+	for typeName := range member.kinds {
+		if member.marks(typeName, graphqlmodel.InterfaceObjectDirective) {
+			member.kinds[typeName] = graphqlmodel.InterfaceKind
+		}
+	}
+
 	return member
+}
+
+func toUsedRoots(extension graphqlmodel.Extension) []rootType {
+	var used []rootType
+	for _, root := range rootTypes {
+		declared := root.of(extension.Roots)
+		typeTakesTheName := slices.ContainsFunc(extension.Types, func(info graphqlmodel.TypeInfo) bool { return info.Coordinate == root.typeName })
+
+		if declared != "" && declared != root.typeName && typeTakesTheName {
+			used = append(used, root)
+		}
+	}
+
+	return used
 }
 
 // rootNames maps each root type a subgraph names otherwise to the name the graph gives it, Query or Mutation, so
@@ -147,9 +175,10 @@ func (this subgraph) resolves(coordinate string) bool {
 	return this.kinds[coordinate] == graphqlmodel.FieldKind && !this.marks(coordinate, graphqlmodel.ExternalDirective) && !this.overridden[coordinate]
 }
 
-// A field counts as @shareable when it says so, or when a @key of the subgraph names it.
+// A field counts as @shareable when it says so, when a @key of the subgraph names it, or when the subgraph is a
+// Federation 1 one, whose fields Apollo's upgrade all marks @shareable.
 func (this subgraph) shares(coordinate string) bool {
-	return this.marks(coordinate, graphqlmodel.ShareableDirective) || this.keyFields[coordinate]
+	return this.federation1 || this.marks(coordinate, graphqlmodel.ShareableDirective) || this.keyFields[coordinate]
 }
 
 // typed is the type of a field or an argument: its model fields from the outermost list down to the named type.
@@ -203,11 +232,12 @@ func (this typed) String() string {
 	return written.String()
 }
 
-// propertiesOf names the fields of an object or input schema; their list items sit at "name[]".
+// propertiesOf names the fields of an object, an input or an interface schema; their list items sit at "name[]",
+// and an interface's implementations at "(Dog)".
 func propertiesOf(schema model.Schema) []string {
 	var properties []string
 	for path := range schema {
-		if path != "" && !strings.Contains(path, model.ItemsSegment) {
+		if path != "" && !strings.Contains(path, model.ItemsSegment) && !model.IsMemberSegment(path) {
 			properties = append(properties, path)
 		}
 	}
