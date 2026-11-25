@@ -125,8 +125,10 @@ func (this *composition) enteredFrom(typeName string, at []subgraph) []subgraph 
 			}
 
 			if slices.ContainsFunc(member.directives[typeName], func(key graphqlmodel.Directive) bool {
+				selections, _ := parseFieldSet(key.Fields)
+
 				return key.Directive == graphqlmodel.KeyDirective && key.Resolvable && slices.ContainsFunc(entered, func(from subgraph) bool {
-					return from.resolvesAll(typeName, toKeySelections(key.Fields))
+					return from.resolvesAll(typeName, selections)
 				})
 			}) {
 				entered = append(entered, member)

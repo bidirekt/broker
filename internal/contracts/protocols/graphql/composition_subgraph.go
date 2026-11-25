@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/vektah/gqlparser/v2/ast"
-	"github.com/vektah/gqlparser/v2/parser"
 
 	"github.com/bidirekt/broker/internal/model"
 	graphqlmodel "github.com/bidirekt/broker/internal/model/protocols/graphql"
@@ -45,7 +44,8 @@ func toSubgraph(contract *model.PersistedContract) subgraph {
 		member.directives[directive.Coordinate] = append(member.directives[directive.Coordinate], directive)
 
 		if directive.Directive == graphqlmodel.KeyDirective {
-			member.addKeyFields(directive.Coordinate, toKeySelections(directive.Fields))
+			selections, _ := parseFieldSet(directive.Fields)
+			member.addKeyFields(directive.Coordinate, selections)
 		}
 	}
 
@@ -59,16 +59,6 @@ func (this subgraph) addKeyFields(typeName string, selections ast.SelectionSet) 
 		this.keyFields[coordinate] = true
 		this.addKeyFields(this.namedTypes[coordinate], field.SelectionSet)
 	}
-}
-
-// The field set was checked at publish, so it always parses into fields.
-func toKeySelections(fieldSet string) ast.SelectionSet {
-	document, err := parser.ParseQuery(&ast.Source{Input: "{" + fieldSet + "}"})
-	if err != nil || len(document.Operations) != 1 {
-		return nil
-	}
-
-	return document.Operations[0].SelectionSet
 }
 
 func (this subgraph) marks(coordinate, directive string) bool {
