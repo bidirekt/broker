@@ -47,7 +47,7 @@ func toDeclarations(schema *ast.Schema) protocol.Declarations {
 
 	for _, name := range slices.Sorted(maps.Keys(schema.Types)) {
 		definition := schema.Types[name]
-		if definition.BuiltIn || definition == schema.Subscription {
+		if definition.BuiltIn {
 			continue
 		}
 
@@ -55,7 +55,12 @@ func toDeclarations(schema *ast.Schema) protocol.Declarations {
 	}
 
 	converted.addRootFields(schema.Query, graphqlmodel.QueryOperation)
-	converted.addRootFields(schema.Mutation, graphqlmodel.MutationOperation)
+
+	// One type may be both roots; its fields are then resources once, as queries.
+	if schema.Mutation != schema.Query {
+		converted.addRootFields(schema.Mutation, graphqlmodel.MutationOperation)
+	}
+
 	converted.addExtensionPieces()
 
 	return converted.declarations

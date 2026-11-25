@@ -183,14 +183,66 @@ func TestSDLFormat_ANestedFieldWithArguments_PointsAtItsArgumentsSchema(t *testi
 	}}, sdlSchema(t, declarations, "Pet:reviews:arguments"))
 }
 
-func TestSDLFormat_TheSubscriptionRoot_IsIgnored(t *testing.T) {
+func TestSDLFormat_TheSubscriptionRoot_IsASchemaWithoutResources(t *testing.T) {
 	declarations := sdlDeclarations(t, "type Query {\n  pet: Pet\n}\n\ntype Subscription {\n  petAdded(kind: String): Pet!\n}\n\ntype Pet {\n  id: ID!\n}\n")
 
-	assert.Equal(t, []string{"Pet", "Query", "Query:pet:arguments", "Query:pet:returns"}, sdlSchemaNames(declarations))
+	assert.Equal(t, []string{"Pet", "Query", "Subscription", "Subscription:petAdded:arguments", "Query:pet:arguments", "Query:pet:returns"}, sdlSchemaNames(declarations))
 
 	for _, resource := range declarations.Resources {
 		assert.Equal(t, "query", resource.Resource.Identity.(graphqlmodel.Identity).Operation)
 	}
+}
+
+func TestSDLFormat_ATypePointingAtTheSubscriptionRoot_IsPublishedWithTheRootAsASchema(t *testing.T) {
+	interpreter := contractfiles.NewInterpreter(
+		protocol.NewRegistry([]protocol.Protocol{graphqlcontracts.New()}),
+		[]contractfiles.FileFormat{graphqlcontracts.NewSDLFormat()},
+	)
+
+	uploaded, violations, readErr, err := interpreter.ToUploadedContract(
+		[]model.ContractFile{{Source: "schema.graphqls", Content: "type Query {\n  pet: Pet\n}\n\ntype Subscription {\n  petAdded: Pet!\n}\n\ntype Pet {\n  id: ID!\n  updates: Subscription\n}\n"}},
+		&model.Participant{ID: 1, Name: "pets_api"},
+		"1.0.0",
+	)
+	require.NoError(t, err)
+	require.NoError(t, readErr)
+	require.Empty(t, violations)
+
+	assert.Equal(t, model.Schema{"": {Type: "object"}, "petAdded": {Ref: "Pet"}}, uploaded.Schemas["graphql"]["Subscription"])
+	assert.Equal(t, model.Schema{"": {Type: "object"}, "id": {Type: "string"}, "updates": {Ref: "Subscription", Nullable: true}}, uploaded.Schemas["graphql"]["Pet"])
+	assert.Len(t, uploaded.Resources, 2)
+}
+
+const sharedRootSDL = "schema {\n  query: Root\n  mutation: Root\n}\n\ntype Root {\n  pet(id: ID!): Pet\n  pets: [Pet!]!\n}\n\ntype Pet {\n  id: ID!\n}\n"
+
+func TestSDLFormat_OneTypeAsTheQueryAndTheMutationRoot_GivesItsFieldsOnce(t *testing.T) {
+	declarations := sdlDeclarations(t, sharedRootSDL)
+
+	assert.Equal(t, []string{"Pet", "Root", "Root:pet:arguments", "Root:pet:returns", "Root:pets:arguments", "Root:pets:returns"}, sdlSchemaNames(declarations))
+
+	var paths []string
+	for _, declaration := range declarations.Resources {
+		paths = append(paths, declaration.Path.String())
+	}
+
+	assert.Equal(t, []string{
+		"provides;graphql;query;pet;arguments",
+		"provides;graphql;query;pet;returns",
+		"provides;graphql;query;pets;arguments",
+		"provides;graphql;query;pets;returns",
+	}, paths)
+}
+
+func TestSDLFormat_OneTypeAsTheQueryAndTheMutationRoot_HasNoDuplicateSchema(t *testing.T) {
+	interpreter := contractfiles.NewInterpreter(
+		protocol.NewRegistry([]protocol.Protocol{graphqlcontracts.New()}),
+		[]contractfiles.FileFormat{graphqlcontracts.NewSDLFormat()},
+	)
+
+	violations, readErr := interpreter.ToViolations([]model.ContractFile{{Source: "schema.graphqls", Content: sharedRootSDL}})
+
+	require.NoError(t, readErr)
+	assert.Empty(t, violations)
 }
 
 func TestSDLFormat_EachRootField_IsTwoProvidedResources(t *testing.T) {
