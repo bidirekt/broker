@@ -68,6 +68,11 @@ func compareBodies(
 	return comparison
 }
 
+// Fits is whether a consumed body, or a site of it, meets the provider's with no break.
+func Fits(consumed *model.PersistedResource, consumerBody, providerBody schemagraph.Node, rules ReadingRules) bool {
+	return len(compareBodies(consumed, consumed, rules, consumerBody, providerBody).breaks) == 0
+}
+
 func (this *bodyComparison) compareRead(reader, producer schemagraph.Node, path string) {
 	if !reader.Exists() {
 		return
@@ -93,7 +98,7 @@ func (this *bodyComparison) compareRead(reader, producer schemagraph.Node, path 
 		this.argumentFields = append(this.argumentFields, argumentField{path: path, consumer: consumer, provider: provider})
 	}
 
-	shape := shapeRead(reader, producer, this.rules)
+	shape := ShapeRead(reader, producer, this.rules)
 	shapes := [2]string{shape.ShapeKey(), producer.ShapeKey()}
 
 	if !acceptsType(shape, producer, this.rules) {

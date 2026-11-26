@@ -11,6 +11,8 @@ scalar Instant
 
 type Query {
   pet(id: ID!): Pet
+  pets(ids: [ID!]!): [Pet!]!
+  near(id: ID): Pet
 }
 
 type Mutation {
@@ -41,11 +43,15 @@ const namedTypeWebContract = `consumes:
     graphql:
       query:
         pet: {arguments: PetArgs, returns: MaybePet}
+        pets: {arguments: PetsArgs, returns: TaggedPets}
+        near: {arguments: NearArgs, returns: MaybeAddedPet}
       mutation:
         addPet: {arguments: AddPetArgs, returns: MaybeAddedPet}
         tagPets: {arguments: TagPetsArgs, returns: TaggedPets}
 schemas:
   PetArgs: {type: object, properties: {id: {type: string}}}
+  PetsArgs: {type: object, properties: {ids: {type: array, items: {type: string}}}}
+  NearArgs: {type: object, properties: {id: {type: string, nullable: true}}}
   MaybePet: {ref: Pet, nullable: true}
   Pet: {type: object, properties: {id: {type: string}, reviews: {type: array, items: {type: string}, arguments: ReviewsArgs}}}
   ReviewsArgs: {type: object, properties: {by: {type: string}}}
@@ -69,6 +75,8 @@ const namedTypeLink = `extend schema @link(url: "https://specs.apollo.dev/federa
 const namedTypeSubgraphSDL = namedTypeLink + `
 type Query {
   pet(id: ID!): Pet
+  pets(ids: [ID!]!): [Pet!]!
+  near(id: ID): Pet
 }
 
 type Pet @key(fields: "id") {
@@ -82,9 +90,14 @@ const namedTypeGraphWebContract = `consumes:
     graphql:
       query:
         pet: {arguments: PetArgs, returns: MaybePet}
+        pets: {arguments: PetsArgs, returns: Pets}
+        near: {arguments: NearArgs, returns: MaybePet}
 schemas:
   PetArgs: {type: object, properties: {id: {type: string}}}
+  PetsArgs: {type: object, properties: {ids: {type: array, items: {type: string}}}}
+  NearArgs: {type: object, properties: {id: {type: string, nullable: true}}}
   MaybePet: {ref: Pet, nullable: true}
+  Pets: {type: array, items: {ref: Pet}}
   Pet: {type: object, properties: {name: {type: string}}}
 `
 
@@ -251,16 +264,56 @@ func (this *IntegrationSuite) TestCanIDeployAndValidate_AConsumerAgainstTheDeplo
 		`{"petstore_api": {"deployable": true, "participantVersion": "1.1.0"}}`)
 }
 
-func (this *IntegrationSuite) TestCanIDeployAndValidate_ASubgraphChangingTheNamedTypeOfAnArgumentTheGraphConsumerSends_BreaksThatConsumer() {
+func (this *IntegrationSuite) TestCanIDeployAndValidate_AProviderChangingAListArgumentWhoseItemsNoLongerFit_BreaksThatConsumerOnlyByTheShape() {
+	this.assertNamedTypeProviderCheck("pets(ids: [ID!]!)", "pets(ids: [Int!]!)", false, `{"petstore_web": {
+		"deployable": false,
+		"participantVersion": "1.0.0",
+		"operations": {"query": {"pets": {"arguments": [
+			{"reason": "property_type_mismatch", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "argument": "ids[]", "consumerPropertyType": "String!", "providerPropertyType": "Int!", "consumerField": "PetsArgs.ids[]", "providerField": "Query.pets(ids:)[]"}}
+		]}}}
+	}}`)
+}
+
+func (this *IntegrationSuite) TestCanIDeployAndValidate_AProviderRenamingTheTypeOfANullableArgumentToANonNullOne_BreaksThatConsumerOnlyByTheNullability() {
+	this.assertNamedTypeProviderCheck("near(id: ID)", "near(id: String!)", false, `{"petstore_web": {
+		"deployable": false,
+		"participantVersion": "1.0.0",
+		"operations": {"query": {"near": {"arguments": [
+			{"reason": "property_nullable_in_consumer_not_nullable_in_provider", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "argument": "id", "propertyType": "String", "consumerField": "NearArgs.id", "providerField": "Query.near(id:)"}}
+		]}}}
+	}}`)
+}
+
+func (this *IntegrationSuite) TestCanIDeployAndValidate_AProviderRenamingAnEnumWithoutAValueTheConsumerSends_BreaksThatConsumerOnlyByTheValue() {
+	this.deployNamedTypeProviderAndWeb()
+
+	candidate := strings.Replace(strings.ReplaceAll(namedTypeAPISDL, "PetStatus", "AdoptionStatus"), "  AVAILABLE\n", "", 1)
+	this.Require().NotContains(candidate, "AVAILABLE")
+
+	this.assertNamedTypeCheck("petstore_api", "1.1.0", []contractFragment{{"schema.graphqls", candidate}}, false, `{"petstore_web": {
+		"deployable": false,
+		"participantVersion": "1.0.0",
+		"operations": {"mutation": {"tagPets": {"arguments": [
+			{"reason": "property_member_missing_in_provider", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "argument": "status", "member": "AVAILABLE", "consumerField": "TagPetsArgs.status", "providerField": "Mutation.tagPets(status:)"}}
+		]}}}
+	}}`)
+}
+
+func (this *IntegrationSuite) assertNamedTypeSubgraphCheck(oldText, newText, results string) {
 	this.mustPostForNamedType("/api/environments", `{"environment":"production"}`)
 	this.mustPostForNamedType("/api/participants", `{"participant":"petstore_api"}`)
 	this.mustPostForNamedType("/api/participants", `{"participant":"petstore_web"}`)
 	this.publishAndDeployForNamedType("petstore_api", "1.4.0", contractFragment{"graph.yaml", namedTypeGraphYAML}, contractFragment{"api.graphqls", namedTypeSubgraphSDL})
 	this.publishAndDeployForNamedType("petstore_web", "3.0.0", contractFragment{"web.yaml", namedTypeGraphWebContract})
 
-	candidate := strings.Replace(namedTypeSubgraphSDL, "pet(id: ID!)", "pet(id: String!)", 1)
+	candidate := strings.Replace(namedTypeSubgraphSDL, oldText, newText, 1)
+	this.Require().NotEqual(namedTypeSubgraphSDL, candidate)
 
-	this.assertNamedTypeCheck("petstore_api", "1.5.0", []contractFragment{{"graph.yaml", namedTypeGraphYAML}, {"api.graphqls", candidate}}, false, `{"petstore_web": {
+	this.assertNamedTypeCheck("petstore_api", "1.5.0", []contractFragment{{"graph.yaml", namedTypeGraphYAML}, {"api.graphqls", candidate}}, false, results)
+}
+
+func (this *IntegrationSuite) TestCanIDeployAndValidate_ASubgraphChangingTheNamedTypeOfAnArgumentTheGraphConsumerSends_BreaksThatConsumer() {
+	this.assertNamedTypeSubgraphCheck("pet(id: ID!)", "pet(id: String!)", `{"petstore_web": {
 		"deployable": false,
 		"participantVersion": "3.0.0",
 		"operations": {"query": {"pet": {"arguments": [
@@ -270,19 +323,31 @@ func (this *IntegrationSuite) TestCanIDeployAndValidate_ASubgraphChangingTheName
 }
 
 func (this *IntegrationSuite) TestCanIDeployAndValidate_ASubgraphChangingAnArgumentTheGraphConsumerSendsFromIDToInt_BreaksThatConsumerOnlyByTheShape() {
-	this.mustPostForNamedType("/api/environments", `{"environment":"production"}`)
-	this.mustPostForNamedType("/api/participants", `{"participant":"petstore_api"}`)
-	this.mustPostForNamedType("/api/participants", `{"participant":"petstore_web"}`)
-	this.publishAndDeployForNamedType("petstore_api", "1.4.0", contractFragment{"graph.yaml", namedTypeGraphYAML}, contractFragment{"api.graphqls", namedTypeSubgraphSDL})
-	this.publishAndDeployForNamedType("petstore_web", "3.0.0", contractFragment{"web.yaml", namedTypeGraphWebContract})
-
-	candidate := strings.Replace(namedTypeSubgraphSDL, "pet(id: ID!)", "pet(id: Int!)", 1)
-
-	this.assertNamedTypeCheck("petstore_api", "1.5.0", []contractFragment{{"graph.yaml", namedTypeGraphYAML}, {"api.graphqls", candidate}}, false, `{"petstore_web": {
+	this.assertNamedTypeSubgraphCheck("pet(id: ID!)", "pet(id: Int!)", `{"petstore_web": {
 		"deployable": false,
 		"participantVersion": "3.0.0",
 		"operations": {"query": {"pet": {"arguments": [
 			{"reason": "property_type_mismatch", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_graph", "property": "$", "argument": "id", "consumerPropertyType": "String!", "providerPropertyType": "Int!", "consumerField": "PetArgs.id", "providerField": "Query.pet(id:)", "graph": "petstore_graph"}}
+		]}}}
+	}}`)
+}
+
+func (this *IntegrationSuite) TestCanIDeployAndValidate_ASubgraphChangingAListArgumentWhoseItemsNoLongerFit_BreaksTheGraphConsumerOnlyByTheShape() {
+	this.assertNamedTypeSubgraphCheck("pets(ids: [ID!]!)", "pets(ids: [Int!]!)", `{"petstore_web": {
+		"deployable": false,
+		"participantVersion": "3.0.0",
+		"operations": {"query": {"pets": {"arguments": [
+			{"reason": "property_type_mismatch", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_graph", "property": "$", "argument": "ids[]", "consumerPropertyType": "String!", "providerPropertyType": "Int!", "consumerField": "PetsArgs.ids[]", "providerField": "Query.pets(ids:)[]", "graph": "petstore_graph"}}
+		]}}}
+	}}`)
+}
+
+func (this *IntegrationSuite) TestCanIDeployAndValidate_ASubgraphRenamingTheTypeOfANullableArgumentToANonNullOne_BreaksTheGraphConsumerOnlyByTheNullability() {
+	this.assertNamedTypeSubgraphCheck("near(id: ID)", "near(id: String!)", `{"petstore_web": {
+		"deployable": false,
+		"participantVersion": "3.0.0",
+		"operations": {"query": {"near": {"arguments": [
+			{"reason": "property_nullable_in_consumer_not_nullable_in_provider", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_graph", "property": "$", "argument": "id", "propertyType": "String", "consumerField": "NearArgs.id", "providerField": "Query.near(id:)", "graph": "petstore_graph"}}
 		]}}}
 	}}`)
 }

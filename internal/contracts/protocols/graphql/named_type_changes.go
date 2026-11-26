@@ -172,8 +172,10 @@ func (this *namedTypeWalk) walkSent(consumer, provider, candidate schemagraph.No
 		return
 	}
 
+	rules := bodyReadings[model.Input].Rules
+
 	if change, changed := this.changes[provider.Field()]; changed {
-		if !candidate.Exists() || !compatibility_checker.AcceptsType(candidate, consumer, bodyReadings[model.Input].Rules) {
+		if !candidate.Exists() || !compatibility_checker.Fits(this.consumed, consumer, candidate, rules) {
 			return
 		}
 
@@ -194,13 +196,7 @@ func (this *namedTypeWalk) walkSent(consumer, provider, candidate schemagraph.No
 		return
 	}
 
-	for provider.Type() == model.ArrayType && consumer.Type() != model.ArrayType {
-		provider = provider.Child(model.ItemsSegment)
-	}
-
-	for candidate.Type() == model.ArrayType && consumer.Type() != model.ArrayType {
-		candidate = candidate.Child(model.ItemsSegment)
-	}
+	provider, candidate = compatibility_checker.ShapeRead(provider, consumer, rules), compatibility_checker.ShapeRead(candidate, consumer, rules)
 
 	for _, segment := range consumer.Segments() {
 		this.walkSent(consumer.Child(segment), provider.Child(segment), candidate.Child(segment), fieldPath, model.ChildPath(argumentPath, segment))

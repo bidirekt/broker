@@ -65,12 +65,8 @@ func consumerAndProvider(checked, counterpart *model.PersistedResource) (consume
 	return counterpart, checked
 }
 
-// AcceptsType is whether the reader takes the producer's type, the first thing a comparison judges at a site.
-func AcceptsType(reader, producer schemagraph.Node, rules ReadingRules) bool {
-	return acceptsType(shapeRead(reader, producer, rules), producer, rules)
-}
-
-func shapeRead(reader, producer schemagraph.Node, rules ReadingRules) schemagraph.Node {
+// ShapeRead is the node of the reader that reads what the producer gives at a site.
+func ShapeRead(reader, producer schemagraph.Node, rules ReadingRules) schemagraph.Node {
 	for rules.SingleToList && reader.Type() == model.ArrayType && producer.Type() != model.ArrayType {
 		reader = reader.Child(model.ItemsSegment)
 	}
