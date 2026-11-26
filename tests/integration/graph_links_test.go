@@ -79,10 +79,10 @@ func (this *IntegrationSuite) TestGraphLinks_TheSubgraphPageLinksTheGraphOfEachE
 	status, _, body := this.getPage("/participants/petstore_api", this.signInAsAdmin())
 	this.Require().Equal(http.StatusOK, status, body)
 
-	this.Contains(body, `<a class="badge" href="/graphs/petstore_graph">graph petstore_graph in development</a>`+
-		`<a class="badge" href="/graphs/petstore_graph">graph petstore_graph in production</a>`+
-		`<a class="badge" href="/graphs/petstore_legacy_graph">graph petstore_legacy_graph in staging</a></div></div>`)
-	this.Equal(3, strings.Count(body, `<a class="badge" href="/graphs/`))
+	this.Contains(body, `<a class="badge wrap" href="/graphs/petstore_graph">graph petstore_graph in development</a>`+
+		`<a class="badge wrap" href="/graphs/petstore_graph">graph petstore_graph in production</a>`+
+		`<a class="badge wrap" href="/graphs/petstore_legacy_graph">graph petstore_legacy_graph in staging</a></div></div>`)
+	this.Equal(3, strings.Count(body, `<a class="badge wrap" href="/graphs/`))
 }
 
 func (this *IntegrationSuite) TestGraphLinks_TheCheckOfAGraphConsumerLinksTheGraphByName() {

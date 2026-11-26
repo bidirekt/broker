@@ -25,7 +25,7 @@
   <a href="{{.ParticipantURL}}/relations">Relations <span class="count">{{.Header.RelationCount}}</span></a>
 </nav>
 <section class="sheet">
-  {{if .Links}}<div class="sheet-head"><div class="badges">{{range .Links}}<a class="badge" href="{{.URL}}">{{.Label}}</a>{{end}}</div></div>{{end}}
+  {{if .Links}}<div class="sheet-head"><div class="badges">{{range .Links}}<a class="badge wrap" href="{{.URL}}">{{.Label}}</a>{{end}}</div></div>{{end}}
   {{if .Versions}}
   <div class="scroll"><table class="t stack">
     <thead>

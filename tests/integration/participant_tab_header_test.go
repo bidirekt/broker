@@ -188,5 +188,5 @@ func (this *IntegrationSuite) TestParticipantTabHeader_EveryTabRendersTheSameHea
 
 	status, _, body := this.getPage("/participants/orders_subgraph", sessionCookie)
 	this.Require().Equal(http.StatusOK, status, body)
-	this.Contains(body, `<a class="badge" href="/graphs/orders_graph">graph orders_graph in production</a>`)
+	this.Contains(body, `<a class="badge wrap" href="/graphs/orders_graph">graph orders_graph in production</a>`)
 }
