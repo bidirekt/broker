@@ -1,7 +1,9 @@
 package show_check
 
 import (
+	"maps"
 	"net/url"
+	"slices"
 
 	"github.com/bidirekt/broker/internal/components/breakreport"
 	"github.com/bidirekt/broker/internal/model"
@@ -21,6 +23,7 @@ type ShowCheckPage struct {
 	Counterparts   []CounterpartRow
 	Breaking       []CounterpartRow
 	Compatible     []CounterpartRow
+	DrawnSections  []string
 }
 
 type CounterpartRow struct {
@@ -36,6 +39,7 @@ func newShowCheckPage(check *model.CompatibilityCheck, report breakreport.Report
 		VersionURL:     versionURL(check.ParticipantName, check.Version),
 		Report:         report,
 	}
+	drawn := map[string]bool{}
 	for _, counterpart := range report.Counterparts {
 		row := toCounterpartRow(counterpart)
 		page.Counterparts = append(page.Counterparts, row)
@@ -44,7 +48,11 @@ func newShowCheckPage(check *model.CompatibilityCheck, report breakreport.Report
 		} else {
 			page.Compatible = append(page.Compatible, row)
 		}
+		for _, protocol := range counterpart.Protocols {
+			drawn[protocol.ReportKey] = true
+		}
 	}
+	page.DrawnSections = slices.Sorted(maps.Keys(drawn))
 
 	return page
 }

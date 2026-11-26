@@ -1,0 +1,14 @@
+.ep{padding:16px 20px 20px;border-top:1px solid var(--rule)}
+.group-label+.ep{border-top:0}
+.ep-title{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-family:var(--mono);font-size:13px;font-weight:600;overflow-wrap:anywhere}
+.meth{font-family:var(--mono);font-size:11px;font-weight:700;padding:1px 6px;border-radius:4px;border:1px solid var(--border);background:var(--raised);color:var(--text)}
+.prop{font-family:var(--mono);font-size:11px;font-weight:700;padding:1px 6px;border-radius:4px;background:var(--text);color:var(--surface)}
+.ix{margin:12px 0 0;padding-left:16px;border-left:2px solid var(--rule)}
+.ix-name{font-family:var(--mono);font-size:13px;color:var(--muted);margin-bottom:8px}
+.brk{display:flex;gap:8px;align-items:center;margin-top:4px;font-size:14px;line-height:1.5;overflow-wrap:anywhere}
+.brk svg{color:var(--alert-ink)}
+.places{margin:12px 0 0;padding:0;list-style:none;border:1px solid var(--rule);border-radius:var(--r-ctl)}
+.places li{padding:8px 14px;border-top:1px solid var(--rule);font-family:var(--mono);font-size:13px;display:flex;flex-wrap:wrap;gap:4px 10px;overflow-wrap:anywhere}
+.places li:first-child{border-top:0}
+.places .at{color:var(--muted)}
+.places .cf{color:var(--muted)}

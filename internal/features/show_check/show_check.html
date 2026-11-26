@@ -2,7 +2,8 @@
 
 {{define "content"}}
 {{with .Page}}
-<nav class="crumbs" aria-label="Breadcrumbs"><a href="/participants">participants</a><span aria-hidden="true">/</span><a href="{{.ParticipantURL}}">{{.Check.ParticipantName}}</a><span aria-hidden="true">/</span>{{if .VersionURL}}<a href="{{.VersionURL}}">{{.Check.Version}}</a>{{else}}<span>{{.Check.Version}}</span>{{end}}<span aria-hidden="true">/</span><span aria-current="page">check #{{.Check.ID}}</span></nav>
+{{range .DrawnSections}}<link rel="stylesheet" href="/assets/protocols/{{.}}.css">
+{{end}}<nav class="crumbs" aria-label="Breadcrumbs"><a href="/participants">participants</a><span aria-hidden="true">/</span><a href="{{.ParticipantURL}}">{{.Check.ParticipantName}}</a><span aria-hidden="true">/</span>{{if .VersionURL}}<a href="{{.VersionURL}}">{{.Check.Version}}</a>{{else}}<span>{{.Check.Version}}</span>{{end}}<span aria-hidden="true">/</span><span aria-current="page">check #{{.Check.ID}}</span></nav>
 <section class="sheet">
   <div class="verdict {{if .Check.Deployable}}yes{{else}}no{{end}}">
     <div class="ic">{{if .Check.Deployable}}{{template "icon_check" 20}}{{else}}{{template "icon_x" 20}}{{end}}</div>
@@ -45,7 +46,7 @@
 <details class="cp" open>
   <summary><span class="chev">{{template "icon_chevron" 14}}</span>{{template "role" .Role}}<span class="who-cp">{{.Name}}</span>{{if .Version}}<span class="ver">{{.Version}}</span><span class="badge env">{{$check.EnvironmentName}}</span>{{else}}<span class="muted">no version</span>{{end}}<span class="badge no nb">{{template "icon_x" 12}}no · {{.Breaks}} {{if eq .Breaks 1}}break{{else}}breaks{{end}}</span></summary>
   {{if .ParticipantURL}}<div class="cp-links"><a href="{{.ParticipantURL}}">{{.Name}}</a>{{if .VersionURL}}<span aria-hidden="true">·</span><a href="{{.VersionURL}}">version {{.Version}}</a>{{end}}</div>{{end}}
-  {{with index .Protocols "rest"}}{{template "rest_resources" .}}{{end}}
+  {{range .Protocols}}{{section .Template .Display}}{{end}}
 </details>
 {{end}}
 {{if .Compatible}}

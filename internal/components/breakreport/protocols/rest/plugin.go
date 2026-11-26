@@ -1,8 +1,10 @@
 package rest
 
 import (
+	"embed"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"maps"
 	"slices"
 	"strings"
@@ -50,6 +52,9 @@ type Place struct {
 	CounterpartField string
 }
 
+//go:embed rest_resources.html endpoints.css
+var sectionFiles embed.FS
+
 type Plugin struct{}
 
 func New() *Plugin {
@@ -62,6 +67,14 @@ func (this *Plugin) Protocol() model.Protocol {
 
 func (this *Plugin) ReportKey() string {
 	return restmodel.ReportKey
+}
+
+func (this *Plugin) Files() fs.FS {
+	return sectionFiles
+}
+
+func (this *Plugin) Template() string {
+	return "rest_resources"
 }
 
 func (this *Plugin) ToSection(checked breakreport.CheckedCounterpart, tree json.RawMessage) (breakreport.Section, error) {

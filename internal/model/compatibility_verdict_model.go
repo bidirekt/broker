@@ -7,7 +7,7 @@ import (
 )
 
 // VerdictBreak is a stored property break. On the wire its location sits under its
-// protocol's key: {"rest": {...}, "reason": ..., "details": ...}.
+// protocol's key: {"<protocol>": {...}, "reason": ..., "details": ...}.
 type VerdictBreak struct {
 	Protocol Protocol
 	Location map[string]string

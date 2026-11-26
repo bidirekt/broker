@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/bidirekt/broker/internal/components/bearer"
+	"github.com/bidirekt/broker/internal/components/breakreport"
 	"github.com/bidirekt/broker/internal/components/config"
 	"github.com/bidirekt/broker/internal/components/input"
 	"github.com/bidirekt/broker/internal/components/pages"
@@ -43,7 +44,7 @@ func respondError(ctx fiber.Ctx, err error) error {
 	return respond.Problem(ctx, fiber.StatusInternalServerError, message)
 }
 
-func New(settings config.Settings, sessionKeeper *sessions.Keeper, bearerKeeper *bearer.Keeper) *fiber.App {
+func New(settings config.Settings, sessionKeeper *sessions.Keeper, bearerKeeper *bearer.Keeper, sections []breakreport.ProtocolSection) *fiber.App {
 	appConfig := fiber.Config{
 		BodyLimit:     publishBodyLimit,
 		ErrorHandler:  respondError,
@@ -65,7 +66,7 @@ func New(settings config.Settings, sessionKeeper *sessions.Keeper, bearerKeeper 
 		ContentSecurityPolicy: pageContentSecurityPolicy,
 	}))
 	server.Use(input.Door())
-	serveAssets(server)
+	serveAssets(server, sections)
 	server.Use(versions.Door)
 	server.Use(sessionKeeper.Door)
 	server.Use(bearerKeeper.Door)

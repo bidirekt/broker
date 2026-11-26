@@ -9,6 +9,6 @@ import (
 func Register(kernel *components.Components, reportReader *breakreport.Reader) {
 	compatibilityRepository := repository.NewCompatibilityRepository(kernel.Pool)
 	useCase := NewShowCheckUseCase(compatibilityRepository, reportReader)
-	uiHandler := NewShowCheckUiHandler(useCase)
+	uiHandler := NewShowCheckUiHandler(useCase, reportReader.SectionFiles())
 	kernel.Server.Get("/checks/:id", uiHandler.Handle)
 }

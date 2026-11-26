@@ -51,7 +51,7 @@ components:
   components_input:         { in: internal/components/input }
   components_access:        { in: internal/components/access }
   components_breakreport:   { in: internal/components/breakreport }
-  components_breakreport_protocols: { in: internal/components/breakreport/protocols/** }
+  components_breakreport_protocols_rest: { in: internal/components/breakreport/protocols/rest }
   components_pages:         { in: internal/components/pages }
   components_respond:       { in: internal/components/respond }
   components_bearer:        { in: internal/components/bearer }
@@ -72,11 +72,11 @@ components:
       - internal/contracts/schemagraph
       - internal/contracts/validator
       - internal/contracts/violation
-  contracts_protocols:        { in: internal/contracts/protocols/** }
+  contracts_protocols_rest:   { in: internal/contracts/protocols/rest }
   repository:                 { in: internal/repository }
-  repository_protocols:       { in: internal/repository/protocols/** }
+  repository_protocols_rest:  { in: internal/repository/protocols/rest }
   model:                      { in: internal/model }
-  model_protocols:            { in: internal/model/protocols/** }
+  model_protocols_rest:       { in: internal/model/protocols/rest }
   validations:                { in: internal/validations }
   pkg:                        { in: pkg/** }
   migrations:                 { in: migrations }
@@ -102,12 +102,12 @@ deps:
     mayDependOn:
       - components
       - components_breakreport
-      - components_breakreport_protocols
+      - components_breakreport_protocols_rest
       - components_config
       - contracts
-      - contracts_protocols
+      - contracts_protocols_rest
       - repository
-      - repository_protocols
+      - repository_protocols_rest
       - feature_can_i_deploy
       - feature_create_api_key
       - feature_create_environment
@@ -257,15 +257,15 @@ deps:
     canUse: [fiber]
 
   components:
-    mayDependOn: [components_bearer, components_config, components_database, components_server, components_sessions, repository]
+    mayDependOn: [components_bearer, components_breakreport, components_config, components_database, components_server, components_sessions, repository]
     canUse: [fiber, pgx]
   components_access:
     mayDependOn: [model]
     canUse: [fiber]
   components_breakreport:
     mayDependOn: [model]
-  components_breakreport_protocols:
-    mayDependOn: [components_breakreport, model, model_protocols]
+  components_breakreport_protocols_rest:
+    mayDependOn: [components_breakreport, model, model_protocols_rest]
   components_bearer:
     mayDependOn: [components_access, components_config, components_pages, components_respond, components_tokens, repository, model]
     canUse: [fiber, golang_jwt]
@@ -284,7 +284,7 @@ deps:
     mayDependOn: [components_pages]
     canUse: [fiber]
   components_server:
-    mayDependOn: [components_bearer, components_config, components_input, components_pages, components_respond, components_sessions, components_versions]
+    mayDependOn: [components_bearer, components_breakreport, components_config, components_input, components_pages, components_respond, components_sessions, components_versions]
     canUse: [fiber]
   components_sessions:
     mayDependOn: [components_access, components_config, components_pages, components_respond, components_tokens, repository, model]
@@ -295,17 +295,17 @@ deps:
   contracts:
     mayDependOn: [contracts, model, validations]
     canUse: [yaml, guregu_null]
-  contracts_protocols:
-    mayDependOn: [contracts, model, model_protocols]
+  contracts_protocols_rest:
+    mayDependOn: [contracts, model, model_protocols_rest]
   repository:
     mayDependOn: [model]
     canUse: [pgx, guregu_null]
-  repository_protocols:
-    mayDependOn: [repository, model, model_protocols]
+  repository_protocols_rest:
+    mayDependOn: [repository, model, model_protocols_rest]
 
   model:
     canUse: [guregu_null]
-  model_protocols:
+  model_protocols_rest:
     mayDependOn: [model]
 
   pkg:
@@ -318,7 +318,7 @@ deps:
       - components_access
       - components_bearer
       - components_breakreport
-      - components_breakreport_protocols
+      - components_breakreport_protocols_rest
       - components_config
       - components_database
       - components_pages
@@ -326,13 +326,14 @@ deps:
       - components_tokens
       - components_versions
       - contracts
-      - contracts_protocols
+      - contracts_protocols_rest
       - feature_health
+      - feature_show_check
       - migrations
       - repository
-      - repository_protocols
+      - repository_protocols_rest
       - model
-      - model_protocols
+      - model_protocols_rest
       - validations
       - pkg
     canUse: [fiber, pgx, guregu_null, yaml, testify, testcontainers, golang_jwt]

@@ -14,7 +14,7 @@ func (this Plugin) NewReportTree() compatibility_checker.ReportTree {
 }
 
 func (this Plugin) RefineNotFound(hint any) (model.BreakingReason, map[string]string, bool) {
-	return model.ReasonProviderResourceInteractionNotFound, providerStatusesDetails(hint.(restmodel.DeployedStatuses)), true
+	return restmodel.ReasonProviderResourceInteractionNotFound, providerStatusesDetails(hint.(restmodel.DeployedStatuses)), true
 }
 
 // A removed request keeps no statuses: its endpoint and method only remain through responses.
@@ -50,7 +50,7 @@ func (this Plugin) RefineRemoved(
 
 	slices.Sort(statuses)
 
-	return model.ReasonProviderResourceInteractionRemovedButStillConsumed, providerStatusesDetails(statuses), true
+	return restmodel.ReasonProviderResourceInteractionRemovedButStillConsumed, providerStatusesDetails(statuses), true
 }
 
 func providerStatusesDetails(statuses []string) map[string]string {

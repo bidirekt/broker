@@ -1,11 +1,15 @@
 package breakreport_test
 
 import (
+	"encoding/json"
+	"io/fs"
 	"testing"
+	"testing/fstest"
 
 	"github.com/bidirekt/broker/internal/components/breakreport"
 	restbreakreport "github.com/bidirekt/broker/internal/components/breakreport/protocols/rest"
 	"github.com/bidirekt/broker/internal/model"
+	restmodel "github.com/bidirekt/broker/internal/model/protocols/rest"
 	"github.com/guregu/null"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -90,9 +94,13 @@ func counterpartNamed(t *testing.T, report breakreport.Report, name string) brea
 }
 
 func restResources(t *testing.T, counterpart breakreport.Counterpart) restbreakreport.Resources {
-	resources, ok := counterpart.Protocols["rest"].(restbreakreport.Resources)
-	require.True(t, ok, "counterpart without REST resources", counterpart.Name)
-	return resources
+	for _, protocol := range counterpart.Protocols {
+		if resources, ok := protocol.Display.(restbreakreport.Resources); ok {
+			return resources
+		}
+	}
+	require.FailNow(t, "counterpart without REST resources", counterpart.Name)
+	return restbreakreport.Resources{}
 }
 
 func TestCountsOneBreakPerFieldBlockAndPerEndpointBreak(t *testing.T) {
@@ -208,7 +216,7 @@ func TestRemovedCountsOncePerEndpointAndMethodAndInteractionRemovedOncePerIntera
 	require.Len(t, interactionRemoved.Breaks, 2)
 	assert.Equal(t, "response 200", interactionRemoved.Breaks[0].Interaction)
 	assert.Equal(t, "response 404", interactionRemoved.Breaks[1].Interaction)
-	assert.Equal(t, model.ReasonProviderResourceInteractionRemovedButStillConsumed, interactionRemoved.Breaks[0].Reason)
+	assert.Equal(t, restmodel.ReasonProviderResourceInteractionRemovedButStillConsumed, interactionRemoved.Breaks[0].Reason)
 	assert.Equal(t, "petstore_api now answers GET /pets only with 204, but petstore_web still reads response 200", interactionRemoved.Breaks[0].Sentence.String())
 	assert.Empty(t, interactionRemoved.Breaks[0].ReasonLine)
 
@@ -428,4 +436,114 @@ func TestMissingValuesFromTheProviderUnderCheck(t *testing.T) {
 		{Participant: "petstore_web", Action: `stop reading "adopted" there`},
 	}, fields[1].Fixes)
 	assert.Equal(t, []restbreakreport.Place{{Method: "GET", Endpoint: "/pets/*", Interaction: "response 200", Property: `"$.status"`, CounterpartField: "Pet.status"}}, fields[1].Places)
+}
+
+const probeReportKey = "probes"
+
+var probeSectionFiles = fstest.MapFS{
+	"probes.css": {Data: []byte(`.probe{}`)},
+}
+
+type probeSection struct{}
+
+func (this probeSection) Protocol() model.Protocol {
+	return "probe"
+}
+
+func (this probeSection) ReportKey() string {
+	return probeReportKey
+}
+
+func (this probeSection) ToSection(_ breakreport.CheckedCounterpart, tree json.RawMessage) (breakreport.Section, error) {
+	var breaks []string
+	if tree != nil {
+		if err := json.Unmarshal(tree, &breaks); err != nil {
+			return breakreport.Section{}, err
+		}
+	}
+	return breakreport.Section{Display: breaks, Breaks: len(breaks)}, nil
+}
+
+func (this probeSection) Files() fs.FS {
+	return probeSectionFiles
+}
+
+func (this probeSection) Template() string {
+	return "probe_breaks"
+}
+
+const twoSectionsReport = `{
+  "petstore_api": {
+    "deployable": false,
+    "participantVersion": "1.4.0",
+    "probes": ["petstore_web pings petstore_api, but it stopped answering"],
+    "endpoints": {
+      "/pets": {"get": {"200": [{"reason": "provider_resource_not_found", "role": "consumer"}]}}
+    }
+  },
+  "petstore_reviews": {
+    "deployable": false,
+    "participantVersion": "1.0.0",
+    "probes": ["petstore_web pings petstore_reviews, but it stopped answering", "petstore_web pings petstore_reviews twice, but it answers once"],
+    "endpoints": {}
+  },
+  "petstore_users": {"deployable": true, "participantVersion": "3.0.0", "endpoints": {}}
+}`
+
+func twoSectionsCheck() breakreport.Report {
+	return breakreport.NewReader([]breakreport.ProtocolSection{probeSection{}, restbreakreport.New()}).FromStoredCheck(model.CompatibilityCheck{
+		ParticipantName: checkedParticipant,
+		EnvironmentName: checkEnvironment,
+		Report:          []byte(twoSectionsReport),
+	}, []model.CompatibilityCheckResult{
+		{CounterpartName: "petstore_api", Role: model.CounterpartProvider, CounterpartVersion: null.StringFrom("1.4.0"), CounterpartParticipantID: null.IntFrom(1)},
+		{CounterpartName: "petstore_reviews", Role: model.CounterpartProvider, CounterpartVersion: null.StringFrom("1.0.0"), CounterpartParticipantID: null.IntFrom(1)},
+		{CounterpartName: "petstore_users", Role: model.CounterpartProvider, CounterpartVersion: null.StringFrom("3.0.0"), CounterpartParticipantID: null.IntFrom(1), Deployable: true},
+	})
+}
+
+func reportKeysOf(counterpart breakreport.Counterpart) []string {
+	keys := []string{}
+	for _, protocol := range counterpart.Protocols {
+		keys = append(keys, protocol.ReportKey)
+	}
+	return keys
+}
+
+func TestListsOnlyTheSectionsACounterpartBreaksInOrderedByReportKey(t *testing.T) {
+	report := twoSectionsCheck()
+
+	assert.Equal(t, []string{restmodel.ReportKey, probeReportKey}, reportKeysOf(counterpartNamed(t, report, "petstore_api")))
+	assert.Equal(t, []string{probeReportKey}, reportKeysOf(counterpartNamed(t, report, "petstore_reviews")))
+	assert.Empty(t, reportKeysOf(counterpartNamed(t, report, "petstore_users")))
+}
+
+func TestEachListedSectionCarriesItsTemplateAndDisplay(t *testing.T) {
+	api := counterpartNamed(t, twoSectionsCheck(), "petstore_api")
+
+	require.Len(t, api.Protocols, 2)
+	assert.Equal(t, "rest_resources", api.Protocols[0].Template)
+	assert.Equal(t, "/pets", restResources(t, api).Endpoints[0].Path)
+	assert.Equal(t, "probe_breaks", api.Protocols[1].Template)
+	assert.Equal(t, []string{"petstore_web pings petstore_api, but it stopped answering"}, api.Protocols[1].Display)
+}
+
+func TestASecondSectionCountsInTheBreaksOfTheCounterpart(t *testing.T) {
+	report := twoSectionsCheck()
+
+	assert.Equal(t, 2, counterpartNamed(t, report, "petstore_api").Breaks)
+	assert.Equal(t, 2, counterpartNamed(t, report, "petstore_reviews").Breaks)
+	assert.Equal(t, 0, counterpartNamed(t, report, "petstore_users").Breaks)
+	assert.Equal(t, 4, report.Breaks)
+	assert.Equal(t, 2, report.CounterpartsBreaking)
+}
+
+func TestSectionFilesFollowTheReportKeyOrder(t *testing.T) {
+	files := breakreport.NewReader([]breakreport.ProtocolSection{probeSection{}, restbreakreport.New()}).SectionFiles()
+
+	require.Len(t, files, 2)
+	_, err := fs.Stat(files[0], restmodel.ReportKey+".css")
+	assert.NoError(t, err)
+	_, err = fs.Stat(files[1], probeReportKey+".css")
+	assert.NoError(t, err)
 }

@@ -40,8 +40,8 @@ func TestRefineNotFound(t *testing.T) {
 		details map[string]string
 		refined bool
 	}{
-		{"statuses declared on the method", restmodel.DeployedStatuses{"201", "204"}, model.ReasonProviderResourceInteractionNotFound, map[string]string{"providerStatuses": "201, 204"}, true},
-		{"only a request declared on the method", restmodel.DeployedStatuses(nil), model.ReasonProviderResourceInteractionNotFound, nil, true},
+		{"statuses declared on the method", restmodel.DeployedStatuses{"201", "204"}, restmodel.ReasonProviderResourceInteractionNotFound, map[string]string{"providerStatuses": "201, 204"}, true},
+		{"only a request declared on the method", restmodel.DeployedStatuses(nil), restmodel.ReasonProviderResourceInteractionNotFound, nil, true},
 	}
 
 	for _, tc := range cases {
@@ -82,7 +82,7 @@ func TestRefineRemoved_ResponseOnSurvivingMethod_ListsTheLiveProviderStatusesSor
 	})
 
 	assert.True(t, refined)
-	assert.Equal(t, model.ReasonProviderResourceInteractionRemovedButStillConsumed, reason)
+	assert.Equal(t, restmodel.ReasonProviderResourceInteractionRemovedButStillConsumed, reason)
 	assert.Equal(t, map[string]string{"providerStatuses": "204, 2XX, 404"}, details)
 }
 
@@ -96,7 +96,7 @@ func TestRefineRemoved_RequestOnSurvivingMethod_HasNoStatuses(t *testing.T) {
 	})
 
 	assert.True(t, refined)
-	assert.Equal(t, model.ReasonProviderResourceInteractionRemovedButStillConsumed, reason)
+	assert.Equal(t, restmodel.ReasonProviderResourceInteractionRemovedButStillConsumed, reason)
 	assert.Nil(t, details)
 }
 

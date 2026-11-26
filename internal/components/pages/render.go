@@ -33,10 +33,16 @@ type layoutData struct {
 	Page         any
 }
 
-func Render(ctx fiber.Ctx, status int, files fs.FS, page string, data any) error {
+func Render(ctx fiber.Ctx, status int, files fs.FS, page string, data any, sections ...fs.FS) error {
 	set, err := layouts.Clone()
 	if err != nil {
 		return err
+	}
+	set.Funcs(sectionFuncs(set))
+	for _, section := range sections {
+		if _, err := set.ParseFS(section, "*.html"); err != nil {
+			return err
+		}
 	}
 	if _, err := set.ParseFS(files, page); err != nil {
 		return err
@@ -57,6 +63,18 @@ func Render(ctx fiber.Ctx, status int, files fs.FS, page string, data any) error
 	}
 
 	return ctx.Status(status).Send(html.Bytes())
+}
+
+func sectionFuncs(set *template.Template) template.FuncMap {
+	return template.FuncMap{
+		"section": func(name string, data any) (template.HTML, error) {
+			var html bytes.Buffer
+			if err := set.ExecuteTemplate(&html, name, data); err != nil {
+				return "", err
+			}
+			return template.HTML(html.String()), nil
+		},
+	}
 }
 
 func isHtmxRequest(ctx fiber.Ctx) bool {

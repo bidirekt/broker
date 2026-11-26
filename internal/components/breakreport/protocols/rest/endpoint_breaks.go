@@ -8,6 +8,7 @@ import (
 
 	"github.com/bidirekt/broker/internal/components/breakreport"
 	"github.com/bidirekt/broker/internal/model"
+	restmodel "github.com/bidirekt/broker/internal/model/protocols/rest"
 )
 
 func toEndpointBreak(checked checkedInteraction, contractBreak model.ReportBreak) EndpointBreak {
@@ -40,13 +41,13 @@ func endpointBreakLine(checked checkedInteraction, contractBreak model.ReportBre
 	case reason == model.ReasonProviderResourceNotFound && asConsumer:
 		return breakreport.Phrase{breakreport.Name(me), breakreport.Plain(" calls "), breakreport.Code(resource), breakreport.Plain(", but "), breakreport.Name(other), breakreport.Plain(" doesn't provide it")},
 			fixes("stop calling it", "publish it")
-	case reason == model.ReasonProviderResourceInteractionNotFound && asConsumer && onRequest:
+	case reason == restmodel.ReasonProviderResourceInteractionNotFound && asConsumer && onRequest:
 		return breakreport.Phrase{breakreport.Name(me), breakreport.Plain(" sends a request body, but "), breakreport.Name(other), breakreport.Plain(" declares none")},
 			fixes("stop sending it", "accept a request body")
-	case reason == model.ReasonProviderResourceInteractionNotFound && asConsumer && onResponse && details["providerStatuses"] == "":
+	case reason == restmodel.ReasonProviderResourceInteractionNotFound && asConsumer && onResponse && details["providerStatuses"] == "":
 		return breakreport.Phrase{breakreport.Name(me), breakreport.Plain(" reads response " + status + ", but "), breakreport.Name(other), breakreport.Plain(" declares no response")},
 			fixes("stop reading it", "answer "+status)
-	case reason == model.ReasonProviderResourceInteractionNotFound && asConsumer && onResponse:
+	case reason == restmodel.ReasonProviderResourceInteractionNotFound && asConsumer && onResponse:
 		providerStatuses := orList(details["providerStatuses"])
 		return breakreport.Phrase{breakreport.Name(me), breakreport.Plain(" reads response " + status + ", but "), breakreport.Name(other), breakreport.Plain(" answers only " + providerStatuses)},
 			fixes("read response "+providerStatuses, "answer "+status)
@@ -56,13 +57,13 @@ func endpointBreakLine(checked checkedInteraction, contractBreak model.ReportBre
 	case reason == model.ReasonProviderResourceRemovedButStillConsumed && asProvider:
 		return breakreport.Phrase{breakreport.Name(me), breakreport.Plain(" removed "), breakreport.Code(resource), breakreport.Plain(", but "), breakreport.Name(other), breakreport.Plain(" still calls it")},
 			fixes("keep it until "+other+" stops calling it", "stop calling it")
-	case reason == model.ReasonProviderResourceInteractionRemovedButStillConsumed && asProvider && onRequest:
+	case reason == restmodel.ReasonProviderResourceInteractionRemovedButStillConsumed && asProvider && onRequest:
 		return breakreport.Phrase{breakreport.Name(me), breakreport.Plain(" dropped the request body of "), breakreport.Code(resource), breakreport.Plain(", but "), breakreport.Name(other), breakreport.Plain(" still sends it")},
 			fixes("keep accepting it until "+other+" stops sending it", "stop sending it")
-	case reason == model.ReasonProviderResourceInteractionRemovedButStillConsumed && asProvider && onResponse && details["providerStatuses"] == "":
+	case reason == restmodel.ReasonProviderResourceInteractionRemovedButStillConsumed && asProvider && onResponse && details["providerStatuses"] == "":
 		return breakreport.Phrase{breakreport.Name(me), breakreport.Plain(" no longer answers "), breakreport.Code(resource), breakreport.Plain(", but "), breakreport.Name(other), breakreport.Plain(" still reads response " + status)},
 			fixes("keep answering "+status+" until "+other+" stops reading it", "stop reading it")
-	case reason == model.ReasonProviderResourceInteractionRemovedButStillConsumed && asProvider && onResponse:
+	case reason == restmodel.ReasonProviderResourceInteractionRemovedButStillConsumed && asProvider && onResponse:
 		providerStatuses := orList(details["providerStatuses"])
 		return breakreport.Phrase{breakreport.Name(me), breakreport.Plain(" now answers "), breakreport.Code(resource), breakreport.Plain(" only with " + providerStatuses + ", but "), breakreport.Name(other), breakreport.Plain(" still reads response " + status)},
 			fixes("keep answering "+status+" until "+other+" stops reading it", "read response "+providerStatuses)
@@ -80,7 +81,7 @@ func reasonLine(checked checkedInteraction, contractBreak model.ReportBreak) str
 		return "not deployed in " + environment
 	case model.ReasonProviderResourceNotFound:
 		return deployedCounterpart + ", deployed in " + environment + ", doesn't provide this endpoint"
-	case model.ReasonProviderResourceInteractionNotFound:
+	case restmodel.ReasonProviderResourceInteractionNotFound:
 		line := deployedCounterpart + ", deployed in " + environment + ", declares the endpoint but not this interaction"
 		if statuses := contractBreak.Details["providerStatuses"]; statuses != "" {
 			line += " (declared: " + statuses + ")"
