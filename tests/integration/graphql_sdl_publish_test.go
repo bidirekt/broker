@@ -426,7 +426,56 @@ func (this *IntegrationSuite) TestPublishSDL_ADocumentOfOperations_IsA400AndNoth
 	)
 
 	this.Equal(http.StatusBadRequest, status)
-	this.JSONEq(`{"message":"queries.graphql: holds operations; publish expects the GraphQL schema"}`, body)
+	this.JSONEq(`{"message":"queries.graphql: holds client operations; publish expects the GraphQL schema"}`, body)
+	this.assertNothingPublishedFromSDL()
+}
+
+func (this *IntegrationSuite) TestPublishSDL_ADocumentOfOperationsAfterADescription_IsA400OfClientOperationsAndNothingStored() {
+	this.createSDLPublishParticipant()
+
+	status, body := this.publishSDL("1",
+		contractFragment{"schema.graphqls", sdlPublishQuerySDL + sdlPublishTypesSDL},
+		contractFragment{"queries.graphql", "\"\"\"The pet page\"\"\"\nquery PetPage {\n  pet(id: 1) {\n    id\n  }\n}\n"},
+	)
+
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(`{"message":"queries.graphql: holds client operations; publish expects the GraphQL schema"}`, body)
+	this.assertNothingPublishedFromSDL()
+}
+
+func (this *IntegrationSuite) TestPublishSDL_ADocumentOfFragmentsOnly_IsA400OfClientOperationsAndNothingStored() {
+	this.createSDLPublishParticipant()
+
+	status, body := this.publishSDL("1",
+		contractFragment{"schema.graphqls", sdlPublishQuerySDL + sdlPublishTypesSDL},
+		contractFragment{"fragments.graphql", "fragment PetFields on Pet {\n  id\n}\n"},
+	)
+
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(`{"message":"fragments.graphql: holds client operations; publish expects the GraphQL schema"}`, body)
+	this.assertNothingPublishedFromSDL()
+}
+
+func (this *IntegrationSuite) TestPublishSDL_ADocumentOfOperationsWithASyntaxError_IsA400AtTheSyntaxPositionAndNothingStored() {
+	this.createSDLPublishParticipant()
+
+	status, body := this.publishSDL("1",
+		contractFragment{"schema.graphqls", sdlPublishQuerySDL + sdlPublishTypesSDL},
+		contractFragment{"queries.graphql", "query PetName {\n  pet(id: 1) {\n    id\n  }\n"},
+	)
+
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(`{"message":"queries.graphql:5:1: Expected Name, found <EOF> in client operations; publish expects the GraphQL schema"}`, body)
+	this.assertNothingPublishedFromSDL()
+}
+
+func (this *IntegrationSuite) TestPublishSDL_ASchemaWithAnOperationAfterItsTypes_IsA400AtTheOperationAndNothingStored() {
+	this.createSDLPublishParticipant()
+
+	status, body := this.publishSDL("1", contractFragment{"schema.graphqls", sdlPublishQuerySDL + sdlPublishTypesSDL + "\nquery {\n  pet(id: 1) {\n    id\n  }\n}\n"})
+
+	this.Equal(http.StatusBadRequest, status)
+	this.JSONEq(`{"message":"schema.graphqls:22:1: Unexpected Name \"query\""}`, body)
 	this.assertNothingPublishedFromSDL()
 }
 

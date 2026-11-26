@@ -2,10 +2,12 @@ package graphql
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
 	"github.com/vektah/gqlparser/v2/gqlerror"
+	"github.com/vektah/gqlparser/v2/lexer"
 	"github.com/vektah/gqlparser/v2/parser"
 
 	"github.com/bidirekt/broker/internal/contracts/protocol"
@@ -30,8 +32,8 @@ func (this SDLFormat) ToDeclarations(files []model.ContractFile) (protocol.Decla
 
 	for _, file := range files {
 		source := &ast.Source{Name: file.Source, Input: file.Content}
-		if holdsOperations(source) {
-			return protocol.Declarations{}, fmt.Errorf("%s: holds operations; publish expects the GraphQL schema", file.Source)
+		if err := refuseClientOperations(source); err != nil {
+			return protocol.Declarations{}, err
 		}
 
 		sources = append(sources, source)
@@ -70,8 +72,44 @@ func checkExtendedTypesDefined(sources []*ast.Source) error {
 	return nil
 }
 
-func holdsOperations(source *ast.Source) bool {
-	document, err := parser.ParseQuery(source)
+var executableKeywords = []string{"query", "mutation", "subscription", "fragment"}
 
-	return err == nil && len(document.Operations) > 0
+func refuseClientOperations(source *ast.Source) error {
+	if !startsWithExecutableDefinition(source) {
+		return nil
+	}
+
+	if _, err := parser.ParseQuery(source); err != nil {
+		return fmt.Errorf("%w in client operations; publish expects the GraphQL schema", err)
+	}
+
+	return fmt.Errorf("%s: holds client operations; publish expects the GraphQL schema", source.Name)
+}
+
+func startsWithExecutableDefinition(source *ast.Source) bool {
+	scanner := lexer.New(source)
+
+	token := readTokenSkippingComments(&scanner)
+	if isDescription(token) {
+		token = readTokenSkippingComments(&scanner)
+	}
+
+	return token.Kind == lexer.BraceL || token.Kind == lexer.Name && slices.Contains(executableKeywords, token.Value)
+}
+
+func readTokenSkippingComments(scanner *lexer.Lexer) lexer.Token {
+	for {
+		token, err := scanner.ReadToken()
+		if err != nil {
+			return lexer.Token{Kind: lexer.Invalid}
+		}
+
+		if token.Kind != lexer.Comment {
+			return token
+		}
+	}
+}
+
+func isDescription(token lexer.Token) bool {
+	return token.Kind == lexer.String || token.Kind == lexer.BlockString
 }
