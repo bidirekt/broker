@@ -150,6 +150,10 @@ func propertyDetails(
 
 // A shape met again while rendering renders as its bare type, so a self-referencing array ends.
 func typeToken(node schemagraph.Node) string {
+	if name, named := node.TypeName(); named {
+		return name
+	}
+
 	return typeTokenOf(node, map[string]bool{})
 }
 

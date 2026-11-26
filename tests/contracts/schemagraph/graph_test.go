@@ -367,3 +367,42 @@ func TestField_OfAGraphNamingFields_TakesTheNameItGivesAndKeepsTheSchemaNameOfTh
 	assert.Equal(t, "order total", order.Child("total").Field())
 	assert.Equal(t, "Order.sku", order.Child("sku").Field())
 }
+
+func TestTypeName_OfAGraphNamingTypes_TakesTheNameItGivesAndIsUnnamedElsewhere(t *testing.T) {
+	catalog := model.Schemas{
+		"Order": {
+			"":      {Type: "object"},
+			"total": {Type: "number"},
+		},
+	}
+	root := []model.ResourceBody{{Source: "orders.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Order")}}
+	graph := schemagraph.New(map[string]model.Schemas{model.YAMLNamespace: catalog}).NamingTypes(func(node schemagraph.Node) (string, bool) {
+		return "Decimal", node.Type() == "number"
+	})
+
+	order := graph.Root(root, schemagraph.Readers)
+	name, named := order.Child("total").TypeName()
+	assert.Equal(t, "Decimal", name)
+	assert.True(t, named)
+
+	_, named = order.TypeName()
+	assert.False(t, named)
+
+	_, named = graphRoot(catalog, "Order").Child("total").TypeName()
+	assert.False(t, named)
+}
+
+func TestShapeName_IsTheSchemaTheRefsLeadToAndEmptyInsideASchema(t *testing.T) {
+	catalog := model.Schemas{
+		"MaybeOrder": {"": {Ref: "Order", Nullable: true}},
+		"Order": {
+			"":      {Type: "object"},
+			"total": {Type: "number"},
+		},
+	}
+
+	order := graphRoot(catalog, "MaybeOrder")
+
+	assert.Equal(t, "Order", order.ShapeName())
+	assert.Empty(t, order.Child("total").ShapeName())
+}

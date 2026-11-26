@@ -117,6 +117,37 @@ func TestRules_AScalarAtTheTopOfASchema_IsRefusedAtItsType(t *testing.T) {
 	}, rulesViolations(declarations))
 }
 
+func unionWithPropertiesDeclarations(resourceProtocol model.Protocol) protocol.Declarations {
+	node := contract.Schema{
+		Type:         model.UnionType,
+		Properties:   map[string]contract.Schema{"id": {Type: model.StringType}},
+		UnionMembers: map[string]contract.Schema{"User": {Ref: "UserName"}},
+	}
+	userName := contract.Schema{Type: model.ObjectType, Properties: map[string]contract.Schema{"name": {Type: model.StringType}}}
+	search := contract.Schema{Type: model.ObjectType, Properties: map[string]contract.Schema{"node": node}}
+
+	return protocol.Declarations{
+		Resources: []protocol.ResourceDeclaration{rulesResource(resourceProtocol, "Node"), rulesResource(resourceProtocol, "Search")},
+		Schemas: []protocol.SchemaDeclaration{
+			{Source: "web.yaml", Namespace: model.YAMLNamespace, Name: "Node", Schema: node},
+			{Source: "web.yaml", Namespace: model.YAMLNamespace, Name: "Search", Schema: search},
+			{Source: "web.yaml", Namespace: model.YAMLNamespace, Name: "UserName", Schema: userName},
+		},
+		Catalog: map[string]contract.SchemasMap{model.YAMLNamespace: {"Node": node, "Search": search, "UserName": userName}},
+	}
+}
+
+func TestRules_AUnionWithPropertiesAnotherProtocolReaches_IsRefusedLikeAKeyOfAnotherType(t *testing.T) {
+	assert.Equal(t, []violation.Violation{
+		{ErrorCode: "schema.key_not_allowed", Path: "schemas;Node", Source: "web.yaml", Details: map[string]any{"key": "properties", "type": "union"}},
+		{ErrorCode: "schema.key_not_allowed", Path: "schemas;Search;properties;node", Source: "web.yaml", Details: map[string]any{"key": "properties", "type": "union"}},
+	}, rulesViolations(unionWithPropertiesDeclarations("rest")))
+}
+
+func TestRules_AUnionWithPropertiesOnlyGraphQLReaches_IsAllowed(t *testing.T) {
+	assert.Empty(t, rulesViolations(unionWithPropertiesDeclarations(graphqlmodel.Protocol)))
+}
+
 func argumentsViolations(t *testing.T, consumer string) []violation.Violation {
 	t.Helper()
 

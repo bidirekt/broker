@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 )
@@ -141,7 +142,7 @@ func (this *IntegrationSuite) TestCanIDeployAndValidate_AFieldRemovedOnlyFromThe
 		"deployable": false,
 		"participantVersion": "1.0.0",
 		"operations": {"query": {"node": {"returns": [
-			{"reason": "property_missing_in_provider", "role": "consumer", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$.id", "propertyType": "string", "consumerField": "Node.id"}}
+			{"reason": "property_missing_in_provider", "role": "consumer", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$.id", "propertyType": "String!", "consumerField": "Node.id"}}
 		]}}}
 	}}`)
 	this.assertReadingResults("petstore_admin", readingNodeAsUnionContract, true, `{"petstore_api": {"deployable": true, "participantVersion": "1.0.0"}}`)
@@ -167,7 +168,7 @@ schemas:
 		"deployable": false,
 		"participantVersion": "1.0.0",
 		"operations": {"query": {"pet": {"returns": [
-			{"reason": "property_missing_in_provider", "role": "consumer", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$.bornAt", "propertyType": "string", "consumerField": "Pet.bornAt"}}
+			{"reason": "property_missing_in_provider", "role": "consumer", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$.bornAt", "propertyType": "String", "consumerField": "Pet.bornAt"}}
 		]}}}
 	}}`)
 }
@@ -226,7 +227,7 @@ schemas:
 		"deployable": false,
 		"participantVersion": "1.0.0",
 		"operations": {"query": {"pet": {"arguments": [
-			{"reason": "property_type_mismatch", "role": "consumer", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "argument": "name", "consumerPropertyType": "integer", "providerPropertyType": "string", "consumerField": "PetArgs.name", "providerField": "Query.pet(name:)"}}
+			{"reason": "property_type_mismatch", "role": "consumer", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "argument": "name", "consumerPropertyType": "Int!", "providerPropertyType": "String", "consumerField": "PetArgs.name", "providerField": "Query.pet(name:)"}}
 		]}}}
 	}}`)
 }
@@ -268,7 +269,7 @@ schemas:
 `, true, `{"petstore_api": {"deployable": true, "participantVersion": "1.0.0"}}`)
 }
 
-func (this *IntegrationSuite) TestCanIDeployAndValidate_AGraphQLConsumerOfTheIntrospectionFields_IsDeployable() {
+func (this *IntegrationSuite) TestCanIDeployAndValidate_AGraphQLConsumerOfTheIntrospectionFields_IsDeployableAndNeverStoresThem() {
 	this.deployReadingProvider(readingProviderSDL)
 
 	this.assertReadingResults("petstore_web", `consumes:
@@ -277,7 +278,11 @@ func (this *IntegrationSuite) TestCanIDeployAndValidate_AGraphQLConsumerOfTheInt
       query:
         __schema: {returns: Schema}
         __type: {arguments: TypeArgs, returns: MaybeType}
+        pet: {arguments: PetArgs, returns: MaybePet}
 schemas:
+  PetArgs: {type: object, properties: {id: {type: string}}}
+  MaybePet: {ref: Pet, nullable: true}
+  Pet: {type: object, properties: {id: {type: string}}}
   Schema:
     type: object
     properties:
@@ -289,4 +294,157 @@ schemas:
     properties:
       name: {type: string, nullable: true}
 `, true, `{"petstore_api": {"deployable": true, "participantVersion": "1.0.0"}}`)
+
+	rows, err := this.Pool.Query(context.Background(), `
+		SELECT DISTINCT gr.field FROM resources r JOIN graphql_resources gr ON gr.resource_id = r.id
+		WHERE r.consumed_provider IS NOT NULL ORDER BY gr.field`)
+	this.Require().NoError(err)
+	defer rows.Close()
+
+	var storedFields []string
+	for rows.Next() {
+		var field string
+		this.Require().NoError(rows.Scan(&field))
+		storedFields = append(storedFields, field)
+	}
+	this.Require().NoError(rows.Err())
+	this.Equal([]string{"pet"}, storedFields)
+}
+
+const readingMixedNodeSDL = `interface Node {
+  id: ID!
+}
+
+type User implements Node {
+  id: ID!
+  name: String
+}
+
+type Pet implements Node {
+  id: ID!
+  species: String
+}
+
+type Query {
+  node(id: ID!): Node
+}
+`
+
+const readingMixedUserWithoutNameSDL = `interface Node {
+  id: ID!
+}
+
+type User implements Node {
+  id: ID!
+}
+
+type Pet implements Node {
+  id: ID!
+  species: String
+}
+
+type Query {
+  node(id: ID!): Node
+}
+`
+
+const readingMixedNodeContract = `consumes:
+  petstore_api:
+    graphql:
+      query:
+        node: {arguments: NodeArgs, returns: MaybeNode}
+schemas:
+  NodeArgs: {type: object, properties: {id: {type: string}}}
+  MaybeNode: {ref: Node, nullable: true}
+  Node:
+    type: union
+    properties:
+      __typename: {type: string}
+      id: {type: string}
+    members:
+      User: {ref: UserName}
+      Pet: {ref: PetSpecies}
+  UserName: {type: object, properties: {name: {type: string, nullable: true}}}
+  PetSpecies: {type: object, properties: {species: {type: string, nullable: true}}}
+`
+
+func (this *IntegrationSuite) TestCanIDeployAndValidate_AGraphQLConsumerReadingAnInterfaceThroughItsFieldsAndItsImplementations_IsDeployable() {
+	this.deployReadingProvider(readingMixedNodeSDL)
+
+	this.assertReadingResults("petstore_web", readingMixedNodeContract, true, `{"petstore_api": {"deployable": true, "participantVersion": "1.0.0"}}`)
+}
+
+func (this *IntegrationSuite) TestCanIDeployAndValidate_AFieldRemovedFromAnImplementation_BreaksTheInterfaceReadAtItsMember() {
+	this.deployReadingProvider(readingMixedUserWithoutNameSDL)
+
+	this.assertReadingResults("petstore_web", readingMixedNodeContract, false, `{"petstore_api": {
+		"deployable": false,
+		"participantVersion": "1.0.0",
+		"operations": {"query": {"node": {"returns": [
+			{"reason": "property_missing_in_provider", "role": "consumer", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$(User).name", "propertyType": "String", "consumerField": "UserName.name"}}
+		]}}}
+	}}`)
+}
+
+func (this *IntegrationSuite) TestCanIDeployAndValidate_AGraphQLConsumerSendingASingleValueToAListArgument_IsDeployable() {
+	this.deployReadingProvider(`type Pet {
+  id: ID!
+}
+
+type Query {
+  pets(tags: [String!], matrix: [[Int!]!]): [Pet!]!
+}
+`)
+
+	this.assertReadingResults("petstore_web", `consumes:
+  petstore_api:
+    graphql:
+      query:
+        pets: {arguments: PetsArgs, returns: PetList}
+schemas:
+  PetsArgs:
+    type: object
+    properties:
+      tags: {type: string}
+      matrix: {type: integer}
+  PetList: {type: array, items: {ref: Pet}}
+  Pet: {type: object, properties: {id: {type: string}}}
+`, true, `{"petstore_api": {"deployable": true, "participantVersion": "1.0.0"}}`)
+}
+
+func (this *IntegrationSuite) TestCanIDeployAndValidate_AGraphQLBreak_WritesTheTypesAsGraphQLDoes() {
+	this.deployReadingProvider(`scalar Date
+
+type Pet {
+  id: ID!
+  reviews: String!
+  bornAt: Date!
+}
+
+type Query {
+  pet(id: ID!): Pet
+}
+`)
+
+	this.assertReadingResults("petstore_web", `consumes:
+  petstore_api:
+    graphql:
+      query:
+        pet: {arguments: PetArgs, returns: MaybePet}
+schemas:
+  PetArgs: {type: object, properties: {id: {type: string}}}
+  MaybePet: {ref: Pet, nullable: true}
+  Pet:
+    type: object
+    properties:
+      reviews: {type: array, items: {type: string}}
+      bornAt: {type: scalar, name: DateTime}
+`, false, `{"petstore_api": {
+		"deployable": false,
+		"participantVersion": "1.0.0",
+		"operations": {"query": {"pet": {"returns": [
+			{"reason": "property_type_mismatch", "role": "consumer", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$.bornAt", "consumerPropertyType": "DateTime!", "providerPropertyType": "Date!", "consumerField": "Pet.bornAt", "providerField": "Pet.bornAt"}},
+			{"reason": "property_type_mismatch", "role": "consumer", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$.reviews", "consumerPropertyType": "[String!]!", "providerPropertyType": "String!", "consumerField": "Pet.reviews", "providerField": "Pet.reviews"}}
+		]}}}
+	}}`)
 }

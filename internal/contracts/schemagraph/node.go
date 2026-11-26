@@ -209,3 +209,20 @@ func (this Node) ShapeKey() string {
 
 	return key.String()
 }
+
+func (this Node) TypeName() (string, bool) {
+	if this.graph == nil || this.graph.typeName == nil || !this.Exists() {
+		return "", false
+	}
+
+	return this.graph.typeName(this)
+}
+
+// ShapeName is the schema the first body's refs lead to, or "" when the shape is a field inside a schema.
+func (this Node) ShapeName() string {
+	if !this.Exists() || this.declarations[0].shape.Path != "" {
+		return ""
+	}
+
+	return this.declarations[0].shape.Schema
+}

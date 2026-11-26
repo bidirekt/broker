@@ -102,6 +102,26 @@ schemas:
 			violation: `{"code":"schema.arguments_not_allowed","path":"schemas;Pet;properties;reviews;arguments","source":"web.yaml","details":{"protocol":"rest"}}`,
 		},
 		{
+			name: "union with properties in REST",
+			contract: `consumes:
+  petstore_api:
+    rest:
+      /nodes:
+        get:
+          responses:
+            200: Node
+schemas:
+  Node:
+    type: union
+    properties:
+      id: {type: string}
+    members:
+      User: {ref: UserName}
+  UserName: {type: object, properties: {name: {type: string}}}
+`,
+			violation: `{"code":"schema.key_not_allowed","path":"schemas;Node","source":"web.yaml","details":{"key":"properties","type":"union"}}`,
+		},
+		{
 			name: "query in provides.graphql",
 			contract: `provides:
   graphql:

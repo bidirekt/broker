@@ -50,6 +50,10 @@ func schemaGraph(hooks ProtocolHooks, schemas map[string]model.Schemas) *schemag
 		graph.NamingFields(namer.FieldName)
 	}
 
+	if namer, names := hooks.(TypeNamer); names {
+		graph.NamingTypes(namer.TypeName)
+	}
+
 	return graph
 }
 

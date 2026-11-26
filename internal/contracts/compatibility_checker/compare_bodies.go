@@ -15,6 +15,7 @@ type ReadingRules struct {
 	Nullable          model.BreakingReason
 	Unknown           model.BreakingReason
 	OptionalMustExist bool
+	SingleToList      bool
 	Widenings         []Widening
 	ImplicitFields    []string
 }
@@ -92,9 +93,14 @@ func (this *bodyComparison) compareRead(reader, producer schemagraph.Node, path 
 		this.argumentFields = append(this.argumentFields, argumentField{path: path, consumer: consumer, provider: provider})
 	}
 
-	shapes := [2]string{reader.ShapeKey(), producer.ShapeKey()}
+	shape := reader
+	for this.rules.SingleToList && shape.Type() == model.ArrayType && producer.Type() != model.ArrayType {
+		shape = shape.Child(model.ItemsSegment)
+	}
 
-	if !acceptsType(reader, producer, this.rules) {
+	shapes := [2]string{shape.ShapeKey(), producer.ShapeKey()}
+
+	if !acceptsType(shape, producer, this.rules) {
 		if !this.comparedShapes[shapes] {
 			this.comparedShapes[shapes] = true
 			this.breakAt(model.ReasonPropertyTypeMismatch, path, reader, producer)
@@ -117,23 +123,27 @@ func (this *bodyComparison) compareRead(reader, producer schemagraph.Node, path 
 
 	this.comparedShapes[shapes] = true
 
-	if reader.Type() == model.UnionType {
-		this.compareUnionMembers(reader, producer, path)
+	if shape.Type() == model.UnionType {
+		this.compareUnionMembers(shape, producer, path)
+		this.compareFields(shape, producer, path)
 
 		return
 	}
 
-	this.compareEnumValues(reader, producer, path)
+	this.compareEnumValues(shape, producer, path)
+	this.compareFields(shape, producer, path)
+	this.compareUnknown(shape, producer, path)
+}
 
+// The fields read on a union are the ones it declares itself, like an interface's; its members are compared apart.
+func (this *bodyComparison) compareFields(reader, producer schemagraph.Node, path string) {
 	for _, segment := range reader.Segments() {
-		if slices.Contains(this.rules.ImplicitFields, segment) && !producer.Child(segment).Exists() {
+		if model.IsMemberSegment(segment) || (slices.Contains(this.rules.ImplicitFields, segment) && !producer.Child(segment).Exists()) {
 			continue
 		}
 
 		this.compareRead(reader.Child(segment), producer.Child(segment), model.ChildPath(path, segment))
 	}
-
-	this.compareUnknown(reader, producer, path)
 }
 
 func (this *bodyComparison) compareUnknown(reader, producer schemagraph.Node, path string) {
@@ -167,6 +177,10 @@ func (this *bodyComparison) compareUnionMembers(reader, producer schemagraph.Nod
 	consumer, provider := this.consumerAndProvider(reader, producer)
 
 	for _, segment := range consumer.Segments() {
+		if !model.IsMemberSegment(segment) {
+			continue
+		}
+
 		if !provider.Child(segment).Exists() {
 			this.breaks = append(this.breaks, NewMemberBreakChange(this.checked, this.counterpart, model.MemberKey(segment), path, consumer.Declaring(segment), provider))
 

@@ -1,6 +1,7 @@
 package graphql
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/bidirekt/broker/internal/contracts/compatibility_checker"
@@ -21,6 +22,7 @@ var bodyReadings = map[model.BodyRole]compatibility_checker.BodyReading{
 			Optional:         model.ReasonPropertyOptionalInConsumerRequiredInProvider,
 			Nullable:         model.ReasonPropertyNullableInConsumerNotNullableInProvider,
 			Unknown:          model.ReasonPropertyMissingInProvider,
+			SingleToList:     true,
 			Widenings: []compatibility_checker.Widening{
 				{Reader: compatibility_checker.SchemaType{Type: model.FloatType}, Producer: compatibility_checker.SchemaType{Type: model.IntegerType}},
 				{Reader: compatibility_checker.SchemaType{Type: model.FloatType}, Producer: compatibility_checker.SchemaType{Type: model.NumberType}},
@@ -41,11 +43,6 @@ var bodyReadings = map[model.BodyRole]compatibility_checker.BodyReading{
 		},
 		Join: schemagraph.Readers,
 	},
-}
-
-// A root field starting with "__" is an introspection field, which every GraphQL schema serves without declaring it.
-func (this Plugin) ProvidesImplicitly(identity model.ResourceIdentity) bool {
-	return strings.HasPrefix(identity.(graphqlmodel.Identity).Field, "__")
 }
 
 func (this Plugin) BodyReading(body model.BodyRole) compatibility_checker.BodyReading {
@@ -70,4 +67,51 @@ func (this Plugin) FieldName(site schemagraph.Site) (string, bool) {
 	}
 
 	return typeName + "." + field + "(" + site.Path[:argumentEnd] + ":)" + site.Path[argumentEnd:], true
+}
+
+var builtInScalarNames = toBuiltInScalarNames()
+
+func toBuiltInScalarNames() map[string]string {
+	names := map[string]string{}
+	for name, schema := range builtInScalarSchemas {
+		if schema.Scalar == "" {
+			names[schema.Type] = name
+		}
+	}
+
+	// GraphQL has no number: Float is the type a number reads.
+	names[model.NumberType] = names[model.FloatType]
+
+	return names
+}
+
+var namedShapeTypes = []string{model.ObjectType, model.UnionType, model.MapType, model.EnumType}
+
+// TypeName writes the type as GraphQL does, "[Review!]!": a list item of a shape met again is written by its kind,
+// so a self-referencing list ends.
+func (this Plugin) TypeName(node schemagraph.Node) (string, bool) {
+	return graphqlTypeName(node, map[string]bool{}), true
+}
+
+func graphqlTypeName(node schemagraph.Node, writing map[string]bool) string {
+	name := node.Type()
+
+	switch shape := node.ShapeKey(); {
+	case writing[shape]:
+	case node.Type() == model.ArrayType:
+		writing[shape] = true
+		name = "[" + graphqlTypeName(node.Child(model.ItemsSegment), writing) + "]"
+	case node.Scalar() != "":
+		name = node.Scalar()
+	case builtInScalarNames[node.Type()] != "":
+		name = builtInScalarNames[node.Type()]
+	case slices.Contains(namedShapeTypes, node.Type()) && node.ShapeName() != "":
+		name = node.ShapeName()
+	}
+
+	if !node.Nullable() {
+		name += "!"
+	}
+
+	return name
 }

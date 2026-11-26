@@ -13,11 +13,14 @@ const (
 
 func (this Plugin) SchemaVocabulary() descriptor.Vocabulary {
 	return descriptor.Vocabulary{
-		Types: []descriptor.TypeVocabulary{{
-			Name:  model.ScalarType,
-			Keys:  descriptor.Keys{scalarNameKey: func(descriptor.Vocabulary) descriptor.Node { return descriptor.String() }},
-			Rules: []descriptor.Rule{scalarRequiresName},
-		}},
+		Types: []descriptor.TypeVocabulary{
+			{
+				Name:  model.ScalarType,
+				Keys:  descriptor.Keys{scalarNameKey: func(descriptor.Vocabulary) descriptor.Node { return descriptor.String() }},
+				Rules: []descriptor.Rule{scalarRequiresName},
+			},
+			{Name: model.UnionType, Keys: descriptor.Keys{"properties": descriptor.Properties}},
+		},
 		PropertyKeys: descriptor.Keys{argumentsKey: func(descriptor.Vocabulary) descriptor.Node { return descriptor.SchemaRef }},
 	}
 }

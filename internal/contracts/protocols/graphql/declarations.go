@@ -1,6 +1,8 @@
 package graphql
 
 import (
+	"strings"
+
 	"github.com/bidirekt/broker/internal/contracts/contract"
 	"github.com/bidirekt/broker/internal/contracts/protocol"
 	"github.com/bidirekt/broker/internal/model"
@@ -20,6 +22,10 @@ func (this Plugin) ToDeclarations(block protocol.Block) protocol.BlockDeclaratio
 		fields := block.Document.Mapping(operation)
 
 		for _, field := range fields.Keys() {
+			if isIntrospectionField(field) {
+				continue
+			}
+
 			declared := fields.Mapping(field)
 			fieldPath := block.Path.Append(operation, field)
 
@@ -49,6 +55,11 @@ func (this Plugin) ToDeclarations(block protocol.Block) protocol.BlockDeclaratio
 	}
 
 	return declarations
+}
+
+// The GraphQL library of the provider's server serves the introspection fields, not its contract, so they are never compared.
+func isIntrospectionField(field string) bool {
+	return strings.HasPrefix(field, "__")
 }
 
 // No arguments means none are sent: an empty object, never `~`, which would leave the body optional to the sender.

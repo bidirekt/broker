@@ -25,9 +25,23 @@ func graphQLKeysOutsideGraphQL(declarations protocol.Declarations) []violation.V
 		if reached.arguments != "" {
 			violations = append(violations, reached.violation("schema.arguments_not_allowed", argumentsKey))
 		}
+
+		if reached.unionProperties {
+			violations = append(violations, unionPropertiesNotAllowed(reached))
+		}
 	}
 
 	return violations
+}
+
+// Outside GraphQL a union reads no fields of its own, so it is refused as the core grammar refuses a key of another type.
+func unionPropertiesNotAllowed(reached reachedSchema) violation.Violation {
+	return violation.Violation{
+		ErrorCode: "schema.key_not_allowed",
+		Path:      reached.documentPath,
+		Source:    reached.source,
+		Details:   map[string]any{"key": "properties", "type": model.UnionType},
+	}
 }
 
 // A body of arguments is compared argument by argument, never as a whole, so it must name a non-nullable object.
@@ -98,12 +112,13 @@ func argumentsNotObjectViolation(path, source string, details map[string]any) vi
 
 // reachedSchema is a schema, or one nested in it, holding a GraphQL key, where it is written, and the first protocol whose body reaches it.
 type reachedSchema struct {
-	source       string
-	namespace    string
-	documentPath string
-	scalar       bool
-	arguments    string
-	protocol     model.Protocol
+	source          string
+	namespace       string
+	documentPath    string
+	scalar          bool
+	arguments       string
+	unionProperties bool
+	protocol        model.Protocol
 }
 
 func (this reachedSchema) violation(errorCode, key string) violation.Violation {
@@ -155,14 +170,16 @@ func (this *graphQLKeysWalk) visit(namespace, name string, reachedBy model.Proto
 
 // Children is not used: it sorts and copies every child, and this walk runs on every contract, of every protocol.
 func (this *graphQLKeysWalk) walk(schema contract.Schema, namespace, source string, documentPath []string, reachedBy model.Protocol) {
-	if schema.Type == model.ScalarType || schema.Arguments != "" {
+	unionProperties := schema.IsUnion() && schema.Properties != nil
+	if schema.Type == model.ScalarType || schema.Arguments != "" || unionProperties {
 		this.reached = append(this.reached, reachedSchema{
-			source:       source,
-			namespace:    namespace,
-			documentPath: strings.Join(documentPath, ";"),
-			scalar:       schema.Type == model.ScalarType,
-			arguments:    schema.Arguments,
-			protocol:     reachedBy,
+			source:          source,
+			namespace:       namespace,
+			documentPath:    strings.Join(documentPath, ";"),
+			scalar:          schema.Type == model.ScalarType,
+			arguments:       schema.Arguments,
+			unionProperties: unionProperties,
+			protocol:        reachedBy,
 		})
 	}
 

@@ -84,3 +84,27 @@ func TestSchemaVocabulary_ArgumentsOutsideAProperty_IsUnknown(t *testing.T) {
 		{ErrorCode: "key.unknown", Path: "schemas;Pets;items;arguments", Source: "web.yaml", Details: map[string]any{"key": "arguments"}},
 	}, violations)
 }
+
+func TestSchemaVocabulary_AUnionWithPropertiesAndMembers_IsValid(t *testing.T) {
+	violations := vocabularyViolations(t, `schemas:
+  Node:
+    type: union
+    properties:
+      id: {type: string}
+    members:
+      User: {ref: UserName}
+      Pet: {ref: PetSpecies}
+  UserName: {type: object, properties: {name: {type: string}}}
+  PetSpecies: {type: object, properties: {species: {type: string}}}
+`)
+
+	assert.Empty(t, violations)
+}
+
+func TestSchemaVocabulary_AUnionWithPropertiesButNoMembers_StillNeedsItsMembers(t *testing.T) {
+	violations := vocabularyViolations(t, "schemas:\n  Node: {type: union, properties: {id: {type: string}}}\n")
+
+	assert.Equal(t, []violation.Violation{
+		{ErrorCode: "members.required", Path: "schemas;Node", Source: "web.yaml", Details: map[string]any{"type": "union"}},
+	}, violations)
+}

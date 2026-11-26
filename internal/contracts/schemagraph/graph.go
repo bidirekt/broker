@@ -16,6 +16,7 @@ type Graph struct {
 	catalog   map[string]model.Schemas
 	segments  map[Site]map[string][]string
 	fieldName func(site Site) (name string, named bool)
+	typeName  func(node Node) (name string, named bool)
 }
 
 func New(catalog map[string]model.Schemas) *Graph {
@@ -25,6 +26,13 @@ func New(catalog map[string]model.Schemas) *Graph {
 // A site fieldName leaves unnamed keeps its schema's name.
 func (this *Graph) NamingFields(fieldName func(site Site) (name string, named bool)) *Graph {
 	this.fieldName = fieldName
+
+	return this
+}
+
+// A node typeName leaves unnamed keeps the core's type token.
+func (this *Graph) NamingTypes(typeName func(node Node) (name string, named bool)) *Graph {
+	this.typeName = typeName
 
 	return this
 }

@@ -161,7 +161,7 @@ schemas:
 		"deployable": false,
 		"participantVersion": "1.0.0",
 		"operations": {"query": {"pet": {"arguments": [
-			{"reason": "property_missing_in_consumer", "role": "consumer", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "argument": "id", "propertyType": "string", "providerField": "Query.pet(id:)"}}
+			{"reason": "property_missing_in_consumer", "role": "consumer", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "argument": "id", "propertyType": "ID!", "providerField": "Query.pet(id:)"}}
 		]}}}
 	}}`)
 }
@@ -191,7 +191,7 @@ schemas:
 		"deployable": false,
 		"participantVersion": "1.0.0",
 		"operations": {"query": {"pets": {"returns": [
-			{"reason": "property_missing_in_provider", "role": "consumer", "details": {"consumerName": "petstore_admin", "providerName": "petstore_api", "property": "$[].name", "propertyType": "string", "consumerField": "Pet.name"}}
+			{"reason": "property_missing_in_provider", "role": "consumer", "details": {"consumerName": "petstore_admin", "providerName": "petstore_api", "property": "$[].name", "propertyType": "String!", "consumerField": "Pet.name"}}
 		]}}}
 	}}`)
 }

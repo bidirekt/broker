@@ -155,7 +155,7 @@ func TestClosedInput_AnOptionalArgumentTheProviderRemoved_Breaks(t *testing.T) {
 
 	assertClosedInputBreaks(t, "arguments", consumer, provider, []closedInputBreak{{
 		model.ReasonPropertyMissingInProvider,
-		closedInputArgumentDetails("tag", "string", "PetArgs.tag", ""),
+		closedInputArgumentDetails("tag", "String", "PetArgs.tag", ""),
 	}})
 }
 
@@ -168,7 +168,7 @@ func TestClosedInput_ARequiredArgumentTheProviderRemoved_Breaks(t *testing.T) {
 
 	assertClosedInputBreaks(t, "arguments", consumer, provider, []closedInputBreak{{
 		model.ReasonPropertyMissingInProvider,
-		closedInputArgumentDetails("id", "string", "PetArgs.id", ""),
+		closedInputArgumentDetails("id", "String!", "PetArgs.id", ""),
 	}})
 }
 
@@ -184,7 +184,7 @@ func TestClosedInput_AnInputFieldTheProviderRemoved_Breaks(t *testing.T) {
 
 	assertClosedInputBreaks(t, "arguments", consumer, provider, []closedInputBreak{{
 		model.ReasonPropertyMissingInProvider,
-		closedInputArgumentDetails("filter.minAge", "integer", "PetFilter.minAge", ""),
+		closedInputArgumentDetails("filter.minAge", "Int", "PetFilter.minAge", ""),
 	}})
 }
 
@@ -215,7 +215,7 @@ func TestClosedInput_ANewRequiredArgument_BreaksTheConsumerThatDeclaresArguments
 
 	assertClosedInputBreaks(t, "arguments", consumer, provider, []closedInputBreak{{
 		model.ReasonPropertyMissingInConsumer,
-		closedInputArgumentDetails("owner", "string", "", "Query.pet(owner:)"),
+		closedInputArgumentDetails("owner", "String!", "", "Query.pet(owner:)"),
 	}})
 }
 
@@ -232,7 +232,7 @@ func TestClosedInput_ANewRequiredArgument_BreaksTheConsumerWithoutArguments(t *t
 
 	assertClosedInputBreaks(t, "arguments", consumer, provider, []closedInputBreak{{
 		model.ReasonPropertyMissingInConsumer,
-		closedInputArgumentDetails("id", "string", "", "Query.pet(id:)"),
+		closedInputArgumentDetails("id", "String!", "", "Query.pet(id:)"),
 	}})
 }
 
@@ -247,8 +247,8 @@ func TestClosedInput_ANullableArgumentThatBecomesNonNull_Breaks(t *testing.T) {
 	}})
 
 	assertClosedInputBreaks(t, "arguments", consumer, provider, []closedInputBreak{
-		{model.ReasonPropertyOptionalInConsumerRequiredInProvider, closedInputArgumentDetails("id", "string", "PetArgs.id", "Query.pet(id:)")},
-		{model.ReasonPropertyNullableInConsumerNotNullableInProvider, closedInputArgumentDetails("id", "string", "PetArgs.id", "Query.pet(id:)")},
+		{model.ReasonPropertyOptionalInConsumerRequiredInProvider, closedInputArgumentDetails("id", "String", "PetArgs.id", "Query.pet(id:)")},
+		{model.ReasonPropertyNullableInConsumerNotNullableInProvider, closedInputArgumentDetails("id", "String", "PetArgs.id", "Query.pet(id:)")},
 	})
 }
 
@@ -264,7 +264,7 @@ func TestClosedInput_ANonNullOutputFieldThatBecomesNullable_Breaks(t *testing.T)
 
 	assertClosedInputBreaks(t, "returns", consumer, provider, []closedInputBreak{{
 		model.ReasonPropertyNullableInProviderNotNullableInConsumer,
-		closedInputDetails("$.name", "string", "Pet.name", "Query.pet.name"),
+		closedInputDetails("$.name", "String!", "Pet.name", "Query.pet.name"),
 	}})
 }
 

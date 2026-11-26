@@ -54,7 +54,7 @@ func (this *IntegrationSuite) TestCanIDeployAndShowCheck_ABreakAtTheRootOfWhatAF
 		"deployable": false,
 		"participantVersion": "1.0.0",
 		"operations": {"query": {"age": {"returns": [
-			{"reason": "property_type_mismatch", "role": "consumer", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "consumerPropertyType": "string", "providerPropertyType": "integer", "consumerField": "Age", "providerField": "Query.age"}}
+			{"reason": "property_type_mismatch", "role": "consumer", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "consumerPropertyType": "String!", "providerPropertyType": "Int!", "consumerField": "Age", "providerField": "Query.age"}}
 		]}}}
 	}}`, results)
 

@@ -32,12 +32,6 @@ func (this *CompatibilityChecker) checkConsumer(
 	if !found {
 		result.Counterpart.ParticipantVersion = registered.DeployedVersion
 
-		if implicit, provides := this.hooksOf(consumerResource.Protocol).(ImplicitProvider); provides && implicit.ProvidesImplicitly(consumerResource.Identity) {
-			report.AppendResult(providerName, result)
-
-			return
-		}
-
 		notFound := NewProviderResourceNotFound(&consumerResource)
 		if hint, declaresAround := counterparts.ProviderHints[consumerResource.ProviderHash]; declaresAround {
 			if refiner, refines := this.hooksOf(consumerResource.Protocol).(NotFoundRefiner); refines {

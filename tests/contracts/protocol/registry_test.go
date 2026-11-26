@@ -43,6 +43,17 @@ func (this scalarProtocol) SchemaVocabulary() descriptor.Vocabulary {
 	}}}
 }
 
+type labeledUnionProtocol struct {
+	namedProtocol
+}
+
+func (this labeledUnionProtocol) SchemaVocabulary() descriptor.Vocabulary {
+	return descriptor.Vocabulary{Types: []descriptor.TypeVocabulary{{
+		Name: model.UnionType,
+		Keys: descriptor.Keys{"label": func(descriptor.Vocabulary) descriptor.Node { return descriptor.String() }},
+	}}}
+}
+
 type ruledProtocol struct {
 	namedProtocol
 	codes []string
@@ -188,8 +199,22 @@ func TestGrammar_TwoRegistriesInOneProcess_EachValidatesSchemasWithItsOwnVocabul
 	}, descriptor.Validate(withoutScalar.Grammar(), document, "api.yaml"))
 }
 
-func TestNewRegistry_TwoProtocolsAddingTheSameSchemaType_Panics(t *testing.T) {
-	assert.PanicsWithError(t, `schema type "scalar" is defined twice`, func() {
+func TestGrammar_AProtocolAddingAKeyToACoreType_KeepsTheKeysAndRulesOfTheCore(t *testing.T) {
+	grammar := protocol.NewRegistry([]protocol.Protocol{labeledUnionProtocol{namedProtocol{"graphql"}}}).Grammar()
+	labeled := map[string]any{"schemas": map[string]any{
+		"Node": map[string]any{"type": "union", "label": "node", "members": map[string]any{"User": map[string]any{"ref": "User"}}},
+		"User": map[string]any{"type": "object", "properties": map[string]any{"name": map[string]any{"type": "string"}}},
+	}}
+	withoutMembers := map[string]any{"schemas": map[string]any{"Node": map[string]any{"type": "union", "label": "node"}}}
+
+	assert.Empty(t, descriptor.Validate(grammar, labeled, "api.yaml"))
+	assert.Equal(t, []violation.Violation{
+		{ErrorCode: "members.required", Path: "schemas;Node", Source: "api.yaml", Details: map[string]any{"type": "union"}},
+	}, descriptor.Validate(grammar, withoutMembers, "api.yaml"))
+}
+
+func TestNewRegistry_TwoProtocolsAddingTheSameKeyToASchemaType_Panics(t *testing.T) {
+	assert.PanicsWithError(t, `schema type "scalar" key "name" is defined twice`, func() {
 		protocol.NewRegistry([]protocol.Protocol{scalarProtocol{namedProtocol{"graphql"}}, scalarProtocol{namedProtocol{"grpc"}}})
 	})
 }

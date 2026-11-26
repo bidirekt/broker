@@ -133,12 +133,12 @@ func TestScalarType_AnotherScalar_IsATypeMismatch(t *testing.T) {
 	assertBornAtBreaks(t,
 		model.Field{Type: "scalar", Scalar: "DateTime"},
 		model.Field{Type: "scalar", Scalar: "Date"},
-		bornAtTypeMismatch("DateTime", "Date"))
+		bornAtTypeMismatch("DateTime!", "Date!"))
 }
 
 func TestScalarType_ANativeType_IsATypeMismatch(t *testing.T) {
 	assertBornAtBreaks(t,
 		model.Field{Type: "scalar", Scalar: "DateTime"},
 		model.Field{Type: "string"},
-		bornAtTypeMismatch("DateTime", "string"))
+		bornAtTypeMismatch("DateTime!", "String!"))
 }

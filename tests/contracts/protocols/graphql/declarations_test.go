@@ -132,3 +132,18 @@ func TestToDeclarations_AProvidesBlock_DeclaresNothing(t *testing.T) {
 
 	assert.Empty(t, graphqlcontracts.New().ToDeclarations(block))
 }
+
+func TestToDeclarations_TheIntrospectionFields_AreNeverDeclared(t *testing.T) {
+	block := consumedGraphQLBlock(contract.Document{"query": map[string]any{
+		"__schema": map[string]any{"returns": "Schema"},
+		"__type":   map[string]any{"arguments": "TypeArgs", "returns": "MaybeType"},
+		"pet":      map[string]any{"arguments": "PetArgs", "returns": "MaybePet"},
+	}})
+
+	declarations := graphqlcontracts.New().ToDeclarations(block)
+
+	require.Len(t, declarations.Resources, 2)
+	assert.Equal(t, graphqlmodel.Identity{Operation: "query", Field: "pet", Interaction: "arguments"}, declarations.Resources[0].Resource.Identity)
+	assert.Equal(t, graphqlmodel.Identity{Operation: "query", Field: "pet", Interaction: "returns"}, declarations.Resources[1].Resource.Identity)
+	assert.Empty(t, declarations.Schemas)
+}

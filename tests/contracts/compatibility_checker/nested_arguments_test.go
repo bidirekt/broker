@@ -142,7 +142,7 @@ func TestNestedArguments_AnArgumentTheProviderRemoved_BreaksOnTheField(t *testin
 
 	assertReviewsBreaks(t, consumer, provider, []reviewsBreak{{
 		model.ReasonPropertyMissingInProvider,
-		reviewsDetails("first", "integer", map[string]string{"consumer": "ReviewsArgs.first"}),
+		reviewsDetails("first", "Int!", map[string]string{"consumer": "ReviewsArgs.first"}),
 	}})
 }
 
@@ -155,7 +155,7 @@ func TestNestedArguments_AFieldWhoseArgumentsTheProviderDropped_BreaksOnTheField
 
 	assertReviewsBreaks(t, consumer, provider, []reviewsBreak{{
 		model.ReasonPropertyMissingInProvider,
-		reviewsDetails("first", "integer", map[string]string{"consumer": "ReviewsArgs.first"}),
+		reviewsDetails("first", "Int!", map[string]string{"consumer": "ReviewsArgs.first"}),
 	}})
 }
 
@@ -168,7 +168,7 @@ func TestNestedArguments_ANewRequiredArgument_BreaksTheConsumerWithoutArguments(
 
 	assertReviewsBreaks(t, consumer, provider, []reviewsBreak{{
 		model.ReasonPropertyMissingInConsumer,
-		reviewsDetails("first", "integer", map[string]string{"provider": "Pet.reviews(first:)"}),
+		reviewsDetails("first", "Int!", map[string]string{"provider": "Pet.reviews(first:)"}),
 	}})
 }
 
@@ -186,7 +186,7 @@ func TestNestedArguments_AnInputFieldTheProviderRemoved_NamesItsPathInsideTheArg
 
 	assertReviewsBreaks(t, consumer, provider, []reviewsBreak{{
 		model.ReasonPropertyMissingInProvider,
-		reviewsDetails("filter.minStars", "integer", map[string]string{"consumer": "ReviewFilter.minStars"}),
+		reviewsDetails("filter.minStars", "Int!", map[string]string{"consumer": "ReviewFilter.minStars"}),
 	}})
 }
 
