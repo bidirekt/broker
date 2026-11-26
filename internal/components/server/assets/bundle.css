@@ -168,7 +168,7 @@
 .badge .v{font-family:var(--mono);font-size:inherit;color:var(--muted)}
 .bk a.badge:hover{text-decoration:none;border-color:currentColor}
 /* an environment is its name in mono, nothing else */
-.badge.env{min-height:0;padding:0;border:0;background:none;font-family:var(--mono);font-size:13px;color:var(--text)}
+.badge.env{min-height:0;padding:0;border:0;background:none;font-family:var(--mono);font-size:13px;color:var(--text);white-space:normal;overflow-wrap:break-word}
 .badge.env .v{font-weight:400}
 .bk a.badge.env:hover{text-decoration:underline}
 .badge.yes{background:var(--status-bg);color:var(--status-ink);border-color:var(--status-line)}
