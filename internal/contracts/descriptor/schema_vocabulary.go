@@ -12,8 +12,10 @@ import (
 type Keys map[string]func(vocabulary Vocabulary) Node
 
 type TypeVocabulary struct {
-	Name  string
-	Keys  Keys
+	Name string
+	Keys Keys
+	// Takes names keys another type declares that this type accepts too, with the grammar they have there.
+	Takes []string
 	Rules []Rule
 }
 
@@ -29,8 +31,10 @@ type Vocabulary struct {
 func CoreVocabulary() Vocabulary {
 	return Vocabulary{Types: []TypeVocabulary{
 		{
-			Name:  model.ObjectType,
-			Keys:  Keys{"properties": Properties},
+			Name: model.ObjectType,
+			Keys: Keys{"properties": func(vocabulary Vocabulary) Node {
+				return Map(PropertyName, Lazy(vocabulary.Property))
+			}},
 			Rules: []Rule{objectRequiresProperties},
 		},
 		{
@@ -65,11 +69,7 @@ func CoreVocabulary() Vocabulary {
 	}}
 }
 
-func Properties(vocabulary Vocabulary) Node {
-	return Map(PropertyName, Lazy(vocabulary.Property))
-}
-
-// With adds the keys and rules of a type this vocabulary already has to it; it panics on a key either already has.
+// With adds the keys, taken keys and rules of a type this vocabulary already has to it; it panics on a key either already has.
 func (this Vocabulary) With(extension Vocabulary) Vocabulary {
 	joined := Vocabulary{Types: slices.Clone(this.Types), PropertyKeys: maps.Clone(this.PropertyKeys)}
 
@@ -95,6 +95,7 @@ func (this Vocabulary) With(extension Vocabulary) Vocabulary {
 			existing.Keys[key] = grammar
 		}
 
+		existing.Takes = append(slices.Clip(existing.Takes), added.Takes...)
 		existing.Rules = append(slices.Clip(existing.Rules), added.Rules...)
 		joined.Types[index] = existing
 	}

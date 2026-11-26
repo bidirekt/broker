@@ -19,7 +19,7 @@ func (this Plugin) SchemaVocabulary() descriptor.Vocabulary {
 				Keys:  descriptor.Keys{scalarNameKey: func(descriptor.Vocabulary) descriptor.Node { return descriptor.String() }},
 				Rules: []descriptor.Rule{scalarRequiresName},
 			},
-			{Name: model.UnionType, Keys: descriptor.Keys{"properties": descriptor.Properties}},
+			{Name: model.UnionType, Takes: []string{"properties"}},
 		},
 		PropertyKeys: descriptor.Keys{argumentsKey: func(descriptor.Vocabulary) descriptor.Node { return descriptor.SchemaRef }},
 	}

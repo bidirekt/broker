@@ -1,6 +1,7 @@
 package descriptor
 
 import (
+	"fmt"
 	"maps"
 	"slices"
 	"strings"
@@ -45,7 +46,7 @@ func (this Vocabulary) grammar() *schemaGrammar {
 	return bound.built
 }
 
-// A key more than one type takes is chosen by the sibling "type"; a key of one type is validated under any type.
+// A key whose grammar differs by type is chosen by the sibling "type"; a key of one grammar is validated with it under any type.
 func (this Vocabulary) schema(extraKeys Keys) ObjectNode {
 	schemaType := this.Type()
 	fields := Fields{
@@ -59,6 +60,7 @@ func (this Vocabulary) schema(extraKeys Keys) ObjectNode {
 
 	var keys []string
 	grammars := map[string]ByType{}
+	owners := map[string][]string{}
 
 	for _, typeVocabulary := range this.Types {
 		for _, key := range slices.Sorted(maps.Keys(typeVocabulary.Keys)) {
@@ -68,18 +70,27 @@ func (this Vocabulary) schema(extraKeys Keys) ObjectNode {
 			}
 
 			grammars[key][typeVocabulary.Name] = typeVocabulary.Keys[key](this)
+			owners[key] = append(owners[key], typeVocabulary.Name)
+		}
+	}
+
+	for _, typeVocabulary := range this.Types {
+		for _, key := range typeVocabulary.Takes {
+			if len(grammars[key]) != 1 {
+				panic(fmt.Errorf("schema type %q takes key %q, which has no single grammar", typeVocabulary.Name, key))
+			}
+
+			owners[key] = append(owners[key], typeVocabulary.Name)
 		}
 	}
 
 	for _, key := range keys {
-		owners := slices.Collect(maps.Keys(grammars[key]))
-
 		fields[key] = grammars[key]
-		if len(owners) == 1 {
-			fields[key] = grammars[key][owners[0]]
+		if len(grammars[key]) == 1 {
+			fields[key] = slices.Collect(maps.Values(grammars[key]))[0]
 		}
 
-		rules = append(rules, keyBelongsTo(key, schemaType, owners...))
+		rules = append(rules, keyBelongsTo(key, schemaType, owners[key]...))
 	}
 
 	for _, typeVocabulary := range this.Types {

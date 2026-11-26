@@ -165,10 +165,6 @@ func typeTokenOf(node schemagraph.Node, rendering map[string]bool) string {
 
 	rendering[shape] = true
 
-	if node.Type() == model.ScalarType {
-		return node.Scalar()
-	}
-
 	if node.Type() == model.ArrayType {
 		return model.ArrayType + "<" + typeTokenOf(node.Child(model.ItemsSegment), rendering) + ">"
 	}
