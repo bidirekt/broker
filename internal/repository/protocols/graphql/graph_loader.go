@@ -16,7 +16,7 @@ const (
 		WHERE cd.environment_id = $1 AND gm.graph_name = $2
 	`
 
-	// A participant that once consumed the graph is listed too; what its deployed contract consumes decides.
+	// A participant that once consumed the provider is listed too; what its deployed contract consumes decides.
 	deployedConsumersQuery = `
 		SELECT cd.participant_id, cd.contract_id, cd.version
 		FROM current_deployments cd
@@ -29,6 +29,12 @@ const (
 			  AND r.consumed_provider = $2
 		  )
 		ORDER BY cd.participant_id
+	`
+
+	deployedContractQuery = `
+		SELECT cd.participant_id, cd.contract_id, cd.version
+		FROM current_deployments cd
+		WHERE cd.environment_id = $1 AND cd.participant_id = $2
 	`
 
 	deployedGraphQuery = `
@@ -62,8 +68,17 @@ func (this GraphLoader) DeployedMembers(ctx context.Context, environmentID int64
 	return this.deployedContracts(ctx, deployedMembersQuery, environmentID, graph)
 }
 
-func (this GraphLoader) DeployedConsumers(ctx context.Context, environmentID int64, graph string) []graphqlmodel.DeployedContract {
-	return this.deployedContracts(ctx, deployedConsumersQuery, environmentID, graph)
+func (this GraphLoader) DeployedConsumers(ctx context.Context, environmentID int64, provider string) []graphqlmodel.DeployedContract {
+	return this.deployedContracts(ctx, deployedConsumersQuery, environmentID, provider)
+}
+
+func (this GraphLoader) DeployedContract(ctx context.Context, environmentID, participantID int64) (graphqlmodel.DeployedContract, bool) {
+	deployed := this.deployedContracts(ctx, deployedContractQuery, environmentID, participantID)
+	if len(deployed) == 0 {
+		return graphqlmodel.DeployedContract{}, false
+	}
+
+	return deployed[0], true
 }
 
 // DeployedGraph is the graph of the version the participant has deployed in the environment, empty when there is none.
@@ -77,10 +92,10 @@ func (this GraphLoader) DeployedGraph(ctx context.Context, environmentID, partic
 	return graph
 }
 
-func (this GraphLoader) deployedContracts(ctx context.Context, query string, environmentID int64, graph string) []graphqlmodel.DeployedContract {
-	rows, err := this.q.Query(ctx, query, environmentID, graph)
+func (this GraphLoader) deployedContracts(ctx context.Context, query string, environmentID int64, of any) []graphqlmodel.DeployedContract {
+	rows, err := this.q.Query(ctx, query, environmentID, of)
 	if err != nil {
-		panic(fmt.Errorf("error loading deployed contracts of graph %q: %w", graph, err))
+		panic(fmt.Errorf("error loading deployed contracts of %v: %w", of, err))
 	}
 	defer rows.Close()
 
@@ -89,14 +104,14 @@ func (this GraphLoader) deployedContracts(ctx context.Context, query string, env
 	for rows.Next() {
 		var contract graphqlmodel.DeployedContract
 		if err := rows.Scan(&contract.ParticipantID, &contract.ContractID, &contract.Version); err != nil {
-			panic(fmt.Errorf("error scanning deployed contract of graph %q: %w", graph, err))
+			panic(fmt.Errorf("error scanning deployed contract of %v: %w", of, err))
 		}
 
 		deployed = append(deployed, contract)
 	}
 
 	if err := rows.Err(); err != nil {
-		panic(fmt.Errorf("error reading deployed contracts of graph %q: %w", graph, err))
+		panic(fmt.Errorf("error reading deployed contracts of %v: %w", of, err))
 	}
 
 	return deployed

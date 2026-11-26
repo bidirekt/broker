@@ -26,6 +26,7 @@ var rootTypes = []rootType{
 }
 
 type composition struct {
+	graph                    string
 	subgraphs                []subgraph
 	enumUses                 map[string]enumUse
 	schemas                  model.Schemas
@@ -51,7 +52,7 @@ type compositionError struct {
 // contract whose resources are hashed under the graph's name; when it does not compose, the errors come instead,
 // ordered by coordinate and then by subgraph.
 func ToComposedGraph(graph string, subgraphs []*model.PersistedContract) (*model.PersistedContract, []string) {
-	composing := newComposition(subgraphs)
+	composing := newComposition(graph, subgraphs)
 
 	// A step runs only when the ones before it found no error: a root that takes a type's name garbles the schemas.
 	for _, step := range []func(){composing.checkRootNames, composing.compose, composing.checkSatisfiability} {
@@ -91,7 +92,7 @@ func (this *composition) roots() []rootType {
 	})
 }
 
-func newComposition(contracts []*model.PersistedContract) *composition {
+func newComposition(graph string, contracts []*model.PersistedContract) *composition {
 	subgraphs := make([]subgraph, 0, len(contracts))
 	for _, contract := range contracts {
 		subgraphs = append(subgraphs, toSubgraph(contract))
@@ -102,6 +103,7 @@ func newComposition(contracts []*model.PersistedContract) *composition {
 	})
 
 	return &composition{
+		graph:                    graph,
 		subgraphs:                subgraphs,
 		enumUses:                 toEnumUses(subgraphs),
 		schemas:                  model.Schemas{},
@@ -144,8 +146,7 @@ func ownerOf(coordinate string) string {
 }
 
 // takeOverrides leaves each field a subgraph takes over with @override to that subgraph alone. An @override from a
-// subgraph that is not a member, as one named after the subgraph's name in Apollo, takes the field from every other
-// member that resolves it without overriding it too.
+// subgraph that is not a member is ignored, as in Apollo: the field stays with every member that resolves it.
 func (this *composition) takeOverrides() {
 	for _, member := range this.subgraphs {
 		for _, coordinate := range slices.Sorted(maps.Keys(member.directives)) {
@@ -167,11 +168,7 @@ func (this *composition) takeOverride(member subgraph, coordinate, from string) 
 
 	index := slices.IndexFunc(this.subgraphs, func(other subgraph) bool { return other.name == from })
 	if index < 0 {
-		for _, other := range this.subgraphs {
-			if other.name != member.name && !other.marks(coordinate, graphqlmodel.OverrideDirective) {
-				other.overridden[coordinate] = true
-			}
-		}
+		member.strayOverrides[coordinate] = from
 
 		return
 	}
@@ -220,6 +217,7 @@ func (this *composition) toContract(graph string) *model.PersistedContract {
 		ParticipantName: graph,
 		Resources:       map[string]model.PersistedResource{},
 		Schemas:         map[string]model.Schemas{graphqlmodel.Namespace: this.schemas},
+		Extensions:      map[string]any{graphqlmodel.Protocol.String(): graphqlmodel.Extension{Types: this.toTypeInfos()}},
 	}
 
 	for _, root := range this.roots() {
@@ -238,6 +236,26 @@ func (this *composition) toContract(graph string) *model.PersistedContract {
 	}
 
 	return contract
+}
+
+// The graph keeps the kind of each type and the named type of each field and argument, as a subgraph's SDL does.
+func (this *composition) toTypeInfos() []graphqlmodel.TypeInfo {
+	types := make([]graphqlmodel.TypeInfo, 0, len(this.kinds)+len(this.namedTypes))
+
+	for _, typeName := range slices.Sorted(maps.Keys(this.kinds)) {
+		types = append(types, graphqlmodel.TypeInfo{Coordinate: typeName, Kind: this.kinds[typeName]})
+	}
+
+	for _, coordinate := range slices.Sorted(maps.Keys(this.namedTypes)) {
+		kind := graphqlmodel.FieldKind
+		if strings.HasSuffix(coordinate, ":)") {
+			kind = graphqlmodel.ArgumentKind
+		}
+
+		types = append(types, graphqlmodel.TypeInfo{Coordinate: coordinate, Kind: kind, NamedType: this.namedTypes[coordinate]})
+	}
+
+	return types
 }
 
 // What a root field returns is its levels in the root type, moved to the top of a schema of their own.

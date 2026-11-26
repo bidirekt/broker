@@ -555,3 +555,20 @@ func TestToComposedGraph_ErrorsOnOneCoordinate_AreOrderedBySubgraph(t *testing.T
 		"petstore_orders 1.0.0 and petstore_reviews 2.0.0 both resolve Money.amount without @shareable",
 	}, errors)
 }
+
+func TestToComposedGraph_TheGraph_KeepsTheNamedTypeOfEveryArgumentAndInputField(t *testing.T) {
+	composed, errors := graphqlcontracts.ToComposedGraph("petstore_graph", []*model.PersistedContract{
+		compositionMember(t, "petstore_api", "1.4.0", "type Query {\n  pet(id: ID!): Pet\n}\n\ntype Mutation {\n  addPet(input: AddPetInput!): Pet\n}\n\ninput AddPetInput {\n  ownerId: ID!\n}\n\ntype Pet @key(fields: \"id\") {\n  id: ID!\n}\n"),
+		compositionMember(t, "petstore_reviews", "2.0.0", "type Pet @key(fields: \"id\") {\n  id: ID!\n  reviews(by: ID): [String!]!\n}\n"),
+	})
+	require.Empty(t, errors)
+
+	types := composed.Extensions["graphql"].(graphqlmodel.Extension).Types
+
+	assert.Contains(t, types, graphqlmodel.TypeInfo{Coordinate: "Query.pet(id:)", Kind: "argument", NamedType: "ID"})
+	assert.Contains(t, types, graphqlmodel.TypeInfo{Coordinate: "Mutation.addPet(input:)", Kind: "argument", NamedType: "AddPetInput"})
+	assert.Contains(t, types, graphqlmodel.TypeInfo{Coordinate: "AddPetInput", Kind: "input"})
+	assert.Contains(t, types, graphqlmodel.TypeInfo{Coordinate: "AddPetInput.ownerId", Kind: "field", NamedType: "ID"})
+	assert.Contains(t, types, graphqlmodel.TypeInfo{Coordinate: "Pet.reviews(by:)", Kind: "argument", NamedType: "ID"})
+	assert.Contains(t, types, graphqlmodel.TypeInfo{Coordinate: "Pet.reviews", Kind: "field", NamedType: "String"})
+}

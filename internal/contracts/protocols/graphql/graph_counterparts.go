@@ -18,8 +18,9 @@ const candidateVersion = "candidate"
 type GraphLoader interface {
 	GraphNamed(ctx context.Context, name string) bool
 	DeployedMembers(ctx context.Context, environmentID int64, graph string) []graphqlmodel.DeployedContract
-	DeployedConsumers(ctx context.Context, environmentID int64, graph string) []graphqlmodel.DeployedContract
+	DeployedConsumers(ctx context.Context, environmentID int64, provider string) []graphqlmodel.DeployedContract
 	DeployedGraph(ctx context.Context, environmentID, participantID int64) string
+	DeployedContract(ctx context.Context, environmentID, participantID int64) (graphqlmodel.DeployedContract, bool)
 }
 
 type ContractLoader interface {
@@ -59,6 +60,8 @@ func (this CheckerHooks) ExtraCounterparts(
 	for _, graph := range this.affectedGraphs(ctx, contract, environment) {
 		pairs.Pairs = append(pairs.Pairs, this.toGraphConsumerPairs(ctx, graphs, graph)...)
 	}
+
+	pairs.Pairs = append(pairs.Pairs, this.toNamedTypeChangePairs(ctx, contract, environment)...)
 
 	return pairs
 }
@@ -146,13 +149,15 @@ func (this CheckerHooks) toGraphConsumerPairs(ctx context.Context, graphs *graph
 			}
 
 			if base.contract != nil {
+				details := map[string]string{graphqlmodel.GraphKey: graph}
 				pairs = append(pairs, compatibility_checker.ExtraPair{
 					Resources:   consumedFrom(consumer, graph),
 					Contract:    candidate.contract,
 					Counterpart: counterpart,
 					Base:        base.contract,
-					Details:     map[string]string{graphqlmodel.GraphKey: graph},
+					Details:     details,
 				})
+				pairs = append(pairs, toNamedTypeBreakPairs(consumedFrom(consumer, graph), base.contract, toNamedTypeChanges(base.contract, candidate.contract), counterpart, details)...)
 			}
 		}
 	}

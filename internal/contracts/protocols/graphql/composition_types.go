@@ -204,10 +204,26 @@ func (this *composition) checkShared(coordinate string, resolvers []subgraph) {
 	for index, one := range resolvers {
 		for _, other := range resolvers[index+1:] {
 			if !one.shares(coordinate) || !other.shares(coordinate) {
-				this.addError(coordinate, fmt.Sprintf("%s and %s both resolve %s without @shareable", one.label, other.label, coordinate), one, other)
+				this.addError(coordinate, fmt.Sprintf("%s and %s both resolve %s without @shareable%s", one.label, other.label, coordinate, this.strayOverrideOf(coordinate, one, other)), one, other)
 			}
 		}
 	}
+}
+
+// Apollo ignores an @override whose from names no member, often a misspelled one, so the field stays shared.
+func (this *composition) strayOverrideOf(coordinate string, pair ...subgraph) string {
+	for _, member := range pair {
+		if from, stray := member.strayOverrides[coordinate]; stray {
+			names := make([]string, 0, len(this.subgraphs))
+			for _, each := range this.subgraphs {
+				names = append(names, each.name)
+			}
+
+			return fmt.Sprintf(": the @override(from: %q) of %s names no member of %s, whose members are %s", from, member.label, this.graph, strings.Join(names, " and "))
+		}
+	}
+
+	return ""
 }
 
 // Outputs of the same type join, nullable where any subgraph returns null.

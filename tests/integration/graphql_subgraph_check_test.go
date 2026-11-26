@@ -685,3 +685,33 @@ type Pet @key(fields: "id") {
 	consumer := this.canIDeployForSubgraphCheck("petstore_web", "3.0.0")
 	this.True(consumer.Deployable, string(consumer.Results))
 }
+
+func (this *IntegrationSuite) TestCanIDeployAndValidate_ASubgraphCandidate_NeverBreaksAGraphConsumerOfTheIntrospectionFields() {
+	this.setUpSubgraphCheck("petstore_api", "petstore_reviews", "petstore_web")
+	this.publishForSubgraphCheck("petstore_api", "1.4.0", subgraphCheckGraphFile(subgraphCheckGraph), contractFragment{"api.graphqls", subgraphCheckAPISDL})
+	this.publishForSubgraphCheck("petstore_reviews", "2.0.0", subgraphCheckGraphFile(subgraphCheckGraph), contractFragment{"reviews.graphqls", subgraphCheckReviewsSDL})
+	this.publishForSubgraphCheck("petstore_web", "3.0.0", contractFragment{"web.yaml", `consumes:
+  petstore_graph:
+    graphql:
+      query:
+        __schema: {returns: Schema}
+        __type: {arguments: TypeArgs, returns: MaybeType}
+        pet: {arguments: PetArgs, returns: MaybePet}
+schemas:
+  PetArgs: {type: object, properties: {id: {type: string}}}
+  MaybePet: {ref: Pet, nullable: true}
+  Pet: {type: object, properties: {id: {type: string}, reviews: {type: array, items: {type: string}}}}
+  Schema: {type: object, properties: {queryType: {ref: Type}}}
+  TypeArgs: {type: object, properties: {name: {type: string}}}
+  MaybeType: {ref: Type, nullable: true}
+  Type: {type: object, properties: {name: {type: string, nullable: true}}}
+`})
+	this.deployForSubgraphCheck("petstore_api", "1.4.0")
+	this.deployForSubgraphCheck("petstore_reviews", "2.0.0")
+	this.deployForSubgraphCheck("petstore_web", "3.0.0")
+
+	this.assertSubgraphCheck("petstore_reviews", "2.1.0", []contractFragment{
+		subgraphCheckGraphFile(subgraphCheckGraph),
+		{"reviews.graphqls", subgraphCheckReviewsSDL + "\ntype Owner {\n  id: ID!\n}\n"},
+	}, true, `{"petstore_web": {"deployable": true, "participantVersion": "3.0.0"}}`)
+}

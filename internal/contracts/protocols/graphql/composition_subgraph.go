@@ -13,20 +13,21 @@ import (
 
 // subgraph is a member of a graph as the composition reads it: its schemas, the kind and named type of each
 // coordinate, its federation directives, the coordinates its @key field sets name, the fields another subgraph
-// takes over with @override, its roots, the roots it names otherwise while a type of its own takes their default
-// name, and whether it is a Federation 1 subgraph.
+// takes over with @override, the from of each @override that names no member of the graph, its roots, the roots it
+// names otherwise while a type of its own takes their default name, and whether it is a Federation 1 subgraph.
 type subgraph struct {
-	name        string
-	label       string
-	schemas     model.Schemas
-	kinds       map[string]string
-	namedTypes  map[string]string
-	directives  map[string][]graphqlmodel.Directive
-	keyFields   map[string]bool
-	overridden  map[string]bool
-	roots       graphqlmodel.Roots
-	usedRoots   []rootType
-	federation1 bool
+	name           string
+	label          string
+	schemas        model.Schemas
+	kinds          map[string]string
+	namedTypes     map[string]string
+	directives     map[string][]graphqlmodel.Directive
+	keyFields      map[string]bool
+	overridden     map[string]bool
+	strayOverrides map[string]string
+	roots          graphqlmodel.Roots
+	usedRoots      []rootType
+	federation1    bool
 }
 
 func toSubgraph(contract *model.PersistedContract) subgraph {
@@ -34,17 +35,18 @@ func toSubgraph(contract *model.PersistedContract) subgraph {
 	roots := toRootNames(extension.Roots)
 
 	member := subgraph{
-		name:        contract.ParticipantName,
-		label:       contract.ParticipantName + " " + contract.Version,
-		schemas:     roots.toSchemas(contract.Schemas[graphqlmodel.Namespace]),
-		kinds:       make(map[string]string, len(extension.Types)),
-		namedTypes:  make(map[string]string, len(extension.Types)),
-		directives:  map[string][]graphqlmodel.Directive{},
-		keyFields:   map[string]bool{},
-		overridden:  map[string]bool{},
-		roots:       extension.Roots,
-		usedRoots:   toUsedRoots(extension),
-		federation1: extension.Federation1,
+		name:           contract.ParticipantName,
+		label:          contract.ParticipantName + " " + contract.Version,
+		schemas:        roots.toSchemas(contract.Schemas[graphqlmodel.Namespace]),
+		kinds:          make(map[string]string, len(extension.Types)),
+		namedTypes:     make(map[string]string, len(extension.Types)),
+		directives:     map[string][]graphqlmodel.Directive{},
+		keyFields:      map[string]bool{},
+		overridden:     map[string]bool{},
+		strayOverrides: map[string]string{},
+		roots:          extension.Roots,
+		usedRoots:      toUsedRoots(extension),
+		federation1:    extension.Federation1,
 	}
 
 	for _, info := range extension.Types {

@@ -39,8 +39,9 @@ type ReportTree interface {
 	IsEmpty() bool
 }
 
-// ExtraCounterparts is the port of a protocol whose counterparts do not come from the deployments directly. The
-// checker leaves the providers it takes over, for the resources of its protocol, to the pairs it hands back.
+// ExtraCounterparts is the port of a protocol whose counterparts do not come from the deployments directly, or
+// whose breaks a comparison with one contract doesn't find. The checker leaves the providers it takes over, for
+// the resources of its protocol, to the pairs it hands back.
 type ExtraCounterparts interface {
 	ExtraCounterparts(ctx context.Context, contract *model.PersistedContract, environment *model.Environment) ExtraPairs
 }

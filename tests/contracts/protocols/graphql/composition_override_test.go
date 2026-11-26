@@ -119,23 +119,52 @@ func TestToComposedGraph_AnOverrideFromASubgraphThatOverridesTheFieldToo_FailsTh
 	assert.Equal(t, []string{"petstore_reviews 2.0.0 overrides Pet.rating from petstore_api, which overrides it too"}, errors)
 }
 
-func TestToComposedGraph_AnOverrideFromASubgraphOutOfTheGraph_TakesTheFieldFromEveryOtherSubgraph(t *testing.T) {
+func TestToComposedGraph_AnOverrideFromASubgraphOutOfTheGraph_IsIgnoredAndTheSharedFieldFailsWithTheMembers(t *testing.T) {
 	errors := overrideErrors(
 		overrideMember(t, "petstore_api", "1.4.0", overrideAPISDL),
-		overrideMember(t, "petstore_reviews", "2.0.0", fmt.Sprintf(overrideReviewsSDL, ", resolvable: false", ` @override(from: "petstore_legacy")`)),
+		overrideMember(t, "petstore_reviews", "2.0.0", fmt.Sprintf(overrideReviewsSDL, "", ` @override(from: "petstore_legacy")`)),
 	)
 
-	assert.Equal(t, []string{"query pet.rating can't be resolved: no resolvable @key leads from petstore_api 1.4.0 to petstore_reviews 2.0.0 on Pet"}, errors)
+	assert.Equal(t, []string{
+		`petstore_api 1.4.0 and petstore_reviews 2.0.0 both resolve Pet.rating without @shareable: the @override(from: "petstore_legacy") of petstore_reviews 2.0.0 names no member of petstore_graph, whose members are petstore_api and petstore_reviews`,
+	}, errors)
 }
 
-func TestToComposedGraph_TheOverrideExampleOfApollosDocs_Composes(t *testing.T) {
-	composed, errors := graphqlcontracts.ToComposedGraph("petstore_graph", []*model.PersistedContract{
+func TestToComposedGraph_TheSoleResolverOfAField_ComposesWithOrWithoutAnOverrideFromASubgraphOutOfTheGraph(t *testing.T) {
+	for _, override := range []string{"", ` @override(from: "petstore_legacy")`} {
+		_, errors := graphqlcontracts.ToComposedGraph("petstore_graph", []*model.PersistedContract{
+			overrideMember(t, "petstore_api", "1.4.0", "type Query {\n  pet(id: ID!): Pet\n}\n\ntype Pet @key(fields: \"id\") {\n  id: ID!\n}\n"),
+			overrideMember(t, "petstore_reviews", "2.0.0", fmt.Sprintf(overrideReviewsSDL, "", override)),
+		})
+
+		assert.Empty(t, errors, override)
+	}
+}
+
+const overrideBillingSDL = "type Bill @key(fields: \"id\") {\n  id: ID!\n  amount: Int! @override(from: %q)\n}\n"
+
+func overridePaymentsAndBilling(t *testing.T, from string) []*model.PersistedContract {
+	t.Helper()
+
+	return []*model.PersistedContract{
 		overrideMember(t, "petstore_payments", "1.0.0", "type Query {\n  bill(id: ID!): Bill\n}\n\ntype Bill @key(fields: \"id\") {\n  id: ID!\n  amount: Int!\n}\n"),
-		overrideMember(t, "petstore_billing", "1.0.0", "type Bill @key(fields: \"id\") {\n  id: ID!\n  amount: Int! @override(from: \"Payments\")\n}\n"),
-	})
+		overrideMember(t, "petstore_billing", "1.0.0", fmt.Sprintf(overrideBillingSDL, from)),
+	}
+}
+
+func TestToComposedGraph_TheOverrideExampleOfApollosDocsFromTheParticipantName_Composes(t *testing.T) {
+	composed, errors := graphqlcontracts.ToComposedGraph("petstore_graph", overridePaymentsAndBilling(t, "petstore_payments"))
 	require.Empty(t, errors)
 
 	assert.Equal(t, model.Schema{"": {Type: "object"}, "id": {Type: "string", Scalar: "ID"}, "amount": {Type: "integer"}}, composed.Schemas["graphql"]["Bill"])
+}
+
+func TestToComposedGraph_TheOverrideExampleOfApollosDocsFromItsSubgraphName_FailsWithTheMembers(t *testing.T) {
+	errors := overrideErrors(overridePaymentsAndBilling(t, "Payments")...)
+
+	assert.Equal(t, []string{
+		`petstore_billing 1.0.0 and petstore_payments 1.0.0 both resolve Bill.amount without @shareable: the @override(from: "Payments") of petstore_billing 1.0.0 names no member of petstore_graph, whose members are petstore_billing and petstore_payments`,
+	}, errors)
 }
 
 func TestToComposedGraph_AProgressiveOverride_TakesTheWholeField(t *testing.T) {

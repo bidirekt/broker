@@ -565,3 +565,31 @@ schemas:
 		"members": {"petstore_api": "1.4.0", "petstore_reviews": "2.0.0"}
 	}}`)
 }
+
+func (this *IntegrationSuite) TestCanIDeployAndValidate_AGraphConsumerOfTheIntrospectionFields_IsDeployableAndNeverStoresThem() {
+	this.setUpGraphCheck("petstore_api", "petstore_reviews", "petstore_web")
+	this.deployGraphCheckSubgraphs("production")
+
+	this.assertWebGraphCheck(`consumes:
+  petstore_graph:
+    graphql:
+      query:
+        __schema: {returns: Schema}
+        __type: {arguments: TypeArgs, returns: MaybeType}
+        pet: {arguments: PetArgs, returns: MaybePet}
+schemas:
+  PetArgs: {type: object, properties: {id: {type: string}}}
+  MaybePet: {ref: Pet, nullable: true}
+  Pet: {type: object, properties: {name: {type: string}}}
+  Schema: {type: object, properties: {queryType: {ref: Type}}}
+  TypeArgs: {type: object, properties: {name: {type: string}}}
+  MaybeType: {ref: Type, nullable: true}
+  Type: {type: object, properties: {name: {type: string, nullable: true}}}
+`, "production", true, `{"petstore_graph": {"deployable": true, "members": {"petstore_api": "1.4.0", "petstore_reviews": "2.0.0"}}}`)
+
+	var storedFields []string
+	this.Require().NoError(this.Pool.QueryRow(context.Background(), `
+		SELECT COALESCE(array_agg(DISTINCT gr.field ORDER BY gr.field), '{}') FROM resources r JOIN graphql_resources gr ON gr.resource_id = r.id
+		WHERE r.consumed_provider = 'petstore_graph'`).Scan(&storedFields))
+	this.Equal([]string{"pet"}, storedFields)
+}
