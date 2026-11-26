@@ -31,12 +31,6 @@ const (
 		ORDER BY cd.participant_id
 	`
 
-	deployedContractQuery = `
-		SELECT cd.participant_id, cd.contract_id, cd.version
-		FROM current_deployments cd
-		WHERE cd.environment_id = $1 AND cd.participant_id = $2
-	`
-
 	deployedGraphQuery = `
 		SELECT COALESCE((
 			SELECT gm.graph_name
@@ -70,15 +64,6 @@ func (this GraphLoader) DeployedMembers(ctx context.Context, environmentID int64
 
 func (this GraphLoader) DeployedConsumers(ctx context.Context, environmentID int64, provider string) []graphqlmodel.DeployedContract {
 	return this.deployedContracts(ctx, deployedConsumersQuery, environmentID, provider)
-}
-
-func (this GraphLoader) DeployedContract(ctx context.Context, environmentID, participantID int64) (graphqlmodel.DeployedContract, bool) {
-	deployed := this.deployedContracts(ctx, deployedContractQuery, environmentID, participantID)
-	if len(deployed) == 0 {
-		return graphqlmodel.DeployedContract{}, false
-	}
-
-	return deployed[0], true
 }
 
 // DeployedGraph is the graph of the version the participant has deployed in the environment, empty when there is none.

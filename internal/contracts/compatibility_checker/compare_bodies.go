@@ -93,11 +93,7 @@ func (this *bodyComparison) compareRead(reader, producer schemagraph.Node, path 
 		this.argumentFields = append(this.argumentFields, argumentField{path: path, consumer: consumer, provider: provider})
 	}
 
-	shape := reader
-	for this.rules.SingleToList && shape.Type() == model.ArrayType && producer.Type() != model.ArrayType {
-		shape = shape.Child(model.ItemsSegment)
-	}
-
+	shape := shapeRead(reader, producer, this.rules)
 	shapes := [2]string{shape.ShapeKey(), producer.ShapeKey()}
 
 	if !acceptsType(shape, producer, this.rules) {

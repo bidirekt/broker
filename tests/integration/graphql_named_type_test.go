@@ -6,7 +6,10 @@ import (
 	"strings"
 )
 
-const namedTypeAPISDL = `type Query {
+const namedTypeAPISDL = `scalar DateTime
+scalar Instant
+
+type Query {
   pet(id: ID!): Pet
 }
 
@@ -18,6 +21,8 @@ type Mutation {
 input AddPetInput {
   name: String!
   ownerId: ID!
+  age: Int
+  bornAt: DateTime
 }
 
 enum PetStatus {
@@ -45,7 +50,7 @@ schemas:
   Pet: {type: object, properties: {id: {type: string}, reviews: {type: array, items: {type: string}, arguments: ReviewsArgs}}}
   ReviewsArgs: {type: object, properties: {by: {type: string}}}
   AddPetArgs: {type: object, properties: {input: {ref: NewPet}}}
-  NewPet: {type: object, properties: {name: {type: string}, ownerId: {type: string}}}
+  NewPet: {type: object, properties: {name: {type: string}, ownerId: {type: string}, age: {type: integer}, bornAt: {type: scalar, name: DateTime}}}
   MaybeAddedPet: {ref: AddedPet, nullable: true}
   AddedPet: {type: object, properties: {id: {type: string}}}
   TagPetsArgs: {type: object, properties: {status: {ref: Status}}}
@@ -165,6 +170,36 @@ func (this *IntegrationSuite) TestCanIDeployAndValidate_AProviderChangingTheName
 	}}`)
 }
 
+func (this *IntegrationSuite) TestCanIDeployAndValidate_AProviderChangingAnArgumentAConsumerSendsFromIDToInt_BreaksThatConsumerOnlyByTheShape() {
+	this.assertNamedTypeProviderCheck("pet(id: ID!)", "pet(id: Int!)", false, `{"petstore_web": {
+		"deployable": false,
+		"participantVersion": "1.0.0",
+		"operations": {"query": {"pet": {"arguments": [
+			{"reason": "property_type_mismatch", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "argument": "id", "consumerPropertyType": "String!", "providerPropertyType": "Int!", "consumerField": "PetArgs.id", "providerField": "Query.pet(id:)"}}
+		]}}}
+	}}`)
+}
+
+func (this *IntegrationSuite) TestCanIDeployAndValidate_AProviderChangingAnInputFieldAConsumerSendsFromIntToFloat_BreaksThatConsumerByTheName() {
+	this.assertNamedTypeProviderCheck("age: Int", "age: Float", false, `{"petstore_web": {
+		"deployable": false,
+		"participantVersion": "1.0.0",
+		"operations": {"mutation": {"addPet": {"arguments": [
+			{"reason": "property_type_mismatch", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "argument": "input.age", "consumerPropertyType": "Int", "providerPropertyType": "Float", "consumerField": "NewPet.age", "providerField": "AddPetInput.age"}}
+		]}}}
+	}}`)
+}
+
+func (this *IntegrationSuite) TestCanIDeployAndValidate_AProviderRenamingACustomScalarAConsumerNames_BreaksThatConsumerOnce() {
+	this.assertNamedTypeProviderCheck("bornAt: DateTime", "bornAt: Instant", false, `{"petstore_web": {
+		"deployable": false,
+		"participantVersion": "1.0.0",
+		"operations": {"mutation": {"addPet": {"arguments": [
+			{"reason": "property_type_mismatch", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "argument": "input.bornAt", "consumerPropertyType": "DateTime!", "providerPropertyType": "Instant", "consumerField": "NewPet.bornAt", "providerField": "AddPetInput.bornAt"}}
+		]}}}
+	}}`)
+}
+
 func (this *IntegrationSuite) TestCanIDeployAndValidate_AProviderRenamingAnInputAConsumerSends_BreaksThatConsumer() {
 	this.deployNamedTypeProviderAndWeb()
 
@@ -230,6 +265,24 @@ func (this *IntegrationSuite) TestCanIDeployAndValidate_ASubgraphChangingTheName
 		"participantVersion": "3.0.0",
 		"operations": {"query": {"pet": {"arguments": [
 			{"reason": "property_type_mismatch", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_graph", "property": "$", "argument": "id", "consumerPropertyType": "ID", "providerPropertyType": "String", "consumerField": "PetArgs.id", "providerField": "Query.pet(id:)", "graph": "petstore_graph"}}
+		]}}}
+	}}`)
+}
+
+func (this *IntegrationSuite) TestCanIDeployAndValidate_ASubgraphChangingAnArgumentTheGraphConsumerSendsFromIDToInt_BreaksThatConsumerOnlyByTheShape() {
+	this.mustPostForNamedType("/api/environments", `{"environment":"production"}`)
+	this.mustPostForNamedType("/api/participants", `{"participant":"petstore_api"}`)
+	this.mustPostForNamedType("/api/participants", `{"participant":"petstore_web"}`)
+	this.publishAndDeployForNamedType("petstore_api", "1.4.0", contractFragment{"graph.yaml", namedTypeGraphYAML}, contractFragment{"api.graphqls", namedTypeSubgraphSDL})
+	this.publishAndDeployForNamedType("petstore_web", "3.0.0", contractFragment{"web.yaml", namedTypeGraphWebContract})
+
+	candidate := strings.Replace(namedTypeSubgraphSDL, "pet(id: ID!)", "pet(id: Int!)", 1)
+
+	this.assertNamedTypeCheck("petstore_api", "1.5.0", []contractFragment{{"graph.yaml", namedTypeGraphYAML}, {"api.graphqls", candidate}}, false, `{"petstore_web": {
+		"deployable": false,
+		"participantVersion": "3.0.0",
+		"operations": {"query": {"pet": {"arguments": [
+			{"reason": "property_type_mismatch", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_graph", "property": "$", "argument": "id", "consumerPropertyType": "String!", "providerPropertyType": "Int!", "consumerField": "PetArgs.id", "providerField": "Query.pet(id:)", "graph": "petstore_graph"}}
 		]}}}
 	}}`)
 }

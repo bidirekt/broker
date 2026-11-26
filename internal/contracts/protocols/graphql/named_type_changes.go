@@ -25,12 +25,12 @@ func (this CheckerHooks) toNamedTypeChangePairs(ctx context.Context, contract *m
 		return nil
 	}
 
-	deployedVersion, deployed := this.graphs.DeployedContract(ctx, environment.ID, contract.ParticipantID)
+	deployedVersion, deployedContractID, deployed := this.deployments.CurrentDeploymentInEnv(ctx, contract.ParticipantID, environment.ID)
 	if !deployed {
 		return nil
 	}
 
-	provider := this.contracts.GetContractByIDAndVersion(ctx, deployedVersion.ContractID, deployedVersion.Version)
+	provider := this.contracts.GetContractByIDAndVersion(ctx, deployedContractID, deployedVersion)
 
 	changes := toNamedTypeChanges(provider, contract)
 	if len(changes) == 0 {
@@ -52,7 +52,7 @@ func (this CheckerHooks) toNamedTypeChangePairs(ctx context.Context, contract *m
 			Role:               model.CounterpartConsumer,
 		}
 
-		pairs = append(pairs, toNamedTypeBreakPairs(consumedFrom(consumer, contract.ParticipantName), provider, changes, counterpart, nil)...)
+		pairs = append(pairs, toNamedTypeBreakPairs(consumedFrom(consumer, contract.ParticipantName), provider, contract, changes, counterpart, nil)...)
 	}
 
 	return pairs
@@ -98,7 +98,7 @@ func typeInfosOf(contract *model.PersistedContract) map[string]graphqlmodel.Type
 // Each break is a pair of its own: a ready break stands for one site of the resource.
 func toNamedTypeBreakPairs(
 	consumed []model.PersistedResource,
-	provider *model.PersistedContract,
+	deployed, candidate *model.PersistedContract,
 	changes map[string]namedTypeChange,
 	counterpart compatibility_checker.Counterpart,
 	details map[string]string,
@@ -106,12 +106,14 @@ func toNamedTypeBreakPairs(
 	var pairs []compatibility_checker.ExtraPair
 
 	for _, resource := range consumed {
-		provided, found := provider.Resources[resource.ProviderHash]
+		provided, found := deployed.Resources[resource.ProviderHash]
 		if !found {
 			continue
 		}
 
-		for _, readyBreak := range toNamedTypeBreaks(&resource, &provided, changes) {
+		changed := candidate.Resources[resource.ProviderHash]
+
+		for _, readyBreak := range toNamedTypeBreaks(&resource, &provided, &changed, changes) {
 			pairs = append(pairs, compatibility_checker.ExtraPair{
 				Resources:   []model.PersistedResource{resource},
 				Counterpart: counterpart,
@@ -125,7 +127,7 @@ func toNamedTypeBreakPairs(
 }
 
 // namedTypeWalk follows what a consumer resource sends, its arguments and the arguments of the fields it reads,
-// through the deployed provider, whose sites are named by their GraphQL coordinates.
+// through the deployed provider, whose sites are named by their GraphQL coordinates, and through the candidate.
 type namedTypeWalk struct {
 	consumed *model.PersistedResource
 	changes  map[string]namedTypeChange
@@ -133,42 +135,48 @@ type namedTypeWalk struct {
 	breaks   []compatibility_checker.ReadyBreak
 }
 
-func toNamedTypeBreaks(consumed, provided *model.PersistedResource, changes map[string]namedTypeChange) []compatibility_checker.ReadyBreak {
+func toNamedTypeBreaks(consumed, provided, changed *model.PersistedResource, changes map[string]namedTypeChange) []compatibility_checker.ReadyBreak {
 	walk := &namedTypeWalk{consumed: consumed, changes: changes, visited: map[[2]string]bool{}}
 	join := bodyReadings[consumed.Body].Join
 	consumer := schemagraph.New(consumed.Schemas).NamingFields(Plugin{}.FieldName).Root(consumed.Bodies, join)
 	provider := schemagraph.New(provided.Schemas).NamingFields(Plugin{}.FieldName).Root(provided.Bodies, join)
+	candidate := schemagraph.New(changed.Schemas).Root(changed.Bodies, join)
 
 	if consumed.Body == model.Input {
-		walk.walkSent(consumer, provider, "$", "$")
+		walk.walkSent(consumer, provider, candidate, "$", "$")
 	} else {
-		walk.walkRead(consumer, provider, "$")
+		walk.walkRead(consumer, provider, candidate, "$")
 	}
 
 	return walk.breaks
 }
 
-func (this *namedTypeWalk) walkRead(consumer, provider schemagraph.Node, path string) {
+func (this *namedTypeWalk) walkRead(consumer, provider, candidate schemagraph.Node, path string) {
 	if !this.visits(consumer, provider) {
 		return
 	}
 
 	if consumer.Arguments() != "" {
-		this.walkSent(consumer.ArgumentsRoot(schemagraph.Senders), provider.ArgumentsRoot(schemagraph.Senders), path, "$")
+		this.walkSent(consumer.ArgumentsRoot(schemagraph.Senders), provider.ArgumentsRoot(schemagraph.Senders), candidate.ArgumentsRoot(schemagraph.Senders), path, "$")
 	}
 
 	for _, segment := range consumer.Segments() {
-		this.walkRead(consumer.Child(segment), provider.Child(segment), model.ChildPath(path, segment))
+		this.walkRead(consumer.Child(segment), provider.Child(segment), candidate.Child(segment), model.ChildPath(path, segment))
 	}
 }
 
-// A renamed input's fields are no longer the ones the consumer sends: the rename is the break.
-func (this *namedTypeWalk) walkSent(consumer, provider schemagraph.Node, fieldPath, argumentPath string) {
+// A renamed input's fields are no longer the ones the consumer sends: the rename is the break. Where the consumer's
+// value no longer fits the candidate, the comparison breaks there already and that break alone stands.
+func (this *namedTypeWalk) walkSent(consumer, provider, candidate schemagraph.Node, fieldPath, argumentPath string) {
 	if !this.visits(consumer, provider) {
 		return
 	}
 
 	if change, changed := this.changes[provider.Field()]; changed {
+		if !candidate.Exists() || !compatibility_checker.AcceptsType(candidate, consumer, bodyReadings[model.Input].Rules) {
+			return
+		}
+
 		this.breaks = append(this.breaks, compatibility_checker.ReadyBreak{
 			Reason: model.ReasonPropertyTypeMismatch,
 			Details: map[string]string{
@@ -190,8 +198,12 @@ func (this *namedTypeWalk) walkSent(consumer, provider schemagraph.Node, fieldPa
 		provider = provider.Child(model.ItemsSegment)
 	}
 
+	for candidate.Type() == model.ArrayType && consumer.Type() != model.ArrayType {
+		candidate = candidate.Child(model.ItemsSegment)
+	}
+
 	for _, segment := range consumer.Segments() {
-		this.walkSent(consumer.Child(segment), provider.Child(segment), fieldPath, model.ChildPath(argumentPath, segment))
+		this.walkSent(consumer.Child(segment), provider.Child(segment), candidate.Child(segment), fieldPath, model.ChildPath(argumentPath, segment))
 	}
 }
 

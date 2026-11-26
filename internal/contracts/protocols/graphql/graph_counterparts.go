@@ -20,7 +20,10 @@ type GraphLoader interface {
 	DeployedMembers(ctx context.Context, environmentID int64, graph string) []graphqlmodel.DeployedContract
 	DeployedConsumers(ctx context.Context, environmentID int64, provider string) []graphqlmodel.DeployedContract
 	DeployedGraph(ctx context.Context, environmentID, participantID int64) string
-	DeployedContract(ctx context.Context, environmentID, participantID int64) (graphqlmodel.DeployedContract, bool)
+}
+
+type DeploymentLoader interface {
+	CurrentDeploymentInEnv(ctx context.Context, participantID, environmentID int64) (version string, contractID int64, deployed bool)
 }
 
 type ContractLoader interface {
@@ -31,12 +34,13 @@ type ContractLoader interface {
 // from what is deployed in the environment.
 type CheckerHooks struct {
 	Plugin
-	graphs    GraphLoader
-	contracts ContractLoader
+	graphs      GraphLoader
+	deployments DeploymentLoader
+	contracts   ContractLoader
 }
 
-func NewCheckerHooks(graphs GraphLoader, contracts ContractLoader) CheckerHooks {
-	return CheckerHooks{graphs: graphs, contracts: contracts}
+func NewCheckerHooks(graphs GraphLoader, deployments DeploymentLoader, contracts ContractLoader) CheckerHooks {
+	return CheckerHooks{graphs: graphs, deployments: deployments, contracts: contracts}
 }
 
 func (this CheckerHooks) ExtraCounterparts(
@@ -157,7 +161,7 @@ func (this CheckerHooks) toGraphConsumerPairs(ctx context.Context, graphs *graph
 					Base:        base.contract,
 					Details:     details,
 				})
-				pairs = append(pairs, toNamedTypeBreakPairs(consumedFrom(consumer, graph), base.contract, toNamedTypeChanges(base.contract, candidate.contract), counterpart, details)...)
+				pairs = append(pairs, toNamedTypeBreakPairs(consumedFrom(consumer, graph), base.contract, candidate.contract, toNamedTypeChanges(base.contract, candidate.contract), counterpart, details)...)
 			}
 		}
 	}

@@ -88,7 +88,9 @@ func GraphQLModule() Module {
 		ContractExtensions: store,
 		ReservedNames:      store,
 		BindHooks: func(kernel *components.Components, contracts *repository.ContractRepository) compatibility_checker.ProtocolHooks {
-			return graphqlcontracts.NewCheckerHooks(graphqlrepository.NewGraphLoader(kernel.Pool), contracts)
+			return graphqlcontracts.NewCheckerHooks(
+				graphqlrepository.NewGraphLoader(kernel.Pool), repository.NewDeploymentRepository(kernel.Pool), contracts,
+			)
 		},
 	}
 }
