@@ -6,8 +6,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/bidirekt/broker/internal/contracts/contractfiles"
 	"github.com/bidirekt/broker/internal/contracts/protocol"
 	graphqlcontracts "github.com/bidirekt/broker/internal/contracts/protocols/graphql"
+	"github.com/bidirekt/broker/internal/contracts/violation"
 	"github.com/bidirekt/broker/internal/model"
 	graphqlmodel "github.com/bidirekt/broker/internal/model/protocols/graphql"
 )
@@ -69,6 +71,26 @@ func TestSDLFormat_Federation1_WithoutAGraph_TheSameSDLIsAReadError(t *testing.T
 
 	require.Error(t, err)
 	assert.Equal(t, `reviews.graphqls:12:12: Undefined directive external.`, err.Error())
+}
+
+func TestSDLFormat_Federation1_AGraphOutsideTheNameFormat_IsRefusedAtTheGraphNotReadWithoutIt(t *testing.T) {
+	interpreter := contractfiles.NewInterpreter(
+		protocol.NewRegistry([]protocol.Protocol{graphqlcontracts.New()}),
+		[]contractfiles.FileFormat{graphqlcontracts.NewSDLFormat()},
+	)
+
+	_, violations, readErr := interpreter.ToViolations([]model.ContractFile{
+		{Source: "graph.yaml", Content: "provides:\n  graphql:\n    graph: petstore-graph\n"},
+		{Source: "reviews.graphqls", Content: federation1ReviewsSDL},
+	})
+
+	require.NoError(t, readErr)
+	assert.Equal(t, []violation.Violation{{
+		ErrorCode: "graph.name_syntax",
+		Path:      "provides;graphql;graph",
+		Source:    "graph.yaml",
+		Details:   map[string]any{"graph": "petstore-graph", "error": "must be snake_case"},
+	}}, violations)
 }
 
 func TestSDLFormat_Federation1_ASubgraphWithAFederation2Link_IsNoFederation1Subgraph(t *testing.T) {

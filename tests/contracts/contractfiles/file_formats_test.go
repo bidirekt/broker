@@ -125,7 +125,7 @@ func TestToViolations_AFormat_ReadsItsFilesByWhatTheYAMLDeclares(t *testing.T) {
 	assert.Equal(t, "Tagged,tagged", violations[0].Details["extension"])
 }
 
-func TestToViolations_AFormat_ReadsItsFilesByTheYAMLWhoseShapeIsValid(t *testing.T) {
+func TestToViolations_YAMLShapeViolations_AreTheAnswerNextToAFormatFileThatReads(t *testing.T) {
 	_, violations, readErr := probeInterpreter.ToViolations([]model.ContractFile{
 		{Source: "api.yaml", Content: probeTagYAML},
 		{Source: "other.yaml", Content: "provides:\n  probe:\n    unknown: x\n"},
@@ -147,14 +147,28 @@ func TestToViolations_AFormatReadError_IsTheReadError(t *testing.T) {
 	assert.Nil(t, violations)
 }
 
-func TestToViolations_AFormatReadError_WinsOverYAMLShapeViolations(t *testing.T) {
+func TestToViolations_YAMLShapeViolations_WinOverAFormatReadError(t *testing.T) {
 	_, violations, readErr := probeInterpreter.ToViolations([]model.ContractFile{
 		{Source: "api.yaml", Content: "provides:\n  probe:\n    unknown: x\n"},
 		{Source: "schema.probe", Content: "broken"},
 	})
 
-	assert.EqualError(t, readErr, "schema.probe: unreadable")
-	assert.Nil(t, violations)
+	require.NoError(t, readErr)
+	assert.Equal(t, []violation.Violation{
+		{ErrorCode: "key.unknown", Path: "provides;probe;unknown", Source: "api.yaml", Details: map[string]any{"key": "unknown"}},
+	}, violations)
+}
+
+func TestToViolations_YAMLShapeViolations_WinOverTheReadErrorOfAFormatFileThatNeedsThatYAML(t *testing.T) {
+	_, violations, readErr := probeInterpreter.ToViolations([]model.ContractFile{
+		{Source: "api.yaml", Content: "provides:\n  probe:\n    tag: Tagged\n    unknown: x\n"},
+		{Source: "schema.probe", Content: "tagged"},
+	})
+
+	require.NoError(t, readErr)
+	assert.Equal(t, []violation.Violation{
+		{ErrorCode: "key.unknown", Path: "provides;probe;unknown", Source: "api.yaml", Details: map[string]any{"key": "unknown"}},
+	}, violations)
 }
 
 func TestToViolations_UnsupportedFile_ListsTheExtensionOfEveryRegisteredFormat(t *testing.T) {

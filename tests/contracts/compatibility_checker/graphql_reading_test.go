@@ -612,3 +612,48 @@ func TestGraphQLReading_AMapOfTheConsumerWithoutASchemaName_IsWrittenWithItsValu
 		}},
 	})
 }
+
+const readingFromContextSDL = `extend schema @link(url: "https://specs.apollo.dev/federation/v2.8", import: ["@key", "@context", "@fromContext"])
+
+type Owner @key(fields: "id") @context(name: "ownerContext") {
+  id: ID!
+  locale: String!
+}
+
+type Query {
+  pet(id: ID!, locale: String! @fromContext(field: "$ownerContext { locale }")): Owner
+}
+`
+
+const readingWithoutFromContextSDL = `extend schema @link(url: "https://specs.apollo.dev/federation/v2.8", import: ["@key", "@context", "@fromContext"])
+
+type Owner @key(fields: "id") @context(name: "ownerContext") {
+  id: ID!
+  locale: String!
+}
+
+type Query {
+  pet(id: ID!, locale: String!): Owner
+}
+`
+
+var readingPetArgumentsWithoutLocale = model.Schemas{
+	"PetArgs": {"": {Type: "object"}, "id": {Type: "string"}},
+}
+
+func TestGraphQLReading_AnArgumentTheRouterFillsFromTheContext_IsNotSentByTheConsumer(t *testing.T) {
+	assertReadingBreaks(t, readingFromContextSDL, "pet", graphqlmodel.ArgumentsInteraction, readingPetArgumentsWithoutLocale, "PetArgs", nil)
+}
+
+func TestGraphQLReading_TheSameRequiredArgumentWithoutFromContext_BreaksTheConsumerThatDoesNotSendIt(t *testing.T) {
+	assertReadingBreaks(t, readingWithoutFromContextSDL, "pet", graphqlmodel.ArgumentsInteraction, readingPetArgumentsWithoutLocale, "PetArgs", []readingBreak{
+		{model.ReasonPropertyMissingInConsumer, map[string]string{
+			"property":      "$",
+			"argument":      "locale",
+			"consumerName":  readingConsumerName,
+			"providerName":  readingProviderName,
+			"propertyType":  "String!",
+			"providerField": "Query.pet(locale:)",
+		}},
+	})
+}

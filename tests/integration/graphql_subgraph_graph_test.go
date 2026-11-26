@@ -23,6 +23,31 @@ type Pet @key(fields: "id") {
 }
 `
 
+const subgraphExtendingQuerySDL = `extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key"])
+
+extend type Query {
+  pet(id: ID!): Pet
+}
+
+type Pet @key(fields: "id") {
+  id: ID!
+}
+`
+
+const subgraphFederation1SDL = `extend type Query {
+  topReviews: [Review!]!
+}
+
+type Review @key(fields: "id") {
+  id: ID!
+}
+
+extend type Pet @key(fields: "id") {
+  id: ID! @external
+  reviews: [Review!]!
+}
+`
+
 const subgraphEntitiesOnlySDL = `extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key"])
 
 type Pet @key(fields: "id") {
@@ -93,12 +118,33 @@ func (this *IntegrationSuite) TestGraphQLSubgraphGraph_Refusals_AnswerTheViolati
 			violation: `{"code":"graph.required_by_federation","path":"","source":"schema.graphqls","details":{}}`,
 		},
 		{
+			name:      "a federated SDL extending a Query no file defines, without a graph",
+			fragments: []contractFragment{{"schema.graphqls", subgraphExtendingQuerySDL}},
+			violation: `{"code":"graph.required_by_federation","path":"","source":"schema.graphqls","details":{}}`,
+		},
+		{
 			name: "a graph outside the participant name format",
 			fragments: []contractFragment{
 				{"graph.yaml", "provides:\n  graphql:\n    graph: Petstore-Graph\n"},
 				{"schema.graphqls", subgraphSDL},
 			},
 			violation: `{"code":"graph.name_syntax","path":"provides;graphql;graph","source":"graph.yaml","details":{"graph":"Petstore-Graph","error":"must be snake_case"}}`,
+		},
+		{
+			name: "a Federation 1 SDL with a graph outside the participant name format",
+			fragments: []contractFragment{
+				{"graph.yaml", "provides:\n  graphql:\n    graph: petstore-graph\n"},
+				{"schema.graphqls", subgraphFederation1SDL},
+			},
+			violation: `{"code":"graph.name_syntax","path":"provides;graphql;graph","source":"graph.yaml","details":{"graph":"petstore-graph","error":"must be snake_case"}}`,
+		},
+		{
+			name: "a federated SDL extending a Query no file defines, with a graph outside the participant name format",
+			fragments: []contractFragment{
+				{"graph.yaml", "provides:\n  graphql:\n    graph: petstore-graph\n"},
+				{"schema.graphqls", subgraphExtendingQuerySDL},
+			},
+			violation: `{"code":"graph.name_syntax","path":"provides;graphql;graph","source":"graph.yaml","details":{"graph":"petstore-graph","error":"must be snake_case"}}`,
 		},
 		{
 			name: "two YAML files with different graphs",

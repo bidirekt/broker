@@ -12,6 +12,7 @@ import (
 	"github.com/bidirekt/broker/internal/contracts/protocol"
 	graphqlcontracts "github.com/bidirekt/broker/internal/contracts/protocols/graphql"
 	restcontracts "github.com/bidirekt/broker/internal/contracts/protocols/rest"
+	"github.com/bidirekt/broker/internal/contracts/violation"
 	"github.com/bidirekt/broker/internal/model"
 	graphqlmodel "github.com/bidirekt/broker/internal/model/protocols/graphql"
 )
@@ -411,6 +412,54 @@ func TestSDLFormat_AnExtendOfATypeNoFileDefines_IsAReadErrorWithTheGraphQLJSText
 	}, protocol.Declarations{})
 
 	assert.EqualError(t, readErr, `query.graphqls:1:13: Cannot extend type "Query" because it is not defined.`)
+}
+
+const federatedExtendingQuerySDL = `extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key"])
+
+extend type Query {
+  pet: Pet
+}
+
+type Pet @key(fields: "id") {
+  id: ID!
+}
+`
+
+func TestSDLFormat_AFederatedSDLExtendingATypeNoFileDefines_WithoutAGraph_IsRefusedForTheMissingGraph(t *testing.T) {
+	interpreter := contractfiles.NewInterpreter(
+		protocol.NewRegistry([]protocol.Protocol{graphqlcontracts.New()}),
+		[]contractfiles.FileFormat{graphqlcontracts.NewSDLFormat()},
+	)
+
+	_, violations, readErr := interpreter.ToViolations([]model.ContractFile{{Source: "schema.graphqls", Content: federatedExtendingQuerySDL}})
+
+	require.NoError(t, readErr)
+	assert.Equal(t, []violation.Violation{{
+		ErrorCode: "graph.required_by_federation",
+		Path:      "",
+		Source:    "schema.graphqls",
+		Details:   map[string]any{},
+	}}, violations)
+}
+
+func TestSDLFormat_AFederatedSDLExtendingATypeNoFileDefines_WithAGraphOutsideTheNameFormat_IsRefusedAtTheGraph(t *testing.T) {
+	interpreter := contractfiles.NewInterpreter(
+		protocol.NewRegistry([]protocol.Protocol{graphqlcontracts.New()}),
+		[]contractfiles.FileFormat{graphqlcontracts.NewSDLFormat()},
+	)
+
+	_, violations, readErr := interpreter.ToViolations([]model.ContractFile{
+		{Source: "graph.yaml", Content: "provides:\n  graphql:\n    graph: petstore-graph\n"},
+		{Source: "schema.graphqls", Content: federatedExtendingQuerySDL},
+	})
+
+	require.NoError(t, readErr)
+	assert.Equal(t, []violation.Violation{{
+		ErrorCode: "graph.name_syntax",
+		Path:      "provides;graphql;graph",
+		Source:    "graph.yaml",
+		Details:   map[string]any{"graph": "petstore-graph", "error": "must be snake_case"},
+	}}, violations)
 }
 
 func TestSDLFormat_ADocumentOfOperations_IsAReadError(t *testing.T) {

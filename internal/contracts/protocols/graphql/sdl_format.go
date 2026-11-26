@@ -28,7 +28,7 @@ func (this SDLFormat) Extensions() []string {
 }
 
 // All the files are one schema: a type defined in one file may be used or extended in another. A subgraph, an SDL
-// whose YAML declares its graph, may also extend a type only another subgraph defines.
+// that links federation or whose YAML declares its graph, may also extend a type only another subgraph defines.
 func (this SDLFormat) ToDeclarations(files []model.ContractFile, yaml protocol.Declarations) (protocol.Declarations, error) {
 	sources := make([]*ast.Source, 0, len(files))
 
@@ -53,7 +53,7 @@ func (this SDLFormat) ToDeclarations(files []model.ContractFile, yaml protocol.D
 		return protocol.Declarations{}, err
 	}
 
-	if !inGraph {
+	if !inGraph && !federation.federated() {
 		if err := checkExtendedTypesDefined(sources); err != nil {
 			return protocol.Declarations{}, err
 		}
