@@ -245,3 +245,38 @@ schemas:
 	this.Contains(body, `<div class="fix self"><span class="side">Fix in <b>petstore_web</b></span><span>stop reading it</span></div><div class="fix other"><span class="side">or fix in <b>petstore_api</b></span><span>provide it</span></div>`)
 	this.NotContains(body, `mark it optional`)
 }
+
+func (this *IntegrationSuite) TestShowCheck_AGraphQLEnumReadWithoutASchemaNameIsWrittenWithItsValues() {
+	this.mustPostForGraphQLCheck("/api/environments", `{"environment":"production"}`)
+	for _, participant := range []string{"petstore_api", "petstore_web"} {
+		this.mustPostForGraphQLCheck("/api/participants", `{"participant":"`+participant+`"}`)
+	}
+	this.publishForGraphQLCheck("petstore_api", "1.4.0", contractFragment{"schema.graphqls", `type Query {
+  pet: Pet
+}
+
+type Pet {
+  status: String!
+}
+`})
+	this.deployForGraphQLCheck("petstore_api", "1.4.0")
+	this.publishForGraphQLCheck("petstore_web", "2.0.0", contractFragment{"web.yaml", `consumes:
+  petstore_api:
+    graphql:
+      query:
+        pet: {returns: MaybePet}
+schemas:
+  MaybePet: {ref: Pet, nullable: true}
+  Pet:
+    type: object
+    properties:
+      status: {type: enum, members: [SOLD, AVAILABLE]}
+`})
+
+	status, _, body := this.getPage(this.checkPathForGraphQLCheck("petstore_web", "2.0.0"), this.signInAsAdmin())
+
+	this.Require().Equal(http.StatusOK, status, body)
+	this.Contains(body, `<span class="op-prop">FIELD</span><span>Pet.status</span><span class="badge">1 place</span>`)
+	this.Contains(body, `<b class="name">petstore_web</b> reads it as <code>enum (AVAILABLE | SOLD)!</code>, but <b class="name">petstore_api</b> provides <code>String!</code>`)
+	this.Contains(body, `<div class="fix self"><span class="side">Fix in <b>petstore_web</b></span><span>read it as String!</span></div><div class="fix other"><span class="side">or fix in <b>petstore_api</b></span><span>provide it as enum (AVAILABLE | SOLD)! there</span></div>`)
+}

@@ -87,8 +87,9 @@ func toBuiltInScalarNames() map[string]string {
 
 var namedShapeTypes = []string{model.ObjectType, model.UnionType, model.MapType, model.EnumType}
 
-// TypeName writes the type as GraphQL does, "[Review!]!": a list item of a shape met again is written by its kind,
-// so a self-referencing list ends.
+// TypeName writes the type as GraphQL does, "[Review!]!", and an enum, union or map without a schema name by its
+// values, "enum (AVAILABLE | SOLD)!": an item or value of a shape met again is written by its kind, so a
+// self-referencing list ends.
 func (this Plugin) TypeName(node schemagraph.Node) (string, bool) {
 	return graphqlTypeName(node, map[string]bool{}), true
 }
@@ -107,6 +108,13 @@ func graphqlTypeName(node schemagraph.Node, writing map[string]bool) string {
 		name = builtInScalarNames[node.Type()]
 	case slices.Contains(namedShapeTypes, node.Type()) && node.ShapeName() != "":
 		name = node.ShapeName()
+	case node.Type() == model.EnumType:
+		name = model.EnumType + " (" + strings.Join(node.Members(), " | ") + ")"
+	case node.Type() == model.UnionType:
+		name = model.UnionType + " (" + strings.Join(memberKeys(node), " | ") + ")"
+	case node.Type() == model.MapType:
+		writing[shape] = true
+		name = model.MapType + "<" + graphqlTypeName(node.Child(model.ValuesSegment), writing) + ">"
 	}
 
 	if !node.Nullable() {
@@ -114,4 +122,15 @@ func graphqlTypeName(node schemagraph.Node, writing map[string]bool) string {
 	}
 
 	return name
+}
+
+func memberKeys(union schemagraph.Node) []string {
+	var keys []string
+	for _, segment := range union.Segments() {
+		if model.IsMemberSegment(segment) {
+			keys = append(keys, model.MemberKey(segment))
+		}
+	}
+
+	return keys
 }

@@ -549,3 +549,65 @@ func TestGraphQLReading_ANamedPrimitiveSchemaOfTheConsumer_IsWrittenByItsGraphQL
 		}},
 	})
 }
+
+const readingUnnamedTypesSDL = `type Pet {
+  id: ID!
+  status: String!
+  labels: String!
+}
+
+type Query {
+  pet(id: ID!): Pet
+  search: [Pet!]!
+}
+`
+
+func TestGraphQLReading_AnEnumOfTheConsumerWithoutASchemaName_IsWrittenWithItsValues(t *testing.T) {
+	assertReadingBreaks(t, readingUnnamedTypesSDL, "pet", graphqlmodel.ReturnsInteraction, model.Schemas{
+		"PetRead": {"": {Type: "object", Nullable: true}, "status": {Type: "enum", Members: []string{"AVAILABLE", "SOLD"}}},
+	}, "PetRead", []readingBreak{
+		{model.ReasonPropertyTypeMismatch, map[string]string{
+			"property":             "$.status",
+			"consumerName":         readingConsumerName,
+			"providerName":         readingProviderName,
+			"consumerPropertyType": "enum (AVAILABLE | SOLD)!",
+			"providerPropertyType": "String!",
+			"consumerField":        "PetRead.status",
+			"providerField":        "Pet.status",
+		}},
+	})
+}
+
+func TestGraphQLReading_AUnionOfTheConsumerWithoutASchemaName_IsWrittenWithItsMembers(t *testing.T) {
+	assertReadingBreaks(t, readingUnnamedTypesSDL, "search", graphqlmodel.ReturnsInteraction, model.Schemas{
+		"SearchRead": {"": {Type: "array"}, "[]": {Type: "union"}, "[](Pet)": {Ref: "PetRead"}, "[](Owner)": {Ref: "OwnerRead"}},
+		"PetRead":    {"": {Type: "object"}, "id": {Type: "string"}},
+		"OwnerRead":  {"": {Type: "object"}, "id": {Type: "string"}},
+	}, "SearchRead", []readingBreak{
+		{model.ReasonPropertyTypeMismatch, map[string]string{
+			"property":             "$[]",
+			"consumerName":         readingConsumerName,
+			"providerName":         readingProviderName,
+			"consumerPropertyType": "union (Owner | Pet)!",
+			"providerPropertyType": "Pet!",
+			"consumerField":        "SearchRead[]",
+			"providerField":        "Query.search[]",
+		}},
+	})
+}
+
+func TestGraphQLReading_AMapOfTheConsumerWithoutASchemaName_IsWrittenWithItsValueType(t *testing.T) {
+	assertReadingBreaks(t, readingUnnamedTypesSDL, "pet", graphqlmodel.ReturnsInteraction, model.Schemas{
+		"PetRead": {"": {Type: "object", Nullable: true}, "labels": {Type: "map", Nullable: true}, "labels{}": {Type: "string"}},
+	}, "PetRead", []readingBreak{
+		{model.ReasonPropertyTypeMismatch, map[string]string{
+			"property":             "$.labels",
+			"consumerName":         readingConsumerName,
+			"providerName":         readingProviderName,
+			"consumerPropertyType": "map<String!>",
+			"providerPropertyType": "String!",
+			"consumerField":        "PetRead.labels",
+			"providerField":        "Pet.labels",
+		}},
+	})
+}
