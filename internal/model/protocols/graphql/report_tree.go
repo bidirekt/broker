@@ -2,6 +2,7 @@ package graphql
 
 import (
 	"cmp"
+	"maps"
 	"slices"
 	"strings"
 
@@ -20,14 +21,15 @@ func (this ReportTree) IsEmpty() bool {
 }
 
 // Append keeps a resource break once per field, under returns: every field has returns, so
-// the break lands in the same place whichever interaction reports it first.
+// the break lands in the same place whichever interaction reports it first. The same reason with other details,
+// such as the field read directly and through a graph, is another break.
 func (this ReportTree) Append(location map[string]string, reportBreak model.ReportBreak) {
 	operation, field, interaction := location[OperationKey], location[FieldKey], location[InteractionKey]
 
 	if !reportBreak.Reason.IsPropertyBreak() {
 		interaction = ReturnsInteraction
 		if slices.ContainsFunc(this[operation][field][interaction], func(reported model.ReportBreak) bool {
-			return reported.Reason == reportBreak.Reason
+			return reported.Reason == reportBreak.Reason && maps.Equal(reported.Details, reportBreak.Details)
 		}) {
 			return
 		}
@@ -47,6 +49,7 @@ func (this ReportTree) Append(location map[string]string, reportBreak model.Repo
 			strings.Compare(a.Details["property"], b.Details["property"]),
 			strings.Compare(a.Details["argument"], b.Details["argument"]),
 			strings.Compare(string(a.Reason), string(b.Reason)),
+			strings.Compare(a.Details[GraphKey], b.Details[GraphKey]),
 		)
 	})
 	this[operation][field][interaction] = breaks

@@ -169,6 +169,19 @@ func TestSDLFormat_AnInterface_IsStoredWithItsFieldsAndItsMembers(t *testing.T) 
 	}, uploaded.Schemas["graphql"]["Node"])
 }
 
+func TestSDLFormat_AnInterfaceThatImplementsAnother_IsKeptInTheExtensionNotAmongTheMembers(t *testing.T) {
+	declarations := sdlDeclarations(t, "type Query {\n  node: Node\n}\n\ninterface Entity {\n  id: ID!\n}\n\ninterface Node {\n  id: ID!\n}\n\ninterface Animal implements Node & Entity {\n  id: ID!\n}\n\ntype Dog implements Animal & Node & Entity {\n  id: ID!\n}\n")
+
+	merged, violations := graphqlcontracts.New().MergeExtensions(declarations.ExtensionPieces["graphql"])
+	require.Empty(t, violations)
+
+	assert.Equal(t, []graphqlmodel.Implementation{
+		{Interface: "Animal", Implements: "Entity"},
+		{Interface: "Animal", Implements: "Node"},
+	}, merged.(graphqlmodel.Extension).Implementations)
+	assert.Equal(t, map[string]contract.Schema{"Dog": {Ref: "Dog"}}, sdlSchema(t, declarations, "Node").UnionMembers)
+}
+
 func TestSDLFormat_AnOutputFieldWithoutBang_IsNullableNeverOptional(t *testing.T) {
 	declarations := sdlDeclarations(t, "type Query {\n  pet: Pet\n}\n\ntype Pet {\n  name: String\n  owner: Owner\n}\n\ntype Owner {\n  name: String!\n}\n")
 

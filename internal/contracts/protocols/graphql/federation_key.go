@@ -83,14 +83,27 @@ func toFieldSet(value *ast.Value) (ast.SelectionSet, bool) {
 		return nil, false
 	}
 
-	document, err := parser.ParseQuery(&ast.Source{Input: "{" + value.Raw + "}"})
+	return parseFieldSet(value.Raw)
+}
+
+// A field set selects fields only: a fragment or an inline fragment makes it invalid.
+func parseFieldSet(fieldSet string) (ast.SelectionSet, bool) {
+	selections, parsed := parseSelections(fieldSet)
+	if !parsed || !onlyFields(selections) {
+		return nil, false
+	}
+
+	return selections, true
+}
+
+// The field set of a @provides may also select through inline fragments.
+func parseSelections(fieldSet string) (ast.SelectionSet, bool) {
+	document, err := parser.ParseQuery(&ast.Source{Input: "{" + fieldSet + "}"})
 	if err != nil || len(document.Operations) != 1 || len(document.Fragments) > 0 {
 		return nil, false
 	}
 
-	selections := document.Operations[0].SelectionSet
-
-	return selections, onlyFields(selections)
+	return document.Operations[0].SelectionSet, true
 }
 
 func onlyFields(selections ast.SelectionSet) bool {

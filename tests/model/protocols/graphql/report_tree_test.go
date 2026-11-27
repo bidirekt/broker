@@ -80,3 +80,17 @@ func TestReportTree_Append_KeepsResourceBreaksOfDifferentReasons(t *testing.T) {
 		{Reason: model.ReasonProviderResourceRemovedButStillConsumed, Role: model.RoleProvider},
 	}}}}, tree)
 }
+
+func TestReportTree_Append_KeepsAResourceBreakWithOtherDetails_DirectFirst(t *testing.T) {
+	tree := graphqlmodel.ReportTree{}
+
+	tree.Append(petArguments, model.ReportBreak{Reason: model.ReasonProviderResourceRemovedButStillConsumed, Role: model.RoleProvider, Details: map[string]string{"graph": "petstore_graph"}})
+	tree.Append(petReturns, model.ReportBreak{Reason: model.ReasonProviderResourceRemovedButStillConsumed, Role: model.RoleProvider})
+	tree.Append(petReturns, model.ReportBreak{Reason: model.ReasonProviderResourceRemovedButStillConsumed, Role: model.RoleProvider, Details: map[string]string{"graph": "petstore_graph"}})
+	tree.Append(petArguments, model.ReportBreak{Reason: model.ReasonProviderResourceRemovedButStillConsumed, Role: model.RoleProvider})
+
+	assert.Equal(t, graphqlmodel.ReportTree{"query": {"pet": {"returns": {
+		{Reason: model.ReasonProviderResourceRemovedButStillConsumed, Role: model.RoleProvider},
+		{Reason: model.ReasonProviderResourceRemovedButStillConsumed, Role: model.RoleProvider, Details: map[string]string{"graph": "petstore_graph"}},
+	}}}}, tree)
+}

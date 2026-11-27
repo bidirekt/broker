@@ -488,7 +488,7 @@ func errorAtDirective(directive *ast.Directive, message string, args ...any) err
 // countedDirectives maps the local name of each directive the composition counts to its federation name.
 func (this federation) countedDirectives() map[string]string {
 	counted := map[string]string{}
-	for _, directive := range []string{graphqlmodel.KeyDirective, graphqlmodel.ShareableDirective, graphqlmodel.InaccessibleDirective, graphqlmodel.ExternalDirective, graphqlmodel.OverrideDirective, graphqlmodel.ProvidesDirective} {
+	for _, directive := range []string{graphqlmodel.KeyDirective, graphqlmodel.ShareableDirective, graphqlmodel.InaccessibleDirective, graphqlmodel.ExternalDirective, graphqlmodel.OverrideDirective, graphqlmodel.ProvidesDirective, graphqlmodel.InterfaceObjectDirective} {
 		for _, name := range this.localNamesOf("@" + directive) {
 			counted[name] = directive
 		}

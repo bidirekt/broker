@@ -8,6 +8,7 @@ import (
 
 	"github.com/bidirekt/broker/internal/components/breakreport"
 	"github.com/bidirekt/broker/internal/model"
+	graphqlmodel "github.com/bidirekt/broker/internal/model/protocols/graphql"
 )
 
 func toOperationBreak(checked checkedOperation, contractBreak model.ReportBreak) OperationBreak {
@@ -16,6 +17,10 @@ func toOperationBreak(checked checkedOperation, contractBreak model.ReportBreak)
 	broken := OperationBreak{Reason: contractBreak.Reason, Sentence: sentence, Fixes: fixes}
 	if contractBreak.Reason.IsPropertyBreak() {
 		broken.Interaction = checked.interaction
+	}
+
+	if contractBreak.Reason == graphqlmodel.ReasonProviderGraphNotComposable {
+		broken.Graph = contractBreak.Details[graphqlmodel.GraphKey]
 	}
 
 	return broken
@@ -34,19 +39,42 @@ func operationBreakLine(checked checkedOperation, contractBreak model.ReportBrea
 		}
 	}
 
+	graph, cause := contractBreak.Details[graphqlmodel.GraphKey], contractBreak.Details[graphqlmodel.CauseKey]
+
+	subject := breakreport.Phrase{breakreport.Name(me)}
+	if asProvider && graph != "" {
+		subject = append(subject, viaGraph(graph))
+	}
+
+	toDeploy := "it"
+	if graph != "" {
+		toDeploy = "a subgraph of it"
+	}
+
 	switch {
+	case reason == graphqlmodel.ReasonProviderGraphNotComposable && asConsumer:
+		return breakreport.Phrase{breakreport.Name(me), breakreport.Plain(" calls "), breakreport.Code(resource), breakreport.Plain(", but "), breakreport.Name(other), breakreport.Plain(" can't be built in "), breakreport.Name(checked.Environment), breakreport.Plain(": " + cause)},
+			[]breakreport.Fix{{Participant: other + " subgraphs", Action: "make it compose"}}
+	case reason == graphqlmodel.ReasonProviderGraphNotComposable && asProvider:
+		return append(subject, breakreport.Plain(" makes "), breakreport.Name(graph), breakreport.Plain(" fail to compose in "), breakreport.Name(checked.Environment), breakreport.Plain(": "+cause+", and "), breakreport.Name(other), breakreport.Plain(" calls "), breakreport.Code(resource)),
+			[]breakreport.Fix{{Participant: me, Action: "make " + graph + " compose", Checked: true}}
 	case reason == model.ReasonProviderResourceNotFound && asConsumer:
 		return breakreport.Phrase{breakreport.Name(me), breakreport.Plain(" calls "), breakreport.Code(resource), breakreport.Plain(", but "), breakreport.Name(other), breakreport.Plain(" doesn't provide it")},
 			fixes("stop calling it", "publish it")
 	case reason == model.ReasonProviderResourceNotDeployedInEnvironment && asConsumer:
 		return breakreport.Phrase{breakreport.Name(me), breakreport.Plain(" calls "), breakreport.Code(resource), breakreport.Plain(", but "), breakreport.Name(other), breakreport.Plain(" is not deployed in "), breakreport.Name(checked.Environment)},
-			[]breakreport.Fix{{Participant: other, Action: "deploy it to " + checked.Environment + " first"}}
+			[]breakreport.Fix{{Participant: other, Action: "deploy " + toDeploy + " to " + checked.Environment + " first"}}
 	case reason == model.ReasonProviderResourceRemovedButStillConsumed && asProvider:
-		return breakreport.Phrase{breakreport.Name(me), breakreport.Plain(" removed "), breakreport.Code(resource), breakreport.Plain(", but "), breakreport.Name(other), breakreport.Plain(" still calls it")},
+		return append(subject, breakreport.Plain(" removed "), breakreport.Code(resource), breakreport.Plain(", but "), breakreport.Name(other), breakreport.Plain(" still calls it")),
 			fixes("keep it until "+other+" stops calling it", "stop calling it")
 	default:
 		return breakreport.Phrase{breakreport.Plain(fallbackBreakLine(reason, contractBreak.Details))}, nil
 	}
+}
+
+// A subgraph under check breaks a consumer through the graph it belongs to.
+func viaGraph(graph string) breakreport.Segment {
+	return breakreport.Plain(" (via " + graph + ")")
 }
 
 func fallbackBreakLine(reason model.BreakingReason, details map[string]string) string {

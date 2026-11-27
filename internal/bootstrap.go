@@ -61,6 +61,8 @@ type Module struct {
 	FileFormat         contractfiles.FileFormat
 	ContractExtensions repository.ContractExtensionStore
 	ReservedNames      repository.ReservedNames
+	// BindHooks stands in for Hooks when the protocol's hooks read the database, once it is open.
+	BindHooks func(kernel *components.Components, contracts *repository.ContractRepository) compatibility_checker.ProtocolHooks
 }
 
 func RESTModule() Module {
@@ -80,12 +82,16 @@ func GraphQLModule() Module {
 
 	return Module{
 		Protocol:           plugin,
-		Hooks:              plugin,
 		Table:              store,
 		Section:            graphqlbreakreport.New(),
 		FileFormat:         graphqlcontracts.NewSDLFormat(),
 		ContractExtensions: store,
 		ReservedNames:      store,
+		BindHooks: func(kernel *components.Components, contracts *repository.ContractRepository) compatibility_checker.ProtocolHooks {
+			return graphqlcontracts.NewCheckerHooks(
+				graphqlrepository.NewGraphLoader(kernel.Pool), repository.NewDeploymentRepository(kernel.Pool), contracts,
+			)
+		},
 	}
 }
 
@@ -106,7 +112,6 @@ func RunWith(modules []Module) (*components.Components, error) {
 
 	for _, module := range modules {
 		plugins = append(plugins, module.Protocol)
-		hooks = append(hooks, module.Hooks)
 		tables = append(tables, module.Table)
 		sections = append(sections, module.Section)
 
@@ -131,6 +136,15 @@ func RunWith(modules []Module) (*components.Components, error) {
 	interpreter := contractfiles.NewInterpreter(protocol.NewRegistry(plugins), formats)
 	reportReader := breakreport.NewReader(sections)
 	protocols := repository.Protocols{Tables: tables, Extensions: stores}
+	contracts := repository.NewContractRepository(kernel.Pool, protocols)
+
+	for _, module := range modules {
+		if module.BindHooks != nil {
+			hooks = append(hooks, module.BindHooks(kernel, contracts))
+		} else {
+			hooks = append(hooks, module.Hooks)
+		}
+	}
 
 	// registers /participants/new-participant, which must precede show_participant_versions' /participants/:name
 	create_participant.Register(kernel, reserved)

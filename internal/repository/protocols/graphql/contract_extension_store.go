@@ -30,6 +30,15 @@ const (
 			unnest($2::text[], $3::text[], $4::text[]) AS info (coordinate, kind, named_type)
 	`
 
+	insertImplementationsQuery = `
+		INSERT INTO graphql_interface_implementations
+			(contract_id, interface_name, implements)
+		SELECT
+			$1, interface_name, implements
+		FROM
+			unnest($2::text[], $3::text[]) AS implementation (interface_name, implements)
+	`
+
 	insertRootTypesQuery = `
 		INSERT INTO graphql_root_types
 			(contract_id, operation, type_name)
@@ -60,6 +69,19 @@ const (
 			contract_id = ANY($1)
 		ORDER BY
 			contract_id, coordinate COLLATE "C"
+	`
+
+	loadImplementationsQuery = `
+		SELECT
+			contract_id,
+			interface_name,
+			implements
+		FROM
+			graphql_interface_implementations
+		WHERE
+			contract_id = ANY($1)
+		ORDER BY
+			contract_id, interface_name COLLATE "C", implements COLLATE "C"
 	`
 
 	loadRootTypesQuery = `
@@ -137,6 +159,7 @@ func (this Plugin) InsertContractExtension(ctx context.Context, q repository.Que
 	}
 
 	this.insertTypeInfo(ctx, q, contractID, graphqlExtension.Types)
+	this.insertImplementations(ctx, q, contractID, graphqlExtension.Implementations)
 	this.insertRootTypes(ctx, q, contractID, graphqlExtension.Roots)
 	this.insertDirectives(ctx, q, contractID, graphqlExtension.Directives)
 }
@@ -158,6 +181,24 @@ func (this Plugin) insertTypeInfo(ctx context.Context, q repository.Querier, con
 
 	if _, err := q.Exec(ctx, insertTypeInfoQuery, contractID, coordinates, kinds, namedTypes); err != nil {
 		panic(fmt.Errorf("error inserting graphql type info: %w", err))
+	}
+}
+
+func (this Plugin) insertImplementations(ctx context.Context, q repository.Querier, contractID int64, implementations []graphqlmodel.Implementation) {
+	if len(implementations) == 0 {
+		return
+	}
+
+	interfaces := make([]string, 0, len(implementations))
+	implemented := make([]string, 0, len(implementations))
+
+	for _, implementation := range implementations {
+		interfaces = append(interfaces, implementation.Interface)
+		implemented = append(implemented, implementation.Implements)
+	}
+
+	if _, err := q.Exec(ctx, insertImplementationsQuery, contractID, interfaces, implemented); err != nil {
+		panic(fmt.Errorf("error inserting graphql interface implementations: %w", err))
 	}
 }
 
@@ -215,6 +256,7 @@ func (this Plugin) LoadContractExtensions(ctx context.Context, q repository.Quer
 
 	this.loadGraphMembers(ctx, q, contractIDs, extensionOf)
 	this.loadTypeInfo(ctx, q, contractIDs, extensionOf)
+	this.loadImplementations(ctx, q, contractIDs, extensionOf)
 	this.loadRootTypes(ctx, q, contractIDs, extensionOf)
 	this.loadDirectives(ctx, q, contractIDs, extensionOf)
 
@@ -272,6 +314,30 @@ func (this Plugin) loadTypeInfo(ctx context.Context, q repository.Querier, contr
 
 	if err := rows.Err(); err != nil {
 		panic(fmt.Errorf("error reading graphql type info: %w", err))
+	}
+}
+
+func (this Plugin) loadImplementations(ctx context.Context, q repository.Querier, contractIDs []int64, extensionOf func(int64) *graphqlmodel.Extension) {
+	rows, err := q.Query(ctx, loadImplementationsQuery, contractIDs)
+	if err != nil {
+		panic(fmt.Errorf("error loading graphql interface implementations: %w", err))
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var contractID int64
+		var implementation graphqlmodel.Implementation
+
+		if err := rows.Scan(&contractID, &implementation.Interface, &implementation.Implements); err != nil {
+			panic(fmt.Errorf("error scanning graphql interface implementation: %w", err))
+		}
+
+		extension := extensionOf(contractID)
+		extension.Implementations = append(extension.Implementations, implementation)
+	}
+
+	if err := rows.Err(); err != nil {
+		panic(fmt.Errorf("error reading graphql interface implementations: %w", err))
 	}
 }
 

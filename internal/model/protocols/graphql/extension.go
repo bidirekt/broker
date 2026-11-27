@@ -12,27 +12,30 @@ const (
 )
 
 const (
-	KeyDirective          = "key"
-	ShareableDirective    = "shareable"
-	InaccessibleDirective = "inaccessible"
-	ExternalDirective     = "external"
-	OverrideDirective     = "override"
-	ProvidesDirective     = "provides"
+	KeyDirective             = "key"
+	ShareableDirective       = "shareable"
+	InaccessibleDirective    = "inaccessible"
+	ExternalDirective        = "external"
+	OverrideDirective        = "override"
+	ProvidesDirective        = "provides"
+	InterfaceObjectDirective = "interfaceObject"
 )
 
 // Extension is what the SDL keeps that the schemas lose: whether a type is an input, the GraphQL name of a
-// field's or argument's type (ID and String both become string), the types whose fields are the queries and the
-// mutations, the federation directives that compose a graph, the graph the subgraph belongs to, and whether it is a
-// Federation 1 subgraph, one without a federation @link. GraphSource and LinkSource name the files the graph and
-// the federation @link came from; like every source, they stay out of the checksum and are never stored.
+// field's or argument's type (ID and String both become string), the interfaces each interface implements, the types
+// whose fields are the queries and the mutations, the federation directives that compose a graph, the graph the
+// subgraph belongs to, and whether it is a Federation 1 subgraph, one without a federation @link. GraphSource and
+// LinkSource name the files the graph and the federation @link came from; like every source, they stay out of the
+// checksum and are never stored.
 type Extension struct {
-	Graph       string      `json:"graph,omitempty"`
-	Federation1 bool        `json:"federation1,omitempty"`
-	Directives  []Directive `json:"directives,omitempty"`
-	Types       []TypeInfo  `json:"types,omitempty"`
-	Roots       Roots       `json:"roots,omitzero"`
-	GraphSource string      `json:"-"`
-	LinkSource  string      `json:"-"`
+	Graph           string           `json:"graph,omitempty"`
+	Federation1     bool             `json:"federation1,omitempty"`
+	Directives      []Directive      `json:"directives,omitempty"`
+	Types           []TypeInfo       `json:"types,omitempty"`
+	Implementations []Implementation `json:"implementations,omitempty"`
+	Roots           Roots            `json:"roots,omitzero"`
+	GraphSource     string           `json:"-"`
+	LinkSource      string           `json:"-"`
 }
 
 // Roots names the type each operation reads its fields from: Query and Mutation unless `schema { … }` says otherwise.
@@ -46,6 +49,13 @@ type TypeInfo struct {
 	Coordinate string `json:"coordinate"`
 	Kind       string `json:"kind"`
 	NamedType  string `json:"namedType,omitempty"`
+}
+
+// Implementation is an interface that implements another: `interface Animal implements Node`. The interface's schema
+// keeps only the objects as its members, the ones a consumer reads.
+type Implementation struct {
+	Interface  string `json:"interface"`
+	Implements string `json:"implements"`
 }
 
 // Directive is a federation directive that counts in the composition; Fields is the field set of a @key or a

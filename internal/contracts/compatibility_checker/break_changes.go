@@ -12,6 +12,19 @@ type ContractBreakingChange struct {
 	CounterpartResource *model.PersistedResource
 	Reason              model.BreakingReason
 	Details             map[string]string
+	Role                model.BreakRole
+}
+
+func (this *ContractBreakingChange) ReportRole() model.BreakRole {
+	if this.Role != "" {
+		return this.Role
+	}
+
+	if this.CheckedResource.IsConsumer() {
+		return model.RoleConsumer
+	}
+
+	return model.RoleProvider
 }
 
 func (this *ContractBreakingChange) refine(reason model.BreakingReason, details map[string]string, refined bool) {

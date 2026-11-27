@@ -30,6 +30,8 @@ type OperationBreak struct {
 	Interaction string
 	Sentence    breakreport.Phrase
 	Fixes       []breakreport.Fix
+	// Graph names the graph page that shows why it does not compose.
+	Graph string
 }
 
 type FieldBlock struct {

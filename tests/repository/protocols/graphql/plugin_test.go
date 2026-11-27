@@ -69,6 +69,10 @@ var federatedExtension = graphqlmodel.Extension{
 		{Coordinate: "Pet.owner", Kind: "field", NamedType: "Owner"},
 		{Coordinate: "Query.pet(id:)", Kind: "argument", NamedType: "ID"},
 	},
+	Implementations: []graphqlmodel.Implementation{
+		{Interface: "Animal", Implements: "Entity"},
+		{Interface: "Animal", Implements: "Node"},
+	},
 	Roots: graphqlmodel.Roots{Query: "RootQuery", Mutation: "RootMutation"},
 }
 

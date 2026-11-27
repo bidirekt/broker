@@ -16,7 +16,7 @@ CREATE TABLE graphql_root_types (
 CREATE TABLE graphql_federation_directives (
   contract_id  BIGINT NOT NULL REFERENCES contracts(id),
   coordinate   text NOT NULL,
-  directive    text NOT NULL CHECK (directive IN ('key', 'shareable', 'inaccessible', 'external', 'override', 'provides')),
+  directive    text NOT NULL CHECK (directive IN ('key', 'shareable', 'inaccessible', 'external', 'override', 'provides', 'interfaceObject')),
   fields       text NOT NULL DEFAULT '',
   override_from text NOT NULL DEFAULT '',
   resolvable   boolean NOT NULL DEFAULT true,

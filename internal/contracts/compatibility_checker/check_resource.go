@@ -65,6 +65,15 @@ func consumerAndProvider(checked, counterpart *model.PersistedResource) (consume
 	return counterpart, checked
 }
 
+// ShapeRead is the node of the reader that reads what the producer gives at a site.
+func ShapeRead(reader, producer schemagraph.Node, rules ReadingRules) schemagraph.Node {
+	for rules.SingleToList && reader.Type() == model.ArrayType && producer.Type() != model.ArrayType {
+		reader = reader.Child(model.ItemsSegment)
+	}
+
+	return reader
+}
+
 func acceptsType(reader, producer schemagraph.Node, rules ReadingRules) bool {
 	if reader.Type() == producer.Type() {
 		return reader.Type() != model.ScalarType || reader.Scalar() == producer.Scalar()

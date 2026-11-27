@@ -32,14 +32,7 @@ func (this *CompatibilityChecker) checkConsumer(
 	if !found {
 		result.Counterpart.ParticipantVersion = registered.DeployedVersion
 
-		notFound := NewProviderResourceNotFound(&consumerResource)
-		if hint, declaresAround := counterparts.ProviderHints[consumerResource.ProviderHash]; declaresAround {
-			if refiner, refines := this.hooksOf(consumerResource.Protocol).(NotFoundRefiner); refines {
-				notFound.refine(refiner.RefineNotFound(hint))
-			}
-		}
-
-		result.AppendContractBreakChange(notFound)
+		result.AppendContractBreakChange(this.toProviderResourceNotFound(&consumerResource, counterparts.ProviderHints))
 
 		report.AppendResult(providerName, result)
 
@@ -62,4 +55,15 @@ func (this *CompatibilityChecker) checkConsumer(
 	}
 
 	report.AppendResult(providerName, result)
+}
+
+func (this *CompatibilityChecker) toProviderResourceNotFound(consumerResource *model.PersistedResource, providerHints map[string]any) ContractBreakingChange {
+	notFound := NewProviderResourceNotFound(consumerResource)
+	if hint, declaresAround := providerHints[consumerResource.ProviderHash]; declaresAround {
+		if refiner, refines := this.hooksOf(consumerResource.Protocol).(NotFoundRefiner); refines {
+			notFound.refine(refiner.RefineNotFound(hint))
+		}
+	}
+
+	return notFound
 }
