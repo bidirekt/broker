@@ -48,6 +48,8 @@ func (this *CreateParticipantUiHandler) Create(ctx fiber.Ctx) error {
 		return this.respondProblem(ctx, fiber.StatusBadRequest, page, ParticipantNameNotSnakeCaseMessage)
 	case ParticipantAlreadyExists:
 		return this.respondProblem(ctx, fiber.StatusConflict, page, ParticipantAlreadyExistsMessage)
+	case ParticipantNameReserved:
+		return this.respondProblem(ctx, fiber.StatusConflict, page, output.Message)
 	}
 
 	this.sessionKeeper.AddMessage(ctx, model.MessageSuccess, ParticipantCreatedMessage)

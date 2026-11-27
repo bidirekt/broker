@@ -19,11 +19,12 @@ const yamlFormat = "yaml"
 
 var yamlExtensions = []string{".yaml", ".yml"}
 
-// FileFormat reads the contract files of its extensions; the error is a read error, answered as the file's own.
-// Its declarations list their schemas in Schemas only: the catalog is built when they are joined with the others.
+// FileFormat reads the contract files of its extensions by what the YAML files of the same contract declare; the
+// error is a read error, answered as the file's own. Its declarations list their schemas in Schemas only: the catalog
+// is built when they are joined with the others.
 type FileFormat interface {
 	Extensions() []string
-	ToDeclarations(files []model.ContractFile) (protocol.Declarations, error)
+	ToDeclarations(files []model.ContractFile, yaml protocol.Declarations) (protocol.Declarations, error)
 }
 
 func HasBlankSource(files []model.ContractFile) bool {
@@ -76,6 +77,7 @@ func (this *Interpreter) ToUploadedContract(
 
 	uploadedContract = model.NewUploadedContract(participant.ID, participant.Name, version, files)
 	uploadedContract.Schemas = fragmentmapper.ToSchemaModels(declarations)
+	uploadedContract.Extensions = declarations.Extensions
 
 	for _, resource := range resources {
 		if err = uploadedContract.AddResource(&resource); err != nil {
@@ -86,30 +88,18 @@ func (this *Interpreter) ToUploadedContract(
 	return uploadedContract, nil, nil, nil
 }
 
-func (this *Interpreter) ToViolations(files []model.ContractFile) ([]violation.Violation, error) {
-	_, violations, readErr := this.toCheckedDeclarations(files)
+func (this *Interpreter) ToViolations(files []model.ContractFile) (extensions map[string]any, violations []violation.Violation, readErr error) {
+	declarations, violations, readErr := this.toCheckedDeclarations(files)
 
-	return violations, readErr
+	return declarations.Extensions, violations, readErr
 }
 
+// The shape violations of the YAML win over a format's read error, since a format reads its files by what the YAML
+// declares.
 func (this *Interpreter) toCheckedDeclarations(files []model.ContractFile) (protocol.Declarations, []violation.Violation, error) {
 	fragments, formatFiles, readErr := this.toFragmentsAndFormatFiles(files)
 	if readErr != nil {
 		return protocol.Declarations{}, nil, readErr
-	}
-
-	formatDeclarations := make([]protocol.Declarations, 0, len(this.formats))
-	for _, format := range this.formats {
-		if len(formatFiles[format]) == 0 {
-			continue
-		}
-
-		declarations, readErr := format.ToDeclarations(formatFiles[format])
-		if readErr != nil {
-			return protocol.Declarations{}, nil, readErr
-		}
-
-		formatDeclarations = append(formatDeclarations, declarations)
 	}
 
 	var shapeViolations []violation.Violation
@@ -124,6 +114,20 @@ func (this *Interpreter) toCheckedDeclarations(files []model.ContractFile) (prot
 	declarations := fragmentmapper.ToDeclarations(fragments, this.registry)
 	if len(fragments) > 0 {
 		declarations.Formats = []string{yamlFormat}
+	}
+
+	formatDeclarations := make([]protocol.Declarations, 0, len(this.formats))
+	for _, format := range this.formats {
+		if len(formatFiles[format]) == 0 {
+			continue
+		}
+
+		read, readErr := format.ToDeclarations(formatFiles[format], declarations)
+		if readErr != nil {
+			return protocol.Declarations{}, nil, readErr
+		}
+
+		formatDeclarations = append(formatDeclarations, read)
 	}
 
 	for _, joined := range formatDeclarations {

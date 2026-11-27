@@ -23,6 +23,11 @@ const (
 	ReturnsInteraction   = "returns"
 )
 
+const GraphKey = "graph"
+
+// GraphPath is where a subgraph declares its graph: provides.graphql.graph.
+const GraphPath = "provides;graphql;graph"
+
 const (
 	OperationKey   = "operation"
 	FieldKey       = "field"

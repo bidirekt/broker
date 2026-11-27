@@ -156,7 +156,7 @@ func argumentsViolations(t *testing.T, consumer string) []violation.Violation {
 		[]contractfiles.FileFormat{graphqlcontracts.NewSDLFormat()},
 	)
 
-	violations, readErr := interpreter.ToViolations([]model.ContractFile{{Source: "petstore_web.yaml", Content: consumer}})
+	_, violations, readErr := interpreter.ToViolations([]model.ContractFile{{Source: "petstore_web.yaml", Content: consumer}})
 	require.NoError(t, readErr)
 
 	return violations

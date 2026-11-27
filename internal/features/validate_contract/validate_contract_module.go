@@ -13,10 +13,10 @@ import (
 func Register(
 	kernel *components.Components,
 	interpreter *contractfiles.Interpreter,
-	tables []repository.ProtocolTable,
+	protocols repository.Protocols,
 	hooks []compatibility_checker.ProtocolHooks,
 ) {
-	contractRepository := repository.NewContractRepository(kernel.Pool, tables)
+	contractRepository := repository.NewContractRepository(kernel.Pool, protocols)
 	deploymentRepository := repository.NewDeploymentRepository(kernel.Pool)
 	environmentRepository := repository.NewEnvironmentRepository(kernel.Pool)
 	participantRepository := repository.NewParticipantRepository(kernel.Pool)

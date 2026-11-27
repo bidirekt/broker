@@ -14,22 +14,26 @@ const (
 	ParticipantCreated CreateParticipantStatus = iota
 	ParticipantNameInvalid
 	ParticipantAlreadyExists
+	ParticipantNameReserved
 )
 
 type CreateParticipantInput struct {
 	Participant string
 }
 
+// Message is the reserving protocol's reason when the Status is ParticipantNameReserved.
 type CreateParticipantOutput struct {
-	Status CreateParticipantStatus
+	Status  CreateParticipantStatus
+	Message string
 }
 
 type CreateParticipantUseCase struct {
 	participantRepository *repository.ParticipantRepository
+	reservedNames         []repository.ReservedNames
 }
 
-func NewCreateParticipantUseCase(participantRepository *repository.ParticipantRepository) *CreateParticipantUseCase {
-	return &CreateParticipantUseCase{participantRepository: participantRepository}
+func NewCreateParticipantUseCase(participantRepository *repository.ParticipantRepository, reservedNames []repository.ReservedNames) *CreateParticipantUseCase {
+	return &CreateParticipantUseCase{participantRepository: participantRepository, reservedNames: reservedNames}
 }
 
 func (this *CreateParticipantUseCase) Execute(ctx context.Context, input CreateParticipantInput) CreateParticipantOutput {
@@ -37,10 +41,14 @@ func (this *CreateParticipantUseCase) Execute(ctx context.Context, input CreateP
 		return CreateParticipantOutput{Status: ParticipantNameInvalid}
 	}
 
-	created := this.participantRepository.Create(ctx, model.NewParticipant(input.Participant))
-	if !created {
-		return CreateParticipantOutput{Status: ParticipantAlreadyExists}
-	}
+	result := this.participantRepository.Create(ctx, model.NewParticipant(input.Participant), this.reservedNames)
 
-	return CreateParticipantOutput{Status: ParticipantCreated}
+	switch result.Outcome {
+	case repository.ParticipantExists:
+		return CreateParticipantOutput{Status: ParticipantAlreadyExists}
+	case repository.ParticipantNameReserved:
+		return CreateParticipantOutput{Status: ParticipantNameReserved, Message: result.Message}
+	default:
+		return CreateParticipantOutput{Status: ParticipantCreated}
+	}
 }

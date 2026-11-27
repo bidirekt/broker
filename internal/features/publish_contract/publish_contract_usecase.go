@@ -70,7 +70,7 @@ func (this *PublishContractUseCase) Execute(ctx context.Context, input PublishCo
 		return PublishContractOutput{}, err
 	}
 
-	conflict := this.contractRepository.Publish(ctx, uploadedContract,
+	result := this.contractRepository.Publish(ctx, uploadedContract,
 		func(current *model.PersistedContract) model.ContractDiff {
 			return contract_differ.DiffContracts(current, uploadedContract)
 		},
@@ -78,11 +78,14 @@ func (this *PublishContractUseCase) Execute(ctx context.Context, input PublishCo
 			return this.hasSameContent(stored, participant, uploadedContract)
 		},
 	)
-	if conflict {
+	switch result.Outcome {
+	case repository.PublishConflicted:
 		return PublishContractOutput{Status: ContractVersionConflict}, nil
+	case repository.PublishRefused:
+		return PublishContractOutput{Status: ContractValidationFailed, Violations: []violation.Violation{violation.FromRefusal(result.Refusal)}}, nil
+	default:
+		return PublishContractOutput{Status: ContractPublishSuccessful}, nil
 	}
-
-	return PublishContractOutput{Status: ContractPublishSuccessful}, nil
 }
 
 func (this *PublishContractUseCase) hasSameContent(stored []model.ContractFile, participant *model.Participant, uploadedContract *model.UploadedContract) bool {

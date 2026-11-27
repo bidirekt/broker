@@ -11,7 +11,7 @@ import (
 )
 
 func (this Plugin) Rules() []protocol.Rule {
-	return []protocol.Rule{graphQLKeysOutsideGraphQL, argumentsNotObject}
+	return []protocol.Rule{graphQLKeysOutsideGraphQL, argumentsNotObject, graphWithoutSchema, federationWithoutGraph}
 }
 
 func graphQLKeysOutsideGraphQL(declarations protocol.Declarations) []violation.Violation {

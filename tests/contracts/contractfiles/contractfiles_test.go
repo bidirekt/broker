@@ -208,7 +208,7 @@ func TestToUploadedContract_RuleViolations_ReturnedWithoutContract(t *testing.T)
 }
 
 func TestToViolations_UnsupportedExtension_ReturnsTheReadError(t *testing.T) {
-	violations, readErr := interpreter.ToViolations([]model.ContractFile{
+	_, violations, readErr := interpreter.ToViolations([]model.ContractFile{
 		{Source: "notes.txt", Content: petsEndpointYAML},
 	})
 
@@ -225,7 +225,7 @@ func TestToViolations_ShapeViolations_SameViolationsAsToUploadedContract(t *test
 	require.NoError(t, readErr)
 	require.NoError(t, err)
 
-	violations, readErr := interpreter.ToViolations(files)
+	_, violations, readErr := interpreter.ToViolations(files)
 
 	require.NoError(t, readErr)
 	assert.Len(t, violations, 2)
@@ -238,7 +238,7 @@ func TestToViolations_UnresolvedSchemaName_SameViolationsAsToUploadedContract(t 
 	require.NoError(t, readErr)
 	require.NoError(t, err)
 
-	violations, readErr := interpreter.ToViolations(files)
+	_, violations, readErr := interpreter.ToViolations(files)
 
 	require.NoError(t, readErr)
 	assert.Equal(t, []violation.Violation{
@@ -262,7 +262,7 @@ func TestToViolations_SchemaDeclaredInTwoFiles_SameViolationsAsToUploadedContrac
 	require.NoError(t, readErr)
 	require.NoError(t, err)
 
-	violations, readErr := interpreter.ToViolations(files)
+	_, violations, readErr := interpreter.ToViolations(files)
 
 	require.NoError(t, readErr)
 	assert.Equal(t, []violation.Violation{
@@ -277,7 +277,7 @@ func TestToViolations_SchemaDeclaredInTwoFiles_SameViolationsAsToUploadedContrac
 }
 
 func TestToViolations_ValidFiles_ReturnsNoViolation(t *testing.T) {
-	violations, readErr := interpreter.ToViolations([]model.ContractFile{
+	_, violations, readErr := interpreter.ToViolations([]model.ContractFile{
 		{Source: "endpoints.yaml", Content: petsEndpointYAML},
 		{Source: "schemas.yaml", Content: petSchemaYAML},
 	})

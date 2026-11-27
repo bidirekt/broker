@@ -16,6 +16,10 @@ var operations = []string{graphqlmodel.QueryOperation, graphqlmodel.MutationOper
 func (this Plugin) ToDeclarations(block protocol.Block) protocol.BlockDeclarations {
 	var declarations protocol.BlockDeclarations
 
+	if graph := block.Document.Text(graphqlmodel.GraphKey); graph != "" {
+		declarations.Extension = graphqlmodel.Extension{Graph: graph}
+	}
+
 	lacksArguments := false
 
 	for _, operation := range operations {

@@ -120,7 +120,7 @@ func restAndGraphQLViolations(t *testing.T, contract string) []violation.Violati
 		[]contractfiles.FileFormat{graphqlcontracts.NewSDLFormat()},
 	)
 
-	violations, readErr := interpreter.ToViolations([]model.ContractFile{{Source: "api.yaml", Content: contract}})
+	_, violations, readErr := interpreter.ToViolations([]model.ContractFile{{Source: "api.yaml", Content: contract}})
 	require.NoError(t, readErr)
 
 	return violations

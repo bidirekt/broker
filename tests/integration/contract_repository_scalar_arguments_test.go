@@ -54,16 +54,16 @@ func (this *IntegrationSuite) scalarArgumentsContract(participantID int64, versi
 }
 
 func (this *IntegrationSuite) publishScalarArgumentsContract(repo *repository.ContractRepository, contract *model.UploadedContract) {
-	conflict := repo.Publish(context.Background(), contract,
+	result := repo.Publish(context.Background(), contract,
 		func(current *model.PersistedContract) model.ContractDiff {
 			return contract_differ.DiffContracts(current, contract)
 		},
 		func([]model.ContractFile) bool { return true })
-	this.Require().False(conflict)
+	this.Require().Equal(repository.Published, result.Outcome)
 }
 
 func (this *IntegrationSuite) TestContractRepository_ScalarAndArguments_ReadBackAsWritten() {
-	repo := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()})
+	repo := repository.NewContractRepository(this.Pool, repository.Protocols{Tables: []repository.ProtocolTable{restrepository.New()}})
 	written := scalarArgumentsPetSchemas("DateTime", "ReviewsArguments")
 	this.publishScalarArgumentsContract(repo, this.scalarArgumentsContract(this.scalarArgumentsParticipantID(), "1", written))
 
@@ -75,7 +75,7 @@ func (this *IntegrationSuite) TestContractRepository_ScalarAndArguments_ReadBack
 
 func (this *IntegrationSuite) TestContractRepository_ScalarOrArgumentsChanged_WritesAModifiedFieldVersion() {
 	ctx := context.Background()
-	repo := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()})
+	repo := repository.NewContractRepository(this.Pool, repository.Protocols{Tables: []repository.ProtocolTable{restrepository.New()}})
 	participantID := this.scalarArgumentsParticipantID()
 
 	this.publishScalarArgumentsContract(repo, this.scalarArgumentsContract(participantID, "1", scalarArgumentsPetSchemas("DateTime", "ReviewsArguments")))

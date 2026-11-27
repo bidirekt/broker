@@ -12,6 +12,7 @@ import (
 
 	"github.com/bidirekt/broker/internal/contracts/protocol"
 	"github.com/bidirekt/broker/internal/model"
+	graphqlmodel "github.com/bidirekt/broker/internal/model/protocols/graphql"
 )
 
 const formatName = "graphql"
@@ -26,8 +27,9 @@ func (this SDLFormat) Extensions() []string {
 	return []string{".graphql", ".graphqls", ".gql"}
 }
 
-// All the files are one schema: a type defined in one file may be used or extended in another.
-func (this SDLFormat) ToDeclarations(files []model.ContractFile) (protocol.Declarations, error) {
+// All the files are one schema: a type defined in one file may be used or extended in another. A subgraph, an SDL
+// that links federation or whose YAML declares its graph, may also extend a type only another subgraph defines.
+func (this SDLFormat) ToDeclarations(files []model.ContractFile, yaml protocol.Declarations) (protocol.Declarations, error) {
 	sources := make([]*ast.Source, 0, len(files))
 
 	for _, file := range files {
@@ -39,16 +41,29 @@ func (this SDLFormat) ToDeclarations(files []model.ContractFile) (protocol.Decla
 		sources = append(sources, source)
 	}
 
-	schema, err := gqlparser.LoadSchema(sources...)
+	inGraph := declaresGraph(yaml)
+
+	federation, err := toFederation(sources, inGraph)
 	if err != nil {
 		return protocol.Declarations{}, err
 	}
 
-	if err := checkExtendedTypesDefined(sources); err != nil {
+	schema, err := gqlparser.LoadSchema(withDefinitions(sources, federation.definitions)...)
+	if err != nil {
 		return protocol.Declarations{}, err
 	}
 
-	return toDeclarations(schema), nil
+	if !inGraph && !federation.federated() {
+		if err := checkExtendedTypesDefined(sources); err != nil {
+			return protocol.Declarations{}, err
+		}
+	}
+
+	if err := federation.checkKeys(schema, sources); err != nil {
+		return protocol.Declarations{}, err
+	}
+
+	return toDeclarations(schema, federation), nil
 }
 
 // gqlparser takes the extension of a type no file defines as its definition; graphql-js refuses it.
@@ -70,6 +85,14 @@ func checkExtendedTypesDefined(sources []*ast.Source) error {
 	}
 
 	return nil
+}
+
+func declaresGraph(yaml protocol.Declarations) bool {
+	return slices.ContainsFunc(yaml.ExtensionPieces[graphqlmodel.Protocol.String()], func(piece protocol.ExtensionPiece) bool {
+		extension, _ := piece.Value.(graphqlmodel.Extension)
+
+		return extension.Graph != ""
+	})
 }
 
 var executableKeywords = []string{"query", "mutation", "subscription", "fragment"}
@@ -112,4 +135,12 @@ func readTokenSkippingComments(scanner *lexer.Lexer) lexer.Token {
 
 func isDescription(token lexer.Token) bool {
 	return token.Kind == lexer.String || token.Kind == lexer.BlockString
+}
+
+func withDefinitions(sources []*ast.Source, definitions *ast.Source) []*ast.Source {
+	if definitions == nil {
+		return sources
+	}
+
+	return append([]*ast.Source{definitions}, sources...)
 }

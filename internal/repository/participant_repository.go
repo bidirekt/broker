@@ -63,17 +63,38 @@ func (this *ParticipantRepository) FindByName(ctx context.Context, name string) 
 	return p, true
 }
 
-func (this *ParticipantRepository) Create(ctx context.Context, p *model.Participant) (created bool) {
-	err := this.pool.QueryRow(ctx, insertParticipantQuery, p.Name).Scan(&p.ID)
+// Create holds the name's lock while it asks each reserving protocol, so a name is never taken by a participant
+// and reserved at once.
+func (this *ParticipantRepository) Create(ctx context.Context, p *model.Participant, reserved []ReservedNames) CreateParticipantResult {
+	tx, err := this.pool.Begin(ctx)
+	if err != nil {
+		panic(fmt.Errorf("error starting transaction: %w", err))
+	}
+
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	LockParticipantName(ctx, tx, p.Name)
+
+	for _, names := range reserved {
+		if message, isReserved := names.ReservedParticipantName(ctx, tx, p.Name); isReserved {
+			return CreateParticipantResult{Outcome: ParticipantNameReserved, Message: message}
+		}
+	}
+
+	err = tx.QueryRow(ctx, insertParticipantQuery, p.Name).Scan(&p.ID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return false
+		return CreateParticipantResult{Outcome: ParticipantExists}
 	}
 
 	if err != nil {
 		panic(fmt.Errorf("error inserting participant: %w", err))
 	}
 
-	return true
+	if err := tx.Commit(ctx); err != nil {
+		panic(fmt.Errorf("error committing transaction: %w", err))
+	}
+
+	return CreateParticipantResult{Outcome: ParticipantCreated}
 }
 
 func (this *ParticipantRepository) ListNames(ctx context.Context) []string {

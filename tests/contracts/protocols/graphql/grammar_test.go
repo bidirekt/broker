@@ -120,3 +120,11 @@ func TestGrammar_GraphQLNames_AreAccepted(t *testing.T) {
 
 	assert.Empty(t, violations)
 }
+
+func TestGrammar_AGraphOutsideTheParticipantNameFormat_IsRefusedAtTheGraph(t *testing.T) {
+	violations := grammarViolations(t, "provides:\n  graphql:\n    graph: Petstore-Graph\n")
+
+	assert.Equal(t, []violation.Violation{
+		{ErrorCode: "graph.name_syntax", Path: "provides;graphql;graph", Source: "web.yaml", Details: map[string]any{"graph": "Petstore-Graph", "error": "must be snake_case"}},
+	}, violations)
+}
