@@ -89,6 +89,7 @@
 .list{list-style:none;margin:0;padding:0}
 .list>li{padding:14px 20px;border-top:1px solid var(--rule);display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;font-size:14px}
 .list>li:first-child{border-top:0}
+.list.errors>li{overflow-wrap:anywhere}
 
 /* ---------- controls ---------- */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:40px;padding:0 14px;border-radius:var(--r-ctl);border:1px solid var(--control);background:var(--raised);color:var(--text)!important;font:500 14px var(--sans);cursor:pointer;white-space:nowrap;text-decoration:none!important}
@@ -163,7 +164,7 @@
   .t.stack td .badges>*{white-space:normal}
 }
 
-/* ---------- badges: never wrap inside, except .cpb ---------- */
+/* ---------- badges: never wrap inside, except .cpb and .wrap ---------- */
 .badge{display:inline-flex;align-items:center;gap:5px;min-height:22px;padding:1px 8px;border-radius:99px;font-size:12px;font-weight:500;border:1px solid var(--border);background:var(--raised);color:var(--text);max-width:100%;white-space:nowrap;overflow-wrap:normal}
 .badge .v{font-family:var(--mono);font-size:inherit;color:var(--muted)}
 .bk a.badge:hover{text-decoration:none;border-color:currentColor}
@@ -181,6 +182,7 @@
 .badge.cpb.no{color:var(--alert-ink)}
 .badge.cpb.no .v{color:var(--alert-ink)}
 .badge.cpb.quiet{color:var(--muted)}
+.badge.wrap{white-space:normal;overflow-wrap:anywhere}
 .badge.more{color:var(--accent);border-style:dashed}
 .badges{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;min-width:0}
 .latest{font-size:11px;font-weight:600;color:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:0 4px;white-space:nowrap}

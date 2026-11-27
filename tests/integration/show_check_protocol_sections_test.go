@@ -150,6 +150,7 @@ func (this *IntegrationSuite) getFromProbeCheckPage(path string) string {
 	show_check.Register(
 		&components.Components{Server: server, Pool: this.Pool},
 		breakreport.NewReader([]breakreport.ProtocolSection{checkSectionsProbe{}, restbreakreport.New()}),
+		nil,
 	)
 
 	resp, err := server.Test(httptest.NewRequest("GET", path, nil), fiber.TestConfig{Timeout: 10 * time.Second})

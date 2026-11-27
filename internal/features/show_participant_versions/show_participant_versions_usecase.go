@@ -25,14 +25,19 @@ type ShowParticipantVersionsOutput struct {
 	Header   *model.ParticipantVersionsHeader
 	Versions []model.PublishedVersion
 	Total    int
+	Links    []repository.Link
 }
 
 type ShowParticipantVersionsUseCase struct {
 	participantVersionsRepository *repository.ParticipantVersionsRepository
+	protocolLinks                 *repository.ProtocolLinks
 }
 
-func NewShowParticipantVersionsUseCase(participantVersionsRepository *repository.ParticipantVersionsRepository) *ShowParticipantVersionsUseCase {
-	return &ShowParticipantVersionsUseCase{participantVersionsRepository: participantVersionsRepository}
+func NewShowParticipantVersionsUseCase(
+	participantVersionsRepository *repository.ParticipantVersionsRepository,
+	protocolLinks *repository.ProtocolLinks,
+) *ShowParticipantVersionsUseCase {
+	return &ShowParticipantVersionsUseCase{participantVersionsRepository: participantVersionsRepository, protocolLinks: protocolLinks}
 }
 
 func (this *ShowParticipantVersionsUseCase) Execute(ctx context.Context, input ShowParticipantVersionsInput) ShowParticipantVersionsOutput {
@@ -43,5 +48,11 @@ func (this *ShowParticipantVersionsUseCase) Execute(ctx context.Context, input S
 
 	versions, total := this.participantVersionsRepository.ListPublishedVersions(ctx, header.Participant.ID, pages.PageSize, pages.Offset(input.Page))
 
-	return ShowParticipantVersionsOutput{Status: ParticipantVersionsFound, Header: header, Versions: versions, Total: total}
+	return ShowParticipantVersionsOutput{
+		Status:   ParticipantVersionsFound,
+		Header:   header,
+		Versions: versions,
+		Total:    total,
+		Links:    this.protocolLinks.ParticipantLinks(ctx, header.Participant.ID),
+	}
 }

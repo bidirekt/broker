@@ -28,11 +28,12 @@ type ShowCheckPage struct {
 
 type CounterpartRow struct {
 	breakreport.Counterpart
-	ParticipantURL string
-	VersionURL     string
+	URL        string
+	VersionURL string
 }
 
-func newShowCheckPage(check *model.CompatibilityCheck, report breakreport.Report) ShowCheckPage {
+func newShowCheckPage(output ShowCheckOutput) ShowCheckPage {
+	check, report := output.Check, output.Report
 	page := ShowCheckPage{
 		Check:          check,
 		ParticipantURL: participantURL(check.ParticipantName),
@@ -41,7 +42,7 @@ func newShowCheckPage(check *model.CompatibilityCheck, report breakreport.Report
 	}
 	drawn := map[string]bool{}
 	for _, counterpart := range report.Counterparts {
-		row := toCounterpartRow(counterpart)
+		row := toCounterpartRow(counterpart, output.CounterpartURLs)
 		page.Counterparts = append(page.Counterparts, row)
 		if counterpart.Breaks > 0 {
 			page.Breaking = append(page.Breaking, row)
@@ -57,13 +58,14 @@ func newShowCheckPage(check *model.CompatibilityCheck, report breakreport.Report
 	return page
 }
 
-func toCounterpartRow(counterpart breakreport.Counterpart) CounterpartRow {
+func toCounterpartRow(counterpart breakreport.Counterpart, counterpartURLs map[string]string) CounterpartRow {
 	row := CounterpartRow{Counterpart: counterpart}
 	if !counterpart.Registered {
+		row.URL = counterpartURLs[counterpart.Name]
 		return row
 	}
 
-	row.ParticipantURL = participantURL(counterpart.Name)
+	row.URL = participantURL(counterpart.Name)
 	row.VersionURL = versionURL(counterpart.Name, counterpart.Version)
 
 	return row

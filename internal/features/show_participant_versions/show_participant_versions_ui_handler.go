@@ -47,5 +47,5 @@ func (this *ShowParticipantVersionsUiHandler) Handle(ctx fiber.Ctx) error {
 		return respond.NotFound(ctx)
 	}
 
-	return pages.Render(ctx, fiber.StatusOK, pageFiles, showParticipantVersionsTemplate, newShowParticipantVersionsPage(output.Header, output.Versions, pager))
+	return pages.Render(ctx, fiber.StatusOK, pageFiles, showParticipantVersionsTemplate, newShowParticipantVersionsPage(output, pager))
 }

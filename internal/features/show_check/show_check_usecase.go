@@ -20,18 +20,24 @@ type ShowCheckInput struct {
 }
 
 type ShowCheckOutput struct {
-	Status ShowCheckStatus
-	Check  *model.CompatibilityCheck
-	Report breakreport.Report
+	Status          ShowCheckStatus
+	Check           *model.CompatibilityCheck
+	Report          breakreport.Report
+	CounterpartURLs map[string]string
 }
 
 type ShowCheckUseCase struct {
 	compatibilityRepository *repository.CompatibilityRepository
 	reportReader            *breakreport.Reader
+	protocolLinks           *repository.ProtocolLinks
 }
 
-func NewShowCheckUseCase(compatibilityRepository *repository.CompatibilityRepository, reportReader *breakreport.Reader) *ShowCheckUseCase {
-	return &ShowCheckUseCase{compatibilityRepository: compatibilityRepository, reportReader: reportReader}
+func NewShowCheckUseCase(
+	compatibilityRepository *repository.CompatibilityRepository,
+	reportReader *breakreport.Reader,
+	protocolLinks *repository.ProtocolLinks,
+) *ShowCheckUseCase {
+	return &ShowCheckUseCase{compatibilityRepository: compatibilityRepository, reportReader: reportReader, protocolLinks: protocolLinks}
 }
 
 func (this *ShowCheckUseCase) Execute(ctx context.Context, input ShowCheckInput) ShowCheckOutput {
@@ -42,5 +48,20 @@ func (this *ShowCheckUseCase) Execute(ctx context.Context, input ShowCheckInput)
 
 	report := this.reportReader.FromStoredCheck(*check, this.compatibilityRepository.ListCheckResults(ctx, check.ID))
 
-	return ShowCheckOutput{Status: CheckFound, Check: check, Report: report}
+	return ShowCheckOutput{Status: CheckFound, Check: check, Report: report, CounterpartURLs: this.counterpartURLs(ctx, report)}
+}
+
+func (this *ShowCheckUseCase) counterpartURLs(ctx context.Context, report breakreport.Report) map[string]string {
+	urls := map[string]string{}
+	for _, counterpart := range report.Counterparts {
+		if counterpart.Registered {
+			continue
+		}
+
+		if url, found := this.protocolLinks.CounterpartURL(ctx, counterpart.Name); found {
+			urls[counterpart.Name] = url
+		}
+	}
+
+	return urls
 }

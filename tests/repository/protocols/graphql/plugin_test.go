@@ -293,3 +293,16 @@ func (this *PluginSuite) TestReservedParticipantNameReservesAGraphName() {
 	this.Equal(`"petstore_graph" is a graph name; pick another participant name`, message)
 	this.False(freeReserved)
 }
+
+func (this *PluginSuite) TestCounterpartURLIsTheGraphPageOfAGraphNameOnly() {
+	url, found := this.plugin.CounterpartURL(context.Background(), this.pool, "petstore_graph")
+	_, participantFound := this.plugin.CounterpartURL(context.Background(), this.pool, "pets_api")
+
+	this.True(found)
+	this.Equal("/graphs/petstore_graph", url)
+	this.False(participantFound)
+}
+
+func (this *PluginSuite) TestParticipantLinksAreNoneWithoutADeployedVersion() {
+	this.Empty(this.plugin.ParticipantLinks(context.Background(), this.pool, 1))
+}
