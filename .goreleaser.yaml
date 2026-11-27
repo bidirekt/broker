@@ -1,0 +1,40 @@
+version: 2
+
+project_name: bidirekt-broker
+
+builds:
+  - main: ./cmd/server
+    binary: bidirekt-broker
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -X github.com/bidirekt/broker/internal/components/versions.brokerVersion={{.Version}}
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+
+# The Homebrew tap (bidirekt/homebrew-tap) depends on these archive names and checksums.txt.
+archives:
+  - name_template: "bidirekt-broker_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    files:
+      - LICENSE
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: github-native
+
+# A tag with a suffix such as -rc.1 is a pre-release.
+release:
+  prerelease: auto
+  header: |
+    ```
+    docker pull ghcr.io/bidirekt/broker:{{ .Version }}
+    ```
