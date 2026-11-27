@@ -9,17 +9,26 @@ import (
 )
 
 func ToDeclarations(fragments []contract.Fragment, registry *protocol.Registry) protocol.Declarations {
-	declarations := protocol.Declarations{Catalog: contract.SchemasMap{}}
+	declarations := protocol.Declarations{Catalog: map[string]contract.SchemasMap{}}
 
 	for _, fragment := range contract.SortedBySource(fragments) {
 		schemas := fragment.Root().Mapping("schemas")
 
 		for _, name := range schemas.Keys() {
-			schema := contract.SchemaFromDocument(schemas.Mapping(name))
-			declarations.Schemas = append(declarations.Schemas, protocol.SchemaDeclaration{Source: fragment.Source, Name: name, Schema: schema})
+			if declarations.Catalog[model.YAMLNamespace] == nil {
+				declarations.Catalog[model.YAMLNamespace] = contract.SchemasMap{}
+			}
 
-			if _, declared := declarations.Catalog[name]; !declared {
-				declarations.Catalog[name] = schema
+			schema := contract.SchemaFromDocument(schemas.Mapping(name))
+			declarations.Schemas = append(declarations.Schemas, protocol.SchemaDeclaration{
+				Source:    fragment.Source,
+				Namespace: model.YAMLNamespace,
+				Name:      name,
+				Schema:    schema,
+			})
+
+			if _, declared := declarations.Catalog[model.YAMLNamespace][name]; !declared {
+				declarations.Catalog[model.YAMLNamespace][name] = schema
 			}
 		}
 
@@ -40,15 +49,20 @@ func ToResourceModels(declarations protocol.Declarations) []model.UploadedResour
 	return resources
 }
 
-func ToSchemaModels(declarations protocol.Declarations) model.Schemas {
-	roots := make([]string, 0, len(declarations.Resources))
+func ToSchemaModels(declarations protocol.Declarations) map[string]model.Schemas {
+	roots := map[string][]string{}
 	for _, declaration := range declarations.Resources {
 		if !declaration.WithoutSchema {
-			roots = append(roots, declaration.SchemaName)
+			roots[declaration.Namespace] = append(roots[declaration.Namespace], declaration.SchemaName)
 		}
 	}
 
-	return schemamapper.ToSchemaModels(declarations.Catalog, roots)
+	schemas := make(map[string]model.Schemas, len(declarations.Catalog))
+	for namespace, catalog := range declarations.Catalog {
+		schemas[namespace] = schemamapper.ToSchemaModels(catalog, roots[namespace])
+	}
+
+	return schemas
 }
 
 func resourceDeclarationsFromFragment(fragment contract.Fragment, registry *protocol.Registry) []protocol.ResourceDeclaration {

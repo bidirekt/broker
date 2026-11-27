@@ -14,7 +14,7 @@ func unresolvedSchemaRefs(declarations protocol.Declarations) []violation.Violat
 	for _, declaration := range declarations.Schemas {
 		violations = append(violations, unresolvedRefsIn(
 			declaration.Schema,
-			declarations.Catalog,
+			declarations.Catalog[declaration.Namespace],
 			declaration,
 			schemaPath(declaration.Name),
 			"",

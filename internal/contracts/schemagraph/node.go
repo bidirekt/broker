@@ -112,7 +112,7 @@ func (this Node) Child(segment string) Node {
 	child := Node{graph: this.graph, join: this.join}
 
 	for _, parent := range this.declarations {
-		site := Site{Schema: parent.shape.Schema, Path: model.ChildPath(parent.shape.Path, segment)}
+		site := Site{Namespace: parent.shape.Namespace, Schema: parent.shape.Schema, Path: model.ChildPath(parent.shape.Path, segment)}
 		if !this.graph.declares(site) {
 			child.lacking = !model.IsMemberSegment(segment)
 
@@ -128,7 +128,7 @@ func (this Node) Child(segment string) Node {
 func (this Node) Declaring(segment string) Node {
 	declaring := Node{graph: this.graph, join: this.join}
 	for _, declaration := range this.declarations {
-		if this.graph.declares(Site{Schema: declaration.shape.Schema, Path: model.ChildPath(declaration.shape.Path, segment)}) {
+		if this.graph.declares(Site{Namespace: declaration.shape.Namespace, Schema: declaration.shape.Schema, Path: model.ChildPath(declaration.shape.Path, segment)}) {
 			declaring.declarations = append(declaring.declarations, declaration)
 		}
 	}
@@ -144,7 +144,7 @@ func (this Node) SiteKey() string {
 	}
 
 	for _, declaration := range this.declarations {
-		key.WriteString("\x00" + declaration.source + "\x00" + declaration.site.Schema + "\x00" + declaration.site.Path)
+		key.WriteString("\x00" + declaration.source + "\x00" + declaration.site.Namespace + "\x00" + declaration.site.Schema + "\x00" + declaration.site.Path)
 	}
 
 	return key.String()
@@ -154,7 +154,7 @@ func (this Node) SiteKey() string {
 func (this Node) ShapeKey() string {
 	var key strings.Builder
 	for _, declaration := range this.declarations {
-		key.WriteString("\x00" + declaration.source + "\x00" + declaration.shape.Schema + "\x00" + declaration.shape.Path)
+		key.WriteString("\x00" + declaration.source + "\x00" + declaration.shape.Namespace + "\x00" + declaration.shape.Schema + "\x00" + declaration.shape.Path)
 	}
 
 	return key.String()

@@ -41,11 +41,11 @@ func (this Block) ToResourceDeclaration(
 	if schemaRef == nil {
 		resource.Bodies = []model.ResourceBody{{Source: this.Source}}
 
-		return ResourceDeclaration{Source: this.Source, Path: path, WithoutSchema: true, Resource: resource}
+		return ResourceDeclaration{Source: this.Source, Path: path, Namespace: model.YAMLNamespace, WithoutSchema: true, Resource: resource}
 	}
 
 	schemaName, _ := schemaRef.(string)
-	resource.Bodies = []model.ResourceBody{{Source: this.Source, SchemaName: null.StringFrom(schemaName)}}
+	resource.Bodies = []model.ResourceBody{{Source: this.Source, Namespace: model.YAMLNamespace, SchemaName: null.StringFrom(schemaName)}}
 
-	return ResourceDeclaration{Source: this.Source, Path: path, SchemaName: schemaName, Resource: resource}
+	return ResourceDeclaration{Source: this.Source, Path: path, Namespace: model.YAMLNamespace, SchemaName: schemaName, Resource: resource}
 }

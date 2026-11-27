@@ -193,7 +193,7 @@ func schemaModelsOf(t *testing.T, files ...schemaFile) model.Schemas {
 		fragments = append(fragments, contract.Fragment{Source: file.source, Document: document})
 	}
 
-	return fragmentmapper.ToSchemaModels(fragmentmapper.ToDeclarations(fragments, protocol.NewRegistry([]protocol.Protocol{restcontracts.New()})))
+	return fragmentmapper.ToSchemaModels(fragmentmapper.ToDeclarations(fragments, protocol.NewRegistry([]protocol.Protocol{restcontracts.New()})))[model.YAMLNamespace]
 }
 
 func TestToSchemaModels_PrimitiveBody_IsASchemaWithItsOwnFieldOnly(t *testing.T) {

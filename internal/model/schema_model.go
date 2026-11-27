@@ -104,3 +104,17 @@ func ParentOf(path string) (parent string, segment string, nested bool) {
 }
 
 type Schemas map[string]Schema
+
+// YAMLNamespace holds the schemas a contract file declares under `schemas:`.
+const YAMLNamespace = "yaml"
+
+func CatalogFor(schemas map[string]Schemas, bodies []ResourceBody) map[string]Schemas {
+	catalog := map[string]Schemas{}
+	for _, body := range bodies {
+		if namespaced, declared := schemas[body.Namespace]; declared {
+			catalog[body.Namespace] = namespaced
+		}
+	}
+
+	return catalog
+}

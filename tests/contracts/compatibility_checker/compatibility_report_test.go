@@ -45,11 +45,11 @@ func postPetsResources(
 			Body:             body,
 			Identity:         restmodel.Identity{Endpoint: "/pets", Method: "post", Status: status},
 			ConsumedProvider: null.StringFrom(petstoreAPI),
-			Bodies:           []model.ResourceBody{{Source: "web.yaml", SchemaName: null.StringFrom("Pet")}},
+			Bodies:           []model.ResourceBody{{Source: "web.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Pet")}},
 		},
 		ConsumerHash: null.StringFrom("web-" + postPetsHash),
 		ProviderHash: postPetsHash,
-		Schemas:      model.Schemas{"Pet": consumerSchema},
+		Schemas:      map[string]model.Schemas{model.YAMLNamespace: model.Schemas{"Pet": consumerSchema}},
 	}
 
 	provider = model.PersistedResource{
@@ -59,10 +59,10 @@ func postPetsResources(
 			Protocol:        restmodel.Protocol,
 			Body:            body,
 			Identity:        restmodel.Identity{Endpoint: "/pets", Method: "post", Status: status},
-			Bodies:          []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Pet")}},
+			Bodies:          []model.ResourceBody{{Source: "api.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Pet")}},
 		},
 		ProviderHash:       postPetsHash,
-		Schemas:            model.Schemas{"Pet": providerSchema},
+		Schemas:            map[string]model.Schemas{model.YAMLNamespace: model.Schemas{"Pet": providerSchema}},
 		ParticipantVersion: null.StringFrom("1.0.0"),
 	}
 

@@ -29,6 +29,7 @@ func TestToResourceDeclaration_ANamedSchema_IsTheBody(t *testing.T) {
 	assert.Equal(t, protocol.ResourceDeclaration{
 		Source:     "web.yaml",
 		Path:       path,
+		Namespace:  model.YAMLNamespace,
 		SchemaName: "Pet",
 		Resource: model.UploadedResource{Resource: model.Resource{
 			Direction:        model.Consumes,
@@ -36,7 +37,7 @@ func TestToResourceDeclaration_ANamedSchema_IsTheBody(t *testing.T) {
 			Body:             model.Output,
 			Identity:         identity,
 			ConsumedProvider: null.StringFrom("pets_api"),
-			Bodies:           []model.ResourceBody{{Source: "web.yaml", SchemaName: null.StringFrom("Pet")}},
+			Bodies:           []model.ResourceBody{{Source: "web.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Pet")}},
 		}},
 	}, declaration)
 }

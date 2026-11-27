@@ -43,7 +43,7 @@ type ordersSide struct {
 
 func ordersBody(schemaName string, schemas model.Schemas) ordersSide {
 	return ordersSide{
-		bodies:  []model.ResourceBody{{Source: "orders.yaml", SchemaName: null.StringFrom(schemaName)}},
+		bodies:  []model.ResourceBody{{Source: "orders.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom(schemaName)}},
 		schemas: schemas,
 	}
 }
@@ -98,7 +98,7 @@ func ordersBreaks(t *testing.T, interaction string, consumerSide, providerSide o
 		},
 		ConsumerHash: null.StringFrom("spa-" + ordersProviderHash),
 		ProviderHash: ordersProviderHash,
-		Schemas:      consumerSide.schemas,
+		Schemas:      map[string]model.Schemas{model.YAMLNamespace: consumerSide.schemas},
 	}
 	provider := model.PersistedResource{
 		Resource: model.Resource{
@@ -110,7 +110,7 @@ func ordersBreaks(t *testing.T, interaction string, consumerSide, providerSide o
 			Bodies:          providerSide.bodies,
 		},
 		ProviderHash:       ordersProviderHash,
-		Schemas:            providerSide.schemas,
+		Schemas:            map[string]model.Schemas{model.YAMLNamespace: providerSide.schemas},
 		ParticipantVersion: null.StringFrom("1.0.0"),
 	}
 
@@ -319,8 +319,8 @@ func TestExponentialSchema_ComparesFastAndBreaksOnce(t *testing.T) {
 
 		twoModules := ordersSide{
 			bodies: []model.ResourceBody{
-				{Source: "a.yaml", SchemaName: null.StringFrom("S0")},
-				{Source: "b.yaml", SchemaName: null.StringFrom("T0")},
+				{Source: "a.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("S0")},
+				{Source: "b.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("T0")},
 			},
 			schemas: catalog,
 		}
@@ -444,7 +444,7 @@ func TestUndescribedBody_BreaksOnlyWhereTheReaderNeedsABody(t *testing.T) {
 		oneUndescribed := ordersSide{
 			bodies: []model.ResourceBody{
 				{Source: "a.yaml"},
-				{Source: "b.yaml", SchemaName: null.StringFrom("Order")},
+				{Source: "b.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Order")},
 			},
 			schemas: order,
 		}

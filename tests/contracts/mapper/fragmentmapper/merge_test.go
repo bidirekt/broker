@@ -247,8 +247,8 @@ func TestMerge_TwoConsumerModulesReadingOneResponse_OneResourceWithABodyPerModul
 			assert.Equal(t, "/invoices", resource.Identity.(restmodel.Identity).Endpoint)
 			assert.Equal(t, "200", resource.Identity.(restmodel.Identity).Status)
 			assert.Equal(t, []model.ResourceBody{
-				{Source: "detail.yaml", SchemaName: null.StringFrom("InvoiceDetail")},
-				{Source: "list.yaml", SchemaName: null.StringFrom("InvoiceList")},
+				{Source: "detail.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("InvoiceDetail")},
+				{Source: "list.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("InvoiceList")},
 			}, resource.Bodies)
 		})
 	}
@@ -263,8 +263,8 @@ func TestMerge_TwoConsumerModulesSendingOneRequest_OneResourceWithABodyPerModule
 
 			request := mergedResource(t, resources, model.Input)
 			assert.Equal(t, []model.ResourceBody{
-				{Source: "create.yaml", SchemaName: null.StringFrom("InvoiceCreate")},
-				{Source: "import.yaml", SchemaName: null.StringFrom("InvoiceImport")},
+				{Source: "create.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("InvoiceCreate")},
+				{Source: "import.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("InvoiceImport")},
 			}, request.Bodies)
 		})
 	}
@@ -275,7 +275,7 @@ func TestMerge_UndescribedBodyInOneModule_IsABodyWithoutSchema(t *testing.T) {
 		t.Run(order.name, func(t *testing.T) {
 			bodies := []model.ResourceBody{
 				{Source: "a.yaml"},
-				{Source: "b.yaml", SchemaName: null.StringFrom("GroupName")},
+				{Source: "b.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("GroupName")},
 			}
 
 			assert.Equal(t, []model.UploadedResource{
@@ -308,8 +308,8 @@ func TestMerge_IdenticalDeclarationInTwoFiles_BuildsOneResourceWithBothBodies(t 
 
 	require.Len(t, resources, 1)
 	assert.Equal(t, []model.ResourceBody{
-		{Source: "a.yaml", SchemaName: null.StringFrom("InvoiceList")},
-		{Source: "b.yaml", SchemaName: null.StringFrom("InvoiceList")},
+		{Source: "a.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("InvoiceList")},
+		{Source: "b.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("InvoiceList")},
 	}, resources[0].Bodies)
 }
 
@@ -340,5 +340,5 @@ func TestMerge_ProvidedResourceDeclaredTwice_FirstSourceWins(t *testing.T) {
 	)
 
 	require.Len(t, resources, 1)
-	assert.Equal(t, []model.ResourceBody{{Source: "a.yaml", SchemaName: null.StringFrom("Pet")}}, resources[0].Bodies)
+	assert.Equal(t, []model.ResourceBody{{Source: "a.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Pet")}}, resources[0].Bodies)
 }

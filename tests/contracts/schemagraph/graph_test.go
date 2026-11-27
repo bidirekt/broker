@@ -10,8 +10,8 @@ import (
 )
 
 func graphRoot(catalog model.Schemas, schemaName string) schemagraph.Node {
-	return schemagraph.New(catalog).Root(
-		[]model.ResourceBody{{Source: "orders.yaml", SchemaName: null.StringFrom(schemaName)}},
+	return schemagraph.New(map[string]model.Schemas{model.YAMLNamespace: catalog}).Root(
+		[]model.ResourceBody{{Source: "orders.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom(schemaName)}},
 		schemagraph.Senders,
 	)
 }
@@ -100,7 +100,7 @@ func TestRoot_UndeclaredSchema_IsAnEmptyNode(t *testing.T) {
 }
 
 func TestRoot_UndescribedBody_DoesNotExist(t *testing.T) {
-	root := schemagraph.New(model.Schemas{}).Root([]model.ResourceBody{{Source: "files.yaml"}}, schemagraph.Readers)
+	root := schemagraph.New(map[string]model.Schemas{}).Root([]model.ResourceBody{{Source: "files.yaml"}}, schemagraph.Readers)
 
 	assert.False(t, root.Exists())
 	assert.Empty(t, root.Type())
@@ -234,9 +234,9 @@ func TestUnion_MembersDeclaredInTwoBodies_JoinIntoBothMembers(t *testing.T) {
 		"PixPayment":  {"": {Type: "object"}, "key": {Type: "string"}},
 	}
 
-	payment := schemagraph.New(catalog).Root([]model.ResourceBody{
-		{Source: "a.yaml", SchemaName: null.StringFrom("OrderA")},
-		{Source: "b.yaml", SchemaName: null.StringFrom("OrderB")},
+	payment := schemagraph.New(map[string]model.Schemas{model.YAMLNamespace: catalog}).Root([]model.ResourceBody{
+		{Source: "a.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("OrderA")},
+		{Source: "b.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("OrderB")},
 	}, schemagraph.Senders).Child("payment")
 
 	assert.Equal(t, "union", payment.Type())
@@ -254,4 +254,30 @@ func TestUnion_AtTheRoot_NamesItsMemberRightAfterTheSchema(t *testing.T) {
 	}
 
 	assert.Equal(t, "Payment(card)", graphRoot(catalog, "Payment").Child("(card)").Field())
+}
+
+func TestNamespaces_BodiesOfOneResource_ResolveTheirSchemaAndRefsInTheirOwnNamespace(t *testing.T) {
+	catalog := map[string]model.Schemas{
+		model.YAMLNamespace: {
+			"Pet":   {"": {Type: "object"}, "id": {Type: "string"}, "owner": {Ref: "Owner"}},
+			"Owner": {"": {Type: "object"}, "name": {Type: "string"}},
+		},
+		"graphql": {
+			"Pet":   {"": {Type: "object"}, "id": {Type: "integer"}, "owner": {Ref: "Owner"}},
+			"Owner": {"": {Type: "object"}, "email": {Type: "string"}},
+		},
+	}
+
+	pet := schemagraph.New(catalog).Root([]model.ResourceBody{
+		{Source: "pets.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Pet")},
+		{Source: "pets.graphql", Namespace: "graphql", SchemaName: null.StringFrom("Pet")},
+	}, schemagraph.Readers)
+
+	assert.Equal(t, []schemagraph.Declaration{
+		{Source: "pets.yaml", Type: "string"},
+		{Source: "pets.graphql", Type: "integer"},
+	}, pet.Child("id").Declarations())
+	assert.Equal(t, []string{"email", "name"}, pet.Child("owner").Segments())
+	assert.Equal(t, []schemagraph.Declaration{{Source: "pets.yaml", Type: "string"}}, pet.Child("owner").Child("name").Declarations())
+	assert.Equal(t, []schemagraph.Declaration{{Source: "pets.graphql", Type: "string"}}, pet.Child("owner").Child("email").Declarations())
 }

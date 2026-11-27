@@ -8,7 +8,7 @@ type PersistedResource struct {
 	ContractID         int64
 	ConsumerHash       null.String
 	ProviderHash       string
-	Schemas            Schemas
+	Schemas            map[string]Schemas
 	ParticipantVersion null.String
 	Removed            bool
 }

@@ -60,11 +60,11 @@ func avatarsResources(
 			Body:             body,
 			Identity:         restmodel.Identity{Endpoint: avatarsEndpoint, Method: avatarsMethod, Status: status},
 			ConsumedProvider: null.StringFrom(avatarsProviderName),
-			Bodies:           []model.ResourceBody{{Source: "spa.yaml", SchemaName: null.StringFrom("Profile")}},
+			Bodies:           []model.ResourceBody{{Source: "spa.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Profile")}},
 		},
 		ConsumerHash: null.StringFrom("spa-" + avatarsProviderHash),
 		ProviderHash: avatarsProviderHash,
-		Schemas:      model.Schemas{"Profile": consumerSchema},
+		Schemas:      map[string]model.Schemas{model.YAMLNamespace: model.Schemas{"Profile": consumerSchema}},
 	}
 
 	provider = model.PersistedResource{
@@ -74,10 +74,10 @@ func avatarsResources(
 			Protocol:        restmodel.Protocol,
 			Body:            body,
 			Identity:        restmodel.Identity{Endpoint: avatarsEndpoint, Method: avatarsMethod, Status: status},
-			Bodies:          []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Profile")}},
+			Bodies:          []model.ResourceBody{{Source: "api.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Profile")}},
 		},
 		ProviderHash:       avatarsProviderHash,
-		Schemas:            model.Schemas{"Profile": providerSchema},
+		Schemas:            map[string]model.Schemas{model.YAMLNamespace: model.Schemas{"Profile": providerSchema}},
 		ParticipantVersion: null.StringFrom("1.0.0"),
 	}
 

@@ -6,5 +6,5 @@ type PersistedContract struct {
 	ParticipantName string
 	Version         string
 	Resources       map[string]PersistedResource
-	Schemas         Schemas
+	Schemas         map[string]Schemas
 }

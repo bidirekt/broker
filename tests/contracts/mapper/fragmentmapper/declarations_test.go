@@ -306,9 +306,9 @@ func TestToDeclarations_SortsSchemasBySourceAndName(t *testing.T) {
 	)
 
 	assert.Equal(t, []protocol.SchemaDeclaration{
-		{Source: "a.yaml", Name: "Pet", Schema: contract.Schema{Type: "object", Properties: map[string]contract.Schema{"id": {Type: "string"}}}},
-		{Source: "a.yaml", Name: "Problem", Schema: contract.Schema{Type: "object", Properties: map[string]contract.Schema{"title": {Type: "string"}}}},
-		{Source: "b.yaml", Name: "Pet", Schema: contract.Schema{Type: "object", Properties: map[string]contract.Schema{"name": {Type: "string"}}}},
+		{Source: "a.yaml", Namespace: model.YAMLNamespace, Name: "Pet", Schema: contract.Schema{Type: "object", Properties: map[string]contract.Schema{"id": {Type: "string"}}}},
+		{Source: "a.yaml", Namespace: model.YAMLNamespace, Name: "Problem", Schema: contract.Schema{Type: "object", Properties: map[string]contract.Schema{"title": {Type: "string"}}}},
+		{Source: "b.yaml", Namespace: model.YAMLNamespace, Name: "Pet", Schema: contract.Schema{Type: "object", Properties: map[string]contract.Schema{"name": {Type: "string"}}}},
 	}, declarations.Schemas)
 }
 
@@ -318,16 +318,16 @@ func TestToDeclarations_CatalogKeepsTheFirstDeclarationOfEachName(t *testing.T) 
 		declaredFile{"a.yaml", petByIdYAML},
 	)
 
-	assert.Equal(t, contract.SchemasMap{
+	assert.Equal(t, map[string]contract.SchemasMap{model.YAMLNamespace: {
 		"Pet":     {Type: "object", Properties: map[string]contract.Schema{"id": {Type: "string"}}},
 		"Problem": {Type: "object", Properties: map[string]contract.Schema{"title": {Type: "string"}}},
-	}, declarations.Catalog)
+	}}, declarations.Catalog)
 
 	require.Len(t, declarations.Resources, 2)
 	consumer := declarations.Resources[1]
 	assert.Equal(t, "b.yaml", consumer.Source)
-	assert.Equal(t, []model.ResourceBody{{Source: "b.yaml", SchemaName: null.StringFrom("Pet")}}, consumer.Resource.Bodies)
-	assert.Equal(t, model.Schema{"": {Type: "object"}, "id": {Type: "string"}}, fragmentmapper.ToSchemaModels(declarations)["Pet"])
+	assert.Equal(t, []model.ResourceBody{{Source: "b.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Pet")}}, consumer.Resource.Bodies)
+	assert.Equal(t, model.Schema{"": {Type: "object"}, "id": {Type: "string"}}, fragmentmapper.ToSchemaModels(declarations)[model.YAMLNamespace]["Pet"])
 }
 
 func TestToDeclarations_CapturesTheSchemaNameOfTheRequestAndOfEachResponse(t *testing.T) {
@@ -338,17 +338,17 @@ func TestToDeclarations_CapturesTheSchemaNameOfTheRequestAndOfEachResponse(t *te
 	request := declarations.Resources[0]
 	assert.Equal(t, "PetCreate", request.SchemaName)
 	assert.Equal(t, model.Input, request.Resource.Body)
-	assert.Equal(t, []model.ResourceBody{{Source: "pets.yaml", SchemaName: null.StringFrom("PetCreate")}}, request.Resource.Bodies)
+	assert.Equal(t, []model.ResourceBody{{Source: "pets.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("PetCreate")}}, request.Resource.Bodies)
 
 	created := declarations.Resources[1]
 	assert.Equal(t, "Pet", created.SchemaName)
 	assert.Equal(t, "201", created.Resource.Identity.(restmodel.Identity).Status)
-	assert.Equal(t, []model.ResourceBody{{Source: "pets.yaml", SchemaName: null.StringFrom("Pet")}}, created.Resource.Bodies)
+	assert.Equal(t, []model.ResourceBody{{Source: "pets.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Pet")}}, created.Resource.Bodies)
 
 	rejected := declarations.Resources[2]
 	assert.Equal(t, "Problem", rejected.SchemaName)
 	assert.Equal(t, "422", rejected.Resource.Identity.(restmodel.Identity).Status)
-	assert.Equal(t, []model.ResourceBody{{Source: "pets.yaml", SchemaName: null.StringFrom("Problem")}}, rejected.Resource.Bodies)
+	assert.Equal(t, []model.ResourceBody{{Source: "pets.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Problem")}}, rejected.Resource.Bodies)
 }
 
 func TestToDeclarations_NormalizesTheEndpointInThePath(t *testing.T) {
@@ -369,8 +369,8 @@ func TestToDeclarations_UnresolvedSchemaName_StaysInTheBody(t *testing.T) {
 
 	require.Len(t, declarations.Resources, 1)
 	assert.Equal(t, "Ghost", declarations.Resources[0].SchemaName)
-	assert.NotContains(t, declarations.Catalog, "Ghost")
-	assert.Equal(t, []model.ResourceBody{{Source: "ghosts.yaml", SchemaName: null.StringFrom("Ghost")}}, declarations.Resources[0].Resource.Bodies)
+	assert.NotContains(t, declarations.Catalog[model.YAMLNamespace], "Ghost")
+	assert.Equal(t, []model.ResourceBody{{Source: "ghosts.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Ghost")}}, declarations.Resources[0].Resource.Bodies)
 }
 
 func TestToDeclarations_NullBody_DeclaresTheResourceWithABodyWithoutSchema(t *testing.T) {
@@ -413,7 +413,7 @@ func TestToDeclarations_EmptyStringBodyIsAnUnresolvedSchemaName(t *testing.T) {
 	for _, declaration := range declarations.Resources {
 		assert.False(t, declaration.WithoutSchema, declaration.Path.String())
 		assert.Empty(t, declaration.SchemaName, declaration.Path.String())
-		assert.Equal(t, []model.ResourceBody{{Source: "files.yaml", SchemaName: null.StringFrom("")}}, declaration.Resource.Bodies, declaration.Path.String())
+		assert.Equal(t, []model.ResourceBody{{Source: "files.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("")}}, declaration.Resource.Bodies, declaration.Path.String())
 	}
 
 	assert.Equal(t, []string{
@@ -432,8 +432,8 @@ func TestToDeclarations_PatchRoute_DeclaresRequestAndResponseInProvidesAndConsum
 		"provides;rest;/pets/*;patch;responses;200",
 	}, resourcePaths(declarations))
 
-	requestBodies := []model.ResourceBody{{Source: "pets.yaml", SchemaName: null.StringFrom("PetPatch")}}
-	responseBodies := []model.ResourceBody{{Source: "pets.yaml", SchemaName: null.StringFrom("Pet")}}
+	requestBodies := []model.ResourceBody{{Source: "pets.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("PetPatch")}}
+	responseBodies := []model.ResourceBody{{Source: "pets.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Pet")}}
 
 	resources := make([]model.UploadedResource, 0, len(declarations.Resources))
 	for _, declaration := range declarations.Resources {

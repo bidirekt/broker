@@ -9,8 +9,8 @@ const (
 )
 
 type ContractDiff struct {
-	Resources map[string]ChangeKind // resource hash → added | removed
-	Schemas   map[string]SchemaChange
+	Resources map[string]ChangeKind              // resource hash → added | removed
+	Schemas   map[string]map[string]SchemaChange // namespace → schema name → change
 }
 
 // SchemaChange is modified when the schema stays reachable and only its fields change.

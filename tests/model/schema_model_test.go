@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/bidirekt/broker/internal/model"
+	"github.com/guregu/null"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -73,4 +74,25 @@ func TestFieldName_SpellsTheSchemaFollowedByThePathInsideIt(t *testing.T) {
 
 func TestMemberKey_IsTheKeyMemberSegmentWrapped(t *testing.T) {
 	assert.Equal(t, "card", model.MemberKey(model.MemberSegment("card")))
+}
+
+func TestCatalogFor_KeepsOnlyTheNamespacesTheBodiesResolveIn(t *testing.T) {
+	yamlSchemas := model.Schemas{"Pet": {"": {Type: "object"}}}
+	generatedSchemas := model.Schemas{"EmptyArguments": {"": {Type: "object"}}}
+	schemas := map[string]model.Schemas{
+		model.YAMLNamespace: yamlSchemas,
+		"graphql":           {"Pet": {"": {Type: "object"}}},
+		"graphql_generated": generatedSchemas,
+	}
+
+	catalog := model.CatalogFor(schemas, []model.ResourceBody{
+		{Source: "a.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Pet")},
+		{Source: "b.yaml"},
+		{Source: "c.yaml", Namespace: "graphql_generated", SchemaName: null.StringFrom("EmptyArguments")},
+	})
+
+	assert.Equal(t, map[string]model.Schemas{
+		model.YAMLNamespace: yamlSchemas,
+		"graphql_generated": generatedSchemas,
+	}, catalog)
 }

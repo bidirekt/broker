@@ -8,19 +8,21 @@ import (
 type Declarations struct {
 	Resources []ResourceDeclaration
 	Schemas   []SchemaDeclaration
-	Catalog   contract.SchemasMap
+	Catalog   map[string]contract.SchemasMap
 }
 
 type ResourceDeclaration struct {
 	Source        string
 	Path          contract.ResourcePath
+	Namespace     string
 	SchemaName    string
 	WithoutSchema bool
 	Resource      model.UploadedResource
 }
 
 type SchemaDeclaration struct {
-	Source string
-	Name   string
-	Schema contract.Schema
+	Source    string
+	Namespace string
+	Name      string
+	Schema    contract.Schema
 }

@@ -26,7 +26,7 @@ func (this *UploadedResource) ProviderHash() string {
 		providerName = this.ConsumedProvider.String
 	}
 
-	return Hash(append([]string{providerName}, this.Identity.HashParts()...)...)
+	return Hash(append([]string{providerName, this.Protocol.String()}, this.Identity.HashParts()...)...)
 }
 
 func (this *UploadedResource) ConsumerHash() string {
@@ -34,7 +34,7 @@ func (this *UploadedResource) ConsumerHash() string {
 		return ""
 	}
 
-	return Hash(append([]string{this.ParticipantName, this.ConsumedProvider.String}, this.Identity.HashParts()...)...)
+	return Hash(append([]string{this.ParticipantName, this.ConsumedProvider.String, this.Protocol.String()}, this.Identity.HashParts()...)...)
 }
 
 func (this *UploadedResource) PrimaryHash() string {

@@ -41,11 +41,11 @@ func conflictingPropertyTypes(declarations protocol.Declarations) []violation.Vi
 	return violations
 }
 
-func describedBodies(bodies []model.ResourceBody, catalog contract.SchemasMap) []model.ResourceBody {
+func describedBodies(bodies []model.ResourceBody, catalog map[string]contract.SchemasMap) []model.ResourceBody {
 	var described []model.ResourceBody
 
 	for _, body := range bodies {
-		if _, declared := catalog[body.SchemaName.String]; body.SchemaName.Valid && declared {
+		if _, declared := catalog[body.Namespace][body.SchemaName.String]; body.SchemaName.Valid && declared {
 			described = append(described, body)
 		}
 	}

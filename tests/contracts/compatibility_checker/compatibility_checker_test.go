@@ -26,11 +26,11 @@ func consumerResource() *model.PersistedResource {
 			ParticipantName:  "front",
 			Bodies:           thingsBodies("FrontThing"),
 		},
-		Schemas: model.Schemas{"FrontThing": {
+		Schemas: map[string]model.Schemas{model.YAMLNamespace: {"FrontThing": {
 			"":     {Type: "object"},
 			"id":   {Type: "integer"},
 			"name": {Type: "string"},
-		}},
+		}}},
 	}
 }
 
@@ -44,15 +44,15 @@ func providerResource() *model.PersistedResource {
 			ParticipantName: "api",
 			Bodies:          thingsBodies("ApiThing"),
 		},
-		Schemas: model.Schemas{"ApiThing": {
+		Schemas: map[string]model.Schemas{model.YAMLNamespace: {"ApiThing": {
 			"":   {Type: "object"},
 			"id": {Type: "string"},
-		}},
+		}}},
 	}
 }
 
 func thingsBodies(schemaName string) []model.ResourceBody {
-	return []model.ResourceBody{{Source: "things.yaml", SchemaName: null.StringFrom(schemaName)}}
+	return []model.ResourceBody{{Source: "things.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom(schemaName)}}
 }
 
 func thingsNode(resource *model.PersistedResource, segments ...string) schemagraph.Node {
@@ -120,10 +120,10 @@ func TestPropertyBreakDetails(t *testing.T) {
 			ParticipantName:  "front",
 			Bodies:           thingsBodies("FrontFlag"),
 		},
-		Schemas: model.Schemas{"FrontFlag": {
+		Schemas: map[string]model.Schemas{model.YAMLNamespace: {"FrontFlag": {
 			"":     {Type: "object"},
 			"flag": {Type: "boolean", Optional: true},
-		}},
+		}}},
 	}
 	providerRequest := &model.PersistedResource{
 		Resource: model.Resource{
@@ -134,11 +134,11 @@ func TestPropertyBreakDetails(t *testing.T) {
 			ParticipantName: "api",
 			Bodies:          thingsBodies("ApiFlag"),
 		},
-		Schemas: model.Schemas{"ApiFlag": {
+		Schemas: map[string]model.Schemas{model.YAMLNamespace: {"ApiFlag": {
 			"":     {Type: "object"},
 			"user": {Type: "string"},
 			"flag": {Type: "boolean"},
-		}},
+		}}},
 	}
 
 	typeMismatch := thingsBreak(consumerResponse, providerResponse, model.ReasonPropertyTypeMismatch, "id")
@@ -176,7 +176,7 @@ func TestPropertyBreakDetails(t *testing.T) {
 
 func TestPropertyTypeRendersArrayItemType(t *testing.T) {
 	consumer := consumerResource()
-	consumer.Schemas = model.Schemas{"FrontThing": {
+	consumer.Schemas = map[string]model.Schemas{model.YAMLNamespace: {"FrontThing": {
 		"":          {Type: "object"},
 		"list":      {Type: "array"},
 		"list[]":    {Type: "object"},
@@ -186,12 +186,12 @@ func TestPropertyTypeRendersArrayItemType(t *testing.T) {
 		"tags[][]":  {Type: "integer"},
 		"other":     {Type: "array"},
 		"other[]":   {Type: "string"},
-	}}
+	}}}
 	provider := providerResource()
-	provider.Schemas = model.Schemas{"ApiThing": {
+	provider.Schemas = map[string]model.Schemas{model.YAMLNamespace: {"ApiThing": {
 		"":      {Type: "object"},
 		"other": {Type: "array"},
-	}}
+	}}}
 
 	missingList := thingsBreak(consumer, provider, model.ReasonPropertyMissingInProvider, "list")
 	missingTags := thingsBreak(consumer, provider, model.ReasonPropertyMissingInProvider, "tags")
@@ -204,7 +204,7 @@ func TestPropertyTypeRendersArrayItemType(t *testing.T) {
 
 func TestPropertyTypeRendersMapValueType(t *testing.T) {
 	consumer := consumerResource()
-	consumer.Schemas = model.Schemas{"FrontThing": {
+	consumer.Schemas = map[string]model.Schemas{model.YAMLNamespace: {"FrontThing": {
 		"":            {Type: "object"},
 		"pets":        {Type: "map"},
 		"pets{}":      {Type: "object"},
@@ -216,13 +216,13 @@ func TestPropertyTypeRendersMapValueType(t *testing.T) {
 		"owner.name":  {Type: "string"},
 		"scores":      {Type: "map"},
 		"scores{}":    {Type: "integer"},
-	}}
+	}}}
 	provider := providerResource()
-	provider.Schemas = model.Schemas{"ApiThing": {
+	provider.Schemas = map[string]model.Schemas{model.YAMLNamespace: {"ApiThing": {
 		"":         {Type: "object"},
 		"scores":   {Type: "array"},
 		"scores[]": {Type: "integer"},
-	}}
+	}}}
 
 	missingPets := thingsBreak(consumer, provider, model.ReasonPropertyMissingInProvider, "pets")
 	missingTags := thingsBreak(consumer, provider, model.ReasonPropertyMissingInProvider, "tags")

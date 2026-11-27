@@ -54,11 +54,11 @@ func statusResources(interaction string, consumerStatus, providerStatus model.Fi
 			Body:             body,
 			Identity:         restmodel.Identity{Endpoint: statusEndpoint, Method: statusMethod, Status: status},
 			ConsumedProvider: null.StringFrom(statusProviderName),
-			Bodies:           []model.ResourceBody{{Source: "web.yaml", SchemaName: null.StringFrom("Pet")}},
+			Bodies:           []model.ResourceBody{{Source: "web.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Pet")}},
 		},
 		ConsumerHash: null.StringFrom("petstore-web-" + statusProviderHash),
 		ProviderHash: statusProviderHash,
-		Schemas:      model.Schemas{"Pet": {"": {Type: "object"}, "status": consumerStatus}},
+		Schemas:      map[string]model.Schemas{model.YAMLNamespace: {"Pet": {"": {Type: "object"}, "status": consumerStatus}}},
 	}
 
 	provider = model.PersistedResource{
@@ -68,10 +68,10 @@ func statusResources(interaction string, consumerStatus, providerStatus model.Fi
 			Protocol:        restmodel.Protocol,
 			Body:            body,
 			Identity:        restmodel.Identity{Endpoint: statusEndpoint, Method: statusMethod, Status: status},
-			Bodies:          []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("PetRecord")}},
+			Bodies:          []model.ResourceBody{{Source: "api.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("PetRecord")}},
 		},
 		ProviderHash:       statusProviderHash,
-		Schemas:            model.Schemas{"PetRecord": {"": {Type: "object"}, "status": providerStatus}},
+		Schemas:            map[string]model.Schemas{model.YAMLNamespace: {"PetRecord": {"": {Type: "object"}, "status": providerStatus}}},
 		ParticipantVersion: null.StringFrom("1.0.0"),
 	}
 
