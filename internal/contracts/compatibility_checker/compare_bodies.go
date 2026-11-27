@@ -7,12 +7,23 @@ import (
 	"github.com/bidirekt/broker/internal/model"
 )
 
-type readingRules struct {
-	readerIsConsumer bool
-	missing          model.BreakingReason
-	optional         model.BreakingReason
-	nullable         model.BreakingReason
+// Unknown is the break of a field only the producer declares; left empty, the reader ignores the field.
+type ReadingRules struct {
+	ReaderIsConsumer  bool
+	Missing           model.BreakingReason
+	Optional          model.BreakingReason
+	Nullable          model.BreakingReason
+	Unknown           model.BreakingReason
+	OptionalMustExist bool
+	SingleToList      bool
+	Widenings         []Widening
+	ImplicitFields    []string
 }
+
+type SchemaType struct{ Type, Scalar string }
+
+// A Widening lets a reader take a producer type beyond the ones every protocol accepts.
+type Widening struct{ Reader, Producer SchemaType }
 
 // Optional and nullable belong to the fields a node is reached through, so each pair of them is compared once;
 // the type and the children belong to the shapes the refs lead to, so each pair of shapes is compared once.
@@ -20,18 +31,25 @@ type readingRules struct {
 type bodyComparison struct {
 	checked        *model.PersistedResource
 	counterpart    *model.PersistedResource
-	rules          readingRules
+	rules          ReadingRules
 	comparedSites  map[[2]string]bool
 	comparedShapes map[[2]string]bool
 	breaks         []ContractBreakingChange
+	argumentFields []argumentField
+}
+
+type argumentField struct {
+	path     string
+	consumer schemagraph.Node
+	provider schemagraph.Node
 }
 
 func compareBodies(
 	checked *model.PersistedResource,
 	counterpart *model.PersistedResource,
-	rules readingRules,
-	reader, producer schemagraph.Node,
-) []ContractBreakingChange {
+	rules ReadingRules,
+	consumerBody, providerBody schemagraph.Node,
+) *bodyComparison {
 	comparison := &bodyComparison{
 		checked:        checked,
 		counterpart:    counterpart,
@@ -40,9 +58,19 @@ func compareBodies(
 		comparedShapes: map[[2]string]bool{},
 	}
 
+	reader, producer := providerBody, consumerBody
+	if rules.ReaderIsConsumer {
+		reader, producer = consumerBody, providerBody
+	}
+
 	comparison.compareRead(reader, producer, "$")
 
-	return comparison.breaks
+	return comparison
+}
+
+// Fits is whether a consumed body, or a site of it, meets the provider's with no break.
+func Fits(consumed *model.PersistedResource, consumerBody, providerBody schemagraph.Node, rules ReadingRules) bool {
+	return len(compareBodies(consumed, consumed, rules, consumerBody, providerBody).breaks) == 0
 }
 
 func (this *bodyComparison) compareRead(reader, producer schemagraph.Node, path string) {
@@ -51,8 +79,8 @@ func (this *bodyComparison) compareRead(reader, producer schemagraph.Node, path 
 	}
 
 	if !producer.Exists() {
-		if !reader.Optional() {
-			this.breakAt(this.rules.missing, path, reader, producer)
+		if !reader.Optional() || this.rules.OptionalMustExist {
+			this.breakAt(this.rules.Missing, path, reader, producer)
 		}
 
 		return
@@ -65,9 +93,15 @@ func (this *bodyComparison) compareRead(reader, producer schemagraph.Node, path 
 
 	this.comparedSites[sites] = true
 
-	shapes := [2]string{reader.ShapeKey(), producer.ShapeKey()}
+	if reader.Arguments() != "" || producer.Arguments() != "" {
+		consumer, provider := this.consumerAndProvider(reader, producer)
+		this.argumentFields = append(this.argumentFields, argumentField{path: path, consumer: consumer, provider: provider})
+	}
 
-	if !acceptsType(reader.Type(), producer.Type()) {
+	shape := ShapeRead(reader, producer, this.rules)
+	shapes := [2]string{shape.ShapeKey(), producer.ShapeKey()}
+
+	if !acceptsType(shape, producer, this.rules) {
 		if !this.comparedShapes[shapes] {
 			this.comparedShapes[shapes] = true
 			this.breakAt(model.ReasonPropertyTypeMismatch, path, reader, producer)
@@ -77,11 +111,11 @@ func (this *bodyComparison) compareRead(reader, producer schemagraph.Node, path 
 	}
 
 	if !reader.Optional() && producer.Optional() {
-		this.breakAt(this.rules.optional, path, reader, producer)
+		this.breakAt(this.rules.Optional, path, reader, producer)
 	}
 
 	if producer.Nullable() && !reader.Nullable() {
-		this.breakAt(this.rules.nullable, path, reader, producer)
+		this.breakAt(this.rules.Nullable, path, reader, producer)
 	}
 
 	if this.comparedShapes[shapes] {
@@ -90,16 +124,38 @@ func (this *bodyComparison) compareRead(reader, producer schemagraph.Node, path 
 
 	this.comparedShapes[shapes] = true
 
-	if reader.Type() == model.UnionType {
-		this.compareUnionMembers(reader, producer, path)
+	if shape.Type() == model.UnionType {
+		this.compareUnionMembers(shape, producer, path)
+		this.compareFields(shape, producer, path)
 
 		return
 	}
 
-	this.compareEnumValues(reader, producer, path)
+	this.compareEnumValues(shape, producer, path)
+	this.compareFields(shape, producer, path)
+	this.compareUnknown(shape, producer, path)
+}
 
+// The fields read on a union are the ones it declares itself, like an interface's; its members are compared apart.
+func (this *bodyComparison) compareFields(reader, producer schemagraph.Node, path string) {
 	for _, segment := range reader.Segments() {
+		if model.IsMemberSegment(segment) || (slices.Contains(this.rules.ImplicitFields, segment) && !producer.Child(segment).Exists()) {
+			continue
+		}
+
 		this.compareRead(reader.Child(segment), producer.Child(segment), model.ChildPath(path, segment))
+	}
+}
+
+func (this *bodyComparison) compareUnknown(reader, producer schemagraph.Node, path string) {
+	if this.rules.Unknown == "" {
+		return
+	}
+
+	for _, segment := range producer.Segments() {
+		if !reader.Child(segment).Exists() {
+			this.breakAt(this.rules.Unknown, model.ChildPath(path, segment), reader.Child(segment), producer.Child(segment))
+		}
 	}
 }
 
@@ -122,6 +178,10 @@ func (this *bodyComparison) compareUnionMembers(reader, producer schemagraph.Nod
 	consumer, provider := this.consumerAndProvider(reader, producer)
 
 	for _, segment := range consumer.Segments() {
+		if !model.IsMemberSegment(segment) {
+			continue
+		}
+
 		if !provider.Child(segment).Exists() {
 			this.breaks = append(this.breaks, NewMemberBreakChange(this.checked, this.counterpart, model.MemberKey(segment), path, consumer.Declaring(segment), provider))
 
@@ -139,7 +199,7 @@ func (this *bodyComparison) breakAt(reason model.BreakingReason, path string, re
 }
 
 func (this *bodyComparison) consumerAndProvider(reader, producer schemagraph.Node) (consumer, provider schemagraph.Node) {
-	if this.rules.readerIsConsumer {
+	if this.rules.ReaderIsConsumer {
 		return reader, producer
 	}
 

@@ -12,8 +12,10 @@ import (
 type Keys map[string]func(vocabulary Vocabulary) Node
 
 type TypeVocabulary struct {
-	Name  string
-	Keys  Keys
+	Name string
+	Keys Keys
+	// Takes names keys another type declares that this type accepts too, with the grammar they have there.
+	Takes []string
 	Rules []Rule
 }
 
@@ -67,16 +69,35 @@ func CoreVocabulary() Vocabulary {
 	}}
 }
 
-// With panics on a type or a property key this vocabulary already has.
+// With adds the keys, taken keys and rules of a type this vocabulary already has to it; it panics on a key either already has.
 func (this Vocabulary) With(extension Vocabulary) Vocabulary {
 	joined := Vocabulary{Types: slices.Clone(this.Types), PropertyKeys: maps.Clone(this.PropertyKeys)}
 
 	for _, added := range extension.Types {
-		if slices.ContainsFunc(joined.Types, func(schemaType TypeVocabulary) bool { return schemaType.Name == added.Name }) {
-			panic(fmt.Errorf("schema type %q is defined twice", added.Name))
+		index := slices.IndexFunc(joined.Types, func(schemaType TypeVocabulary) bool { return schemaType.Name == added.Name })
+		if index == -1 {
+			joined.Types = append(joined.Types, added)
+
+			continue
 		}
 
-		joined.Types = append(joined.Types, added)
+		existing := joined.Types[index]
+		existing.Keys = maps.Clone(existing.Keys)
+		if existing.Keys == nil {
+			existing.Keys = Keys{}
+		}
+
+		for key, grammar := range added.Keys {
+			if _, defined := existing.Keys[key]; defined {
+				panic(fmt.Errorf("schema type %q key %q is defined twice", added.Name, key))
+			}
+
+			existing.Keys[key] = grammar
+		}
+
+		existing.Takes = append(slices.Clip(existing.Takes), added.Takes...)
+		existing.Rules = append(slices.Clip(existing.Rules), added.Rules...)
+		joined.Types[index] = existing
 	}
 
 	for _, key := range slices.Sorted(maps.Keys(extension.PropertyKeys)) {

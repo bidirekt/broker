@@ -15,6 +15,17 @@ const participantTabHeaderContract = `provides:
           200: ~
 `
 
+const participantTabHeaderSubgraphFiles = `extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key"])
+
+type Query {
+  order(id: ID!): Order
+}
+
+type Order @key(fields: "id") {
+  id: ID!
+}
+`
+
 var participantTabHeaderTabs = []struct {
 	name    string
 	path    string
@@ -35,7 +46,7 @@ func (this *IntegrationSuite) seedForParticipantTabHeader() {
 	for _, environment := range []string{"staging", "production"} {
 		this.mustPostForParticipantTabHeader("/api/environments", `{"environment":"`+environment+`"}`)
 	}
-	for _, participant := range []string{"orders_web", "orders_api", "orders_admin"} {
+	for _, participant := range []string{"orders_web", "orders_api", "orders_admin", "orders_subgraph"} {
 		this.mustPostForParticipantTabHeader("/api/participants", `{"participant":"`+participant+`"}`)
 	}
 	for _, published := range []struct{ participant, version string }{
@@ -45,6 +56,10 @@ func (this *IntegrationSuite) seedForParticipantTabHeader() {
 	} {
 		this.mustPostForParticipantTabHeader("/api/contracts", this.publishBody(published.participant, published.version, contractFragment{"contract.yaml", participantTabHeaderContract}))
 	}
+	this.mustPostForParticipantTabHeader("/api/contracts", this.publishBody("orders_subgraph", "3.0.0",
+		contractFragment{"graph.yaml", "provides:\n  graphql:\n    graph: orders_graph\n"},
+		contractFragment{"orders.graphqls", participantTabHeaderSubgraphFiles}))
+	this.mustPostForParticipantTabHeader("/api/deployments", `{"participant":"orders_subgraph","version":"3.0.0","environment":"production"}`)
 	for _, deployed := range []struct{ version, environment string }{
 		{"1.0.0", "production"},
 		{"1.0.0+build", "staging"},
@@ -140,6 +155,24 @@ func (this *IntegrationSuite) TestParticipantTabHeader_EveryTabRendersTheSameHea
 			}, "\n"),
 			counts: [4]int{0, 0, 0, 0},
 		},
+		{
+			name: "orders_subgraph",
+			head: strings.Join([]string{
+				`<div class="head">`,
+				`  <div>`,
+				`    <h1 class="mono">orders_subgraph</h1>`,
+				`    `,
+				`    <div class="sub badges">`,
+				`      <span>Latest <a class="ver" href="/participants/orders_subgraph/versions/3.0.0">3.0.0</a></span>`,
+				`      <span aria-hidden="true">·</span>`,
+				`      <a class="badge env" href="` + production + `">production <span class="v">3.0.0</span></a>`,
+				`    </div>`,
+				`    `,
+				`  </div>`,
+				`</div>`,
+			}, "\n"),
+			counts: [4]int{1, 1, 0, 0},
+		},
 	}
 
 	for _, participant := range participants {
@@ -152,4 +185,8 @@ func (this *IntegrationSuite) TestParticipantTabHeader_EveryTabRendersTheSameHea
 			})
 		}
 	}
+
+	status, _, body := this.getPage("/participants/orders_subgraph", sessionCookie)
+	this.Require().Equal(http.StatusOK, status, body)
+	this.Contains(body, `<a class="badge wrap" href="/graphs/orders_graph">graph orders_graph in production</a>`)
 }

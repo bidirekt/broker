@@ -23,7 +23,7 @@ func duplicateSchemas(declarations protocol.Declarations) []violation.Violation 
 			ErrorCode: "schema.duplicate",
 			Path:      schemaPath(declaration.Name),
 			Source:    declaration.Source,
-			Details: map[string]string{
+			Details: map[string]any{
 				"schema":     declaration.Name,
 				"declaredIn": first,
 			},

@@ -11,10 +11,37 @@ const (
 	ArgumentKind  = "argument"
 )
 
-// Extension is what the SDL keeps that the schemas lose: whether a type is an input, and the GraphQL name of a
-// field's or argument's type (ID and String both become string).
+const (
+	KeyDirective             = "key"
+	ShareableDirective       = "shareable"
+	InaccessibleDirective    = "inaccessible"
+	ExternalDirective        = "external"
+	OverrideDirective        = "override"
+	ProvidesDirective        = "provides"
+	InterfaceObjectDirective = "interfaceObject"
+)
+
+// Extension is what the SDL keeps that the schemas lose: whether a type is an input, the GraphQL name of a
+// field's or argument's type (ID and String both become string), the interfaces each interface implements, the types
+// whose fields are the queries and the mutations, the federation directives that compose a graph, the graph the
+// subgraph belongs to, and whether it is a Federation 1 subgraph, one without a federation @link. GraphSource and
+// LinkSource name the files the graph and the federation @link came from; like every source, they stay out of the
+// checksum and are never stored.
 type Extension struct {
-	Types []TypeInfo `json:"types,omitempty"`
+	Graph           string           `json:"graph,omitempty"`
+	Federation1     bool             `json:"federation1,omitempty"`
+	Directives      []Directive      `json:"directives,omitempty"`
+	Types           []TypeInfo       `json:"types,omitempty"`
+	Implementations []Implementation `json:"implementations,omitempty"`
+	Roots           Roots            `json:"roots,omitzero"`
+	GraphSource     string           `json:"-"`
+	LinkSource      string           `json:"-"`
+}
+
+// Roots names the type each operation reads its fields from: Query and Mutation unless `schema { … }` says otherwise.
+type Roots struct {
+	Query    string `json:"query,omitempty"`
+	Mutation string `json:"mutation,omitempty"`
 }
 
 // TypeInfo is a type (Pet), a field (Pet.id) or an argument (Query.pet(id:)); NamedType is empty for a type.
@@ -22,4 +49,21 @@ type TypeInfo struct {
 	Coordinate string `json:"coordinate"`
 	Kind       string `json:"kind"`
 	NamedType  string `json:"namedType,omitempty"`
+}
+
+// Implementation is an interface that implements another: `interface Animal implements Node`. The interface's schema
+// keeps only the objects as its members, the ones a consumer reads.
+type Implementation struct {
+	Interface  string `json:"interface"`
+	Implements string `json:"implements"`
+}
+
+// Directive is a federation directive that counts in the composition; Fields is the field set of a @key or a
+// @provides, From the subgraph an @override takes the field from.
+type Directive struct {
+	Coordinate string `json:"coordinate"`
+	Directive  string `json:"directive"`
+	Fields     string `json:"fields,omitempty"`
+	From       string `json:"from,omitempty"`
+	Resolvable bool   `json:"resolvable"`
 }

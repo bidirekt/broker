@@ -40,6 +40,7 @@ import (
 	"github.com/bidirekt/broker/internal/features/show_compatibility"
 	"github.com/bidirekt/broker/internal/features/show_contract_version"
 	"github.com/bidirekt/broker/internal/features/show_environment"
+	"github.com/bidirekt/broker/internal/features/show_graph"
 	"github.com/bidirekt/broker/internal/features/show_overview"
 	"github.com/bidirekt/broker/internal/features/show_participant_relations"
 	"github.com/bidirekt/broker/internal/features/show_participant_versions"
@@ -54,11 +55,17 @@ import (
 
 // Module is one protocol: the pieces every protocol has, and its optional ports, nil when it has none.
 type Module struct {
-	Protocol   protocol.Protocol
-	Hooks      compatibility_checker.ProtocolHooks
-	Table      repository.ProtocolTable
-	Section    breakreport.ProtocolSection
-	FileFormat contractfiles.FileFormat
+	Protocol           protocol.Protocol
+	Hooks              compatibility_checker.ProtocolHooks
+	Table              repository.ProtocolTable
+	Section            breakreport.ProtocolSection
+	FileFormat         contractfiles.FileFormat
+	ContractExtensions repository.ContractExtensionStore
+	ReservedNames      repository.ReservedNames
+	Links              repository.Links
+	// BindHooks stands in for Hooks when the protocol's hooks read the database, once it is open.
+	BindHooks      func(kernel *components.Components, contracts *repository.ContractRepository) compatibility_checker.ProtocolHooks
+	RegisterRoutes func(kernel *components.Components, contracts *repository.ContractRepository)
 }
 
 func RESTModule() Module {
@@ -74,13 +81,22 @@ func RESTModule() Module {
 
 func GraphQLModule() Module {
 	plugin := graphqlcontracts.New()
+	store := graphqlrepository.New()
 
 	return Module{
-		Protocol:   plugin,
-		Hooks:      plugin,
-		Table:      graphqlrepository.New(),
-		Section:    graphqlbreakreport.New(),
-		FileFormat: graphqlcontracts.NewSDLFormat(),
+		Protocol:           plugin,
+		Table:              store,
+		Section:            graphqlbreakreport.New(),
+		FileFormat:         graphqlcontracts.NewSDLFormat(),
+		ContractExtensions: store,
+		ReservedNames:      store,
+		Links:              store,
+		BindHooks: func(kernel *components.Components, contracts *repository.ContractRepository) compatibility_checker.ProtocolHooks {
+			return graphqlcontracts.NewCheckerHooks(
+				graphqlrepository.NewGraphLoader(kernel.Pool), repository.NewDeploymentRepository(kernel.Pool), contracts,
+			)
+		},
+		RegisterRoutes: show_graph.Register,
 	}
 }
 
@@ -95,16 +111,30 @@ func RunWith(modules []Module) (*components.Components, error) {
 		tables   []repository.ProtocolTable
 		sections []breakreport.ProtocolSection
 		formats  []contractfiles.FileFormat
+		stores   []repository.ContractExtensionStore
+		reserved []repository.ReservedNames
+		links    []repository.Links
 	)
 
 	for _, module := range modules {
 		plugins = append(plugins, module.Protocol)
-		hooks = append(hooks, module.Hooks)
 		tables = append(tables, module.Table)
 		sections = append(sections, module.Section)
 
 		if module.FileFormat != nil {
 			formats = append(formats, module.FileFormat)
+		}
+
+		if module.ContractExtensions != nil {
+			stores = append(stores, module.ContractExtensions)
+		}
+
+		if module.ReservedNames != nil {
+			reserved = append(reserved, module.ReservedNames)
+		}
+
+		if module.Links != nil {
+			links = append(links, module.Links)
 		}
 	}
 
@@ -115,14 +145,24 @@ func RunWith(modules []Module) (*components.Components, error) {
 
 	interpreter := contractfiles.NewInterpreter(protocol.NewRegistry(plugins), formats)
 	reportReader := breakreport.NewReader(sections)
+	protocols := repository.Protocols{Tables: tables, Extensions: stores}
+	contracts := repository.NewContractRepository(kernel.Pool, protocols)
+
+	for _, module := range modules {
+		if module.BindHooks != nil {
+			hooks = append(hooks, module.BindHooks(kernel, contracts))
+		} else {
+			hooks = append(hooks, module.Hooks)
+		}
+	}
 
 	// registers /participants/new-participant, which must precede show_participant_versions' /participants/:name
-	create_participant.Register(kernel)
+	create_participant.Register(kernel, reserved)
 	// registers /environments/new-environment, which must precede show_environment's /environments/:id
 	create_environment.Register(kernel)
-	publish_contract.Register(kernel, interpreter, tables)
-	validate_contract.Register(kernel, interpreter, tables, hooks)
-	can_i_deploy.Register(kernel, tables, hooks)
+	publish_contract.Register(kernel, interpreter, protocols)
+	validate_contract.Register(kernel, interpreter, protocols, hooks)
+	can_i_deploy.Register(kernel, protocols, hooks)
 	record_deployment.Register(kernel)
 	rename_environment.Register(kernel)
 	health.Register(kernel)
@@ -143,9 +183,9 @@ func RunWith(modules []Module) (*components.Components, error) {
 	reactivate_user.Register(kernel)
 	set_password.Register(kernel)
 	setup_admin.Register(kernel)
-	show_check.Register(kernel, reportReader)
+	show_check.Register(kernel, reportReader, links)
 	list_participant_pages.Register(kernel)
-	show_participant_versions.Register(kernel)
+	show_participant_versions.Register(kernel, links)
 	list_participant_deployments.Register(kernel)
 	list_participant_checks.Register(kernel, reportReader)
 	show_contract_version.Register(kernel, reportReader)
@@ -154,6 +194,12 @@ func RunWith(modules []Module) (*components.Components, error) {
 	show_environment.Register(kernel, reportReader)
 	show_compatibility.Register(kernel, reportReader)
 	show_overview.Register(kernel, reportReader)
+
+	for _, module := range modules {
+		if module.RegisterRoutes != nil {
+			module.RegisterRoutes(kernel, contracts)
+		}
+	}
 
 	return kernel, nil
 }

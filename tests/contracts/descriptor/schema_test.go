@@ -128,7 +128,7 @@ func TestSchema_PropertiesThatIsNotAMappingIsOnlyAnInvalidKind(t *testing.T) {
 			require.Len(t, violations, 1)
 			assert.Equal(t, "value.invalid_kind", violations[0].ErrorCode)
 			assert.Equal(t, "properties", violations[0].Path)
-			assert.Equal(t, map[string]string{"expected": "mapping", "got": kind}, violations[0].Details)
+			assert.Equal(t, map[string]any{"expected": "mapping", "got": kind}, violations[0].Details)
 		})
 	}
 }
@@ -143,7 +143,7 @@ func TestSchema_ObjectWithValuesHasNoPropertiesAndAKeyNotAllowed(t *testing.T) {
 	require.Len(t, violations, 2)
 	assert.Equal(t, "schema.key_not_allowed", violations[0].ErrorCode)
 	assert.Equal(t, "", violations[0].Path)
-	assert.Equal(t, map[string]string{"key": "values", "type": "object"}, violations[0].Details)
+	assert.Equal(t, map[string]any{"key": "values", "type": "object"}, violations[0].Details)
 	assert.Equal(t, "schema.object_without_properties", violations[1].ErrorCode)
 	assert.Equal(t, "", violations[1].Path)
 	assert.Nil(t, violations[1].Details)
@@ -155,7 +155,7 @@ func TestSchema_EmptyIsAnInvalidType(t *testing.T) {
 	require.Len(t, violations, 1)
 	assert.Equal(t, "schema.invalid_type", violations[0].ErrorCode)
 	assert.Equal(t, "", violations[0].Path)
-	assert.Equal(t, map[string]string{
+	assert.Equal(t, map[string]any{
 		"value":   "",
 		"allowed": "object, array, map, string, integer, float, number, boolean, enum, union",
 	}, violations[0].Details)
@@ -202,7 +202,7 @@ func TestSchema_EmptyRefIsAnInvalidType(t *testing.T) {
 			require.Len(t, violations, 1)
 			assert.Equal(t, "schema.invalid_type", violations[0].ErrorCode)
 			assert.Equal(t, "properties;owner", violations[0].Path)
-			assert.Equal(t, map[string]string{
+			assert.Equal(t, map[string]any{
 				"value":   "",
 				"allowed": "object, array, map, string, integer, float, number, boolean, enum, union",
 			}, violations[0].Details)
@@ -219,7 +219,7 @@ func TestSchema_EmptyRefBesideTypeIsAKeyNotAllowed(t *testing.T) {
 	require.Len(t, violations, 1)
 	assert.Equal(t, "schema.key_not_allowed", violations[0].ErrorCode)
 	assert.Equal(t, "", violations[0].Path)
-	assert.Equal(t, map[string]string{"key": "type", "type": "ref"}, violations[0].Details)
+	assert.Equal(t, map[string]any{"key": "type", "type": "ref"}, violations[0].Details)
 }
 
 func TestSchema_ShapeKeyBesideRefIsNotAllowed(t *testing.T) {
@@ -240,7 +240,7 @@ func TestSchema_ShapeKeyBesideRefIsNotAllowed(t *testing.T) {
 			require.Len(t, violations, 1)
 			assert.Equal(t, "schema.key_not_allowed", violations[0].ErrorCode)
 			assert.Equal(t, "properties;owner", violations[0].Path)
-			assert.Equal(t, map[string]string{"key": key, "type": "ref"}, violations[0].Details)
+			assert.Equal(t, map[string]any{"key": key, "type": "ref"}, violations[0].Details)
 		})
 	}
 }
@@ -256,9 +256,9 @@ func TestSchema_EachShapeKeyBesideRefIsReportedOnItsOwn(t *testing.T) {
 
 	require.Len(t, violations, 2)
 	assert.Equal(t, "schema.key_not_allowed", violations[0].ErrorCode)
-	assert.Equal(t, map[string]string{"key": "type", "type": "ref"}, violations[0].Details)
+	assert.Equal(t, map[string]any{"key": "type", "type": "ref"}, violations[0].Details)
 	assert.Equal(t, "schema.key_not_allowed", violations[1].ErrorCode)
-	assert.Equal(t, map[string]string{"key": "properties", "type": "ref"}, violations[1].Details)
+	assert.Equal(t, map[string]any{"key": "properties", "type": "ref"}, violations[1].Details)
 }
 
 func TestSchema_TypeBesideRefIsOnlyAKeyNotAllowed(t *testing.T) {
@@ -272,7 +272,7 @@ func TestSchema_TypeBesideRefIsOnlyAKeyNotAllowed(t *testing.T) {
 			require.Len(t, violations, 1)
 			assert.Equal(t, "schema.key_not_allowed", violations[0].ErrorCode)
 			assert.Equal(t, "", violations[0].Path)
-			assert.Equal(t, map[string]string{"key": "type", "type": "ref"}, violations[0].Details)
+			assert.Equal(t, map[string]any{"key": "type", "type": "ref"}, violations[0].Details)
 		})
 	}
 }
@@ -333,7 +333,7 @@ func TestSchema_PropertiesItemsOrValuesWithoutTypeIsAnInvalidType(t *testing.T) 
 			require.Len(t, violations, 1)
 			assert.Equal(t, "schema.invalid_type", violations[0].ErrorCode)
 			assert.Equal(t, "properties;attributes", violations[0].Path)
-			assert.Equal(t, map[string]string{
+			assert.Equal(t, map[string]any{
 				"value":   "",
 				"allowed": "object, array, map, string, integer, float, number, boolean, enum, union",
 			}, violations[0].Details)
@@ -389,7 +389,7 @@ func TestSchema_KeyOfAnotherTypeIsNotAllowed(t *testing.T) {
 			require.Len(t, violations, 1)
 			assert.Equal(t, "schema.key_not_allowed", violations[0].ErrorCode)
 			assert.Equal(t, "properties;pets", violations[0].Path)
-			assert.Equal(t, map[string]string{"key": testCase.key, "type": testCase.declaredType}, violations[0].Details)
+			assert.Equal(t, map[string]any{"key": testCase.key, "type": testCase.declaredType}, violations[0].Details)
 		})
 	}
 }
@@ -410,7 +410,7 @@ func TestSchema_EachKeyOfAnotherTypeIsReportedOnItsOwn(t *testing.T) {
 	for index, key := range []string{"properties", "items", "values"} {
 		assert.Equal(t, "schema.key_not_allowed", violations[index].ErrorCode)
 		assert.Equal(t, "", violations[index].Path)
-		assert.Equal(t, map[string]string{"key": key, "type": "integer"}, violations[index].Details)
+		assert.Equal(t, map[string]any{"key": key, "type": "integer"}, violations[index].Details)
 	}
 }
 
@@ -487,7 +487,7 @@ func TestSchema_OptionalOnItemsOrValuesIsNotAllowed(t *testing.T) {
 			require.Len(t, violations, 1)
 			assert.Equal(t, "schema.optional_not_allowed", violations[0].ErrorCode)
 			assert.Equal(t, testCase.path, violations[0].Path)
-			assert.Equal(t, map[string]string{"position": testCase.position}, violations[0].Details)
+			assert.Equal(t, map[string]any{"position": testCase.position}, violations[0].Details)
 		})
 	}
 }
@@ -525,10 +525,10 @@ func TestSchema_NonBooleanOptionalOnItemsIsAnInvalidKindAndNotAllowed(t *testing
 	require.Len(t, violations, 2)
 	assert.Equal(t, "value.invalid_kind", violations[0].ErrorCode)
 	assert.Equal(t, "properties;tags;items;optional", violations[0].Path)
-	assert.Equal(t, map[string]string{"expected": "boolean", "got": "string"}, violations[0].Details)
+	assert.Equal(t, map[string]any{"expected": "boolean", "got": "string"}, violations[0].Details)
 	assert.Equal(t, "schema.optional_not_allowed", violations[1].ErrorCode)
 	assert.Equal(t, "properties;tags;items", violations[1].Path)
-	assert.Equal(t, map[string]string{"position": "items"}, violations[1].Details)
+	assert.Equal(t, map[string]any{"position": "items"}, violations[1].Details)
 }
 
 func TestSchema_OptionalOnAPropertyIsValid(t *testing.T) {
@@ -571,10 +571,10 @@ func TestSchema_DescriptionIsCheckedAtEveryLevel(t *testing.T) {
 
 	syntaxError := "must be ASCII letters and digits, with single spaces between words"
 	assert.Equal(t, []violation.Violation{
-		{ErrorCode: "schema.description_syntax", Path: "description", Source: "api.yaml", Details: map[string]string{"value": "A pet.", "error": syntaxError}},
-		{ErrorCode: "schema.description_syntax", Path: "properties;name;description", Source: "api.yaml", Details: map[string]string{"value": "", "error": "must not be empty"}},
-		{ErrorCode: "schema.description_syntax", Path: "properties;notes;values;description", Source: "api.yaml", Details: map[string]string{"value": "free text, as typed", "error": syntaxError}},
-		{ErrorCode: "schema.description_syntax", Path: "properties;owner;description", Source: "api.yaml", Details: map[string]string{"value": "who looks after the pet!", "error": syntaxError}},
-		{ErrorCode: "schema.description_syntax", Path: "properties;tags;items;description", Source: "api.yaml", Details: map[string]string{"value": " one tag", "error": syntaxError}},
+		{ErrorCode: "schema.description_syntax", Path: "description", Source: "api.yaml", Details: map[string]any{"value": "A pet.", "error": syntaxError}},
+		{ErrorCode: "schema.description_syntax", Path: "properties;name;description", Source: "api.yaml", Details: map[string]any{"value": "", "error": "must not be empty"}},
+		{ErrorCode: "schema.description_syntax", Path: "properties;notes;values;description", Source: "api.yaml", Details: map[string]any{"value": "free text, as typed", "error": syntaxError}},
+		{ErrorCode: "schema.description_syntax", Path: "properties;owner;description", Source: "api.yaml", Details: map[string]any{"value": "who looks after the pet!", "error": syntaxError}},
+		{ErrorCode: "schema.description_syntax", Path: "properties;tags;items;description", Source: "api.yaml", Details: map[string]any{"value": " one tag", "error": syntaxError}},
 	}, violations)
 }

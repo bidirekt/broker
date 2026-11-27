@@ -96,7 +96,7 @@ func (this *ContractRepository) LoadCounterparts(
 				continue
 			}
 
-			if table, hints := this.tables[resource.Protocol].(ProviderHintTable); hints {
+			if table, hints := this.tableOf(resource.ConsumerHash.String, resource.Protocol).(ProviderHintTable); hints {
 				if hint, found := table.LoadProviderHint(ctx, this.pool, resource, environmentID); found {
 					counterparts.ProviderHints[resource.ProviderHash] = hint
 				}

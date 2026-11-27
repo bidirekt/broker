@@ -51,7 +51,7 @@ func invalidKind(value any, path string, expected string) violation.Violation {
 	return violation.Violation{
 		ErrorCode: "value.invalid_kind",
 		Path:      path,
-		Details: map[string]string{
+		Details: map[string]any{
 			"expected": expected,
 			"got":      kindOf(value),
 		},

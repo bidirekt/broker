@@ -117,7 +117,7 @@ func (this *CanIDeployUseCase) recordCheck(
 
 		result := model.CompatibilityCheckResult{
 			CounterpartName:    counterpartName,
-			CounterpartVersion: counterpart.ParticipantVersion,
+			CounterpartVersion: counterpart.Version(),
 			Deployable:         item.Deployable,
 			Role:               counterpart.Role,
 		}

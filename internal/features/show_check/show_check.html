@@ -45,7 +45,7 @@
 {{range .Breaking}}
 <details class="cp" open>
   <summary><span class="chev">{{template "icon_chevron" 14}}</span>{{template "role" .Role}}<span class="who-cp">{{.Name}}</span>{{if .Version}}<span class="ver">{{.Version}}</span><span class="badge env">{{$check.EnvironmentName}}</span>{{else}}<span class="muted">no version</span>{{end}}<span class="badge no nb">{{template "icon_x" 12}}no · {{.Breaks}} {{if eq .Breaks 1}}break{{else}}breaks{{end}}</span></summary>
-  {{if .ParticipantURL}}<div class="cp-links"><a href="{{.ParticipantURL}}">{{.Name}}</a>{{if .VersionURL}}<span aria-hidden="true">·</span><a href="{{.VersionURL}}">version {{.Version}}</a>{{end}}</div>{{end}}
+  {{if .URL}}<div class="cp-links"><a href="{{.URL}}">{{.Name}}</a>{{if .VersionURL}}<span aria-hidden="true">·</span><a href="{{.VersionURL}}">version {{.Version}}</a>{{end}}</div>{{end}}
   {{range .Protocols}}{{section .Template .Display}}{{end}}
 </details>
 {{end}}
@@ -75,7 +75,7 @@
 
 {{define "role"}}{{if eq . "both"}}<span class="role">PROVIDER · CONSUMER</span>{{else if eq . "provider"}}<span class="role">PROVIDER</span>{{else if eq . "consumer"}}<span class="role">CONSUMER</span>{{end}}{{end}}
 
-{{define "counterpart_name"}}{{if .ParticipantURL}}<a class="name" href="{{.ParticipantURL}}">{{.Name}}</a>{{else}}<span class="name">{{.Name}}</span>{{end}}{{end}}
+{{define "counterpart_name"}}{{if .URL}}<a class="name" href="{{.URL}}">{{.Name}}</a>{{else}}<span class="name">{{.Name}}</span>{{end}}{{end}}
 
 {{define "counterpart_version"}}{{if .VersionURL}}<a class="ver" href="{{.VersionURL}}">{{.Version}}</a>{{else}}{{template "version" .Version}}{{end}}{{end}}
 

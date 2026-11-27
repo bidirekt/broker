@@ -41,19 +41,19 @@ func TestBroker_IsDevWhenTheBuildDoesNotSetIt(t *testing.T) {
 	assert.Equal(t, "dev", versions.Broker())
 }
 
-func TestMinimumCli_IsZeroDotOne(t *testing.T) {
-	assert.Equal(t, "0.1.0", versions.MinimumCli)
+func TestMinimumCli_IsZeroDotFour(t *testing.T) {
+	assert.Equal(t, "0.4.0", versions.MinimumCli)
 }
 
 func TestDoor_RefusesACliBelowTheMinimumOnTheAPI(t *testing.T) {
-	status, body := doorTestSend(t, "/api/participants", "0.0.9")
+	status, body := doorTestSend(t, "/api/participants", "0.3.0")
 
 	assert.Equal(t, http.StatusUpgradeRequired, status)
-	assert.JSONEq(t, `{"message":"bidirekt 0.0.9 doesn't work with this broker (dev); upgrade bidirekt to 0.1.0 or later"}`, body)
+	assert.JSONEq(t, `{"message":"bidirekt 0.3.0 doesn't work with this broker (dev); upgrade bidirekt to 0.4.0 or later"}`, body)
 }
 
 func TestDoor_PassesACliAtOrAboveTheMinimum(t *testing.T) {
-	for _, cliVersion := range []string{"0.1.0", "0.1", "0.2.0-rc.1", "1.0.0"} {
+	for _, cliVersion := range []string{"0.4.0", "0.4", "0.5.0-rc.1", "1.0.0"} {
 		status, body := doorTestSend(t, "/api/participants", cliVersion)
 
 		assert.Equal(t, http.StatusOK, status, cliVersion)
@@ -71,7 +71,7 @@ func TestDoor_PassesARequestWithoutAVersion(t *testing.T) {
 }
 
 func TestDoor_DoesNotCheckPages(t *testing.T) {
-	status, body := doorTestSend(t, "/participants", "0.0.9")
+	status, body := doorTestSend(t, "/participants", "0.3.0")
 
 	assert.Equal(t, http.StatusOK, status)
 	assert.Equal(t, doorTestPassedBody, body)

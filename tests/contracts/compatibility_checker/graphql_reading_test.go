@@ -1,0 +1,659 @@
+package compatibility_checker_test
+
+import (
+	"context"
+	"testing"
+
+	"github.com/bidirekt/broker/internal/contracts/compatibility_checker"
+	"github.com/bidirekt/broker/internal/contracts/contract"
+	"github.com/bidirekt/broker/internal/contracts/mapper/schemamapper"
+	"github.com/bidirekt/broker/internal/contracts/protocol"
+	graphqlcontracts "github.com/bidirekt/broker/internal/contracts/protocols/graphql"
+	"github.com/bidirekt/broker/internal/model"
+	graphqlmodel "github.com/bidirekt/broker/internal/model/protocols/graphql"
+	"github.com/guregu/null"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+const (
+	readingConsumerName = "petstore_web"
+	readingProviderName = "petstore_api"
+	readingEnvironment  = "production"
+)
+
+const readingInterfaceSDL = `interface Node {
+  id: ID!
+  name: String
+}
+
+type Person implements Node {
+  id: ID!
+  name: String
+  age: Int
+}
+
+type Org implements Node {
+  id: ID!
+  name: String
+}
+
+type Query {
+  node(id: ID!): Node
+}
+`
+
+const readingInterfaceWithoutIDSDL = `interface Node {
+  name: String
+}
+
+type Person implements Node {
+  id: ID!
+  name: String
+  age: Int
+}
+
+type Org implements Node {
+  id: ID!
+  name: String
+}
+
+type Query {
+  node(id: ID!): Node
+}
+`
+
+const readingPetSDL = `type Pet {
+  id: ID!
+}
+
+type Query {
+  pet(id: ID!, weight: Float, name: String): Pet
+}
+`
+
+const readingSearchSDL = `type Pet {
+  id: ID!
+}
+
+type Owner {
+  id: ID!
+}
+
+union SearchResult = Pet | Owner
+
+type Query {
+  search: SearchResult
+}
+`
+
+type readingWithoutVerdict struct{}
+
+func (this readingWithoutVerdict) GetVerdict(context.Context, int64, int64) (*model.CompatibilityVerdict, bool) {
+	return nil, false
+}
+
+type readingBreak struct {
+	reason  model.BreakingReason
+	details map[string]string
+}
+
+func readingProviderSchemas(t *testing.T, sdl string) model.Schemas {
+	t.Helper()
+
+	declarations, err := graphqlcontracts.NewSDLFormat().ToDeclarations([]model.ContractFile{{Source: "schema.graphqls", Content: sdl}}, protocol.Declarations{})
+	require.NoError(t, err)
+
+	catalog := contract.SchemasMap{}
+	roots := make([]string, 0, len(declarations.Schemas))
+	for _, declaration := range declarations.Schemas {
+		catalog[declaration.Name] = declaration.Schema
+		roots = append(roots, declaration.Name)
+	}
+
+	return schemamapper.ToSchemaModels(catalog, roots)
+}
+
+func readingResources(t *testing.T, sdl, field, interaction string, consumerSchemas model.Schemas, consumerRoot string) (consumer, provider model.PersistedResource) {
+	t.Helper()
+
+	body := model.Output
+	if interaction == graphqlmodel.ArgumentsInteraction {
+		body = model.Input
+	}
+
+	identity := graphqlmodel.Identity{Operation: graphqlmodel.QueryOperation, Field: field, Interaction: interaction}
+	providerHash := readingProviderName + "-query-" + field + "-" + interaction
+
+	consumer = model.PersistedResource{
+		Resource: model.Resource{
+			ParticipantName:  readingConsumerName,
+			Direction:        model.Consumes,
+			Protocol:         graphqlmodel.Protocol,
+			Body:             body,
+			Identity:         identity,
+			ConsumedProvider: null.StringFrom(readingProviderName),
+			Bodies:           []model.ResourceBody{{Source: "petstore_web.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom(consumerRoot)}},
+		},
+		ConsumerHash: null.StringFrom(readingConsumerName + "-" + providerHash),
+		ProviderHash: providerHash,
+		Schemas:      map[string]model.Schemas{model.YAMLNamespace: consumerSchemas},
+	}
+
+	provider = model.PersistedResource{
+		Resource: model.Resource{
+			ParticipantName: readingProviderName,
+			Direction:       model.Provides,
+			Protocol:        graphqlmodel.Protocol,
+			Body:            body,
+			Identity:        identity,
+			Bodies:          []model.ResourceBody{{Source: "schema.graphqls", Namespace: graphqlmodel.Namespace, SchemaName: null.StringFrom("Query:" + field + ":" + interaction)}},
+		},
+		ProviderHash:       providerHash,
+		Schemas:            map[string]model.Schemas{graphqlmodel.Namespace: readingProviderSchemas(t, sdl)},
+		ParticipantVersion: null.StringFrom("1.0.0"),
+	}
+
+	return consumer, provider
+}
+
+func readingBreaksCheckedFrom(checked model.PersistedResource, counterparts model.ResourceCounterparts, counterpartName string) []readingBreak {
+	checkedContract := &model.PersistedContract{
+		ParticipantName: checked.ParticipantName,
+		Version:         "2.0.0",
+		Resources:       map[string]model.PersistedResource{checked.PrimaryHash(): checked},
+	}
+
+	report := compatibility_checker.NewCompatibilityChecker(readingWithoutVerdict{}, []compatibility_checker.ProtocolHooks{graphqlcontracts.New()}).Check(
+		context.Background(),
+		checkedContract,
+		model.NewEnvironment(readingEnvironment),
+		counterparts,
+	)
+
+	var breaks []readingBreak
+	for _, found := range report.Results[counterpartName].Breaks {
+		breaks = append(breaks, readingBreak{found.Reason, found.Details})
+	}
+
+	return breaks
+}
+
+func assertReadingBreaks(t *testing.T, sdl, field, interaction string, consumerSchemas model.Schemas, consumerRoot string, expected []readingBreak) {
+	t.Helper()
+
+	consumer, provider := readingResources(t, sdl, field, interaction, consumerSchemas, consumerRoot)
+
+	t.Run("checked from the consumer", func(t *testing.T) {
+		assert.Equal(t, expected, readingBreaksCheckedFrom(consumer, model.ResourceCounterparts{
+			Providers:           map[string]model.PersistedResource{provider.ProviderHash: provider},
+			RegisteredProviders: map[string]model.RegisteredProvider{readingProviderName: {DeployedVersion: null.StringFrom("1.0.0")}},
+		}, readingProviderName))
+	})
+
+	t.Run("checked from the provider", func(t *testing.T) {
+		assert.Equal(t, expected, readingBreaksCheckedFrom(provider, model.ResourceCounterparts{
+			Consumers: map[string][]model.PersistedResource{provider.ProviderHash: {consumer}},
+		}, readingConsumerName))
+	})
+}
+
+var readingNodeAsObject = model.Schemas{
+	"NodeRead": {"": {Type: "object", Nullable: true}, "id": {Type: "string"}},
+}
+
+var readingNodeAsUnion = model.Schemas{
+	"NodeRead":   {"": {Type: "union", Nullable: true}, "(Person)": {Ref: "PersonRead"}},
+	"PersonRead": {"": {Type: "object"}, "id": {Type: "string"}, "age": {Type: "integer", Nullable: true}},
+}
+
+func TestGraphQLReading_AnInterfaceReadAsAnObject_IsCompatible(t *testing.T) {
+	assertReadingBreaks(t, readingInterfaceSDL, "node", graphqlmodel.ReturnsInteraction, readingNodeAsObject, "NodeRead", nil)
+}
+
+func TestGraphQLReading_AnInterfaceReadAsTheUnionOfItsImplementations_IsCompatible(t *testing.T) {
+	assertReadingBreaks(t, readingInterfaceSDL, "node", graphqlmodel.ReturnsInteraction, readingNodeAsUnion, "NodeRead", nil)
+}
+
+func TestGraphQLReading_AFieldRemovedOnlyFromTheInterface_BreaksTheObjectRead(t *testing.T) {
+	assertReadingBreaks(t, readingInterfaceWithoutIDSDL, "node", graphqlmodel.ReturnsInteraction, readingNodeAsObject, "NodeRead", []readingBreak{
+		{model.ReasonPropertyMissingInProvider, map[string]string{
+			"property":      "$.id",
+			"consumerName":  readingConsumerName,
+			"providerName":  readingProviderName,
+			"propertyType":  "String!",
+			"consumerField": "NodeRead.id",
+		}},
+	})
+}
+
+func TestGraphQLReading_AFieldRemovedOnlyFromTheInterface_KeepsTheUnionRead(t *testing.T) {
+	assertReadingBreaks(t, readingInterfaceWithoutIDSDL, "node", graphqlmodel.ReturnsInteraction, readingNodeAsUnion, "NodeRead", nil)
+}
+
+func TestGraphQLReading_AUnionWithoutFieldsReadAsAnObject_IsATypeMismatch(t *testing.T) {
+	assertReadingBreaks(t, readingSearchSDL, "search", graphqlmodel.ReturnsInteraction, model.Schemas{
+		"SearchRead": {"": {Type: "object", Nullable: true}, "id": {Type: "string"}},
+	}, "SearchRead", []readingBreak{
+		{model.ReasonPropertyTypeMismatch, map[string]string{
+			"property":             "$",
+			"consumerName":         readingConsumerName,
+			"providerName":         readingProviderName,
+			"consumerPropertyType": "SearchRead",
+			"providerPropertyType": "SearchResult",
+			"consumerField":        "SearchRead",
+			"providerField":        "Query.search",
+		}},
+	})
+}
+
+func TestGraphQLReading_AnOptionalFieldTheProviderLacks_Breaks(t *testing.T) {
+	assertReadingBreaks(t, readingPetSDL, "pet", graphqlmodel.ReturnsInteraction, model.Schemas{
+		"PetRead": {"": {Type: "object", Nullable: true}, "id": {Type: "string"}, "bornAt": {Type: "string", Optional: true, Nullable: true}},
+	}, "PetRead", []readingBreak{
+		{model.ReasonPropertyMissingInProvider, map[string]string{
+			"property":      "$.bornAt",
+			"consumerName":  readingConsumerName,
+			"providerName":  readingProviderName,
+			"propertyType":  "String",
+			"consumerField": "PetRead.bornAt",
+		}},
+	})
+}
+
+func TestGraphQLReading_AStringReadFromAnID_IsCompatible(t *testing.T) {
+	assertReadingBreaks(t, readingPetSDL, "pet", graphqlmodel.ReturnsInteraction, model.Schemas{
+		"PetRead": {"": {Type: "object", Nullable: true}, "id": {Type: "string"}},
+	}, "PetRead", nil)
+}
+
+func TestGraphQLReading_ArgumentsTheSpecCoerces_AreCompatible(t *testing.T) {
+	for label, arguments := range map[string]model.Schema{
+		"a string to an ID":    {"": {Type: "object"}, "id": {Type: "string"}},
+		"an integer to an ID":  {"": {Type: "object"}, "id": {Type: "integer"}},
+		"an integer to Float":  {"": {Type: "object"}, "id": {Type: "string"}, "weight": {Type: "integer"}},
+		"a number to Float":    {"": {Type: "object"}, "id": {Type: "string"}, "weight": {Type: "number"}},
+		"a float to Float":     {"": {Type: "object"}, "id": {Type: "string"}, "weight": {Type: "float"}},
+		"a string to a String": {"": {Type: "object"}, "id": {Type: "string"}, "name": {Type: "string"}},
+	} {
+		t.Run(label, func(t *testing.T) {
+			assertReadingBreaks(t, readingPetSDL, "pet", graphqlmodel.ArgumentsInteraction, model.Schemas{"PetArgs": arguments}, "PetArgs", nil)
+		})
+	}
+}
+
+func TestGraphQLReading_AnIntegerSentToAString_IsATypeMismatch(t *testing.T) {
+	assertReadingBreaks(t, readingPetSDL, "pet", graphqlmodel.ArgumentsInteraction, model.Schemas{
+		"PetArgs": {"": {Type: "object"}, "id": {Type: "string"}, "name": {Type: "integer"}},
+	}, "PetArgs", []readingBreak{
+		{model.ReasonPropertyTypeMismatch, map[string]string{
+			"property":             "$",
+			"argument":             "name",
+			"consumerName":         readingConsumerName,
+			"providerName":         readingProviderName,
+			"consumerPropertyType": "Int!",
+			"providerPropertyType": "String",
+			"consumerField":        "PetArgs.name",
+			"providerField":        "Query.pet(name:)",
+		}},
+	})
+}
+
+func TestGraphQLReading_TheTypenameOfAnObject_IsAlwaysProvided(t *testing.T) {
+	assertReadingBreaks(t, readingPetSDL, "pet", graphqlmodel.ReturnsInteraction, model.Schemas{
+		"PetRead": {"": {Type: "object", Nullable: true}, "__typename": {Type: "string"}, "id": {Type: "string"}},
+	}, "PetRead", nil)
+}
+
+func TestGraphQLReading_TheTypenameOfAUnion_IsAlwaysProvided(t *testing.T) {
+	assertReadingBreaks(t, readingSearchSDL, "search", graphqlmodel.ReturnsInteraction, model.Schemas{
+		"SearchRead": {"": {Type: "object", Nullable: true}, "__typename": {Type: "string"}},
+	}, "SearchRead", nil)
+}
+
+func TestGraphQLReading_TheTypenameOfAUnionMember_IsAlwaysProvided(t *testing.T) {
+	assertReadingBreaks(t, readingSearchSDL, "search", graphqlmodel.ReturnsInteraction, model.Schemas{
+		"SearchRead": {"": {Type: "union", Nullable: true}, "(Pet)": {Ref: "PetRead"}},
+		"PetRead":    {"": {Type: "object"}, "__typename": {Type: "string"}, "id": {Type: "string"}},
+	}, "SearchRead", nil)
+}
+
+func TestGraphQLReading_ATypenameSentAsAnArgument_Breaks(t *testing.T) {
+	assertReadingBreaks(t, readingPetSDL, "pet", graphqlmodel.ArgumentsInteraction, model.Schemas{
+		"PetArgs": {"": {Type: "object"}, "id": {Type: "string"}, "__typename": {Type: "string"}},
+	}, "PetArgs", []readingBreak{
+		{model.ReasonPropertyMissingInProvider, map[string]string{
+			"property":      "$",
+			"argument":      "__typename",
+			"consumerName":  readingConsumerName,
+			"providerName":  readingProviderName,
+			"propertyType":  "String!",
+			"consumerField": "PetArgs.__typename",
+		}},
+	})
+}
+
+const readingMixedNodeSDL = `interface Node {
+  id: ID!
+}
+
+type User implements Node {
+  id: ID!
+  name: String
+}
+
+type Pet implements Node {
+  id: ID!
+  species: String
+}
+
+type Query {
+  node(id: ID!): Node
+}
+`
+
+const readingMixedNodeWithoutIDSDL = `interface Node {
+  label: String
+}
+
+type User implements Node {
+  id: ID!
+  label: String
+  name: String
+}
+
+type Pet implements Node {
+  id: ID!
+  label: String
+  species: String
+}
+
+type Query {
+  node(id: ID!): Node
+}
+`
+
+const readingMixedUserWithoutNameSDL = `interface Node {
+  id: ID!
+}
+
+type User implements Node {
+  id: ID!
+}
+
+type Pet implements Node {
+  id: ID!
+  species: String
+}
+
+type Query {
+  node(id: ID!): Node
+}
+`
+
+const readingMixedUserOutsideNodeSDL = `interface Node {
+  id: ID!
+}
+
+type User {
+  id: ID!
+  name: String
+}
+
+type Pet implements Node {
+  id: ID!
+  species: String
+}
+
+type Query {
+  node(id: ID!): Node
+}
+`
+
+var readingMixedNode = model.Schemas{
+	"Node":       {"": {Type: "union", Nullable: true}, "id": {Type: "string"}, "(User)": {Ref: "UserName"}, "(Pet)": {Ref: "PetSpecies"}},
+	"UserName":   {"": {Type: "object"}, "name": {Type: "string", Nullable: true}},
+	"PetSpecies": {"": {Type: "object"}, "species": {Type: "string", Nullable: true}},
+}
+
+func TestGraphQLReading_AnInterfaceReadThroughItsOwnFieldsAndItsImplementations_IsCompatible(t *testing.T) {
+	assertReadingBreaks(t, readingMixedNodeSDL, "node", graphqlmodel.ReturnsInteraction, readingMixedNode, "Node", nil)
+}
+
+func TestGraphQLReading_AFieldRemovedOnlyFromTheInterface_BreaksTheFieldReadOnTheInterface(t *testing.T) {
+	assertReadingBreaks(t, readingMixedNodeWithoutIDSDL, "node", graphqlmodel.ReturnsInteraction, readingMixedNode, "Node", []readingBreak{
+		{model.ReasonPropertyMissingInProvider, map[string]string{
+			"property":      "$.id",
+			"consumerName":  readingConsumerName,
+			"providerName":  readingProviderName,
+			"propertyType":  "String!",
+			"consumerField": "Node.id",
+		}},
+	})
+}
+
+func TestGraphQLReading_AFieldRemovedFromAnImplementation_BreaksTheFieldReadOnItsMember(t *testing.T) {
+	assertReadingBreaks(t, readingMixedUserWithoutNameSDL, "node", graphqlmodel.ReturnsInteraction, readingMixedNode, "Node", []readingBreak{
+		{model.ReasonPropertyMissingInProvider, map[string]string{
+			"property":      "$(User).name",
+			"consumerName":  readingConsumerName,
+			"providerName":  readingProviderName,
+			"propertyType":  "String",
+			"consumerField": "UserName.name",
+		}},
+	})
+}
+
+func TestGraphQLReading_AnImplementationThatNoLongerImplementsTheInterface_IsAMemberMissingInTheProvider(t *testing.T) {
+	assertReadingBreaks(t, readingMixedUserOutsideNodeSDL, "node", graphqlmodel.ReturnsInteraction, readingMixedNode, "Node", []readingBreak{
+		{model.ReasonPropertyMemberMissingInProvider, map[string]string{
+			"property":      "$",
+			"member":        "User",
+			"consumerName":  readingConsumerName,
+			"providerName":  readingProviderName,
+			"consumerField": "Node",
+			"providerField": "Query.node",
+		}},
+	})
+}
+
+func TestGraphQLReading_TheTypenameReadOnAnInterfaceWithItsImplementations_IsAlwaysProvided(t *testing.T) {
+	assertReadingBreaks(t, readingMixedNodeSDL, "node", graphqlmodel.ReturnsInteraction, model.Schemas{
+		"Node":     {"": {Type: "union", Nullable: true}, "__typename": {Type: "string"}, "id": {Type: "string"}, "(User)": {Ref: "UserName"}},
+		"UserName": {"": {Type: "object"}, "name": {Type: "string", Nullable: true}},
+	}, "Node", nil)
+}
+
+const readingListArgumentsSDL = `type Pet {
+  id: ID!
+}
+
+type Query {
+  pets(tags: [String!], matrix: [[Int!]!], names: [String]!): [Pet!]!
+}
+`
+
+func TestGraphQLReading_ASingleValueSentToAListArgument_IsCompatible(t *testing.T) {
+	for label, arguments := range map[string]model.Schema{
+		"a string to [String!]":   {"": {Type: "object"}, "names": {Type: "array"}, "names[]": {Type: "string"}, "tags": {Type: "string"}},
+		"an integer to [[Int!]!]": {"": {Type: "object"}, "names": {Type: "array"}, "names[]": {Type: "string"}, "matrix": {Type: "integer"}},
+		"a string to [String]!":   {"": {Type: "object"}, "names": {Type: "string"}},
+	} {
+		t.Run(label, func(t *testing.T) {
+			assertReadingBreaks(t, readingListArgumentsSDL, "pets", graphqlmodel.ArgumentsInteraction, model.Schemas{"PetsArgs": arguments}, "PetsArgs", nil)
+		})
+	}
+}
+
+func TestGraphQLReading_ASingleValueOfAnotherTypeSentToAListArgument_IsATypeMismatch(t *testing.T) {
+	assertReadingBreaks(t, readingListArgumentsSDL, "pets", graphqlmodel.ArgumentsInteraction, model.Schemas{
+		"PetsArgs": {"": {Type: "object"}, "names": {Type: "string"}, "tags": {Type: "integer"}},
+	}, "PetsArgs", []readingBreak{
+		{model.ReasonPropertyTypeMismatch, map[string]string{
+			"property":             "$",
+			"argument":             "tags",
+			"consumerName":         readingConsumerName,
+			"providerName":         readingProviderName,
+			"consumerPropertyType": "Int!",
+			"providerPropertyType": "[String!]",
+			"consumerField":        "PetsArgs.tags",
+			"providerField":        "Query.pets(tags:)",
+		}},
+	})
+}
+
+func TestGraphQLReading_ANullableSingleValueSentToANonNullListArgument_Breaks(t *testing.T) {
+	assertReadingBreaks(t, readingListArgumentsSDL, "pets", graphqlmodel.ArgumentsInteraction, model.Schemas{
+		"PetsArgs": {"": {Type: "object"}, "names": {Type: "string", Nullable: true}},
+	}, "PetsArgs", []readingBreak{
+		{model.ReasonPropertyNullableInConsumerNotNullableInProvider, map[string]string{
+			"property":      "$",
+			"argument":      "names",
+			"consumerName":  readingConsumerName,
+			"providerName":  readingProviderName,
+			"propertyType":  "String",
+			"consumerField": "PetsArgs.names",
+			"providerField": "Query.pets(names:)",
+		}},
+	})
+}
+
+func TestGraphQLReading_AListReturnedReadAsASingleValue_IsATypeMismatch(t *testing.T) {
+	assertReadingBreaks(t, readingListArgumentsSDL, "pets", graphqlmodel.ReturnsInteraction, model.Schemas{
+		"PetRead": {"": {Type: "object"}, "id": {Type: "string"}},
+	}, "PetRead", []readingBreak{
+		{model.ReasonPropertyTypeMismatch, map[string]string{
+			"property":             "$",
+			"consumerName":         readingConsumerName,
+			"providerName":         readingProviderName,
+			"consumerPropertyType": "PetRead!",
+			"providerPropertyType": "[Pet!]!",
+			"consumerField":        "PetRead",
+			"providerField":        "Query.pets",
+		}},
+	})
+}
+
+func TestGraphQLReading_ANamedPrimitiveSchemaOfTheConsumer_IsWrittenByItsGraphQLType(t *testing.T) {
+	assertReadingBreaks(t, readingPetSDL, "pet", graphqlmodel.ReturnsInteraction, model.Schemas{
+		"PetRead": {"": {Type: "object", Nullable: true}, "id": {Ref: "Age"}},
+		"Age":     {"": {Type: "number"}},
+	}, "PetRead", []readingBreak{
+		{model.ReasonPropertyTypeMismatch, map[string]string{
+			"property":             "$.id",
+			"consumerName":         readingConsumerName,
+			"providerName":         readingProviderName,
+			"consumerPropertyType": "Float!",
+			"providerPropertyType": "ID!",
+			"consumerField":        "PetRead.id",
+			"providerField":        "Pet.id",
+		}},
+	})
+}
+
+const readingUnnamedTypesSDL = `type Pet {
+  id: ID!
+  status: String!
+  labels: String!
+}
+
+type Query {
+  pet(id: ID!): Pet
+  search: [Pet!]!
+}
+`
+
+func TestGraphQLReading_AnEnumOfTheConsumerWithoutASchemaName_IsWrittenWithItsValues(t *testing.T) {
+	assertReadingBreaks(t, readingUnnamedTypesSDL, "pet", graphqlmodel.ReturnsInteraction, model.Schemas{
+		"PetRead": {"": {Type: "object", Nullable: true}, "status": {Type: "enum", Members: []string{"AVAILABLE", "SOLD"}}},
+	}, "PetRead", []readingBreak{
+		{model.ReasonPropertyTypeMismatch, map[string]string{
+			"property":             "$.status",
+			"consumerName":         readingConsumerName,
+			"providerName":         readingProviderName,
+			"consumerPropertyType": "enum (AVAILABLE | SOLD)!",
+			"providerPropertyType": "String!",
+			"consumerField":        "PetRead.status",
+			"providerField":        "Pet.status",
+		}},
+	})
+}
+
+func TestGraphQLReading_AUnionOfTheConsumerWithoutASchemaName_IsWrittenWithItsMembers(t *testing.T) {
+	assertReadingBreaks(t, readingUnnamedTypesSDL, "search", graphqlmodel.ReturnsInteraction, model.Schemas{
+		"SearchRead": {"": {Type: "array"}, "[]": {Type: "union"}, "[](Pet)": {Ref: "PetRead"}, "[](Owner)": {Ref: "OwnerRead"}},
+		"PetRead":    {"": {Type: "object"}, "id": {Type: "string"}},
+		"OwnerRead":  {"": {Type: "object"}, "id": {Type: "string"}},
+	}, "SearchRead", []readingBreak{
+		{model.ReasonPropertyTypeMismatch, map[string]string{
+			"property":             "$[]",
+			"consumerName":         readingConsumerName,
+			"providerName":         readingProviderName,
+			"consumerPropertyType": "union (Owner | Pet)!",
+			"providerPropertyType": "Pet!",
+			"consumerField":        "SearchRead[]",
+			"providerField":        "Query.search[]",
+		}},
+	})
+}
+
+func TestGraphQLReading_AMapOfTheConsumerWithoutASchemaName_IsWrittenWithItsValueType(t *testing.T) {
+	assertReadingBreaks(t, readingUnnamedTypesSDL, "pet", graphqlmodel.ReturnsInteraction, model.Schemas{
+		"PetRead": {"": {Type: "object", Nullable: true}, "labels": {Type: "map", Nullable: true}, "labels{}": {Type: "string"}},
+	}, "PetRead", []readingBreak{
+		{model.ReasonPropertyTypeMismatch, map[string]string{
+			"property":             "$.labels",
+			"consumerName":         readingConsumerName,
+			"providerName":         readingProviderName,
+			"consumerPropertyType": "map<String!>",
+			"providerPropertyType": "String!",
+			"consumerField":        "PetRead.labels",
+			"providerField":        "Pet.labels",
+		}},
+	})
+}
+
+const readingFromContextSDL = `extend schema @link(url: "https://specs.apollo.dev/federation/v2.8", import: ["@key", "@context", "@fromContext"])
+
+type Owner @key(fields: "id") @context(name: "ownerContext") {
+  id: ID!
+  locale: String!
+}
+
+type Query {
+  pet(id: ID!, locale: String! @fromContext(field: "$ownerContext { locale }")): Owner
+}
+`
+
+const readingWithoutFromContextSDL = `extend schema @link(url: "https://specs.apollo.dev/federation/v2.8", import: ["@key", "@context", "@fromContext"])
+
+type Owner @key(fields: "id") @context(name: "ownerContext") {
+  id: ID!
+  locale: String!
+}
+
+type Query {
+  pet(id: ID!, locale: String!): Owner
+}
+`
+
+var readingPetArgumentsWithoutLocale = model.Schemas{
+	"PetArgs": {"": {Type: "object"}, "id": {Type: "string"}},
+}
+
+func TestGraphQLReading_AnArgumentTheRouterFillsFromTheContext_IsNotSentByTheConsumer(t *testing.T) {
+	assertReadingBreaks(t, readingFromContextSDL, "pet", graphqlmodel.ArgumentsInteraction, readingPetArgumentsWithoutLocale, "PetArgs", nil)
+}
+
+func TestGraphQLReading_TheSameRequiredArgumentWithoutFromContext_BreaksTheConsumerThatDoesNotSendIt(t *testing.T) {
+	assertReadingBreaks(t, readingWithoutFromContextSDL, "pet", graphqlmodel.ArgumentsInteraction, readingPetArgumentsWithoutLocale, "PetArgs", []readingBreak{
+		{model.ReasonPropertyMissingInConsumer, map[string]string{
+			"property":      "$",
+			"argument":      "locale",
+			"consumerName":  readingConsumerName,
+			"providerName":  readingProviderName,
+			"propertyType":  "String!",
+			"providerField": "Query.pet(locale:)",
+		}},
+	})
+}

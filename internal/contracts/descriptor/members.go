@@ -23,7 +23,7 @@ func (this membersNode) validate(value any, path string) []violation.Violation {
 		return []violation.Violation{{
 			ErrorCode: "members.empty",
 			Path:      path,
-			Details:   map[string]string{"type": this.schemaType},
+			Details:   map[string]any{"type": this.schemaType},
 		}}
 	}
 
@@ -63,7 +63,7 @@ func (enumValuesNode) validate(value any, path string) []violation.Violation {
 			violations = append(violations, violation.Violation{
 				ErrorCode: "members.duplicate",
 				Path:      joinPath(path, strconv.Itoa(index)),
-				Details:   map[string]string{"value": text},
+				Details:   map[string]any{"value": text},
 			})
 		}
 
@@ -99,7 +99,7 @@ func (unionMembersNode) validate(value any, path string) []violation.Violation {
 			violations = append(violations, violation.Violation{
 				ErrorCode: "member.ref_required",
 				Path:      memberPath,
-				Details:   map[string]string{"member": key},
+				Details:   map[string]any{"member": key},
 			})
 		}
 

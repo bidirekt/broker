@@ -57,7 +57,7 @@ func (this probeProtocol) Rules() []protocol.Rule {
 			return nil
 		}
 
-		return []violation.Violation{{ErrorCode: "probe.extension", Path: "provides;probe", Source: "a.yaml", Details: map[string]string{"extension": extension}}}
+		return []violation.Violation{{ErrorCode: "probe.extension", Path: "provides;probe", Source: "a.yaml", Details: map[string]any{"extension": extension}}}
 	}}
 }
 
@@ -120,7 +120,7 @@ func TestValidate_TwoBlocksGeneratingDifferentSchemasUnderOneName_IsADuplicate(t
 		ErrorCode: "schema.duplicate",
 		Path:      "schemas;Shape",
 		Source:    "b.yaml",
-		Details:   map[string]string{"schema": "Shape", "declaredIn": "a.yaml"},
+		Details:   map[string]any{"schema": "Shape", "declaredIn": "a.yaml"},
 	})
 }
 
@@ -152,13 +152,13 @@ func TestValidate_ProtocolRulesJoinTheCoreRules_OverTheExtensionJoinedFromEveryB
 			ErrorCode: "probe.extension",
 			Path:      "provides;probe",
 			Source:    "a.yaml",
-			Details:   map[string]string{"extension": "pet,pets"},
+			Details:   map[string]any{"extension": "pet,pets"},
 		},
 		{
 			ErrorCode: "schema.unresolved_name",
 			Path:      "provides;rest;/pets;get;responses;200",
 			Source:    "a.yaml",
-			Details:   map[string]string{"schema": "Missing", "resource": "provides GET /pets 200"},
+			Details:   map[string]any{"schema": "Missing", "resource": "provides GET /pets 200"},
 		},
 	}, violations)
 }

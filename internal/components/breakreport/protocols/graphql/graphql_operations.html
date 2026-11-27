@@ -1,1 +1,33 @@
-{{define "graphql_operations"}}{{end}}
+{{define "graphql_operations"}}
+  {{if .Operations}}
+  <p class="group-label">Operations</p>
+  {{range .Operations}}
+  <div class="op">
+    <div class="op-title"><span class="op-kind">{{.Operation}}</span><span>{{.Field}}</span></div>
+    {{range .Breaks}}
+    <div class="op-break">
+      {{with .Interaction}}<p class="op-ix">{{.}}</p>{{end}}
+      <p class="op-brk">{{template "icon_x" 14}}<span>{{template "phrase" .Sentence}}</span></p>
+      {{template "fixes" .Fixes}}
+      {{with .Graph}}<p class="op-see">See <a href="/graphs/{{.}}">/graphs/{{.}}</a></p>{{end}}
+    </div>
+    {{end}}
+  </div>
+  {{end}}
+  {{end}}
+  {{if .Fields}}
+  <p class="group-label">Fields</p>
+  {{range .Fields}}
+  <div class="op">
+    <div class="op-title"><span class="op-prop">FIELD</span><span>{{.Field}}</span><span class="badge">{{len .Places}} {{if eq (len .Places) 1}}place{{else}}places{{end}}</span></div>
+    <p class="op-brk">{{template "icon_x" 14}}<span>{{template "phrase" .Sentence}}</span></p>
+    {{template "fixes" .Fixes}}
+    <ul class="op-places">
+      {{range .Places}}
+      <li><span class="op-kind">{{.Operation}}</span><span>{{.Field}}</span><span class="at">{{.Interaction}}</span>{{with .Property}}<span>at {{.}}</span>{{end}}{{with .Argument}}<span class="at">(argument {{.}})</span>{{end}}{{with .CounterpartField}}<span class="cf">({{$.Counterpart}}: {{.}})</span>{{end}}</li>
+      {{end}}
+    </ul>
+  </div>
+  {{end}}
+  {{end}}
+{{end}}

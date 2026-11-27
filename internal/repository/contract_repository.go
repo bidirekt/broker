@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/guregu/null"
@@ -128,12 +129,13 @@ var (
 )
 
 type ContractRepository struct {
-	pool   *pgxpool.Pool
-	tables map[model.Protocol]ProtocolTable
+	pool       *pgxpool.Pool
+	tables     map[model.Protocol]ProtocolTable
+	extensions []ContractExtensionStore
 }
 
-func NewContractRepository(pool *pgxpool.Pool, protocols []ProtocolTable) *ContractRepository {
-	return &ContractRepository{pool: pool, tables: toProtocolTables(protocols)}
+func NewContractRepository(pool *pgxpool.Pool, protocols Protocols) *ContractRepository {
+	return &ContractRepository{pool: pool, tables: toProtocolTables(protocols.Tables), extensions: protocols.Extensions}
 }
 
 func (this *ContractRepository) loadFilesForVersion(ctx context.Context, tx pgx.Tx, participantID int64, version string) ([]model.ContractFile, bool) {
@@ -154,7 +156,7 @@ func (this *ContractRepository) Publish(
 	contract *model.UploadedContract,
 	diff func(*model.PersistedContract) model.ContractDiff,
 	sameContent func(stored []model.ContractFile) bool,
-) (conflict bool) {
+) PublishResult {
 	tx, err := this.pool.Begin(ctx)
 	if err != nil {
 		panic(fmt.Errorf("error starting transaction: %w", err))
@@ -166,8 +168,16 @@ func (this *ContractRepository) Publish(
 		panic(fmt.Errorf("error locking contract participant: %w", err))
 	}
 
+	if refusal, refused := this.refuseExtensions(ctx, tx, contract.Extensions); refused {
+		return PublishResult{Outcome: PublishRefused, Refusal: refusal}
+	}
+
 	if stored, exists := this.loadFilesForVersion(ctx, tx, contract.ParticipantID, contract.Version); exists {
-		return !sameContent(stored)
+		if !sameContent(stored) {
+			return PublishResult{Outcome: PublishConflicted}
+		}
+
+		return PublishResult{Outcome: Published}
 	}
 
 	if !this.aliasVersionToSnapshot(ctx, tx, contract) {
@@ -182,7 +192,7 @@ func (this *ContractRepository) Publish(
 		panic(fmt.Errorf("error committing transaction: %w", err))
 	}
 
-	return false
+	return PublishResult{Outcome: Published}
 }
 
 func (this *ContractRepository) insertFirstSnapshot(
@@ -192,6 +202,7 @@ func (this *ContractRepository) insertFirstSnapshot(
 ) {
 	this.insertContract(ctx, tx, contract)
 	this.insertContractVersion(ctx, tx, contract)
+	this.insertExtensions(ctx, tx, contract)
 
 	for namespace, schemas := range contract.Schemas {
 		for name, schema := range schemas {
@@ -216,6 +227,7 @@ func (this *ContractRepository) insertNextSnapshot(
 ) {
 	this.insertContract(ctx, tx, next)
 	this.insertContractVersion(ctx, tx, next)
+	this.insertExtensions(ctx, tx, next)
 
 	for namespace, schemaChanges := range diff.Schemas {
 		for name, schemaChange := range schemaChanges {
@@ -325,7 +337,7 @@ func (this *ContractRepository) insertResource(
 		panic(fmt.Errorf("error inserting resource: %w", err))
 	}
 
-	this.tableOf(id, resource.Protocol).Insert(ctx, tx, id, resource.Identity)
+	this.tableOf(strconv.FormatInt(id, 10), resource.Protocol).Insert(ctx, tx, id, resource.Identity)
 
 	return id
 }
@@ -393,7 +405,7 @@ func (this *ContractRepository) latestSnapshot(
 		panic(fmt.Errorf("error loading contract tree: %w", err))
 	}
 
-	return this.withSchemas(ctx, q, this.toPersistedContractTree(ctx, q, rows))
+	return this.withSchemasAndExtensions(ctx, q, this.toPersistedContractTree(ctx, q, rows))
 }
 
 func (this *ContractRepository) GetContractByNameAndVersion(
@@ -406,7 +418,7 @@ func (this *ContractRepository) GetContractByNameAndVersion(
 		panic(fmt.Errorf("error loading contract tree by name and version: %w", err))
 	}
 
-	return this.withSchemas(ctx, this.pool, this.toPersistedContractTree(ctx, this.pool, rows))
+	return this.withSchemasAndExtensions(ctx, this.pool, this.toPersistedContractTree(ctx, this.pool, rows))
 }
 
 func (this *ContractRepository) GetContractByIDAndVersion(
@@ -419,7 +431,7 @@ func (this *ContractRepository) GetContractByIDAndVersion(
 		panic(fmt.Errorf("error loading contract tree by id and version: %w", err))
 	}
 
-	contract, found := this.withSchemas(ctx, this.pool, this.toPersistedContractTree(ctx, this.pool, rows))
+	contract, found := this.withSchemasAndExtensions(ctx, this.pool, this.toPersistedContractTree(ctx, this.pool, rows))
 	if !found {
 		panic(fmt.Errorf("contract %d has no version %q", contractID, version))
 	}
@@ -427,7 +439,7 @@ func (this *ContractRepository) GetContractByIDAndVersion(
 	return contract
 }
 
-func (this *ContractRepository) withSchemas(
+func (this *ContractRepository) withSchemasAndExtensions(
 	ctx context.Context,
 	q Querier,
 	contract *model.PersistedContract,
@@ -437,6 +449,7 @@ func (this *ContractRepository) withSchemas(
 	}
 
 	contract.Schemas = this.loadSchemasAt(ctx, q, schemaCatalogs{}, contract.ID)
+	contract.Extensions = this.loadExtensions(ctx, q, contract.ID)
 
 	for hash, resource := range contract.Resources {
 		resource.Schemas = model.CatalogFor(contract.Schemas, resource.Bodies)

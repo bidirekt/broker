@@ -351,7 +351,7 @@ func (this *IntegrationSuite) TestPublishSDL_ASecondVersionThatChangesTheSDL_IsA
 		JOIN contract_versions cv ON cv.contract_id = fv.contract_id
 		WHERE fv.change_type = 'modified'`))
 
-	repo := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{graphqlrepository.New()})
+	repo := repository.NewContractRepository(this.Pool, repository.Protocols{Tables: []repository.ProtocolTable{graphqlrepository.New()}})
 
 	first, found := repo.GetContractByNameAndVersion(context.Background(), sdlPublishParticipant, "1")
 	this.Require().True(found)
@@ -384,7 +384,7 @@ func (this *IntegrationSuite) TestPublishSDL_AOneOfInput_IsPublishedAsAnInputOfO
 	this.Require().Equal(http.StatusOK, status, body)
 	this.JSONEq(`{"message":"contract publish successful"}`, body)
 
-	repo := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{graphqlrepository.New()})
+	repo := repository.NewContractRepository(this.Pool, repository.Protocols{Tables: []repository.ProtocolTable{graphqlrepository.New()}})
 	published, found := repo.GetContractByNameAndVersion(context.Background(), sdlPublishParticipant, "1")
 	this.Require().True(found)
 	this.Equal(model.Schema{

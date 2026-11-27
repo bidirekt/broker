@@ -59,7 +59,7 @@ func TestMembers_EnumOrUnionWithoutMembersIsRequired(t *testing.T) {
 					ErrorCode: "members.required",
 					Path:      "properties;status",
 					Source:    "api.yaml",
-					Details:   map[string]string{"type": schemaType},
+					Details:   map[string]any{"type": schemaType},
 				}}, violations)
 			})
 		}
@@ -79,7 +79,7 @@ func TestMembers_EmptyMembersOfAnEnumIsRejectedAtMembers(t *testing.T) {
 		ErrorCode: "members.empty",
 		Path:      "properties;status;members",
 		Source:    "api.yaml",
-		Details:   map[string]string{"type": "enum"},
+		Details:   map[string]any{"type": "enum"},
 	}}, violations)
 }
 
@@ -93,7 +93,7 @@ func TestMembers_RepeatedValueIsRejectedAtItsIndex(t *testing.T) {
 		ErrorCode: "members.duplicate",
 		Path:      "members;2",
 		Source:    "api.yaml",
-		Details:   map[string]string{"value": "sold"},
+		Details:   map[string]any{"value": "sold"},
 	}}, violations)
 }
 
@@ -142,7 +142,7 @@ func TestMembers_EnumMembersThatIsNotAListIsAnInvalidKind(t *testing.T) {
 	require.Len(t, violations, 1)
 	assert.Equal(t, "value.invalid_kind", violations[0].ErrorCode)
 	assert.Equal(t, "members", violations[0].Path)
-	assert.Equal(t, map[string]string{"expected": "sequence", "got": "string"}, violations[0].Details)
+	assert.Equal(t, map[string]any{"expected": "sequence", "got": "string"}, violations[0].Details)
 }
 
 func TestMembers_MembersOnAnotherTypeIsNotAllowed(t *testing.T) {
@@ -158,7 +158,7 @@ func TestMembers_MembersOnAnotherTypeIsNotAllowed(t *testing.T) {
 		ErrorCode: "schema.key_not_allowed",
 		Path:      "properties;name",
 		Source:    "api.yaml",
-		Details:   map[string]string{"key": "members", "type": "string"},
+		Details:   map[string]any{"key": "members", "type": "string"},
 	}}, violations)
 }
 
@@ -171,7 +171,7 @@ func TestMembers_MembersBesideRefIsNotAllowed(t *testing.T) {
 	assert.Equal(t, []violation.Violation{{
 		ErrorCode: "schema.key_not_allowed",
 		Source:    "api.yaml",
-		Details:   map[string]string{"key": "members", "type": "ref"},
+		Details:   map[string]any{"key": "members", "type": "ref"},
 	}}, violations)
 }
 
@@ -186,7 +186,7 @@ func TestMembers_ShapeKeyOnAnEnumIsNotAllowed(t *testing.T) {
 	assert.Equal(t, []violation.Violation{{
 		ErrorCode: "schema.key_not_allowed",
 		Source:    "api.yaml",
-		Details:   map[string]string{"key": "items", "type": "enum"},
+		Details:   map[string]any{"key": "items", "type": "enum"},
 	}}, violations)
 }
 
@@ -213,7 +213,7 @@ func TestMembers_EmptyMembersOfAUnionIsRejectedAtMembers(t *testing.T) {
 		ErrorCode: "members.empty",
 		Path:      "members",
 		Source:    "api.yaml",
-		Details:   map[string]string{"type": "union"},
+		Details:   map[string]any{"type": "union"},
 	}}, violations)
 }
 
@@ -234,7 +234,7 @@ func TestMembers_UnionMemberWithoutRefIsRejectedAtItsKey(t *testing.T) {
 				ErrorCode: "member.ref_required",
 				Path:      "members;card",
 				Source:    "api.yaml",
-				Details:   map[string]string{"member": "card"},
+				Details:   map[string]any{"member": "card"},
 			}}, violations)
 		})
 	}
@@ -251,7 +251,7 @@ func TestMembers_UnionMemberWithAnotherKeyIsAnUnknownKey(t *testing.T) {
 		ErrorCode: "key.unknown",
 		Path:      "members;card;type",
 		Source:    "api.yaml",
-		Details:   map[string]string{"key": "type"},
+		Details:   map[string]any{"key": "type"},
 	}}, violations)
 }
 
@@ -268,7 +268,7 @@ func TestMembers_UnionMemberKeyWithAPathCharacterIsRejected(t *testing.T) {
 				ErrorCode: "member.name_syntax",
 				Path:      "members;" + key,
 				Source:    "api.yaml",
-				Details:   map[string]string{"key": key, "error": `must not contain ".", "[", "]", "{", "}", ";", "(" or ")"`},
+				Details:   map[string]any{"key": key, "error": `must not contain ".", "[", "]", "{", "}", ";", "(" or ")"`},
 			}}, violations)
 		})
 	}
@@ -283,7 +283,7 @@ func TestMembers_UnionMembersThatIsNotAMappingIsAnInvalidKind(t *testing.T) {
 	require.Len(t, violations, 1)
 	assert.Equal(t, "value.invalid_kind", violations[0].ErrorCode)
 	assert.Equal(t, "members", violations[0].Path)
-	assert.Equal(t, map[string]string{"expected": "mapping", "got": "sequence"}, violations[0].Details)
+	assert.Equal(t, map[string]any{"expected": "mapping", "got": "sequence"}, violations[0].Details)
 }
 
 func indent(line string) string {

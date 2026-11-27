@@ -8,6 +8,7 @@ var rules = []protocol.Rule{
 	duplicateSchemas,
 	unresolvedSchemaNames,
 	unresolvedSchemaRefs,
+	refCycles,
 }
 
 func schemaPath(name string) string {
