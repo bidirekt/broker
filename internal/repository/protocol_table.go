@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/bidirekt/broker/internal/model"
 )
@@ -12,6 +13,10 @@ type ProtocolTable interface {
 	Protocol() model.Protocol
 	Insert(ctx context.Context, q Querier, resourceID int64, identity model.ResourceIdentity)
 	LoadIdentities(ctx context.Context, q Querier, resourceIDs []int64) map[int64]model.ResourceIdentity
+}
+
+// ProviderHintTable is a ProtocolTable that, for a consumer resource with no provider, finds what the provider declares around it.
+type ProviderHintTable interface {
 	LoadProviderHint(ctx context.Context, q Querier, consumer model.PersistedResource, environmentID int64) (hint any, found bool)
 }
 
@@ -24,10 +29,10 @@ func toProtocolTables(tables []ProtocolTable) map[model.Protocol]ProtocolTable {
 	return byProtocol
 }
 
-func (this *ContractRepository) tableOf(resourceID int64, protocol model.Protocol) ProtocolTable {
+func (this *ContractRepository) tableOf(resource string, protocol model.Protocol) ProtocolTable {
 	table, registered := this.tables[protocol]
 	if !registered {
-		panic(fmt.Errorf("resource %d has protocol %q, which has no registered table", resourceID, protocol))
+		panic(fmt.Errorf("resource %s has protocol %q, which has no registered table", resource, protocol))
 	}
 
 	return table
@@ -36,20 +41,20 @@ func (this *ContractRepository) tableOf(resourceID int64, protocol model.Protoco
 func (this *ContractRepository) identitiesOf(ctx context.Context, q Querier, rows []tableRow) map[int64]model.ResourceIdentity {
 	idsByProtocol := make(map[model.Protocol][]int64)
 	for _, row := range rows {
-		protocol := model.Protocol(row.ResourceProtocol)
-		idsByProtocol[protocol] = append(idsByProtocol[protocol], row.ResourceID)
+		protocol := model.Protocol(row.ResourceProtocol.String)
+		idsByProtocol[protocol] = append(idsByProtocol[protocol], row.ResourceID.Int64)
 	}
 
 	identities := make(map[int64]model.ResourceIdentity, len(rows))
 	for protocol, ids := range idsByProtocol {
-		for id, identity := range this.tableOf(ids[0], protocol).LoadIdentities(ctx, q, ids) {
+		for id, identity := range this.tableOf(strconv.FormatInt(ids[0], 10), protocol).LoadIdentities(ctx, q, ids) {
 			identities[id] = identity
 		}
 	}
 
 	for _, row := range rows {
-		if _, found := identities[row.ResourceID]; !found {
-			panic(fmt.Errorf("resource %d has no row in its protocol table", row.ResourceID))
+		if _, found := identities[row.ResourceID.Int64]; !found {
+			panic(fmt.Errorf("resource %d has no row in its protocol table", row.ResourceID.Int64))
 		}
 	}
 

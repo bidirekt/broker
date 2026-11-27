@@ -154,10 +154,8 @@ func (this *IntegrationSuite) TestCanIDeploy_HappyPath() {
 	this.True(v1Api.Deployable)
 	this.Require().NotNil(v1Api.ParticipantVersion)
 	this.Equal("v1", *v1Api.ParticipantVersion)
-	// compatible counterparts render "endpoints":{}, never null
-	this.Contains(body, `"endpoints":{}`)
-	this.Require().NotNil(v1Api.Endpoints)
-	this.Empty(v1Api.Endpoints)
+	this.NotContains(body, `"endpoints"`)
+	this.Nil(v1Api.Endpoints)
 
 	this.Equal(1, this.countRows("compatibility_checks"))
 	this.Equal(1, this.countRows("compatibility_check_results"))
@@ -486,8 +484,7 @@ func (this *IntegrationSuite) TestCanIDeploy_TwoDeployableOneBreaking() {
 		this.Truef(result.Deployable, "expected %s to be deployable", provider)
 		this.Require().NotNil(result.ParticipantVersion)
 		this.Equal("v1", *result.ParticipantVersion)
-		this.Require().NotNilf(result.Endpoints, "expected %s endpoints to render as {}", provider)
-		this.Empty(result.Endpoints)
+		this.Nilf(result.Endpoints, "expected %s to leave endpoints out", provider)
 	}
 
 	catalog := got.Results["catalog"]

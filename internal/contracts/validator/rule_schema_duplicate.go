@@ -8,12 +8,13 @@ import (
 func duplicateSchemas(declarations protocol.Declarations) []violation.Violation {
 	var violations []violation.Violation
 
-	declaredIn := map[string]string{}
+	declaredIn := map[[2]string]string{}
 
 	for _, declaration := range declarations.Schemas {
-		first, taken := declaredIn[declaration.Name]
+		key := [2]string{declaration.Namespace, declaration.Name}
+		first, taken := declaredIn[key]
 		if !taken {
-			declaredIn[declaration.Name] = declaration.Source
+			declaredIn[key] = declaration.Source
 
 			continue
 		}
@@ -22,7 +23,7 @@ func duplicateSchemas(declarations protocol.Declarations) []violation.Violation 
 			ErrorCode: "schema.duplicate",
 			Path:      schemaPath(declaration.Name),
 			Source:    declaration.Source,
-			Details: map[string]string{
+			Details: map[string]any{
 				"schema":     declaration.Name,
 				"declaredIn": first,
 			},

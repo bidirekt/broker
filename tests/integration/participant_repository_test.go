@@ -28,11 +28,11 @@ func (this *IntegrationSuite) TestParticipantRepository_CreateWithAnExistingName
 
 	repo := repository.NewParticipantRepository(pool)
 
-	created := repo.Create(ctx, model.NewParticipant(duplicatedParticipantName))
-	this.Require().True(created)
+	created := repo.Create(ctx, model.NewParticipant(duplicatedParticipantName), nil)
+	this.Require().Equal(repository.ParticipantCreated, created.Outcome)
 
-	created = repo.Create(ctx, model.NewParticipant(duplicatedParticipantName))
-	this.False(created)
+	created = repo.Create(ctx, model.NewParticipant(duplicatedParticipantName), nil)
+	this.Equal(repository.ParticipantExists, created.Outcome)
 
 	this.Equal(1, this.countRows("participants"))
 	this.Empty(queryErrors)

@@ -7,12 +7,15 @@ import (
 
 // A ref field has no Type: Ref names the schema it points at, which is never copied into it.
 // Members holds an enum's values, sorted; a union's members are its child fields at MemberSegment(key), one ref each.
+// Scalar names a scalar-typed field's scalar; Arguments names the schema of the arguments the field takes.
 type Field struct {
-	Type     string
-	Optional bool
-	Nullable bool
-	Ref      string
-	Members  []string
+	Type      string
+	Optional  bool
+	Nullable  bool
+	Ref       string
+	Members   []string
+	Scalar    string `json:",omitempty"`
+	Arguments string `json:",omitempty"`
 }
 
 func (this Field) Equal(other Field) bool {
@@ -20,7 +23,9 @@ func (this Field) Equal(other Field) bool {
 		this.Optional == other.Optional &&
 		this.Nullable == other.Nullable &&
 		this.Ref == other.Ref &&
-		slices.Equal(this.Members, other.Members)
+		slices.Equal(this.Members, other.Members) &&
+		this.Scalar == other.Scalar &&
+		this.Arguments == other.Arguments
 }
 
 // Schema keys its fields by the path relative to the schema: "" (the schema itself), "city", "meta.x",
@@ -38,6 +43,7 @@ const (
 	BooleanType = "boolean"
 	EnumType    = "enum"
 	UnionType   = "union"
+	ScalarType  = "scalar"
 )
 
 const (
@@ -104,3 +110,17 @@ func ParentOf(path string) (parent string, segment string, nested bool) {
 }
 
 type Schemas map[string]Schema
+
+// YAMLNamespace holds the schemas a contract file declares under `schemas:`.
+const YAMLNamespace = "yaml"
+
+func CatalogFor(schemas map[string]Schemas, bodies []ResourceBody) map[string]Schemas {
+	catalog := map[string]Schemas{}
+	for _, body := range bodies {
+		if namespaced, declared := schemas[body.Namespace]; declared {
+			catalog[body.Namespace] = namespaced
+		}
+	}
+
+	return catalog
+}

@@ -41,13 +41,6 @@ func TestListTimeIsRelativeUpToThreeDaysThenTheDate(t *testing.T) {
 	assert.Equal(t, "2026-10-31", pages.ListTime(referenceNow.Add(-4*24*time.Hour), referenceNow))
 }
 
-func TestDetailTimeShowsTheMinuteInUTCAndTheRelativeAtAnyAge(t *testing.T) {
-	saoPaulo := time.FixedZone("BRT", -3*60*60)
-
-	assert.Equal(t, "2026-11-04 15:00 UTC · just now", pages.DetailTime(referenceNow.Add(-30*time.Minute).In(saoPaulo), referenceNow))
-	assert.Equal(t, "2025-11-04 15:30 UTC · 365 days ago", pages.DetailTime(referenceNow.AddDate(-1, 0, 0), referenceNow))
-}
-
 func TestExpiryTimeShowsTheMinuteInUTCWithoutTheRelative(t *testing.T) {
 	saoPaulo := time.FixedZone("BRT", -3*60*60)
 
@@ -79,6 +72,27 @@ func TestRenderedPagesFormatTimesAsTimeElements(t *testing.T) {
 	require.NoError(t, err)
 
 	open := `<time class="time" datetime="` + pages.MachineTime(at) + `" title="` + pages.ExpiryTime(at) + `">`
-	assert.Contains(t, string(body), open+`2 hours ago</time>|`+open+pages.DetailTime(at, time.Now())+`</time>|`)
+	assert.Contains(t, string(body), open+`2 hours ago</time>|`+open+pages.ExpiryTime(at)+`</time> <span class="time">· 2 hours ago</span>|`)
 	assert.Contains(t, string(body), `<time class="time" datetime="2026-11-05T15:30:00Z" title="2026-11-05 15:30 UTC">2026-11-05 15:30 UTC</time>`)
+}
+
+func TestDetailTimeShowsTheMinuteInUTCAndTheRelativeAtAnyAgeAsTwoUnitsThatWrapApart(t *testing.T) {
+	saoPaulo := time.FixedZone("BRT", -3*60*60)
+	at := time.Now().Add(-365 * 24 * time.Hour).In(saoPaulo)
+	page := fstest.MapFS{"page.html": {Data: []byte(
+		`{{define "title"}}Times{{end}}{{define "content"}}{{detailTime .Page}}{{end}}`,
+	)}}
+
+	app := fiber.New()
+	app.Get("/", func(ctx fiber.Ctx) error {
+		return pages.Render(ctx, fiber.StatusOK, page, "page.html", at)
+	})
+
+	response, err := app.Test(httptest.NewRequest(fiber.MethodGet, "/", nil))
+	require.NoError(t, err)
+	body, err := io.ReadAll(response.Body)
+	require.NoError(t, err)
+
+	minute := pages.ExpiryTime(at)
+	assert.Contains(t, string(body), `<time class="time" datetime="`+pages.MachineTime(at)+`" title="`+minute+`">`+minute+`</time> <span class="time">· 365 days ago</span>`)
 }

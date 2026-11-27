@@ -1,18 +1,14 @@
 package validator
 
-import (
-	"github.com/bidirekt/broker/internal/contracts/protocol"
-	"github.com/bidirekt/broker/internal/contracts/violation"
-)
+import "github.com/bidirekt/broker/internal/contracts/protocol"
 
-type rule func(declarations protocol.Declarations) []violation.Violation
-
-var rules = []rule{
+var rules = []protocol.Rule{
 	duplicateResources,
 	conflictingPropertyTypes,
 	duplicateSchemas,
 	unresolvedSchemaNames,
 	unresolvedSchemaRefs,
+	refCycles,
 }
 
 func schemaPath(name string) string {

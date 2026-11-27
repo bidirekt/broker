@@ -1,0 +1,49 @@
+{{define "title"}}{{.Page.Name}}{{end}}
+
+{{define "content"}}
+{{with .Page}}
+<div class="head">
+  <div>
+    <h1 class="mono">{{.Name}}</h1>
+    <p class="sub">Graph composed from the subgraphs deployed in each environment</p>
+  </div>
+</div>
+{{range .Environments}}
+<section class="sheet">
+  <div class="sheet-head"><h2 class="h2"><a class="name" href="{{.URL}}">{{.Name}}</a></h2>{{if .Members}}{{if .Errors}}<span class="badge no">{{template "icon_x" 12}}does not compose</span>{{else}}<span class="badge yes">{{template "icon_check" 12}}composes</span>{{end}}{{end}}</div>
+  {{if .Members}}
+  <div class="scroll"><table class="t stack">
+    <thead>
+      <tr>
+        <th scope="col">Subgraph</th>
+        <th scope="col">Version</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Members}}
+      <tr>
+        <td data-l="Subgraph"><a class="name" href="{{.ParticipantURL}}">{{.ParticipantName}}</a></td>
+        <td data-l="Version">{{if .VersionURL}}<a class="ver" href="{{.VersionURL}}">{{.Version}}</a>{{else}}<span class="ver">{{.Version}}</span>{{end}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table></div>
+  {{if .Errors}}
+  <ul class="list errors">
+    {{range .Errors}}<li>{{.}}</li>{{end}}
+  </ul>
+  {{end}}
+  {{else}}
+  <p class="pad muted">no subgraph deployed</p>
+  {{end}}
+</section>
+{{else}}
+<section class="sheet">
+  <div class="empty">
+    <h2 class="h2">No environments yet</h2>
+    <p>Create an environment and deploy a subgraph of <span class="name">{{.Name}}</span> to it.</p>
+  </div>
+</section>
+{{end}}
+{{end}}
+{{end}}

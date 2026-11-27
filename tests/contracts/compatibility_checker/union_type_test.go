@@ -58,7 +58,7 @@ func paymentResources(interaction string, consumerBodies []string, consumerSchem
 
 	var bodies []model.ResourceBody
 	for _, schema := range consumerBodies {
-		bodies = append(bodies, model.ResourceBody{Source: schema + ".yaml", SchemaName: null.StringFrom(schema)})
+		bodies = append(bodies, model.ResourceBody{Source: schema + ".yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom(schema)})
 	}
 
 	consumer = model.PersistedResource{
@@ -73,7 +73,7 @@ func paymentResources(interaction string, consumerBodies []string, consumerSchem
 		},
 		ConsumerHash: null.StringFrom("shop-web-" + paymentProviderHash),
 		ProviderHash: paymentProviderHash,
-		Schemas:      consumerSchemas,
+		Schemas:      map[string]model.Schemas{model.YAMLNamespace: consumerSchemas},
 	}
 
 	provider = model.PersistedResource{
@@ -83,10 +83,10 @@ func paymentResources(interaction string, consumerBodies []string, consumerSchem
 			Protocol:        restmodel.Protocol,
 			Body:            body,
 			Identity:        restmodel.Identity{Endpoint: paymentEndpoint, Method: paymentMethod, Status: status},
-			Bodies:          []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("OrderRecord")}},
+			Bodies:          []model.ResourceBody{{Source: "api.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("OrderRecord")}},
 		},
 		ProviderHash:       paymentProviderHash,
-		Schemas:            providerSchemas,
+		Schemas:            map[string]model.Schemas{model.YAMLNamespace: providerSchemas},
 		ParticipantVersion: null.StringFrom("1.0.0"),
 	}
 
@@ -217,4 +217,18 @@ func TestUnionAgainstAnotherTypeIsATypeMismatch(t *testing.T) {
 			}}})
 		})
 	}
+}
+
+func TestUnionReadAsAnObjectIsATypeMismatch(t *testing.T) {
+	consumerSchemas := model.Schemas{"Order": {"": {Type: "object"}, "payment": {Type: "object"}, "payment.number": {Type: "string"}}}
+
+	assertPaymentBreaks(t, "200", []string{"Order"}, consumerSchemas, paymentUnion("OrderRecord", "card"), []paymentBreak{{model.ReasonPropertyTypeMismatch, map[string]string{
+		"property":             "$.payment",
+		"consumerName":         paymentConsumerName,
+		"providerName":         paymentProviderName,
+		"consumerField":        "Order.payment",
+		"providerField":        "OrderRecord.payment",
+		"consumerPropertyType": "object",
+		"providerPropertyType": "union",
+	}}})
 }

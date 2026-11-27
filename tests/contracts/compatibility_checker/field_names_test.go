@@ -35,7 +35,7 @@ type billingSide struct {
 
 func billingBody(schemaName string, schemas model.Schemas) billingSide {
 	return billingSide{
-		bodies:  []model.ResourceBody{{Source: "billing.yaml", SchemaName: null.StringFrom(schemaName)}},
+		bodies:  []model.ResourceBody{{Source: "billing.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom(schemaName)}},
 		schemas: schemas,
 	}
 }
@@ -93,7 +93,7 @@ func billingFields(t *testing.T, interaction string, consumerSide, providerSide 
 		},
 		ConsumerHash: null.StringFrom("spa-" + billingProviderHash),
 		ProviderHash: billingProviderHash,
-		Schemas:      consumerSide.schemas,
+		Schemas:      map[string]model.Schemas{model.YAMLNamespace: consumerSide.schemas},
 	}
 	provider := model.PersistedResource{
 		Resource: model.Resource{
@@ -105,7 +105,7 @@ func billingFields(t *testing.T, interaction string, consumerSide, providerSide 
 			Bodies:          providerSide.bodies,
 		},
 		ProviderHash:       billingProviderHash,
-		Schemas:            providerSide.schemas,
+		Schemas:            map[string]model.Schemas{model.YAMLNamespace: providerSide.schemas},
 		ParticipantVersion: null.StringFrom("1.0.0"),
 	}
 
@@ -203,8 +203,8 @@ func TestFieldNames_UndescribedBody_LeavesThatSideOut(t *testing.T) {
 func TestFieldNames_ConsumerWithSeveralModules_NamesTheFirstModuleDeclaringTheField(t *testing.T) {
 	twoModules := billingSide{
 		bodies: []model.ResourceBody{
-			{Source: "a.yaml", SchemaName: null.StringFrom("InvoiceSummary")},
-			{Source: "b.yaml", SchemaName: null.StringFrom("InvoiceDetail")},
+			{Source: "a.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("InvoiceSummary")},
+			{Source: "b.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("InvoiceDetail")},
 		},
 		schemas: model.Schemas{
 			"InvoiceSummary": {"": {Type: "object"}, "total": {Type: "integer"}},

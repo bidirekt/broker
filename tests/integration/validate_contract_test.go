@@ -505,9 +505,9 @@ func (this *IntegrationSuite) TestValidateContract_SchemaWithoutType_Rejected() 
 
 	this.Equal(http.StatusBadRequest, status)
 	this.JSONEq(`{"message":"contract validation failed","violations":[`+
-		`{"code":"schema.invalid_type","path":"schemas;Item;properties;dimensions","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean, enum, union"}},`+
-		`{"code":"schema.invalid_type","path":"schemas;Item;properties;prices","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean, enum, union"}},`+
-		`{"code":"schema.invalid_type","path":"schemas;Item;properties;tags","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean, enum, union"}}`+
+		`{"code":"schema.invalid_type","path":"schemas;Item;properties;dimensions","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean, enum, union, scalar"}},`+
+		`{"code":"schema.invalid_type","path":"schemas;Item;properties;prices","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean, enum, union, scalar"}},`+
+		`{"code":"schema.invalid_type","path":"schemas;Item;properties;tags","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean, enum, union, scalar"}}`+
 		`]}`, body)
 }
 
@@ -804,7 +804,7 @@ func (this *IntegrationSuite) TestValidateContract_WithoutParticipantAndEnvironm
 	}{
 		"unsupported extension": {
 			validateFile{"notes.txt", validateCatalogStockYAML},
-			`{"message":"unsupported contract file: notes.txt (expected .yaml or .yml)"}`,
+			`{"message":"unsupported contract file: notes.txt (expected .yaml, .yml, .graphql, .graphqls or .gql)"}`,
 		},
 		"malformed YAML": {
 			validateFile{"broken.yaml", "provides: {"},

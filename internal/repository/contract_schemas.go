@@ -12,18 +12,18 @@ import (
 const (
 	insertSchemaQuery = `
 		INSERT INTO schemas
-			(participant_id, name)
+			(participant_id, namespace, name)
 		VALUES
-			($1, $2)
+			($1, $2, $3)
 		RETURNING id
 	`
 
 	findSchemaIDByNameQuery = `
-		SELECT id FROM schemas WHERE participant_id = $1 AND name = $2
+		SELECT id FROM schemas WHERE participant_id = $1 AND namespace = $2 AND name = $3
 	`
 
 	findSchemaIDsByParticipantQuery = `
-		SELECT id, name FROM schemas WHERE participant_id = $1
+		SELECT id, namespace, name FROM schemas WHERE participant_id = $1
 	`
 
 	insertSchemaVersionQuery = `
@@ -47,13 +47,14 @@ const (
 
 	insertFieldVersionQuery = `
 		INSERT INTO field_versions
-			(field_id, contract_id, type, optional, nullable, ref, members, change_type)
+			(field_id, contract_id, type, optional, nullable, ref, members, scalar, arguments, change_type)
 		VALUES
-			($1, $2, NULLIF($3, ''), $4, $5, NULLIF($6, ''), $7, $8)
+			($1, $2, NULLIF($3, ''), $4, $5, NULLIF($6, ''), $7, NULLIF($8, ''), NULLIF($9, ''), $10)
 	`
 
 	schemasAtContractQuery = `
-		SELECT s.name, f.path, COALESCE(fv.type, ''), fv.optional, fv.nullable, COALESCE(fv.ref, ''), fv.members
+		SELECT s.namespace, s.name, f.path, COALESCE(fv.type, ''), fv.optional, fv.nullable, COALESCE(fv.ref, ''), fv.members,
+			COALESCE(fv.scalar, ''), COALESCE(fv.arguments, '')
 		FROM contracts c
 		JOIN schemas s ON s.participant_id = c.participant_id
 		JOIN LATERAL (
@@ -65,7 +66,7 @@ const (
 		) sv ON true
 		JOIN fields f ON f.schema_id = s.id
 		JOIN LATERAL (
-			SELECT type, optional, nullable, ref, members, change_type
+			SELECT type, optional, nullable, ref, members, scalar, arguments, change_type
 			FROM field_versions
 			WHERE field_id = f.id AND contract_id <= c.id
 			ORDER BY contract_id DESC
@@ -77,14 +78,14 @@ const (
 	`
 )
 
-type schemaCatalogs map[int64]model.Schemas
+type schemaCatalogs map[int64]map[string]model.Schemas
 
 func (this *ContractRepository) loadSchemasAt(
 	ctx context.Context,
 	q Querier,
 	catalogs schemaCatalogs,
 	contractID int64,
-) model.Schemas {
+) map[string]model.Schemas {
 	if schemas, loaded := catalogs[contractID]; loaded {
 		return schemas
 	}
@@ -96,21 +97,25 @@ func (this *ContractRepository) loadSchemasAt(
 
 	defer rows.Close()
 
-	schemas := model.Schemas{}
+	schemas := map[string]model.Schemas{}
 
 	for rows.Next() {
-		var name, path string
+		var namespace, name, path string
 		var field model.Field
 
-		if err := rows.Scan(&name, &path, &field.Type, &field.Optional, &field.Nullable, &field.Ref, &field.Members); err != nil {
+		if err := rows.Scan(&namespace, &name, &path, &field.Type, &field.Optional, &field.Nullable, &field.Ref, &field.Members, &field.Scalar, &field.Arguments); err != nil {
 			panic(fmt.Errorf("error scanning schema field: %w", err))
 		}
 
-		if schemas[name] == nil {
-			schemas[name] = model.Schema{}
+		if schemas[namespace] == nil {
+			schemas[namespace] = model.Schemas{}
 		}
 
-		schemas[name][path] = field
+		if schemas[namespace][name] == nil {
+			schemas[namespace][name] = model.Schema{}
+		}
+
+		schemas[namespace][name][path] = field
 	}
 
 	if err := rows.Err(); err != nil {
@@ -126,10 +131,11 @@ func (this *ContractRepository) insertAddedSchema(
 	ctx context.Context,
 	tx pgx.Tx,
 	contract *model.UploadedContract,
+	namespace string,
 	name string,
 	schema model.Schema,
 ) {
-	schemaID := this.insertSchema(ctx, tx, contract.ParticipantID, name)
+	schemaID := this.insertSchema(ctx, tx, contract.ParticipantID, namespace, name)
 	this.insertSchemaVersion(ctx, tx, schemaID, contract.ID, model.ChangeAdded)
 
 	for path, field := range schema {
@@ -143,10 +149,11 @@ func (this *ContractRepository) insertRemovedSchema(
 	ctx context.Context,
 	tx pgx.Tx,
 	contract *model.UploadedContract,
+	namespace string,
 	name string,
 	fields map[string]model.FieldChange,
 ) {
-	schemaID, _ := this.findSchemaID(ctx, tx, contract.ParticipantID, name)
+	schemaID, _ := this.findSchemaID(ctx, tx, contract.ParticipantID, namespace, name)
 	this.insertSchemaVersion(ctx, tx, schemaID, contract.ID, model.ChangeRemoved)
 
 	for path, change := range fields {
@@ -159,10 +166,11 @@ func (this *ContractRepository) insertFieldChanges(
 	ctx context.Context,
 	tx pgx.Tx,
 	contract *model.UploadedContract,
+	namespace string,
 	name string,
 	fields map[string]model.FieldChange,
 ) {
-	schemaID, _ := this.findSchemaID(ctx, tx, contract.ParticipantID, name)
+	schemaID, _ := this.findSchemaID(ctx, tx, contract.ParticipantID, namespace, name)
 
 	for path, change := range fields {
 		switch change.Kind {
@@ -179,24 +187,24 @@ func (this *ContractRepository) insertFieldChanges(
 	}
 }
 
-func (this *ContractRepository) insertSchema(ctx context.Context, tx pgx.Tx, participantID int64, name string) int64 {
-	if id, ok := this.findSchemaID(ctx, tx, participantID, name); ok {
+func (this *ContractRepository) insertSchema(ctx context.Context, tx pgx.Tx, participantID int64, namespace, name string) int64 {
+	if id, ok := this.findSchemaID(ctx, tx, participantID, namespace, name); ok {
 		return id
 	}
 
 	var id int64
-	if err := tx.QueryRow(ctx, insertSchemaQuery, participantID, name).Scan(&id); err != nil {
+	if err := tx.QueryRow(ctx, insertSchemaQuery, participantID, namespace, name).Scan(&id); err != nil {
 		panic(fmt.Errorf("error inserting schema: %w", err))
 	}
 
 	return id
 }
 
-func (this *ContractRepository) findSchemaID(ctx context.Context, tx pgx.Tx, participantID int64, name string) (int64, bool) {
-	return findID(ctx, tx, findSchemaIDByNameQuery, participantID, name)
+func (this *ContractRepository) findSchemaID(ctx context.Context, tx pgx.Tx, participantID int64, namespace, name string) (int64, bool) {
+	return findID(ctx, tx, findSchemaIDByNameQuery, participantID, namespace, name)
 }
 
-func (this *ContractRepository) findSchemaIDsByName(ctx context.Context, tx pgx.Tx, participantID int64) map[string]int64 {
+func (this *ContractRepository) findSchemaIDsByName(ctx context.Context, tx pgx.Tx, participantID int64) map[string]map[string]int64 {
 	rows, err := tx.Query(ctx, findSchemaIDsByParticipantQuery, participantID)
 	if err != nil {
 		panic(fmt.Errorf("error loading schema ids: %w", err))
@@ -204,17 +212,21 @@ func (this *ContractRepository) findSchemaIDsByName(ctx context.Context, tx pgx.
 
 	defer rows.Close()
 
-	ids := make(map[string]int64)
+	ids := make(map[string]map[string]int64)
 
 	for rows.Next() {
 		var id int64
-		var name string
+		var namespace, name string
 
-		if err := rows.Scan(&id, &name); err != nil {
+		if err := rows.Scan(&id, &namespace, &name); err != nil {
 			panic(fmt.Errorf("error scanning schema id: %w", err))
 		}
 
-		ids[name] = id
+		if ids[namespace] == nil {
+			ids[namespace] = make(map[string]int64)
+		}
+
+		ids[namespace][name] = id
 	}
 
 	if err := rows.Err(); err != nil {
@@ -271,6 +283,8 @@ func (this *ContractRepository) insertFieldVersion(
 		field.Nullable,
 		field.Ref,
 		field.Members,
+		field.Scalar,
+		field.Arguments,
 		string(kind),
 	); err != nil {
 		panic(fmt.Errorf("error inserting field version: %w", err))

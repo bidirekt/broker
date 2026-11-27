@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"path/filepath"
-	"strings"
 
 	"github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/ast"
@@ -13,14 +11,6 @@ import (
 )
 
 func DecodeFragment(source, content string) (Fragment, error) {
-	extension := strings.ToLower(filepath.Ext(source))
-	if extension != ".yaml" && extension != ".yml" {
-		return Fragment{}, fmt.Errorf(
-			"unsupported contract file: %s (expected .yaml or .yml)",
-			source,
-		)
-	}
-
 	decoded := Fragment{Source: source}
 
 	trimmed := bytes.TrimSpace([]byte(content))

@@ -57,16 +57,11 @@ func (this *PublishContractUseCase) Execute(ctx context.Context, input PublishCo
 		return PublishContractOutput{Status: ContractParticipantNotFound}, nil
 	}
 
-	fragments, shapeViolations, err := this.interpreter.ToFragments(input.Contracts)
-	if err != nil {
-		return PublishContractOutput{Status: ContractFilesUnreadable, ReadError: err.Error()}, nil
+	uploadedContract, violations, readErr, err := this.interpreter.ToUploadedContract(input.Contracts, participant, input.Version)
+	if readErr != nil {
+		return PublishContractOutput{Status: ContractFilesUnreadable, ReadError: readErr.Error()}, nil
 	}
 
-	if len(shapeViolations) > 0 {
-		return PublishContractOutput{Status: ContractValidationFailed, Violations: shapeViolations}, nil
-	}
-
-	uploadedContract, violations, err := this.interpreter.ToUploadedContract(fragments, participant, input.Version, input.Contracts)
 	if len(violations) > 0 {
 		return PublishContractOutput{Status: ContractValidationFailed, Violations: violations}, nil
 	}
@@ -75,7 +70,7 @@ func (this *PublishContractUseCase) Execute(ctx context.Context, input PublishCo
 		return PublishContractOutput{}, err
 	}
 
-	conflict := this.contractRepository.Publish(ctx, uploadedContract,
+	result := this.contractRepository.Publish(ctx, uploadedContract,
 		func(current *model.PersistedContract) model.ContractDiff {
 			return contract_differ.DiffContracts(current, uploadedContract)
 		},
@@ -83,11 +78,14 @@ func (this *PublishContractUseCase) Execute(ctx context.Context, input PublishCo
 			return this.hasSameContent(stored, participant, uploadedContract)
 		},
 	)
-	if conflict {
+	switch result.Outcome {
+	case repository.PublishConflicted:
 		return PublishContractOutput{Status: ContractVersionConflict}, nil
+	case repository.PublishRefused:
+		return PublishContractOutput{Status: ContractValidationFailed, Violations: []violation.Violation{violation.FromRefusal(result.Refusal)}}, nil
+	default:
+		return PublishContractOutput{Status: ContractPublishSuccessful}, nil
 	}
-
-	return PublishContractOutput{Status: ContractPublishSuccessful}, nil
 }
 
 func (this *PublishContractUseCase) hasSameContent(stored []model.ContractFile, participant *model.Participant, uploadedContract *model.UploadedContract) bool {
@@ -95,12 +93,7 @@ func (this *PublishContractUseCase) hasSameContent(stored []model.ContractFile, 
 		return true
 	}
 
-	fragments, shapeViolations, err := this.interpreter.ToFragments(stored)
-	if err != nil || len(shapeViolations) > 0 {
-		return false
-	}
+	storedContract, violations, readErr, err := this.interpreter.ToUploadedContract(stored, participant, uploadedContract.Version)
 
-	storedContract, violations, err := this.interpreter.ToUploadedContract(fragments, participant, uploadedContract.Version, stored)
-
-	return err == nil && len(violations) == 0 && storedContract.Checksum() == uploadedContract.Checksum()
+	return readErr == nil && err == nil && len(violations) == 0 && storedContract.Checksum() == uploadedContract.Checksum()
 }

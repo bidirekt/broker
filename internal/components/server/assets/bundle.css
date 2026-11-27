@@ -1,4 +1,4 @@
-/* Bidirekt — the broker's one stylesheet; the broker serves a copy of it. Put class="bk" on <body>.
+/* Bidirekt — the broker's core stylesheet, beside the one each protocol section brings; the broker serves a copy of it. Put class="bk" on <body>.
    No external fonts, no inline styles. Tokens are written once with light-dark(): without data-theme
    the OS decides, [data-theme="dark"|"light"] on <html> or on the .bk element forces one.
    Four sizes: 14px body, 13px secondary, 12px labels, 11px tags. Monospace values are 13px where they
@@ -89,6 +89,7 @@
 .list{list-style:none;margin:0;padding:0}
 .list>li{padding:14px 20px;border-top:1px solid var(--rule);display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;font-size:14px}
 .list>li:first-child{border-top:0}
+.list.errors>li{overflow-wrap:anywhere}
 
 /* ---------- controls ---------- */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:40px;padding:0 14px;border-radius:var(--r-ctl);border:1px solid var(--control);background:var(--raised);color:var(--text)!important;font:500 14px var(--sans);cursor:pointer;white-space:nowrap;text-decoration:none!important}
@@ -150,6 +151,7 @@
 .t td.acts .actions{justify-content:flex-end}
 .t td .badges{white-space:normal}
 .t td .badges>*{white-space:nowrap}
+.t td .badges>:has(>.badge.cpb){white-space:normal}
 @media (max-width:640px){
   .t.stack thead{display:none}
   .t.stack,.t.stack tbody,.t.stack tr,.t.stack td{display:block;width:100%}
@@ -160,15 +162,14 @@
   .t.stack td.acts{text-align:left;white-space:normal}
   .t.stack td.acts .actions{justify-content:flex-start}
   .t.stack td .badges>*{white-space:normal}
-  .t.stack .badge.cpb{flex-wrap:wrap;white-space:normal;overflow-wrap:anywhere}
 }
 
-/* ---------- badges: never wrap inside, except .cpb in a stacked card ---------- */
+/* ---------- badges: never wrap inside, except .cpb and .wrap ---------- */
 .badge{display:inline-flex;align-items:center;gap:5px;min-height:22px;padding:1px 8px;border-radius:99px;font-size:12px;font-weight:500;border:1px solid var(--border);background:var(--raised);color:var(--text);max-width:100%;white-space:nowrap;overflow-wrap:normal}
 .badge .v{font-family:var(--mono);font-size:inherit;color:var(--muted)}
 .bk a.badge:hover{text-decoration:none;border-color:currentColor}
 /* an environment is its name in mono, nothing else */
-.badge.env{min-height:0;padding:0;border:0;background:none;font-family:var(--mono);font-size:13px;color:var(--text)}
+.badge.env{min-height:0;padding:0;border:0;background:none;font-family:var(--mono);font-size:13px;color:var(--text);white-space:normal;overflow-wrap:break-word}
 .badge.env .v{font-weight:400}
 .bk a.badge.env:hover{text-decoration:underline}
 .badge.yes{background:var(--status-bg);color:var(--status-ink);border-color:var(--status-line)}
@@ -176,11 +177,12 @@
 .badge.rb{background:var(--notice-bg);color:var(--notice-ink);border-color:var(--notice)}
 .badge.quiet{color:var(--muted)}
 .badge.perm{font-family:var(--mono)}
-.badge.cpb{font-family:var(--mono);color:var(--text)}
+.badge.cpb{font-family:var(--mono);color:var(--text);flex-wrap:wrap;white-space:normal;overflow-wrap:anywhere}
 .badge.cpb .v{font-weight:400}
 .badge.cpb.no{color:var(--alert-ink)}
 .badge.cpb.no .v{color:var(--alert-ink)}
 .badge.cpb.quiet{color:var(--muted)}
+.badge.wrap{white-space:normal;overflow-wrap:anywhere}
 .badge.more{color:var(--accent);border-style:dashed}
 .badges{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;min-width:0}
 .latest{font-size:11px;font-weight:600;color:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:0 4px;white-space:nowrap}
@@ -271,15 +273,6 @@
 .cp .nb{margin-left:auto}
 .cp-links{display:flex;flex-wrap:wrap;gap:6px 16px;padding:12px 20px;background:var(--raised);border-bottom:1px solid var(--rule);font-size:13px}
 .group-label{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);padding:20px 20px 4px}
-.ep{padding:16px 20px 20px;border-top:1px solid var(--rule)}
-.group-label+.ep{border-top:0}
-.ep-title{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-family:var(--mono);font-size:13px;font-weight:600;overflow-wrap:anywhere}
-.meth{font-family:var(--mono);font-size:11px;font-weight:700;padding:1px 6px;border-radius:4px;border:1px solid var(--border);background:var(--raised);color:var(--text)}
-.prop{font-family:var(--mono);font-size:11px;font-weight:700;padding:1px 6px;border-radius:4px;background:var(--text);color:var(--surface)}
-.ix{margin:12px 0 0;padding-left:16px;border-left:2px solid var(--rule)}
-.ix-name{font-family:var(--mono);font-size:13px;color:var(--muted);margin-bottom:8px}
-.brk{display:flex;gap:8px;align-items:center;margin-top:4px;font-size:14px;line-height:1.5;overflow-wrap:anywhere}
-.brk svg{color:var(--alert-ink)}
 .fixes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px;margin:14px 0 0}
 .fix{border:1px solid var(--border);border-radius:var(--r-ctl);padding:12px 14px;background:var(--raised);display:flex;flex-direction:column;gap:4px;min-width:0}
 .fix>span:last-child{font-size:14px}
@@ -288,11 +281,6 @@
 .fix.self{border-top:3px solid var(--accent)}
 .fix.other{border-top:3px solid var(--muted)}
 .fix.only{grid-column:1 / -1;max-width:520px}
-.places{margin:12px 0 0;padding:0;list-style:none;border:1px solid var(--rule);border-radius:var(--r-ctl)}
-.places li{padding:8px 14px;border-top:1px solid var(--rule);font-family:var(--mono);font-size:13px;display:flex;flex-wrap:wrap;gap:4px 10px;overflow-wrap:anywhere}
-.places li:first-child{border-top:0}
-.places .at{color:var(--muted)}
-.places .cf{color:var(--muted)}
 .legend{display:flex;flex-wrap:wrap;gap:20px;margin:4px 0;font-size:13px;color:var(--muted)}
 .legend>span{display:flex;gap:6px;align-items:center}
 .sw{display:inline-block;width:12px;height:3px;border-radius:2px;background:var(--accent)}

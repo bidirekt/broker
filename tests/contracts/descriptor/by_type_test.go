@@ -44,7 +44,7 @@ func TestByType_ChosenNodeReportsItsOwnViolations(t *testing.T) {
 	require.Len(t, enum, 1)
 	assert.Equal(t, "value.invalid_kind", enum[0].ErrorCode)
 	assert.Equal(t, "members", enum[0].Path)
-	assert.Equal(t, map[string]string{"expected": "sequence", "got": "mapping"}, enum[0].Details)
+	assert.Equal(t, map[string]any{"expected": "sequence", "got": "mapping"}, enum[0].Details)
 
 	require.Len(t, union, 1)
 	assert.Equal(t, "key.unknown", union[0].ErrorCode)

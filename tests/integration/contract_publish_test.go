@@ -332,7 +332,7 @@ func (this *IntegrationSuite) TestPublishContract_UnsupportedExtension() {
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1", contractFragment{"notes.txt", contractBody}))
 	this.Equal(http.StatusBadRequest, status)
-	this.JSONEq(`{"message":"unsupported contract file: notes.txt (expected .yaml or .yml)"}`, body)
+	this.JSONEq(`{"message":"unsupported contract file: notes.txt (expected .yaml, .yml, .graphql, .graphqls or .gql)"}`, body)
 
 	this.Equal(0, this.countRows("contracts"))
 }
@@ -354,7 +354,7 @@ func (this *IntegrationSuite) TestPublishContract_JSONExtensionRejected() {
 
 	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1", contractFragment{"broken.json", contractBody}))
 	this.Equal(http.StatusBadRequest, status)
-	this.JSONEq(`{"message":"unsupported contract file: broken.json (expected .yaml or .yml)"}`, body)
+	this.JSONEq(`{"message":"unsupported contract file: broken.json (expected .yaml, .yml, .graphql, .graphqls or .gql)"}`, body)
 
 	this.Equal(0, this.countRows("contracts"))
 }
@@ -803,8 +803,8 @@ func (this *IntegrationSuite) TestPublishContract_InvalidSchemaType_Rejected() {
 	))
 	this.Equal(http.StatusBadRequest, status)
 	this.JSONEq(`{"message":"contract validation failed","violations":[`+
-		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;id;type","source":"api.yaml","details":{"value":"strng","allowed":"object, array, map, string, integer, float, number, boolean, enum, union"}},`+
-		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;tags;items","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean, enum, union"}}`+
+		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;id;type","source":"api.yaml","details":{"value":"strng","allowed":"object, array, map, string, integer, float, number, boolean, enum, union, scalar"}},`+
+		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;tags;items","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean, enum, union, scalar"}}`+
 		`]}`, body)
 
 	this.Equal(0, this.countRows("contracts"))
@@ -819,9 +819,9 @@ func (this *IntegrationSuite) TestPublishContract_SchemaWithoutType_Rejected() {
 	))
 	this.Equal(http.StatusBadRequest, status)
 	this.JSONEq(`{"message":"contract validation failed","violations":[`+
-		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;owner","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean, enum, union"}},`+
-		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;tags","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean, enum, union"}},`+
-		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;vaccinations","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean, enum, union"}}`+
+		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;owner","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean, enum, union, scalar"}},`+
+		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;tags","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean, enum, union, scalar"}},`+
+		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;vaccinations","source":"api.yaml","details":{"value":"","allowed":"object, array, map, string, integer, float, number, boolean, enum, union, scalar"}}`+
 		`]}`, body)
 
 	this.Equal(0, this.countRows("contracts"))

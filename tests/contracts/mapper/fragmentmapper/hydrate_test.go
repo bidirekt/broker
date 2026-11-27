@@ -65,7 +65,7 @@ func TestToResourceModels_Happy_MaterializesResources(t *testing.T) {
 	assert.Equal(t, model.Output, resource.Body)
 	assert.Equal(t, "pets_service", resource.ConsumedProvider.String)
 	assert.Equal(t, restmodel.Identity{Endpoint: "/pets", Method: "get", Status: "200"}, resource.Identity)
-	assert.Equal(t, []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Pet")}}, resource.Bodies)
+	assert.Equal(t, []model.ResourceBody{{Source: "api.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Pet")}}, resource.Bodies)
 }
 
 const postWithRequestBodyJSON = `{
@@ -134,12 +134,12 @@ func TestToResourceModels_PostWithRequestBody_EmitsRequestAndResponses(t *testin
 	assert.Equal(t, model.Consumes, request.Direction)
 	assert.Equal(t, model.Input, request.Body)
 	assert.Equal(t, restmodel.Identity{Endpoint: "/pets", Method: "post"}, request.Identity)
-	assert.Equal(t, []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("NewPet")}}, request.Bodies)
+	assert.Equal(t, []model.ResourceBody{{Source: "api.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("NewPet")}}, request.Bodies)
 
 	assert.Equal(t, model.Consumes, response.Direction)
 	assert.Equal(t, model.Output, response.Body)
 	assert.Equal(t, "201", response.Identity.(restmodel.Identity).Status)
-	assert.Equal(t, []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Pet")}}, response.Bodies)
+	assert.Equal(t, []model.ResourceBody{{Source: "api.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Pet")}}, response.Bodies)
 }
 
 func TestToResourceModels_ProvidesSide_EmitsProvidedResource(t *testing.T) {
@@ -152,5 +152,5 @@ func TestToResourceModels_ProvidesSide_EmitsProvidedResource(t *testing.T) {
 	assert.Equal(t, model.Output, resource.Body)
 	assert.Empty(t, resource.ConsumedProvider)
 	assert.Equal(t, restmodel.Identity{Endpoint: "/pets", Method: "get", Status: "200"}, resource.Identity)
-	assert.Equal(t, []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Pet")}}, resource.Bodies)
+	assert.Equal(t, []model.ResourceBody{{Source: "api.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Pet")}}, resource.Bodies)
 }

@@ -3,6 +3,7 @@ package breakreport
 import (
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"slices"
 	"strings"
 
@@ -24,7 +25,14 @@ type Counterpart struct {
 	Registered bool
 	Deployable bool
 	Breaks     int
-	Protocols  map[string]any
+	// only the sections it breaks in, ordered by ReportKey
+	Protocols []ProtocolBreaks
+}
+
+type ProtocolBreaks struct {
+	ReportKey string
+	Template  string
+	Display   any
 }
 
 type Fix struct {
@@ -38,7 +46,17 @@ type Reader struct {
 }
 
 func NewReader(sections []ProtocolSection) *Reader {
-	return &Reader{sections: sections}
+	return &Reader{sections: slices.SortedFunc(slices.Values(sections), func(a, b ProtocolSection) int {
+		return strings.Compare(a.ReportKey(), b.ReportKey())
+	})}
+}
+
+func (this *Reader) SectionFiles() []fs.FS {
+	files := make([]fs.FS, 0, len(this.sections))
+	for _, section := range this.sections {
+		files = append(files, section.Files())
+	}
+	return files
 }
 
 func (this *Reader) FromStoredCheck(check model.CompatibilityCheck, results []model.CompatibilityCheckResult) Report {
@@ -71,7 +89,6 @@ func (this *Reader) FromStoredCheck(check model.CompatibilityCheck, results []mo
 	report := Report{Stored: true, Counterparts: make([]Counterpart, 0, len(counterparts))}
 	for _, counterpart := range counterparts {
 		checked := CheckedCounterpart{Participant: check.ParticipantName, Environment: check.EnvironmentName, Counterpart: counterpart}
-		counterpart.Protocols = make(map[string]any, len(this.sections))
 		for _, section := range this.sections {
 			reported, err := section.ToSection(checked, stored[counterpart.Name][section.ReportKey()])
 			if err != nil {
@@ -80,7 +97,9 @@ func (this *Reader) FromStoredCheck(check model.CompatibilityCheck, results []mo
 
 			counterpart.Breaks += reported.Breaks
 			report.Places += reported.Places
-			counterpart.Protocols[string(section.Protocol())] = reported.Display
+			if reported.Breaks > 0 {
+				counterpart.Protocols = append(counterpart.Protocols, ProtocolBreaks{ReportKey: section.ReportKey(), Template: section.Template(), Display: reported.Display})
+			}
 		}
 
 		report.Breaks += counterpart.Breaks

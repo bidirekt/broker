@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -59,4 +60,56 @@ func (this *IntegrationSuite) TestUnhappyPath_AssetsAreServedOnlyAtTheirExactPat
 	_ = resp.Body.Close()
 
 	this.Equal(http.StatusNotFound, resp.StatusCode)
+}
+
+var restSectionRules = []string{
+	".ep{", ".group-label+.ep{", ".ep-title{", ".meth{", ".prop{", ".ix{", ".ix-name{", ".brk{", ".brk svg{",
+	".places{", ".places li{", ".places li:first-child{", ".places .at{", ".places .cf{",
+}
+
+func ruleLines(stylesheet string) []string {
+	var rules []string
+	for _, line := range strings.Split(stylesheet, "\n") {
+		if strings.HasPrefix(line, ".") {
+			rules = append(rules, line)
+		}
+	}
+	return rules
+}
+
+func (this *IntegrationSuite) TestHappyPath_RestSectionStylesheetIsServedAsCSSWithTheRulesOnlyItsTemplateUses() {
+	status, contentType, body := this.fetchAsset("/assets/protocols/endpoints.css")
+	this.Equal(http.StatusOK, status)
+	this.Contains(contentType, "text/css")
+
+	rules := ruleLines(body)
+	this.Require().Len(rules, len(restSectionRules))
+	for index, selector := range restSectionRules {
+		this.True(strings.HasPrefix(rules[index], selector), rules[index])
+	}
+}
+
+func (this *IntegrationSuite) TestHappyPath_GraphQLSectionStylesheetIsServedAsCSS() {
+	status, contentType, body := this.fetchAsset("/assets/protocols/operations.css")
+	this.Equal(http.StatusOK, status)
+	this.Contains(contentType, "text/css")
+	this.Contains(body, "\n.op-places li{")
+}
+
+func (this *IntegrationSuite) TestHappyPath_StylesheetKeepsOnlyTheRulesOtherPagesShare() {
+	_, _, body := this.fetchAsset("/assets/bundle.css")
+
+	for _, rule := range ruleLines(body) {
+		for _, selector := range restSectionRules {
+			this.False(strings.HasPrefix(rule, selector), rule)
+		}
+	}
+	for _, shared := range []string{".group-label{", ".fixes{", ".fix{", ".badge{", ".muted{"} {
+		this.Contains(body, "\n"+shared)
+	}
+}
+
+func (this *IntegrationSuite) TestUnhappyPath_OnlyRegisteredSectionsHaveAStylesheet() {
+	status, _, _ := this.fetchAsset("/assets/protocols/probes.css")
+	this.Equal(http.StatusNotFound, status)
 }

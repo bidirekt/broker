@@ -48,7 +48,7 @@ func (this *IntegrationSuite) publishOrdersContract() {
 }
 
 func (this *IntegrationSuite) loadOrdersResource() model.PersistedResource {
-	repo := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()})
+	repo := repository.NewContractRepository(this.Pool, repository.Protocols{Tables: []repository.ProtocolTable{restrepository.New()}})
 
 	contract, found := repo.GetContractByNameAndVersion(context.Background(), "orders_service", "1")
 	this.Require().True(found)
@@ -140,7 +140,7 @@ func onlyNullableRoundTripResource(contract *model.PersistedContract) model.Pers
 
 func (this *IntegrationSuite) TestContractRepository_NullableFieldRoundTripsThroughEveryRead() {
 	ctx := context.Background()
-	repo := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()})
+	repo := repository.NewContractRepository(this.Pool, repository.Protocols{Tables: []repository.ProtocolTable{restrepository.New()}})
 
 	this.mustPostForNullableRoundTrip("/api/environments", `{"environment":"production"}`)
 	this.mustPostForNullableRoundTrip("/api/participants", `{"participant":"accounts_api"}`)
@@ -158,28 +158,28 @@ func (this *IntegrationSuite) TestContractRepository_NullableFieldRoundTripsThro
 	byVersion, found := repo.GetContractByNameAndVersion(ctx, "accounts_api", "1")
 	this.Require().True(found)
 	providerResource := onlyNullableRoundTripResource(byVersion)
-	this.Equal(model.Field{Type: "string", Nullable: true}, byVersion.Schemas["Account"]["avatar"], "contract by version")
-	this.Equal(model.Field{Type: "string"}, byVersion.Schemas["Account"]["nickname"], "contract by version")
+	this.Equal(model.Field{Type: "string", Nullable: true}, byVersion.Schemas[model.YAMLNamespace]["Account"]["avatar"], "contract by version")
+	this.Equal(model.Field{Type: "string"}, byVersion.Schemas[model.YAMLNamespace]["Account"]["nickname"], "contract by version")
 	this.Equal(byVersion.Schemas, providerResource.Schemas, "contract by version")
 
 	latest, found := repo.GetLatestSnapshotByParticipantID(ctx, byVersion.ParticipantID)
 	this.Require().True(found)
-	this.True(latest.Schemas["Account"]["avatar"].Nullable, "latest contract")
-	this.True(onlyNullableRoundTripResource(latest).Schemas["Account"]["avatar"].Nullable, "latest contract")
+	this.True(latest.Schemas[model.YAMLNamespace]["Account"]["avatar"].Nullable, "latest contract")
+	this.True(onlyNullableRoundTripResource(latest).Schemas[model.YAMLNamespace]["Account"]["avatar"].Nullable, "latest contract")
 
 	provider, found := repo.GetProviderResourceByProviderHashAndEnvironmentID(ctx, providerResource.ProviderHash, environmentID)
 	this.Require().True(found)
-	this.True(provider.Schemas["Account"]["avatar"].Nullable, "provider resource of a consumer")
-	this.False(provider.Schemas["Account"]["nickname"].Nullable, "provider resource of a consumer")
+	this.True(provider.Schemas[model.YAMLNamespace]["Account"]["avatar"].Nullable, "provider resource of a consumer")
+	this.False(provider.Schemas[model.YAMLNamespace]["Account"]["nickname"].Nullable, "provider resource of a consumer")
 
 	consumers := repo.GetConsumersResourcesByProviderHashAndEnvironmentID(ctx, providerResource.ProviderHash, environmentID)
 	this.Require().Len(consumers, 1)
-	this.True(consumers[0].Schemas["Account"]["avatar"].Nullable, "consumers of a provider")
+	this.True(consumers[0].Schemas[model.YAMLNamespace]["Account"]["avatar"].Nullable, "consumers of a provider")
 }
 
 func (this *IntegrationSuite) TestContractRepository_OnlyNullabilityChanged_WritesAModifiedFieldVersion() {
 	ctx := context.Background()
-	repo := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()})
+	repo := repository.NewContractRepository(this.Pool, repository.Protocols{Tables: []repository.ProtocolTable{restrepository.New()}})
 
 	this.mustPostForNullableRoundTrip("/api/participants", `{"participant":"accounts_api"}`)
 	this.publishNullableAccountsProvider("1", false)
@@ -210,11 +210,11 @@ func (this *IntegrationSuite) TestContractRepository_OnlyNullabilityChanged_Writ
 
 	first, found := repo.GetContractByNameAndVersion(ctx, "accounts_api", "1")
 	this.Require().True(found)
-	this.False(first.Schemas["Account"]["avatar"].Nullable)
+	this.False(first.Schemas[model.YAMLNamespace]["Account"]["avatar"].Nullable)
 
 	second, found := repo.GetContractByNameAndVersion(ctx, "accounts_api", "2")
 	this.Require().True(found)
-	this.True(second.Schemas["Account"]["avatar"].Nullable)
+	this.True(second.Schemas[model.YAMLNamespace]["Account"]["avatar"].Nullable)
 }
 
 const undescribedBodyProviderContract = `provides:
@@ -312,7 +312,7 @@ func onlyUndescribedBodyResource(contract *model.PersistedContract) model.Persis
 
 func (this *IntegrationSuite) assertEveryReadReturnsTheFileResourceWithAnUndescribedBody(providerVersion string) {
 	ctx := context.Background()
-	repo := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()})
+	repo := repository.NewContractRepository(this.Pool, repository.Protocols{Tables: []repository.ProtocolTable{restrepository.New()}})
 	environmentID := this.undescribedBodyProductionID()
 	undescribed := []model.ResourceBody{{Source: "api.yaml"}}
 
@@ -322,7 +322,7 @@ func (this *IntegrationSuite) assertEveryReadReturnsTheFileResourceWithAnUndescr
 	providerResource := onlyUndescribedBodyResource(byVersion)
 	this.Equal("/files/*", providerResource.Identity.(restmodel.Identity).Endpoint, "contract by version")
 	this.Equal(undescribed, providerResource.Bodies, "contract by version")
-	this.Equal(model.Schemas{}, byVersion.Schemas, "contract by version")
+	this.Equal(map[string]model.Schemas{}, byVersion.Schemas, "contract by version")
 
 	latest, found := repo.GetLatestSnapshotByParticipantID(ctx, byVersion.ParticipantID)
 	this.Require().True(found, "latest contract")
@@ -367,10 +367,10 @@ func (this *IntegrationSuite) TestContractRepository_ResourceWhoseBodyBecameUnde
 
 	this.assertEveryReadReturnsTheFileResourceWithAnUndescribedBody("2")
 
-	first, found := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()}).GetContractByNameAndVersion(context.Background(), "files_api", "1")
+	first, found := repository.NewContractRepository(this.Pool, repository.Protocols{Tables: []repository.ProtocolTable{restrepository.New()}}).GetContractByNameAndVersion(context.Background(), "files_api", "1")
 	this.Require().True(found)
-	this.Equal([]model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Pet")}}, onlyUndescribedBodyResource(first).Bodies)
-	this.Equal(model.Schemas{"Pet": {"": {Type: "object"}, "name": {Type: "string"}}}, first.Schemas)
+	this.Equal([]model.ResourceBody{{Source: "api.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Pet")}}, onlyUndescribedBodyResource(first).Bodies)
+	this.Equal(model.Schemas{"Pet": {"": {Type: "object"}, "name": {Type: "string"}}}, first.Schemas[model.YAMLNamespace])
 }
 
 func (this *IntegrationSuite) TestContractRepository_NewSnapshot_DoesNotAddTheUndescribedResourceAgain() {
@@ -401,7 +401,7 @@ func (this *IntegrationSuite) TestContractRepository_NewSnapshot_DoesNotAddTheUn
 
 func (this *IntegrationSuite) TestContractRepository_RemovedResource_ComesBackRemovedWithoutBodyInItsVersion() {
 	ctx := context.Background()
-	repo := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()})
+	repo := repository.NewContractRepository(this.Pool, repository.Protocols{Tables: []repository.ProtocolTable{restrepository.New()}})
 
 	this.mustPostForUndescribedBody("/api/participants", `{"participant":"files_api"}`)
 	this.publishUndescribedBodyContract("files_api", "1", undescribedBodyProviderWithHealthContract)
@@ -410,7 +410,7 @@ func (this *IntegrationSuite) TestContractRepository_RemovedResource_ComesBackRe
 	first, found := repo.GetContractByNameAndVersion(ctx, "files_api", "1")
 	this.Require().True(found)
 	this.Len(first.Resources, 2)
-	this.Contains(first.Schemas, "Health")
+	this.Contains(first.Schemas[model.YAMLNamespace], "Health")
 
 	second, found := repo.GetContractByNameAndVersion(ctx, "files_api", "2")
 	this.Require().True(found)
@@ -424,7 +424,7 @@ func (this *IntegrationSuite) TestContractRepository_RemovedResource_ComesBackRe
 		this.False(resource.Removed)
 		this.Equal([]model.ResourceBody{{Source: "api.yaml"}}, resource.Bodies)
 	}
-	this.Equal(model.Schemas{}, second.Schemas)
+	this.Equal(map[string]model.Schemas{}, second.Schemas)
 
 	latest, found := repo.GetLatestSnapshotByParticipantID(ctx, second.ParticipantID)
 	this.Require().True(found)
@@ -581,16 +581,16 @@ func (this *IntegrationSuite) TestContractRepository_SchemaAddedBack_DoesNotBrin
 	this.publishSchemaRowsOrders("3", strings.Replace(schemaRowsOrdersContract,
 		"      city:\n        type: string\n", "      line:\n        type: string\n", 1))
 
-	third, found := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()}).GetContractByNameAndVersion(ctx, "orders_api", "3")
+	third, found := repository.NewContractRepository(this.Pool, repository.Protocols{Tables: []repository.ProtocolTable{restrepository.New()}}).GetContractByNameAndVersion(ctx, "orders_api", "3")
 	this.Require().True(found)
-	this.Equal(model.Schema{"": {Type: "object"}, "line": {Type: "string"}}, third.Schemas["Address"])
-	this.NotContains(third.Schemas, "PostalAddress")
+	this.Equal(model.Schema{"": {Type: "object"}, "line": {Type: "string"}}, third.Schemas[model.YAMLNamespace]["Address"])
+	this.NotContains(third.Schemas[model.YAMLNamespace], "PostalAddress")
 	this.Equal(1, len(this.schemaRowsStrings(`SELECT name FROM schemas WHERE name = 'Address'`)))
 }
 
 func (this *IntegrationSuite) TestContractRepository_ReadsByVersion_ReturnEachVersionsFields() {
 	ctx := context.Background()
-	repo := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()})
+	repo := repository.NewContractRepository(this.Pool, repository.Protocols{Tables: []repository.ProtocolTable{restrepository.New()}})
 
 	this.mustPostForSchemaRows("/api/participants", `{"participant":"orders_api"}`)
 	this.publishSchemaRowsOrders("1", schemaRowsOrdersContract)
@@ -613,11 +613,13 @@ func (this *IntegrationSuite) TestContractRepository_ReadsByVersion_ReturnEachVe
 			"tags{}":      {Type: "string"},
 		},
 		"Address": {"": {Type: "object"}, "city": {Type: "string"}},
-	}, first.Schemas)
-	this.Equal(model.Field{Type: "integer", Optional: true}, second.Schemas["Address"]["city"])
+	}, first.Schemas[model.YAMLNamespace])
+	this.Equal(model.Field{Type: "integer", Optional: true}, second.Schemas[model.YAMLNamespace]["Address"]["city"])
 
 	for _, resource := range second.Resources {
-		this.Equal(reflect.ValueOf(second.Schemas).Pointer(), reflect.ValueOf(resource.Schemas).Pointer())
+		if yamlSchemas, resolves := resource.Schemas[model.YAMLNamespace]; resolves {
+			this.Equal(reflect.ValueOf(second.Schemas[model.YAMLNamespace]).Pointer(), reflect.ValueOf(yamlSchemas).Pointer())
+		}
 	}
 }
 
@@ -641,10 +643,10 @@ func (this *IntegrationSuite) TestContractRepository_ExponentialSchema_WritesOnl
 	this.Equal(67, this.countRows("fields"))
 	this.Equal(67, this.countRows("field_versions"))
 
-	contract, found := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()}).GetContractByNameAndVersion(context.Background(), "orders_api", "1")
+	contract, found := repository.NewContractRepository(this.Pool, repository.Protocols{Tables: []repository.ProtocolTable{restrepository.New()}}).GetContractByNameAndVersion(context.Background(), "orders_api", "1")
 	this.Require().True(found)
-	this.Len(contract.Schemas, 23)
-	this.Equal(model.Schema{"": {Type: "object"}, "left": {Ref: "S1"}, "right": {Ref: "S1"}}, contract.Schemas["S0"])
+	this.Len(contract.Schemas[model.YAMLNamespace], 23)
+	this.Equal(model.Schema{"": {Type: "object"}, "left": {Ref: "S1"}, "right": {Ref: "S1"}}, contract.Schemas[model.YAMLNamespace]["S0"])
 }
 
 const schemaRowsAccountsProviderContract = `provides:
@@ -694,7 +696,7 @@ schemas:
 
 func (this *IntegrationSuite) TestContractRepository_CounterpartReads_CarryTheCatalogAtTheDeployedVersion() {
 	ctx := context.Background()
-	repo := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()})
+	repo := repository.NewContractRepository(this.Pool, repository.Protocols{Tables: []repository.ProtocolTable{restrepository.New()}})
 
 	this.mustPostForSchemaRows("/api/environments", `{"environment":"production"}`)
 	this.mustPostForSchemaRows("/api/participants", `{"participant":"accounts_api"}`)
@@ -720,26 +722,26 @@ func (this *IntegrationSuite) TestContractRepository_CounterpartReads_CarryTheCa
 		consumer = resource
 	}
 	this.Equal([]model.ResourceBody{
-		{Source: "web.yaml", SchemaName: null.StringFrom("Account")},
-		{Source: "widget.yaml", SchemaName: null.StringFrom("Profile")},
+		{Source: "web.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Account")},
+		{Source: "widget.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Profile")},
 	}, consumer.Bodies)
 
 	provider, found := repo.GetProviderResourceByProviderHashAndEnvironmentID(ctx, consumer.ProviderHash, environmentID)
 	this.Require().True(found)
-	this.Equal(model.Field{Type: "string"}, provider.Schemas["Account"]["avatar"])
-	this.Equal([]model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Account")}}, provider.Bodies)
+	this.Equal(model.Field{Type: "string"}, provider.Schemas[model.YAMLNamespace]["Account"]["avatar"])
+	this.Equal([]model.ResourceBody{{Source: "api.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Account")}}, provider.Bodies)
 
 	consumers := repo.GetConsumersResourcesByProviderHashAndEnvironmentID(ctx, consumer.ProviderHash, environmentID)
 	this.Require().Len(consumers, 1)
 	this.Equal(model.Schemas{
 		"Account": {"": {Type: "object"}, "avatar": {Type: "string"}},
 		"Profile": {"": {Type: "object"}, "avatar": {Type: "string"}},
-	}, consumers[0].Schemas)
+	}, consumers[0].Schemas[model.YAMLNamespace])
 	this.Equal(null.StringFrom("1"), consumers[0].ParticipantVersion)
 
 	latest, found := repo.GetLatestSnapshotByParticipantID(ctx, provider.ParticipantID)
 	this.Require().True(found)
-	this.True(latest.Schemas["Account"]["avatar"].Nullable)
+	this.True(latest.Schemas[model.YAMLNamespace]["Account"]["avatar"].Nullable)
 	counterparts := repo.LoadCounterparts(ctx, latest, environmentID)
 	this.Require().Len(counterparts.Consumers[consumer.ProviderHash], 1)
 	this.Equal(consumers[0].Schemas, counterparts.Consumers[consumer.ProviderHash][0].Schemas)
@@ -788,7 +790,7 @@ const registeredNamesFrontContract = `consumes:
 
 func (this *IntegrationSuite) TestContractRepository_LoadCounterparts_CarriesEachRegisteredNameAndLoadsOnlyDeployedProviders() {
 	ctx := context.Background()
-	repo := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()})
+	repo := repository.NewContractRepository(this.Pool, repository.Protocols{Tables: []repository.ProtocolTable{restrepository.New()}})
 	mustPost := func(path, body string) {
 		status, response := this.post(path, body)
 		this.Require().Equalf(http.StatusOK, status, "POST %s: %s", path, response)

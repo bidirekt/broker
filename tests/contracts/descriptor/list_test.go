@@ -36,9 +36,9 @@ func TestList_ItemPathIsItsIndexStartingAtZero(t *testing.T) {
 	assert.Equal(t, "value.invalid_kind", violations[0].ErrorCode)
 	assert.Equal(t, "values;0", violations[0].Path)
 	assert.Equal(t, "api.yaml", violations[0].Source)
-	assert.Equal(t, map[string]string{"expected": "string", "got": "mapping"}, violations[0].Details)
+	assert.Equal(t, map[string]any{"expected": "string", "got": "mapping"}, violations[0].Details)
 	assert.Equal(t, "values;2", violations[1].Path)
-	assert.Equal(t, map[string]string{"expected": "string", "got": "sequence"}, violations[1].Details)
+	assert.Equal(t, map[string]any{"expected": "string", "got": "sequence"}, violations[1].Details)
 }
 
 func TestList_ItemsKeepNestedPaths(t *testing.T) {
@@ -59,7 +59,7 @@ func TestList_ValueThatIsNotASequenceIsAnInvalidKind(t *testing.T) {
 	require.Len(t, violations, 1)
 	assert.Equal(t, "value.invalid_kind", violations[0].ErrorCode)
 	assert.Equal(t, "values", violations[0].Path)
-	assert.Equal(t, map[string]string{"expected": "sequence", "got": "mapping"}, violations[0].Details)
+	assert.Equal(t, map[string]any{"expected": "sequence", "got": "mapping"}, violations[0].Details)
 }
 
 func TestList_NullAndEmptyListPass(t *testing.T) {

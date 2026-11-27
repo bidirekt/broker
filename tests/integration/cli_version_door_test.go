@@ -32,11 +32,11 @@ func (this *IntegrationSuite) cliVersionDoorBrokerVersion() string {
 }
 
 func (this *IntegrationSuite) TestCliVersionDoor_RefusesACliBelowTheMinimumNamingTheBrokerVersionHealthShows() {
-	status, body := this.cliVersionDoorListParticipants("0.0.9")
+	status, body := this.cliVersionDoorListParticipants("0.3.0")
 
 	this.Equal(http.StatusUpgradeRequired, status)
 	expected, err := json.Marshal(map[string]string{
-		"message": "bidirekt 0.0.9 doesn't work with this broker (" + this.cliVersionDoorBrokerVersion() + "); upgrade bidirekt to 0.1.0 or later",
+		"message": "bidirekt 0.3.0 doesn't work with this broker (" + this.cliVersionDoorBrokerVersion() + "); upgrade bidirekt to 0.4.0 or later",
 	})
 	this.Require().NoError(err)
 	this.JSONEq(string(expected), body)
@@ -44,7 +44,7 @@ func (this *IntegrationSuite) TestCliVersionDoor_RefusesACliBelowTheMinimumNamin
 
 func (this *IntegrationSuite) TestCliVersionDoor_RefusesBeforeAuthentication() {
 	req := httptest.NewRequest(http.MethodGet, "/api/participants", nil)
-	req.Header.Set(cliVersionDoorHeader, "0.0.9")
+	req.Header.Set(cliVersionDoorHeader, "0.3.0")
 
 	status, _, _ := this.sendApiRequest(req, "")
 
@@ -52,7 +52,7 @@ func (this *IntegrationSuite) TestCliVersionDoor_RefusesBeforeAuthentication() {
 }
 
 func (this *IntegrationSuite) TestCliVersionDoor_LetsASupportedMissingOrInvalidVersionThrough() {
-	for _, cliVersion := range []string{"0.1.0", "0.2.0-rc.1", "", "not-a-version"} {
+	for _, cliVersion := range []string{"0.4.0", "0.5.0-rc.1", "", "not-a-version"} {
 		status, body := this.cliVersionDoorListParticipants(cliVersion)
 
 		this.Equal(http.StatusOK, status, cliVersion)
@@ -62,7 +62,7 @@ func (this *IntegrationSuite) TestCliVersionDoor_LetsASupportedMissingOrInvalidV
 
 func (this *IntegrationSuite) TestCliVersionDoor_DoesNotCheckPages() {
 	req := httptest.NewRequest(http.MethodGet, "/participants", nil)
-	req.Header.Set(cliVersionDoorHeader, "0.0.9")
+	req.Header.Set(cliVersionDoorHeader, "0.3.0")
 
 	status, _, _ := this.sendPageRequest(req, this.signInAsAdmin())
 

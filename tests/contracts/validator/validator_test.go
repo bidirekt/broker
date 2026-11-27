@@ -149,25 +149,25 @@ func TestValidator_EveryRule_FiresAtItsLocationSortedBySourceThenPath(t *testing
 			ErrorCode: "resource.duplicate",
 			Path:      "provides;rest;/dup;get;responses;200",
 			Source:    "a.yaml",
-			Details:   map[string]string{"resource": "provides GET /dup 200", "declaredIn": "a.yaml"},
+			Details:   map[string]any{"resource": "provides GET /dup 200", "declaredIn": "a.yaml"},
 		},
 		{
 			ErrorCode: "schema.unresolved_name",
 			Path:      "provides;rest;/pets;get;responses;200",
 			Source:    "a.yaml",
-			Details:   map[string]string{"schema": "Missing", "resource": "provides GET /pets 200"},
+			Details:   map[string]any{"schema": "Missing", "resource": "provides GET /pets 200"},
 		},
 		{
 			ErrorCode: "schema.unresolved_ref",
 			Path:      "schemas;Pet;properties;owner",
 			Source:    "a.yaml",
-			Details:   map[string]string{"schema": "Ghost", "property": "Pet.owner"},
+			Details:   map[string]any{"schema": "Ghost", "property": "Pet.owner"},
 		},
 		{
 			ErrorCode: "resource.type_conflict",
 			Path:      "consumes;payments;rest;/invoices;get;responses;200",
 			Source:    "b.yaml",
-			Details: map[string]string{
+			Details: map[string]any{
 				"resource":     "consumes payments GET /invoices 200",
 				"property":     "$.id",
 				"type":         "integer",
@@ -179,13 +179,13 @@ func TestValidator_EveryRule_FiresAtItsLocationSortedBySourceThenPath(t *testing
 			ErrorCode: "resource.duplicate",
 			Path:      "provides;rest;/pets;get;responses;200",
 			Source:    "b.yaml",
-			Details:   map[string]string{"resource": "provides GET /pets 200", "declaredIn": "a.yaml"},
+			Details:   map[string]any{"resource": "provides GET /pets 200", "declaredIn": "a.yaml"},
 		},
 		{
 			ErrorCode: "schema.duplicate",
 			Path:      "schemas;Pet",
 			Source:    "b.yaml",
-			Details:   map[string]string{"schema": "Pet", "declaredIn": "a.yaml"},
+			Details:   map[string]any{"schema": "Pet", "declaredIn": "a.yaml"},
 		},
 	}, violations)
 }
@@ -210,19 +210,19 @@ func TestValidator_FragmentOrder_DoesNotChangeTheReport(t *testing.T) {
 			ErrorCode: "resource.duplicate",
 			Path:      "provides;rest;/pets;get;responses;200",
 			Source:    "b.yaml",
-			Details:   map[string]string{"resource": "provides GET /pets 200", "declaredIn": "a.yaml"},
+			Details:   map[string]any{"resource": "provides GET /pets 200", "declaredIn": "a.yaml"},
 		},
 		{
 			ErrorCode: "schema.duplicate",
 			Path:      "schemas;Pet",
 			Source:    "d.yaml",
-			Details:   map[string]string{"schema": "Pet", "declaredIn": "c.yaml"},
+			Details:   map[string]any{"schema": "Pet", "declaredIn": "c.yaml"},
 		},
 		{
 			ErrorCode: "resource.type_conflict",
 			Path:      "consumes;payments;rest;/invoices;get;responses;200",
 			Source:    "f.yaml",
-			Details: map[string]string{
+			Details: map[string]any{
 				"resource":     "consumes payments GET /invoices 200",
 				"property":     "$.id",
 				"type":         "integer",

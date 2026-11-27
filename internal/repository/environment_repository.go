@@ -33,6 +33,15 @@ const (
 		RETURNING id
 	`
 
+	listEnvironmentsQuery = `
+		SELECT
+			id, name
+		FROM
+			environments
+		ORDER BY
+			name COLLATE "C"
+	`
+
 	listEnvironmentNamesQuery = `
 		SELECT
 			name
@@ -106,6 +115,20 @@ func (this *EnvironmentRepository) Create(ctx context.Context, e *model.Environm
 	}
 
 	return true
+}
+
+func (this *EnvironmentRepository) List(ctx context.Context) []model.Environment {
+	rows, err := this.pool.Query(ctx, listEnvironmentsQuery)
+	if err != nil {
+		panic(fmt.Errorf("error listing environments: %w", err))
+	}
+
+	environments, err := pgx.AppendRows(make([]model.Environment, 0), rows, pgx.RowToStructByPos[model.Environment])
+	if err != nil {
+		panic(fmt.Errorf("error listing environments: %w", err))
+	}
+
+	return environments
 }
 
 func (this *EnvironmentRepository) ListNames(ctx context.Context) []string {

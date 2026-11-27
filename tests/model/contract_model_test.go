@@ -55,7 +55,7 @@ func restRequestConsumer(provider, endpoint, method string, bodies []model.Resou
 func newContractWithOnePetsResource(participantName string) *model.UploadedContract {
 	contract := model.NewUploadedContract(0, participantName, "1", nil)
 	_ = contract.AddResource(restResponseProvider("/pets", "get", "200", []model.ResourceBody{
-		{Source: "pets.yaml", SchemaName: null.StringFrom("PetList")},
+		{Source: "pets.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("PetList")},
 	}))
 	return contract
 }
@@ -72,7 +72,7 @@ func TestContract_Checksum_DiffersWhenResourceAdded(t *testing.T) {
 
 	b := newContractWithOnePetsResource("pets-service")
 	require.NoError(t, b.AddResource(restResponseProvider("/pets/*", "get", "200", []model.ResourceBody{
-		{Source: "pets.yaml", SchemaName: null.StringFrom("Pet")},
+		{Source: "pets.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Pet")},
 	})))
 
 	assert.NotEqual(t, a.Checksum(), b.Checksum())
@@ -80,10 +80,10 @@ func TestContract_Checksum_DiffersWhenResourceAdded(t *testing.T) {
 
 func TestContract_Checksum_IsOrderIndependent(t *testing.T) {
 	first := restResponseProvider("/pets", "get", "200", []model.ResourceBody{
-		{Source: "pets.yaml", SchemaName: null.StringFrom("PetList")},
+		{Source: "pets.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("PetList")},
 	})
 	second := restResponseProvider("/pets/*", "get", "200", []model.ResourceBody{
-		{Source: "pets.yaml", SchemaName: null.StringFrom("Pet")},
+		{Source: "pets.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Pet")},
 	})
 
 	a := model.NewUploadedContract(0, "pets-service", "1", nil)
@@ -99,21 +99,21 @@ func TestContract_Checksum_IsOrderIndependent(t *testing.T) {
 
 func newOrdersContract(version string, schemaName string, bodies []model.ResourceBody) *model.UploadedContract {
 	contract := model.NewUploadedContract(0, "orders-service", version, []model.ContractFile{{Source: "orders.yaml", Content: "raw " + version}})
-	contract.Schemas = model.Schemas{
+	contract.Schemas = map[string]model.Schemas{model.YAMLNamespace: {
 		schemaName: {
 			"":     {Type: "object"},
 			"city": {Type: "string", Optional: true},
 		},
-	}
+	}}
 	_ = contract.AddResource(restRequestConsumer("addresses-service", "/addresses", "post", bodies))
 	return contract
 }
 
 func addressBodies(schemaName string) []model.ResourceBody {
 	return []model.ResourceBody{
-		{Source: "a.yaml", SchemaName: null.StringFrom(schemaName)},
+		{Source: "a.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom(schemaName)},
 		{Source: "b.yaml"},
-		{Source: "b.yaml", SchemaName: null.StringFrom(schemaName)},
+		{Source: "b.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom(schemaName)},
 	}
 }
 
@@ -140,8 +140,8 @@ func TestContract_Checksum_IgnoresTheOrderOfTheBodies(t *testing.T) {
 func TestContract_Checksum_IgnoresTheSourcesOfTheBodies(t *testing.T) {
 	inTwoFiles := newOrdersContract("1", "Address", addressBodies("Address"))
 	inOtherFiles := newOrdersContract("1", "Address", []model.ResourceBody{
-		{Source: "orders/a.yaml", SchemaName: null.StringFrom("Address")},
-		{Source: "orders/b.yaml", SchemaName: null.StringFrom("Address")},
+		{Source: "orders/a.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Address")},
+		{Source: "orders/b.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Address")},
 		{Source: "orders/c.yaml"},
 	})
 
@@ -165,7 +165,7 @@ func TestContract_Checksum_DiffersWhenASchemaIsRenamed(t *testing.T) {
 }
 
 func TestContract_Checksum_DiffersWhenABodyBecomesUndescribed(t *testing.T) {
-	described := newOrdersContract("1", "Address", []model.ResourceBody{{Source: "a.yaml", SchemaName: null.StringFrom("Address")}})
+	described := newOrdersContract("1", "Address", []model.ResourceBody{{Source: "a.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Address")}})
 	undescribed := newOrdersContract("1", "Address", []model.ResourceBody{{Source: "a.yaml"}})
 
 	assert.NotEqual(t, described.Checksum(), undescribed.Checksum())
@@ -186,7 +186,7 @@ func TestContract_Checksum_DiffersWhenAFieldChanges(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			original := newOrdersContract("1", "Address", addressBodies("Address"))
 			changed := newOrdersContract("1", "Address", addressBodies("Address"))
-			changed.Schemas["Address"]["city"] = testCase.field
+			changed.Schemas[model.YAMLNamespace]["Address"]["city"] = testCase.field
 
 			assert.NotEqual(t, original.Checksum(), changed.Checksum())
 		})
@@ -196,16 +196,59 @@ func TestContract_Checksum_DiffersWhenAFieldChanges(t *testing.T) {
 func TestContract_Checksum_DiffersWhenAFieldIsAdded(t *testing.T) {
 	original := newOrdersContract("1", "Address", addressBodies("Address"))
 	changed := newOrdersContract("1", "Address", addressBodies("Address"))
-	changed.Schemas["Address"]["zip"] = model.Field{Type: "string"}
+	changed.Schemas[model.YAMLNamespace]["Address"]["zip"] = model.Field{Type: "string"}
 
 	assert.NotEqual(t, original.Checksum(), changed.Checksum())
+}
+
+func TestContract_Checksum_DiffersWhenASchemaMovesToAnotherNamespace(t *testing.T) {
+	inYAML := newOrdersContract("1", "Address", addressBodies("Address"))
+	inAnotherNamespace := newOrdersContract("1", "Address", addressBodies("Address"))
+	inAnotherNamespace.Schemas = map[string]model.Schemas{"graphql": inAnotherNamespace.Schemas[model.YAMLNamespace]}
+
+	assert.NotEqual(t, inYAML.Checksum(), inAnotherNamespace.Checksum())
+}
+
+type probeExtension struct {
+	Graph  string `json:"graph"`
+	Source string `json:"-"`
+}
+
+func TestContract_Checksum_DiffersWhenOnlyTheExtensionsDiffer(t *testing.T) {
+	withoutExtensions := newOrdersContract("1", "Address", addressBodies("Address"))
+	withExtension := newOrdersContract("1", "Address", addressBodies("Address"))
+	withExtension.Extensions = map[string]any{"probe": probeExtension{Graph: "petstore_graph"}}
+	withOtherExtension := newOrdersContract("1", "Address", addressBodies("Address"))
+	withOtherExtension.Extensions = map[string]any{"probe": probeExtension{Graph: "orders_graph"}}
+
+	assert.NotEqual(t, withoutExtensions.Checksum(), withExtension.Checksum())
+	assert.NotEqual(t, withExtension.Checksum(), withOtherExtension.Checksum())
+}
+
+func TestContract_Checksum_IgnoresTheFilesAnExtensionCameFrom(t *testing.T) {
+	fromOneFile := newOrdersContract("1", "Address", addressBodies("Address"))
+	fromOneFile.Files = []model.ContractFile{{Source: "graph.yaml", Content: "provides: {}"}}
+	fromOneFile.Extensions = map[string]any{"probe": probeExtension{Graph: "petstore_graph", Source: "graph.yaml"}}
+	fromAnotherFile := newOrdersContract("1", "Address", addressBodies("Address"))
+	fromAnotherFile.Files = []model.ContractFile{{Source: "subgraph/federation.yaml", Content: "provides: {}"}}
+	fromAnotherFile.Extensions = map[string]any{"probe": probeExtension{Graph: "petstore_graph", Source: "subgraph/federation.yaml"}}
+
+	assert.Equal(t, fromOneFile.Checksum(), fromAnotherFile.Checksum())
+}
+
+func TestContract_Checksum_NoExtensionsIsTheSameAsAnEmptyMap(t *testing.T) {
+	withoutExtensions := newOrdersContract("1", "Address", addressBodies("Address"))
+	withEmptyExtensions := newOrdersContract("1", "Address", addressBodies("Address"))
+	withEmptyExtensions.Extensions = map[string]any{}
+
+	assert.Equal(t, withoutExtensions.Checksum(), withEmptyExtensions.Checksum())
 }
 
 func TestContract_AddResource_RejectsAlreadyAddedHash(t *testing.T) {
 	contract := newContractWithOnePetsResource("pets-service")
 
 	err := contract.AddResource(restResponseProvider("/pets", "get", "200", []model.ResourceBody{
-		{Source: "pets.yaml", SchemaName: null.StringFrom("Pet")},
+		{Source: "pets.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Pet")},
 	}))
 
 	require.EqualError(

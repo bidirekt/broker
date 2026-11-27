@@ -23,7 +23,7 @@ func restResponseProvider(endpoint, method, status string, bodies []model.Resour
 const participantName = "pets-service"
 
 func petBody() []model.ResourceBody {
-	return []model.ResourceBody{{Source: "pets.yaml", SchemaName: null.StringFrom("Pet")}}
+	return []model.ResourceBody{{Source: "pets.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Pet")}}
 }
 
 func petSchemas() model.Schemas {
@@ -39,7 +39,7 @@ func persistedPets(schemas model.Schemas, resources ...*model.UploadedResource) 
 	contract := &model.PersistedContract{
 		ParticipantName: participantName,
 		Resources:       map[string]model.PersistedResource{},
-		Schemas:         schemas,
+		Schemas:         map[string]model.Schemas{model.YAMLNamespace: schemas},
 	}
 
 	for _, resource := range resources {
@@ -47,7 +47,7 @@ func persistedPets(schemas model.Schemas, resources ...*model.UploadedResource) 
 		contract.Resources[resource.PrimaryHash()] = model.PersistedResource{
 			Resource:     resource.Resource,
 			ProviderHash: resource.ProviderHash(),
-			Schemas:      schemas,
+			Schemas:      map[string]model.Schemas{model.YAMLNamespace: schemas},
 		}
 	}
 
@@ -56,7 +56,7 @@ func persistedPets(schemas model.Schemas, resources ...*model.UploadedResource) 
 
 func uploadedPets(schemas model.Schemas, resources ...*model.UploadedResource) *model.UploadedContract {
 	contract := model.NewUploadedContract(0, participantName, "1", nil)
-	contract.Schemas = schemas
+	contract.Schemas = map[string]model.Schemas{model.YAMLNamespace: schemas}
 
 	for _, resource := range resources {
 		_ = contract.AddResource(resource)
@@ -104,7 +104,7 @@ func TestDiff_ResourceWhoseBodyChanged_IsNotAResourceChange(t *testing.T) {
 	diff := contract_differ.DiffContracts(persistedPets(petSchemas(), listPets()), uploadedPets(model.Schemas{}, undescribed))
 
 	assert.Empty(t, diff.Resources)
-	assert.Equal(t, model.ChangeRemoved, diff.Schemas["Pet"].Kind)
+	assert.Equal(t, model.ChangeRemoved, diff.Schemas[model.YAMLNamespace]["Pet"].Kind)
 }
 
 func TestDiff_NewSchema_IsAddedWithEveryField(t *testing.T) {
@@ -121,7 +121,7 @@ func TestDiff_NewSchema_IsAddedWithEveryField(t *testing.T) {
 			"":     {Kind: model.ChangeAdded, After: model.Field{Type: "object"}},
 			"name": {Kind: model.ChangeAdded, After: model.Field{Type: "string", Optional: true}},
 		}},
-	}, diff.Schemas)
+	}, diff.Schemas[model.YAMLNamespace])
 }
 
 func TestDiff_SchemaNoLongerReachable_IsRemovedWithEveryField(t *testing.T) {
@@ -132,7 +132,7 @@ func TestDiff_SchemaNoLongerReachable_IsRemovedWithEveryField(t *testing.T) {
 			"":   {Kind: model.ChangeRemoved, Before: model.Field{Type: "object"}},
 			"id": {Kind: model.ChangeRemoved, Before: model.Field{Type: "string"}},
 		}},
-	}, diff.Schemas)
+	}, diff.Schemas[model.YAMLNamespace])
 }
 
 func TestDiff_RenamedSchema_IsRemovedAndAdded(t *testing.T) {
@@ -141,9 +141,9 @@ func TestDiff_RenamedSchema_IsRemovedAndAdded(t *testing.T) {
 
 	diff := contract_differ.DiffContracts(persistedPets(current), uploadedPets(next))
 
-	assert.Len(t, diff.Schemas, 2)
-	assert.Equal(t, model.ChangeRemoved, diff.Schemas["Address"].Kind)
-	assert.Equal(t, model.ChangeAdded, diff.Schemas["PostalAddress"].Kind)
+	assert.Len(t, diff.Schemas[model.YAMLNamespace], 2)
+	assert.Equal(t, model.ChangeRemoved, diff.Schemas[model.YAMLNamespace]["Address"].Kind)
+	assert.Equal(t, model.ChangeAdded, diff.Schemas[model.YAMLNamespace]["PostalAddress"].Kind)
 }
 
 func TestDiff_FieldAddedAndRemoved_ModifyTheSchema(t *testing.T) {
@@ -156,7 +156,7 @@ func TestDiff_FieldAddedAndRemoved_ModifyTheSchema(t *testing.T) {
 			"id":   {Kind: model.ChangeRemoved, Before: model.Field{Type: "string"}},
 			"name": {Kind: model.ChangeAdded, After: model.Field{Type: "string"}},
 		}},
-	}, diff.Schemas)
+	}, diff.Schemas[model.YAMLNamespace])
 }
 
 func TestDiff_FieldWhoseAttributeChanged_IsModified(t *testing.T) {
@@ -169,6 +169,8 @@ func TestDiff_FieldWhoseAttributeChanged_IsModified(t *testing.T) {
 		{name: "nullable", after: model.Field{Type: "string", Nullable: true}},
 		{name: "ref", after: model.Field{Ref: "PetId"}},
 		{name: "members", after: model.Field{Type: "string", Members: []string{"available"}}},
+		{name: "scalar", after: model.Field{Type: "string", Scalar: "DateTime"}},
+		{name: "arguments", after: model.Field{Type: "string", Arguments: "IdArguments"}},
 	}
 
 	for _, testCase := range cases {
@@ -182,7 +184,7 @@ func TestDiff_FieldWhoseAttributeChanged_IsModified(t *testing.T) {
 				"Pet": {Kind: model.ChangeModified, Fields: map[string]model.FieldChange{
 					"id": {Kind: model.ChangeModified, Before: model.Field{Type: "string"}, After: testCase.after},
 				}},
-			}, diff.Schemas)
+			}, diff.Schemas[model.YAMLNamespace])
 		})
 	}
 }
@@ -201,7 +203,7 @@ func TestDiff_RefTargetRenamed_ModifiesTheRefField(t *testing.T) {
 
 	assert.Equal(t, model.SchemaChange{Kind: model.ChangeModified, Fields: map[string]model.FieldChange{
 		"billing": {Kind: model.ChangeModified, Before: model.Field{Ref: "Address"}, After: model.Field{Ref: "PostalAddress"}},
-	}}, diff.Schemas["Order"])
+	}}, diff.Schemas[model.YAMLNamespace]["Order"])
 }
 
 func TestRemovedSinceDeployed_ResourceGoneFromTheFiles_Counts(t *testing.T) {
@@ -250,7 +252,7 @@ func TestRemovedSinceDeployed_ResourceThatOnlyLostFields_DoesNotCount(t *testing
 				Bodies: petBody(),
 			},
 		}},
-		Schemas: petSchemas(),
+		Schemas: map[string]model.Schemas{model.YAMLNamespace: petSchemas()},
 	}
 	next := &model.UploadedContract{
 		ParticipantName: participantName,
@@ -259,7 +261,7 @@ func TestRemovedSinceDeployed_ResourceThatOnlyLostFields_DoesNotCount(t *testing
 				Bodies: petBody(),
 			},
 		}},
-		Schemas: model.Schemas{"Pet": {"": {Type: "object"}}},
+		Schemas: map[string]model.Schemas{model.YAMLNamespace: {"Pet": {"": {Type: "object"}}}},
 	}
 
 	assert.Empty(t, contract_differ.RemovedSinceDeployed(deployed, next))
@@ -303,7 +305,7 @@ func TestDiff_EnumWhoseValuesChanged_IsModified(t *testing.T) {
 				After:  model.Field{Type: "enum", Members: []string{"available", "pending"}},
 			},
 		}},
-	}, diff.Schemas)
+	}, diff.Schemas[model.YAMLNamespace])
 }
 
 func TestDiff_EnumWithTheSameValues_HasNoChanges(t *testing.T) {

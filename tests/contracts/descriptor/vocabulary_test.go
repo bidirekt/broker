@@ -17,7 +17,7 @@ func TestServiceName_ExigeSnakeCase(t *testing.T) {
 	require.Len(t, violations, 1)
 	assert.Equal(t, "service.name_syntax", violations[0].ErrorCode)
 	assert.Equal(t, "Billing-API", violations[0].Path)
-	assert.Equal(t, map[string]string{"key": "Billing-API", "error": "must be snake_case"}, violations[0].Details)
+	assert.Equal(t, map[string]any{"key": "Billing-API", "error": "must be snake_case"}, violations[0].Details)
 }
 
 func TestSchemaType_AcceptsEveryAllowedType(t *testing.T) {
@@ -31,7 +31,7 @@ func TestSchemaType_RejectsATypeOutsideTheSet(t *testing.T) {
 
 	require.Len(t, violations, 1)
 	assert.Equal(t, "schema.invalid_type", violations[0].ErrorCode)
-	assert.Equal(t, map[string]string{
+	assert.Equal(t, map[string]any{
 		"value":   "decimal",
 		"allowed": "object, array, map, string, integer, float, number, boolean, enum, union",
 	}, violations[0].Details)
@@ -41,7 +41,7 @@ func TestFlag_ExigeBooleano(t *testing.T) {
 	violations := descriptor.Validate(descriptor.Flag, "talvez", "api.yaml")
 
 	require.Len(t, violations, 1)
-	assert.Equal(t, map[string]string{"expected": "boolean", "got": "string"}, violations[0].Details)
+	assert.Equal(t, map[string]any{"expected": "boolean", "got": "string"}, violations[0].Details)
 }
 
 func TestPropertyName_RejectsAPathCharacterInAnyPosition(t *testing.T) {
@@ -54,7 +54,7 @@ func TestPropertyName_RejectsAPathCharacterInAnyPosition(t *testing.T) {
 			require.Len(t, violations, 1)
 			assert.Equal(t, "property.name_syntax", violations[0].ErrorCode)
 			assert.Equal(t, name, violations[0].Path)
-			assert.Equal(t, map[string]string{"key": name, "error": `must not contain ".", "[", "]", "{", "}", ";", "(" or ")"`}, violations[0].Details)
+			assert.Equal(t, map[string]any{"key": name, "error": `must not contain ".", "[", "]", "{", "}", ";", "(" or ")"`}, violations[0].Details)
 		})
 	}
 }
@@ -67,7 +67,7 @@ func TestPropertyName_RejectsAnEmptyName(t *testing.T) {
 	require.Len(t, violations, 1)
 	assert.Equal(t, "property.name_syntax", violations[0].ErrorCode)
 	assert.Equal(t, "", violations[0].Path)
-	assert.Equal(t, map[string]string{"key": "", "error": "must not be empty"}, violations[0].Details)
+	assert.Equal(t, map[string]any{"key": "", "error": "must not be empty"}, violations[0].Details)
 }
 
 func TestPropertyName_RejectsControlCharacters(t *testing.T) {
@@ -80,7 +80,7 @@ func TestPropertyName_RejectsControlCharacters(t *testing.T) {
 			require.Len(t, violations, 1)
 			assert.Equal(t, "property.name_syntax", violations[0].ErrorCode)
 			assert.Equal(t, name, violations[0].Path)
-			assert.Equal(t, map[string]string{"key": name, "error": "must not contain control characters"}, violations[0].Details)
+			assert.Equal(t, map[string]any{"key": name, "error": "must not contain control characters"}, violations[0].Details)
 		})
 	}
 }
@@ -112,7 +112,7 @@ func TestSchemaName_RejectsAPathCharacterInAnyPosition(t *testing.T) {
 			require.Len(t, violations, 1)
 			assert.Equal(t, "schema.name_syntax", violations[0].ErrorCode)
 			assert.Equal(t, name, violations[0].Path)
-			assert.Equal(t, map[string]string{"key": name, "error": `must not contain ".", "[", "]", "{", "}", ";", "(" or ")"`}, violations[0].Details)
+			assert.Equal(t, map[string]any{"key": name, "error": `must not contain ".", "[", "]", "{", "}", ";", "(" or ")"`}, violations[0].Details)
 		})
 	}
 }
@@ -125,7 +125,7 @@ func TestSchemaName_RejectsAnEmptyName(t *testing.T) {
 	require.Len(t, violations, 1)
 	assert.Equal(t, "schema.name_syntax", violations[0].ErrorCode)
 	assert.Equal(t, "", violations[0].Path)
-	assert.Equal(t, map[string]string{"key": "", "error": "must not be empty"}, violations[0].Details)
+	assert.Equal(t, map[string]any{"key": "", "error": "must not be empty"}, violations[0].Details)
 }
 
 func TestSchemaName_RejectsControlCharacters(t *testing.T) {
@@ -138,7 +138,7 @@ func TestSchemaName_RejectsControlCharacters(t *testing.T) {
 			require.Len(t, violations, 1)
 			assert.Equal(t, "schema.name_syntax", violations[0].ErrorCode)
 			assert.Equal(t, name, violations[0].Path)
-			assert.Equal(t, map[string]string{"key": name, "error": "must not contain control characters"}, violations[0].Details)
+			assert.Equal(t, map[string]any{"key": name, "error": "must not contain control characters"}, violations[0].Details)
 		})
 	}
 }
@@ -160,7 +160,7 @@ func TestDescription_RejectsPunctuation(t *testing.T) {
 
 			require.Len(t, violations, 1)
 			assert.Equal(t, "schema.description_syntax", violations[0].ErrorCode)
-			assert.Equal(t, map[string]string{"value": description, "error": descriptionSyntaxError}, violations[0].Details)
+			assert.Equal(t, map[string]any{"value": description, "error": descriptionSyntaxError}, violations[0].Details)
 		})
 	}
 }
@@ -179,7 +179,7 @@ func TestDescription_RejectsSpacingOtherThanSingleSpacesBetweenWords(t *testing.
 
 			require.Len(t, violations, 1)
 			assert.Equal(t, "schema.description_syntax", violations[0].ErrorCode)
-			assert.Equal(t, map[string]string{"value": description, "error": descriptionSyntaxError}, violations[0].Details)
+			assert.Equal(t, map[string]any{"value": description, "error": descriptionSyntaxError}, violations[0].Details)
 		})
 	}
 }
@@ -195,7 +195,7 @@ func TestDescription_RejectsNonASCIICharacters(t *testing.T) {
 
 			require.Len(t, violations, 1)
 			assert.Equal(t, "schema.description_syntax", violations[0].ErrorCode)
-			assert.Equal(t, map[string]string{"value": description, "error": descriptionSyntaxError}, violations[0].Details)
+			assert.Equal(t, map[string]any{"value": description, "error": descriptionSyntaxError}, violations[0].Details)
 		})
 	}
 }
@@ -205,7 +205,7 @@ func TestDescription_RejectsAnEmptyDescription(t *testing.T) {
 
 	require.Len(t, violations, 1)
 	assert.Equal(t, "schema.description_syntax", violations[0].ErrorCode)
-	assert.Equal(t, map[string]string{"value": "", "error": "must not be empty"}, violations[0].Details)
+	assert.Equal(t, map[string]any{"value": "", "error": "must not be empty"}, violations[0].Details)
 }
 
 func TestDescription_AcceptsASCIILettersAndDigitsWithSingleSpaces(t *testing.T) {
@@ -231,7 +231,7 @@ func TestDescription_RejectsANonStringAsInvalidKind(t *testing.T) {
 
 			require.Len(t, violations, 1)
 			assert.Equal(t, "value.invalid_kind", violations[0].ErrorCode)
-			assert.Equal(t, map[string]string{"expected": "string", "got": kind}, violations[0].Details)
+			assert.Equal(t, map[string]any{"expected": "string", "got": kind}, violations[0].Details)
 		})
 	}
 }

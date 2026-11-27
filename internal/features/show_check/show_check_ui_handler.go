@@ -2,6 +2,7 @@ package show_check
 
 import (
 	"embed"
+	"io/fs"
 
 	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/components/pages"
@@ -14,11 +15,12 @@ import (
 var pageFiles embed.FS
 
 type ShowCheckUiHandler struct {
-	useCase *ShowCheckUseCase
+	useCase      *ShowCheckUseCase
+	sectionFiles []fs.FS
 }
 
-func NewShowCheckUiHandler(useCase *ShowCheckUseCase) *ShowCheckUiHandler {
-	return &ShowCheckUiHandler{useCase: useCase}
+func NewShowCheckUiHandler(useCase *ShowCheckUseCase, sectionFiles []fs.FS) *ShowCheckUiHandler {
+	return &ShowCheckUiHandler{useCase: useCase, sectionFiles: sectionFiles}
 }
 
 func (this *ShowCheckUiHandler) Handle(ctx fiber.Ctx) error {
@@ -36,5 +38,5 @@ func (this *ShowCheckUiHandler) Handle(ctx fiber.Ctx) error {
 		return respond.NotFound(ctx)
 	}
 
-	return pages.Render(ctx, fiber.StatusOK, pageFiles, showCheckTemplate, newShowCheckPage(output.Check, output.Report))
+	return pages.Render(ctx, fiber.StatusOK, pageFiles, showCheckTemplate, newShowCheckPage(output), this.sectionFiles...)
 }

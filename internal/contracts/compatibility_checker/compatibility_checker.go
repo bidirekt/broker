@@ -45,6 +45,8 @@ func (this *CompatibilityChecker) Check(
 		states:     make(map[[2]int64]*pairState),
 	}
 
+	assumed := this.checkExtraCounterparts(ctx, contract, environment, report)
+
 	for _, resource := range contract.Resources {
 		if resource.Removed {
 			if resource.Direction == model.Provides {
@@ -56,6 +58,10 @@ func (this *CompatibilityChecker) Check(
 
 		switch resource.Direction {
 		case model.Consumes:
+			if assumed[resource.Protocol][resource.ConsumedProvider.String] {
+				continue
+			}
+
 			this.checkConsumer(ctx, resource, counterparts, pairs, report)
 		case model.Provides:
 			this.checkProvider(ctx, resource, counterparts, pairs, report)

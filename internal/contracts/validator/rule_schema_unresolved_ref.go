@@ -14,7 +14,7 @@ func unresolvedSchemaRefs(declarations protocol.Declarations) []violation.Violat
 	for _, declaration := range declarations.Schemas {
 		violations = append(violations, unresolvedRefsIn(
 			declaration.Schema,
-			declarations.Catalog,
+			declarations.Catalog[declaration.Namespace],
 			declaration,
 			schemaPath(declaration.Name),
 			"",
@@ -31,23 +31,28 @@ func unresolvedRefsIn(
 	documentPath string,
 	path string,
 ) []violation.Violation {
+	var violations []violation.Violation
+
+	named := []string{schema.Arguments}
 	if schema.IsRef() {
-		if _, declared := catalog[schema.Ref]; declared {
-			return nil
+		named = []string{schema.Ref, schema.Arguments}
+	}
+
+	for _, name := range named {
+		if _, declared := catalog[name]; name == "" || declared {
+			continue
 		}
 
-		return []violation.Violation{{
+		violations = append(violations, violation.Violation{
 			ErrorCode: "schema.unresolved_ref",
 			Path:      documentPath,
 			Source:    declaration.Source,
-			Details: map[string]string{
-				"schema":   schema.Ref,
+			Details: map[string]any{
+				"schema":   name,
 				"property": model.FieldName(declaration.Name, path),
 			},
-		}}
+		})
 	}
-
-	var violations []violation.Violation
 
 	for _, child := range schema.Children() {
 		violations = append(violations, unresolvedRefsIn(

@@ -37,6 +37,8 @@ func (this *CreateParticipantApiHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondInvalidName(ctx)
 	case ParticipantAlreadyExists:
 		return this.respondAlreadyExists(ctx)
+	case ParticipantNameReserved:
+		return this.respondReserved(ctx, output.Message)
 	}
 
 	return ctx.Status(fiber.StatusOK).JSON(CreateParticipantResponseBody{
@@ -65,5 +67,11 @@ func (this *CreateParticipantApiHandler) respondInvalidName(ctx fiber.Ctx) error
 func (this *CreateParticipantApiHandler) respondAlreadyExists(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusOK).JSON(CreateParticipantResponseBody{
 		Message: ParticipantAlreadyExistsMessage,
+	})
+}
+
+func (this *CreateParticipantApiHandler) respondReserved(ctx fiber.Ctx, message string) error {
+	return ctx.Status(fiber.StatusConflict).JSON(CreateParticipantResponseBody{
+		Message: message,
 	})
 }

@@ -30,7 +30,7 @@ func TestString_RejeitaMapeamento(t *testing.T) {
 	assert.Equal(t, "value.invalid_kind", violations[0].ErrorCode)
 	assert.Equal(t, "", violations[0].Path)
 	assert.Equal(t, "api.yaml", violations[0].Source)
-	assert.Equal(t, map[string]string{"expected": "string", "got": "mapping"}, violations[0].Details)
+	assert.Equal(t, map[string]any{"expected": "string", "got": "mapping"}, violations[0].Details)
 }
 
 func withoutDigits(value string) error {
@@ -60,7 +60,16 @@ func TestText_RejectedTextComesWithTheValueAndTheCheckError(t *testing.T) {
 	assert.Equal(t, "text.digits", violations[0].ErrorCode)
 	assert.Equal(t, "name", violations[0].Path)
 	assert.Equal(t, "api.yaml", violations[0].Source)
-	assert.Equal(t, map[string]string{"value": "Pet2", "error": "must not contain digits"}, violations[0].Details)
+	assert.Equal(t, map[string]any{"value": "Pet2", "error": "must not contain digits"}, violations[0].Details)
+}
+
+func TestText_TheValueDetail_NamesTheDetailThatCarriesTheValue(t *testing.T) {
+	subject := descriptor.Text{ErrorCode: "text.digits", Check: withoutDigits, ValueDetail: "name"}
+
+	violations := descriptor.Validate(subject, "Pet2", "api.yaml")
+
+	require.Len(t, violations, 1)
+	assert.Equal(t, map[string]any{"name": "Pet2", "error": "must not contain digits"}, violations[0].Details)
 }
 
 func TestText_NullCountsAsAbsent(t *testing.T) {
@@ -78,7 +87,7 @@ func TestText_RejectsANonStringAsInvalidKind(t *testing.T) {
 
 	require.Len(t, violations, 1)
 	assert.Equal(t, "value.invalid_kind", violations[0].ErrorCode)
-	assert.Equal(t, map[string]string{"expected": "string", "got": "integer"}, violations[0].Details)
+	assert.Equal(t, map[string]any{"expected": "string", "got": "integer"}, violations[0].Details)
 }
 
 func TestBool_AceitaBooleano(t *testing.T) {
@@ -92,7 +101,7 @@ func TestBool_RejeitaString(t *testing.T) {
 
 	require.Len(t, violations, 1)
 	assert.Equal(t, "value.invalid_kind", violations[0].ErrorCode)
-	assert.Equal(t, map[string]string{"expected": "boolean", "got": "string"}, violations[0].Details)
+	assert.Equal(t, map[string]any{"expected": "boolean", "got": "string"}, violations[0].Details)
 }
 
 func TestEnum_AceitaValorDoConjunto(t *testing.T) {
@@ -113,7 +122,7 @@ func TestEnum_RejeitaValorForaDoConjunto(t *testing.T) {
 	require.Len(t, violations, 1)
 	assert.Equal(t, "schema.invalid_type", violations[0].ErrorCode)
 	assert.Equal(t, "type", violations[0].Path)
-	assert.Equal(t, map[string]string{"value": "number", "allowed": "object, array"}, violations[0].Details)
+	assert.Equal(t, map[string]any{"value": "number", "allowed": "object, array"}, violations[0].Details)
 }
 
 func TestEnum_JulgaEscalarPeloTexto(t *testing.T) {
@@ -135,7 +144,7 @@ func TestEnum_RejeitaMapeamentoComoKind(t *testing.T) {
 
 	require.Len(t, violations, 1)
 	assert.Equal(t, "value.invalid_kind", violations[0].ErrorCode)
-	assert.Equal(t, map[string]string{"expected": "string", "got": "mapping"}, violations[0].Details)
+	assert.Equal(t, map[string]any{"expected": "string", "got": "mapping"}, violations[0].Details)
 }
 
 func TestEnum_NuloContaComoAusente(t *testing.T) {

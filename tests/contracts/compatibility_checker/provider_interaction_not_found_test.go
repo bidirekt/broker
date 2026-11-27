@@ -126,7 +126,7 @@ func TestProviderResourceInteractionNotFound_IsNeverAStoredVerdict(t *testing.T)
 	require.Len(t, result.Breaks, 1)
 	interactionNotFound := result.Breaks[0]
 
-	assert.Equal(t, model.ReasonProviderResourceInteractionNotFound, interactionNotFound.Reason)
+	assert.Equal(t, restmodel.ReasonProviderResourceInteractionNotFound, interactionNotFound.Reason)
 	assert.False(t, interactionNotFound.IsPropertyBreak())
 	assert.Empty(t, compatibility_checker.ToVerdictBreaks(result))
 }

@@ -18,6 +18,22 @@ type Counterpart struct {
 	ParticipantName    string
 	ParticipantVersion null.String
 	Role               model.CounterpartRole
+	// Members are the participants a composed counterpart is made of, each with its version.
+	Members map[string]string
+}
+
+// Version is the participant's version, or each member with its version, in name order.
+func (this Counterpart) Version() null.String {
+	if len(this.Members) == 0 {
+		return this.ParticipantVersion
+	}
+
+	labels := make([]string, 0, len(this.Members))
+	for _, member := range slices.Sorted(maps.Keys(this.Members)) {
+		labels = append(labels, member+" "+this.Members[member])
+	}
+
+	return null.StringFrom(strings.Join(labels, " + "))
 }
 
 type CounterpartResult struct {
@@ -28,6 +44,8 @@ type CounterpartResult struct {
 	// checked resource, and the pair they belong to is already persisted.
 	CachedBreaks  []model.VerdictBreak
 	VerdictCached bool
+	// LiveBreaks never become a verdict: their counterpart is no stored contract.
+	LiveBreaks []ContractBreakingChange
 }
 
 func NewCounterpartResult() *CounterpartResult {
@@ -41,6 +59,11 @@ func (this *CounterpartResult) AppendContractBreakChange(b ContractBreakingChang
 	this.Deployable = false
 }
 
+func (this *CounterpartResult) AppendLiveBreak(b ContractBreakingChange) {
+	this.LiveBreaks = append(this.LiveBreaks, b)
+	this.Deployable = false
+}
+
 func (this *CounterpartResult) AppendCachedBreakChange(b model.VerdictBreak) {
 	this.CachedBreaks = append(this.CachedBreaks, b)
 	this.Deployable = false
@@ -49,6 +72,7 @@ func (this *CounterpartResult) AppendCachedBreakChange(b model.VerdictBreak) {
 type Hierarchical struct {
 	Deployable bool
 	Version    null.String
+	Members    map[string]string
 	Trees      map[model.Protocol]ReportTree
 }
 
@@ -76,50 +100,6 @@ func NewContractCompatibilityReport(
 }
 
 func (this *ContractCompatibilityReport) AppendResult(counterpartName string, result *CounterpartResult) {
-	hierarchical, exists := this.Hierarchical[counterpartName]
-	if !exists {
-		hierarchical = Hierarchical{
-			Deployable: true,
-			Trees:      make(map[model.Protocol]ReportTree, len(this.protocols)),
-		}
-
-		for _, hooks := range this.protocols {
-			hierarchical.Trees[hooks.Protocol()] = hooks.NewReportTree()
-		}
-	}
-
-	if !hierarchical.Version.Valid {
-		hierarchical.Version = result.Counterpart.ParticipantVersion
-	}
-
-	for _, breakChange := range result.Breaks {
-		role := model.RoleProvider
-		if breakChange.CheckedResource.IsConsumer() {
-			role = model.RoleConsumer
-		}
-
-		hierarchical.appendBreak(
-			breakChange.CheckedResource.Protocol,
-			breakChange.CheckedResource.Identity.Location(),
-			model.ReportBreak{Reason: breakChange.Reason, Role: role, Details: breakChange.Details},
-		)
-	}
-
-	for _, cachedBreak := range result.CachedBreaks {
-		role := model.RoleProvider
-		if cachedBreak.Details["consumerName"] == this.ParticipantName {
-			role = model.RoleConsumer
-		}
-
-		hierarchical.appendBreak(
-			cachedBreak.Protocol,
-			cachedBreak.Location,
-			model.ReportBreak{Reason: cachedBreak.Reason, Role: role, Details: cachedBreak.Details},
-		)
-	}
-
-	this.Hierarchical[counterpartName] = hierarchical
-
 	existing := this.Results[counterpartName]
 
 	if existing.Breaks == nil {
@@ -128,6 +108,7 @@ func (this *ContractCompatibilityReport) AppendResult(counterpartName string, re
 
 	existing.Breaks = append(existing.Breaks, result.Breaks...)
 	existing.CachedBreaks = append(existing.CachedBreaks, result.CachedBreaks...)
+	existing.LiveBreaks = append(existing.LiveBreaks, result.LiveBreaks...)
 	existing.VerdictCached = existing.VerdictCached || result.VerdictCached
 
 	// Merged field by field: items of the same counterpart arrive in map order, and the ones
@@ -144,13 +125,53 @@ func (this *ContractCompatibilityReport) AppendResult(counterpartName string, re
 		existing.Counterpart.ParticipantVersion = result.Counterpart.ParticipantVersion
 	}
 
+	if existing.Counterpart.Members == nil {
+		existing.Counterpart.Members = result.Counterpart.Members
+	}
+
 	existing.Counterpart.Role = existing.Counterpart.Role.MergedWith(result.Counterpart.Role)
 
 	existing.Counterpart.ParticipantName = counterpartName
 
-	existing.Deployable = len(existing.Breaks)+len(existing.CachedBreaks) == 0
+	existing.Deployable = len(existing.Breaks)+len(existing.CachedBreaks)+len(existing.LiveBreaks) == 0
 
 	this.Results[counterpartName] = existing
+
+	hierarchical, exists := this.Hierarchical[counterpartName]
+	if !exists {
+		hierarchical = Hierarchical{Trees: make(map[model.Protocol]ReportTree, len(this.protocols))}
+
+		for _, hooks := range this.protocols {
+			hierarchical.Trees[hooks.Protocol()] = hooks.NewReportTree()
+		}
+	}
+
+	for _, breakChange := range slices.Concat(result.Breaks, result.LiveBreaks) {
+		hierarchical.appendBreak(
+			breakChange.CheckedResource.Protocol,
+			breakChange.CheckedResource.Identity.Location(),
+			model.ReportBreak{Reason: breakChange.Reason, Role: breakChange.ReportRole(), Details: breakChange.Details},
+		)
+	}
+
+	for _, cachedBreak := range result.CachedBreaks {
+		role := model.RoleProvider
+		if cachedBreak.Details["consumerName"] == this.ParticipantName {
+			role = model.RoleConsumer
+		}
+
+		hierarchical.appendBreak(
+			cachedBreak.Protocol,
+			cachedBreak.Location,
+			model.ReportBreak{Reason: cachedBreak.Reason, Role: role, Details: cachedBreak.Details},
+		)
+	}
+
+	hierarchical.Deployable = existing.Deployable
+	hierarchical.Version = existing.Counterpart.ParticipantVersion
+	hierarchical.Members = existing.Counterpart.Members
+
+	this.Hierarchical[counterpartName] = hierarchical
 }
 
 func ToVerdictBreaks(result CounterpartResult) []model.VerdictBreak {
@@ -189,8 +210,6 @@ func (this *Hierarchical) appendBreak(protocol model.Protocol, location map[stri
 	}
 
 	tree.Append(location, reportBreak)
-
-	this.Deployable = false
 }
 
 type hierarchicalField struct {
@@ -199,18 +218,23 @@ type hierarchicalField struct {
 }
 
 // MarshalJSON writes the fields in a fixed order, the trees last and sorted by their key, so
-// the bytes of a stored report never depend on map order.
+// the bytes of a stored report never depend on map order. An empty tree is left out, and the
+// members of a composed counterpart stand in for its version.
 func (this Hierarchical) MarshalJSON() ([]byte, error) {
-	fields := []hierarchicalField{
-		{"deployable", this.Deployable},
-		{"participantVersion", this.Version},
+	fields := []hierarchicalField{{"deployable", this.Deployable}}
+	if len(this.Members) > 0 {
+		fields = append(fields, hierarchicalField{"members", this.Members})
+	} else {
+		fields = append(fields, hierarchicalField{"participantVersion", this.Version})
 	}
 
 	trees := slices.SortedFunc(maps.Values(this.Trees), func(a, b ReportTree) int {
 		return strings.Compare(a.ReportKey(), b.ReportKey())
 	})
 	for _, tree := range trees {
-		fields = append(fields, hierarchicalField{tree.ReportKey(), tree})
+		if !tree.IsEmpty() {
+			fields = append(fields, hierarchicalField{tree.ReportKey(), tree})
+		}
 	}
 
 	var buffer bytes.Buffer

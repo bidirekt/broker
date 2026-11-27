@@ -189,7 +189,7 @@ func TestRemovedProvider_StatusChangeOnSurvivingMethod_BreaksAsInteractionRemove
 	assert.Len(t, web.Breaks, 1)
 	assert.Equal(
 		t,
-		model.ReasonProviderResourceInteractionRemovedButStillConsumed,
+		restmodel.ReasonProviderResourceInteractionRemovedButStillConsumed,
 		web.Breaks[0].Reason,
 	)
 	assert.Equal(t, map[string]string{"providerStatuses": "204, 2XX, 404"}, web.Breaks[0].Details)
@@ -221,7 +221,7 @@ func TestRemovedProvider_RequestDroppedOnSurvivingMethod_BreaksAsInteractionRemo
 	assert.Len(t, results[0].Breaks, 1)
 	assert.Equal(
 		t,
-		model.ReasonProviderResourceInteractionRemovedButStillConsumed,
+		restmodel.ReasonProviderResourceInteractionRemovedButStillConsumed,
 		results[0].Breaks[0].Reason,
 	)
 	assert.Nil(t, results[0].Breaks[0].Details)
@@ -246,7 +246,7 @@ func TestRemovedProvider_ResponseDroppedWhereOnlyARequestRemains_BreaksAsInterac
 	assert.Len(t, results[0].Breaks, 1)
 	assert.Equal(
 		t,
-		model.ReasonProviderResourceInteractionRemovedButStillConsumed,
+		restmodel.ReasonProviderResourceInteractionRemovedButStillConsumed,
 		results[0].Breaks[0].Reason,
 	)
 	assert.Nil(t, results[0].Breaks[0].Details)

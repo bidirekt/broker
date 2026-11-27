@@ -1,6 +1,6 @@
 package versions
 
-const MinimumCli = "0.1.0"
+const MinimumCli = "0.4.0"
 
 // var, not const: the release pipeline sets it with -ldflags -X
 var brokerVersion = "dev"

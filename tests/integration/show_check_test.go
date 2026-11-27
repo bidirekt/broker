@@ -211,7 +211,7 @@ func (this *IntegrationSuite) TestShowCheck_ShowsAConsumerSideNoWithItsBreaksRea
 	this.Contains(body, `<a href="/participants" aria-current="page">Participants</a>`)
 	this.Contains(body, `no · cannot be deployed`)
 	this.Contains(body, `<h1><span class="name">petstore_web</span> <span class="ver">2.3.0</span> cannot be deployed to <span class="name">production</span></h1>`)
-	this.Contains(body, ` UTC · just now</time>`)
+	this.Contains(body, ` UTC</time> <span class="time">· just now</span>`)
 	this.Contains(body, `<div><b>5</b><span>breaks</span></div>`)
 	this.Contains(body, `<div><b>4 of 4</b><span>counterparts break</span></div>`)
 	this.Contains(body, `<div><b>2</b><span>places in the contracts</span></div>`)

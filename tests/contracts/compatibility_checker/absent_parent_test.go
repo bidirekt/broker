@@ -72,7 +72,7 @@ type groupsBody struct {
 
 func groupsSchema(schema model.Schema) groupsBody {
 	return groupsBody{
-		bodies:  []model.ResourceBody{{Source: "groups.yaml", SchemaName: null.StringFrom("Group")}},
+		bodies:  []model.ResourceBody{{Source: "groups.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Group")}},
 		schemas: model.Schemas{"Group": schema},
 	}
 }
@@ -110,7 +110,7 @@ func groupRequestMergedFrom(t *testing.T, modules ...string) groupsBody {
 	resources := fragmentmapper.ToResourceModels(declarations)
 	require.Len(t, resources, 1)
 
-	return groupsBody{bodies: resources[0].Bodies, schemas: fragmentmapper.ToSchemaModels(declarations)}
+	return groupsBody{bodies: resources[0].Bodies, schemas: fragmentmapper.ToSchemaModels(declarations)[model.YAMLNamespace]}
 }
 
 func groupsResources(interaction string, consumerBody, providerBody groupsBody) (consumer, provider model.PersistedResource) {
@@ -131,7 +131,7 @@ func groupsResources(interaction string, consumerBody, providerBody groupsBody) 
 		},
 		ConsumerHash: null.StringFrom("spa-" + groupsProviderHash),
 		ProviderHash: groupsProviderHash,
-		Schemas:      consumerBody.schemas,
+		Schemas:      map[string]model.Schemas{model.YAMLNamespace: consumerBody.schemas},
 	}
 
 	provider = model.PersistedResource{
@@ -144,7 +144,7 @@ func groupsResources(interaction string, consumerBody, providerBody groupsBody) 
 			Bodies:          providerBody.bodies,
 		},
 		ProviderHash:       groupsProviderHash,
-		Schemas:            providerBody.schemas,
+		Schemas:            map[string]model.Schemas{model.YAMLNamespace: providerBody.schemas},
 		ParticipantVersion: null.StringFrom("1.0.0"),
 	}
 

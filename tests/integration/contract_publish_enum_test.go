@@ -65,7 +65,7 @@ func (this *IntegrationSuite) publishEnumPetsProvider(version, members string) {
 
 func (this *IntegrationSuite) TestPublishContract_Enum_ReadsBackItsValuesSorted() {
 	ctx := context.Background()
-	repo := repository.NewContractRepository(this.Pool, []repository.ProtocolTable{restrepository.New()})
+	repo := repository.NewContractRepository(this.Pool, repository.Protocols{Tables: []repository.ProtocolTable{restrepository.New()}})
 
 	this.mustPostForEnum("/api/participants", `{"participant":"petstore_api"}`)
 	this.publishEnumPetsProvider("1", "sold, available, pending")
@@ -76,7 +76,7 @@ func (this *IntegrationSuite) TestPublishContract_Enum_ReadsBackItsValuesSorted(
 		"":       {Type: "object"},
 		"status": {Type: "enum", Members: []string{"available", "pending", "sold"}},
 		"name":   {Type: "string"},
-	}, contract.Schemas["Pet"])
+	}, contract.Schemas[model.YAMLNamespace]["Pet"])
 }
 
 func (this *IntegrationSuite) TestPublishContract_OnlyEnumValuesChanged_WritesAModifiedFieldVersion() {

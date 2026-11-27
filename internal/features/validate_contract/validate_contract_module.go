@@ -6,19 +6,17 @@ import (
 	"github.com/bidirekt/broker/internal/components"
 	"github.com/bidirekt/broker/internal/contracts/compatibility_checker"
 	"github.com/bidirekt/broker/internal/contracts/contractfiles"
-	"github.com/bidirekt/broker/internal/contracts/protocol"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/bidirekt/broker/internal/repository"
 )
 
 func Register(
 	kernel *components.Components,
-	protocols *protocol.Registry,
-	tables []repository.ProtocolTable,
+	interpreter *contractfiles.Interpreter,
+	protocols repository.Protocols,
 	hooks []compatibility_checker.ProtocolHooks,
 ) {
-	interpreter := contractfiles.NewInterpreter(protocols)
-	contractRepository := repository.NewContractRepository(kernel.Pool, tables)
+	contractRepository := repository.NewContractRepository(kernel.Pool, protocols)
 	deploymentRepository := repository.NewDeploymentRepository(kernel.Pool)
 	environmentRepository := repository.NewEnvironmentRepository(kernel.Pool)
 	participantRepository := repository.NewParticipantRepository(kernel.Pool)

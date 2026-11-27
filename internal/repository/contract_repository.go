@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
+	"strconv"
 
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/guregu/null"
@@ -86,58 +88,31 @@ const (
 		VALUES
 			($1, $2, $3)
 	`
+)
 
+var (
 	getLatestSnapshotByParticipantID = `
 		SELECT
 			c.id,
-			(SELECT version FROM contract_versions WHERE contract_id = c.id ORDER BY id DESC LIMIT 1),` + resourceColumns + `
+			(SELECT version FROM contract_versions WHERE contract_id = c.id ORDER BY id DESC LIMIT 1),` + resourceColumns("r.change_type") + `
 		FROM contracts c
 		JOIN participants pa ON pa.id = c.participant_id
-		JOIN resources r ON r.participant_id = c.participant_id
-		JOIN LATERAL (
-			SELECT change_type
-			FROM resource_versions
-			WHERE resource_id = r.id AND contract_id <= c.id
-			ORDER BY contract_id DESC
-			LIMIT 1
-		) rv ON true
-		JOIN LATERAL (
-			SELECT
-				array_agg(rb.source ORDER BY rb.source COLLATE "C", rb.id) AS sources,
-				array_agg(s.name ORDER BY rb.source COLLATE "C", rb.id) AS schema_names
-			FROM resource_bodies rb
-			LEFT JOIN schemas s ON s.id = rb.schema_id
-			WHERE rb.resource_id = r.id AND rb.contract_id = c.id
-		) bodies ON true
+		` + contractResourcesJoin(" AND rv.change_type = 'added'") + `
+		` + resourceBodiesJoin("c.id") + `
 		WHERE c.participant_id = $1
 		  AND c.id = (SELECT MAX(id) FROM contracts WHERE participant_id = pa.id)
-		  AND rv.change_type = 'added'
 		ORDER BY r.id
 	`
 
 	contractVersionTreeQuery = `
 		SELECT
 			c.id,
-			cv.version,` + resourceColumns + `
+			cv.version,` + resourceColumns("r.change_type") + `
 		FROM contract_versions cv
 		JOIN contracts c ON c.id = cv.contract_id
 		JOIN participants pa ON pa.id = cv.participant_id
-		JOIN resources r ON r.participant_id = cv.participant_id
-		JOIN LATERAL (
-			SELECT change_type
-			FROM resource_versions
-			WHERE resource_id = r.id AND contract_id <= c.id
-			ORDER BY contract_id DESC
-			LIMIT 1
-		) rv ON true
-		JOIN LATERAL (
-			SELECT
-				array_agg(rb.source ORDER BY rb.source COLLATE "C", rb.id) AS sources,
-				array_agg(s.name ORDER BY rb.source COLLATE "C", rb.id) AS schema_names
-			FROM resource_bodies rb
-			LEFT JOIN schemas s ON s.id = rb.schema_id
-			WHERE rb.resource_id = r.id AND rb.contract_id = c.id
-		) bodies ON true
+		` + contractResourcesJoin("") + `
+		` + resourceBodiesJoin("c.id") + `
 	`
 
 	getContractByNameAndVersion = contractVersionTreeQuery + `
@@ -154,12 +129,13 @@ const (
 )
 
 type ContractRepository struct {
-	pool   *pgxpool.Pool
-	tables map[model.Protocol]ProtocolTable
+	pool       *pgxpool.Pool
+	tables     map[model.Protocol]ProtocolTable
+	extensions []ContractExtensionStore
 }
 
-func NewContractRepository(pool *pgxpool.Pool, protocols []ProtocolTable) *ContractRepository {
-	return &ContractRepository{pool: pool, tables: toProtocolTables(protocols)}
+func NewContractRepository(pool *pgxpool.Pool, protocols Protocols) *ContractRepository {
+	return &ContractRepository{pool: pool, tables: toProtocolTables(protocols.Tables), extensions: protocols.Extensions}
 }
 
 func (this *ContractRepository) loadFilesForVersion(ctx context.Context, tx pgx.Tx, participantID int64, version string) ([]model.ContractFile, bool) {
@@ -180,7 +156,7 @@ func (this *ContractRepository) Publish(
 	contract *model.UploadedContract,
 	diff func(*model.PersistedContract) model.ContractDiff,
 	sameContent func(stored []model.ContractFile) bool,
-) (conflict bool) {
+) PublishResult {
 	tx, err := this.pool.Begin(ctx)
 	if err != nil {
 		panic(fmt.Errorf("error starting transaction: %w", err))
@@ -192,8 +168,16 @@ func (this *ContractRepository) Publish(
 		panic(fmt.Errorf("error locking contract participant: %w", err))
 	}
 
+	if refusal, refused := this.refuseExtensions(ctx, tx, contract.Extensions); refused {
+		return PublishResult{Outcome: PublishRefused, Refusal: refusal}
+	}
+
 	if stored, exists := this.loadFilesForVersion(ctx, tx, contract.ParticipantID, contract.Version); exists {
-		return !sameContent(stored)
+		if !sameContent(stored) {
+			return PublishResult{Outcome: PublishConflicted}
+		}
+
+		return PublishResult{Outcome: Published}
 	}
 
 	if !this.aliasVersionToSnapshot(ctx, tx, contract) {
@@ -208,7 +192,7 @@ func (this *ContractRepository) Publish(
 		panic(fmt.Errorf("error committing transaction: %w", err))
 	}
 
-	return false
+	return PublishResult{Outcome: Published}
 }
 
 func (this *ContractRepository) insertFirstSnapshot(
@@ -218,9 +202,12 @@ func (this *ContractRepository) insertFirstSnapshot(
 ) {
 	this.insertContract(ctx, tx, contract)
 	this.insertContractVersion(ctx, tx, contract)
+	this.insertExtensions(ctx, tx, contract)
 
-	for name, schema := range contract.Schemas {
-		this.insertAddedSchema(ctx, tx, contract, name, schema)
+	for namespace, schemas := range contract.Schemas {
+		for name, schema := range schemas {
+			this.insertAddedSchema(ctx, tx, contract, namespace, name, schema)
+		}
 	}
 
 	for _, resource := range contract.Resources {
@@ -240,15 +227,18 @@ func (this *ContractRepository) insertNextSnapshot(
 ) {
 	this.insertContract(ctx, tx, next)
 	this.insertContractVersion(ctx, tx, next)
+	this.insertExtensions(ctx, tx, next)
 
-	for name, schemaChange := range diff.Schemas {
-		switch schemaChange.Kind {
-		case model.ChangeAdded:
-			this.insertAddedSchema(ctx, tx, next, name, next.Schemas[name])
-		case model.ChangeModified:
-			this.insertFieldChanges(ctx, tx, next, name, schemaChange.Fields)
-		case model.ChangeRemoved:
-			this.insertRemovedSchema(ctx, tx, next, name, schemaChange.Fields)
+	for namespace, schemaChanges := range diff.Schemas {
+		for name, schemaChange := range schemaChanges {
+			switch schemaChange.Kind {
+			case model.ChangeAdded:
+				this.insertAddedSchema(ctx, tx, next, namespace, name, next.Schemas[namespace][name])
+			case model.ChangeModified:
+				this.insertFieldChanges(ctx, tx, next, namespace, name, schemaChange.Fields)
+			case model.ChangeRemoved:
+				this.insertRemovedSchema(ctx, tx, next, namespace, name, schemaChange.Fields)
+			}
 		}
 	}
 
@@ -347,7 +337,7 @@ func (this *ContractRepository) insertResource(
 		panic(fmt.Errorf("error inserting resource: %w", err))
 	}
 
-	this.tableOf(id, resource.Protocol).Insert(ctx, tx, id, resource.Identity)
+	this.tableOf(strconv.FormatInt(id, 10), resource.Protocol).Insert(ctx, tx, id, resource.Identity)
 
 	return id
 }
@@ -389,7 +379,7 @@ func (this *ContractRepository) insertResourceBodies(
 		resourceID, _ := this.findResourceIDByHash(ctx, tx, hash, resource.Direction)
 
 		for _, body := range resource.Bodies {
-			schemaID := null.NewInt(schemaIDs[body.SchemaName.String], body.SchemaName.Valid)
+			schemaID := null.NewInt(schemaIDs[body.Namespace][body.SchemaName.String], body.SchemaName.Valid)
 
 			if _, err := tx.Exec(ctx, insertResourceBodyQuery, resourceID, contract.ID, body.Source, schemaID); err != nil {
 				panic(fmt.Errorf("error inserting resource body: %w", err))
@@ -415,7 +405,7 @@ func (this *ContractRepository) latestSnapshot(
 		panic(fmt.Errorf("error loading contract tree: %w", err))
 	}
 
-	return this.withSchemas(ctx, q, this.toPersistedContractTree(ctx, q, rows))
+	return this.withSchemasAndExtensions(ctx, q, this.toPersistedContractTree(ctx, q, rows))
 }
 
 func (this *ContractRepository) GetContractByNameAndVersion(
@@ -428,7 +418,7 @@ func (this *ContractRepository) GetContractByNameAndVersion(
 		panic(fmt.Errorf("error loading contract tree by name and version: %w", err))
 	}
 
-	return this.withSchemas(ctx, this.pool, this.toPersistedContractTree(ctx, this.pool, rows))
+	return this.withSchemasAndExtensions(ctx, this.pool, this.toPersistedContractTree(ctx, this.pool, rows))
 }
 
 func (this *ContractRepository) GetContractByIDAndVersion(
@@ -441,7 +431,7 @@ func (this *ContractRepository) GetContractByIDAndVersion(
 		panic(fmt.Errorf("error loading contract tree by id and version: %w", err))
 	}
 
-	contract, found := this.withSchemas(ctx, this.pool, this.toPersistedContractTree(ctx, this.pool, rows))
+	contract, found := this.withSchemasAndExtensions(ctx, this.pool, this.toPersistedContractTree(ctx, this.pool, rows))
 	if !found {
 		panic(fmt.Errorf("contract %d has no version %q", contractID, version))
 	}
@@ -449,7 +439,7 @@ func (this *ContractRepository) GetContractByIDAndVersion(
 	return contract
 }
 
-func (this *ContractRepository) withSchemas(
+func (this *ContractRepository) withSchemasAndExtensions(
 	ctx context.Context,
 	q Querier,
 	contract *model.PersistedContract,
@@ -459,9 +449,10 @@ func (this *ContractRepository) withSchemas(
 	}
 
 	contract.Schemas = this.loadSchemasAt(ctx, q, schemaCatalogs{}, contract.ID)
+	contract.Extensions = this.loadExtensions(ctx, q, contract.ID)
 
 	for hash, resource := range contract.Resources {
-		resource.Schemas = contract.Schemas
+		resource.Schemas = model.CatalogFor(contract.Schemas, resource.Bodies)
 		contract.Resources[hash] = resource
 	}
 
@@ -469,17 +460,18 @@ func (this *ContractRepository) withSchemas(
 }
 
 func (this *ContractRepository) toPersistedContractTree(ctx context.Context, q Querier, rows pgx.Rows) *model.PersistedContract {
-	var contract *model.PersistedContract
-
 	tableRows := scanTableRows(rows)
-	identities := this.identitiesOf(ctx, q, tableRows)
+	if len(tableRows) == 0 {
+		return nil
+	}
 
-	for _, row := range tableRows {
-		if contract == nil {
-			contract = row.toPersistedContractModel()
-		}
+	contract := tableRows[0].toPersistedContractModel()
 
-		resource := row.toResourceModel(identities[row.ResourceID])
+	resourceRows := slices.DeleteFunc(tableRows, func(row tableRow) bool { return !row.ResourceID.Valid })
+	identities := this.identitiesOf(ctx, q, resourceRows)
+
+	for _, row := range resourceRows {
+		resource := row.toResourceModel(identities[row.ResourceID.Int64])
 		contract.Resources[resource.PrimaryHash()] = resource
 	}
 

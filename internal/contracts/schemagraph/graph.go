@@ -7,17 +7,34 @@ import (
 )
 
 type Site struct {
-	Schema string
-	Path   string
+	Namespace string
+	Schema    string
+	Path      string
 }
 
 type Graph struct {
-	catalog  model.Schemas
-	segments map[string]map[string][]string
+	catalog   map[string]model.Schemas
+	segments  map[Site]map[string][]string
+	fieldName func(site Site) (name string, named bool)
+	typeName  func(node Node) (name string, named bool)
 }
 
-func New(catalog model.Schemas) *Graph {
-	return &Graph{catalog: catalog, segments: map[string]map[string][]string{}}
+func New(catalog map[string]model.Schemas) *Graph {
+	return &Graph{catalog: catalog, segments: map[Site]map[string][]string{}}
+}
+
+// A site fieldName leaves unnamed keeps its schema's name.
+func (this *Graph) NamingFields(fieldName func(site Site) (name string, named bool)) *Graph {
+	this.fieldName = fieldName
+
+	return this
+}
+
+// A node typeName leaves unnamed keeps the core's type token.
+func (this *Graph) NamingTypes(typeName func(node Node) (name string, named bool)) *Graph {
+	this.typeName = typeName
+
+	return this
 }
 
 // A `~` body declares nothing, so for senders it leaves the body itself optional.
@@ -31,7 +48,7 @@ func (this *Graph) Root(bodies []model.ResourceBody, join Join) Node {
 			continue
 		}
 
-		root.declarations = append(root.declarations, this.declaration(body.Source, Site{Schema: body.SchemaName.String}))
+		root.declarations = append(root.declarations, this.declaration(body.Source, Site{Namespace: body.Namespace, Schema: body.SchemaName.String}))
 	}
 
 	return root
@@ -39,22 +56,33 @@ func (this *Graph) Root(bodies []model.ResourceBody, join Join) Node {
 
 // An undeclared schema or a schema met twice ends the chain on a field without a type.
 func (this *Graph) declaration(source string, site Site) declaration {
-	field, declared := this.catalog[site.Schema][site.Path]
-	resolved := declaration{source: source, site: site, shape: site, fieldType: field.Type, members: field.Members, optional: field.Optional, nullable: field.Nullable}
+	field, declared := this.field(site)
+	resolved := declaration{
+		source:    source,
+		site:      site,
+		shape:     site,
+		fieldType: field.Type,
+		members:   field.Members,
+		scalar:    field.Scalar,
+		arguments: field.Arguments,
+		optional:  field.Optional,
+		nullable:  field.Nullable,
+	}
 	visited := []Site{site}
 
 	for declared && field.Ref != "" {
-		target := Site{Schema: field.Ref}
+		target := Site{Namespace: site.Namespace, Schema: field.Ref}
 		if slices.Contains(visited, target) {
 			break
 		}
 
 		visited = append(visited, target)
-		field, declared = this.catalog[target.Schema][target.Path]
+		field, declared = this.field(target)
 
 		resolved.shape = target
 		resolved.fieldType = field.Type
 		resolved.members = field.Members
+		resolved.scalar = field.Scalar
 		resolved.optional = resolved.optional || field.Optional
 		resolved.nullable = resolved.nullable || field.Nullable
 	}
@@ -63,19 +91,26 @@ func (this *Graph) declaration(source string, site Site) declaration {
 }
 
 func (this *Graph) childSegments(shape Site) []string {
-	bySchema, indexed := this.segments[shape.Schema]
+	schema := Site{Namespace: shape.Namespace, Schema: shape.Schema}
+	bySchema, indexed := this.segments[schema]
 	if !indexed {
-		bySchema = segmentsByParent(this.catalog[shape.Schema])
-		this.segments[shape.Schema] = bySchema
+		bySchema = segmentsByParent(this.catalog[shape.Namespace][shape.Schema])
+		this.segments[schema] = bySchema
 	}
 
 	return bySchema[shape.Path]
 }
 
 func (this *Graph) declares(site Site) bool {
-	_, declared := this.catalog[site.Schema][site.Path]
+	_, declared := this.field(site)
 
 	return declared
+}
+
+func (this *Graph) field(site Site) (model.Field, bool) {
+	field, declared := this.catalog[site.Namespace][site.Schema][site.Path]
+
+	return field, declared
 }
 
 func segmentsByParent(schema model.Schema) map[string][]string {

@@ -76,11 +76,11 @@ func assertPetsBreaks(t *testing.T, readByTheConsumer, providedByTheProvider mod
 			Body:             model.Output,
 			Identity:         restmodel.Identity{Endpoint: "/api/pets", Method: "get", Status: "200"},
 			ConsumedProvider: null.StringFrom(petsProviderName),
-			Bodies:           []model.ResourceBody{{Source: "spa.yaml", SchemaName: null.StringFrom("Pets")}},
+			Bodies:           []model.ResourceBody{{Source: "spa.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Pets")}},
 		},
 		ConsumerHash: null.StringFrom("spa-" + petsProviderHash),
 		ProviderHash: petsProviderHash,
-		Schemas:      model.Schemas{"Pets": readByTheConsumer},
+		Schemas:      map[string]model.Schemas{model.YAMLNamespace: model.Schemas{"Pets": readByTheConsumer}},
 	}
 	provider := model.PersistedResource{
 		Resource: model.Resource{
@@ -89,10 +89,10 @@ func assertPetsBreaks(t *testing.T, readByTheConsumer, providedByTheProvider mod
 			Protocol:        restmodel.Protocol,
 			Body:            model.Output,
 			Identity:        restmodel.Identity{Endpoint: "/api/pets", Method: "get", Status: "200"},
-			Bodies:          []model.ResourceBody{{Source: "api.yaml", SchemaName: null.StringFrom("Pets")}},
+			Bodies:          []model.ResourceBody{{Source: "api.yaml", Namespace: model.YAMLNamespace, SchemaName: null.StringFrom("Pets")}},
 		},
 		ProviderHash:       petsProviderHash,
-		Schemas:            model.Schemas{"Pets": providedByTheProvider},
+		Schemas:            map[string]model.Schemas{model.YAMLNamespace: model.Schemas{"Pets": providedByTheProvider}},
 		ParticipantVersion: null.StringFrom("1.0.0"),
 	}
 

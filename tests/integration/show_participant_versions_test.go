@@ -287,3 +287,13 @@ func (this *IntegrationSuite) TestShowParticipantVersions_CountsOnlyTheParticipa
 	this.Contains(body, `Checks <span class="count">0</span>`)
 	this.Contains(body, `Relations <span class="count">1</span>`)
 }
+
+func (this *IntegrationSuite) TestShowParticipantVersions_RestParticipantHasNoGraphLinksRow() {
+	this.seedForShowParticipantVersions()
+
+	status, _, body := this.getPage("/participants/petstore_web", this.signInAsAdmin())
+
+	this.Require().Equal(http.StatusOK, status, body)
+	this.NotContains(body, `/graphs/`)
+	this.NotContains(body, `badge wrap`)
+}

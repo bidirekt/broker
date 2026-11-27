@@ -67,7 +67,7 @@ func NewValidateContractUseCase(
 
 func (this *ValidateContractUseCase) Execute(ctx context.Context, input ValidateContractInput) (ValidateContractOutput, error) {
 	if input.EnvironmentName == "" {
-		return this.validateSyntax(input.Contracts), nil
+		return this.validateSyntax(ctx, input.Contracts), nil
 	}
 
 	participant, exists := this.participantRepository.FindByName(ctx, input.ParticipantName)
@@ -80,16 +80,11 @@ func (this *ValidateContractUseCase) Execute(ctx context.Context, input Validate
 		return ValidateContractOutput{Status: EnvironmentNotFound}, nil
 	}
 
-	fragments, shapeViolations, err := this.interpreter.ToFragments(input.Contracts)
-	if err != nil {
-		return ValidateContractOutput{Status: ContractFilesUnreadable, ReadError: err.Error()}, nil
+	uploadedContract, violations, readErr, err := this.interpreter.ToUploadedContract(input.Contracts, participant, "")
+	if readErr != nil {
+		return ValidateContractOutput{Status: ContractFilesUnreadable, ReadError: readErr.Error()}, nil
 	}
 
-	if len(shapeViolations) > 0 {
-		return ValidateContractOutput{Status: ContractValidationFailed, Violations: shapeViolations}, nil
-	}
-
-	uploadedContract, violations, err := this.interpreter.ToUploadedContract(fragments, participant, "", nil)
 	if len(violations) > 0 {
 		return ValidateContractOutput{Status: ContractValidationFailed, Violations: violations}, nil
 	}
@@ -101,6 +96,10 @@ func (this *ValidateContractUseCase) Execute(ctx context.Context, input Validate
 	removedResources := this.toRemovedSinceDeployed(ctx, participant, environment, uploadedContract)
 
 	localContract := toPersistedContract(uploadedContract, removedResources)
+
+	if refusal, refused := this.contractRepository.RefuseContractExtensions(ctx, localContract); refused {
+		return ValidateContractOutput{Status: ContractValidationFailed, Violations: []violation.Violation{violation.FromRefusal(refusal)}}, nil
+	}
 
 	counterparts := this.contractRepository.LoadCounterparts(ctx, localContract, environment.ID)
 	compatibilityReport := this.compatibilityChecker.Check(ctx, localContract, environment, counterparts)
@@ -114,18 +113,18 @@ func (this *ValidateContractUseCase) Execute(ctx context.Context, input Validate
 	}, nil
 }
 
-func (this *ValidateContractUseCase) validateSyntax(files []model.ContractFile) ValidateContractOutput {
-	fragments, shapeViolations, err := this.interpreter.ToFragments(files)
-	if err != nil {
-		return ValidateContractOutput{Status: ContractFilesUnreadable, ReadError: err.Error()}
+func (this *ValidateContractUseCase) validateSyntax(ctx context.Context, files []model.ContractFile) ValidateContractOutput {
+	extensions, violations, readErr := this.interpreter.ToViolations(files)
+	if readErr != nil {
+		return ValidateContractOutput{Status: ContractFilesUnreadable, ReadError: readErr.Error()}
 	}
 
-	if len(shapeViolations) > 0 {
-		return ValidateContractOutput{Status: ContractValidationFailed, Violations: shapeViolations}
-	}
-
-	if violations := this.interpreter.ToViolations(fragments); len(violations) > 0 {
+	if len(violations) > 0 {
 		return ValidateContractOutput{Status: ContractValidationFailed, Violations: violations}
+	}
+
+	if refusal, refused := this.contractRepository.RefuseContractExtensions(ctx, &model.PersistedContract{Extensions: extensions}); refused {
+		return ValidateContractOutput{Status: ContractValidationFailed, Violations: []violation.Violation{violation.FromRefusal(refusal)}}
 	}
 
 	return ValidateContractOutput{Status: ContractSyntaxValidated}
@@ -155,7 +154,7 @@ func toPersistedContract(
 	for hash, resource := range uploadedContract.Resources {
 		resources[hash] = model.PersistedResource{
 			Resource:     resource.Resource,
-			Schemas:      uploadedContract.Schemas,
+			Schemas:      model.CatalogFor(uploadedContract.Schemas, resource.Bodies),
 			ProviderHash: resource.ProviderHash(),
 		}
 	}
@@ -165,8 +164,10 @@ func toPersistedContract(
 	}
 
 	return &model.PersistedContract{
+		ParticipantID:   uploadedContract.ParticipantID,
 		ParticipantName: uploadedContract.ParticipantName,
 		Resources:       resources,
 		Schemas:         uploadedContract.Schemas,
+		Extensions:      uploadedContract.Extensions,
 	}
 }
