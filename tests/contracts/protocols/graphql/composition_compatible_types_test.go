@@ -136,6 +136,34 @@ type Dog implements Animal @shareable { friend: Animal }
 	assert.Equal(t, model.Schema{"": {Type: "object"}, "friend": {Ref: "Animal", Nullable: true}}, composed.Schemas["graphql"]["Dog"])
 }
 
+func compatibleTypesAnimalHolder(root, itemType string) string {
+	return `
+type Query { ` + root + `: Holder }
+type Holder @shareable { item: ` + itemType + ` }
+interface Node { id: ID! }
+interface Animal implements Node { id: ID! name: String }
+type Dog implements Animal & Node @shareable { id: ID! name: String }
+`
+}
+
+func TestToComposedGraph_AnInterfaceAndAnInterfaceThatImplementsIt_JoinAsTheWiderOne(t *testing.T) {
+	for _, order := range [][]string{{"Node", "Animal"}, {"Animal", "Node"}} {
+		composed, errors := graphqlcontracts.ToComposedGraph("petstore_graph", []*model.PersistedContract{
+			compatibleTypesMember(t, "petstore_api", "1.4.0", compatibleTypesAnimalHolder("api", order[0])),
+			compatibleTypesMember(t, "petstore_reviews", "2.0.0", compatibleTypesAnimalHolder("reviews", order[1])),
+		})
+		require.Empty(t, errors, order)
+
+		assert.Equal(t, model.Schema{"": {Type: "object"}, "item": {Ref: "Node", Nullable: true}}, composed.Schemas["graphql"]["Holder"], order)
+		assert.Equal(t, model.Schema{"": {Type: "union"}, "id": {Type: "string", Scalar: "ID"}, "(Dog)": {Ref: "Dog"}}, composed.Schemas["graphql"]["Node"], order)
+	}
+}
+
+const compatibleTypesUnrelated = `
+type Plain @shareable { id: ID! }
+interface Loose { id: ID! }
+`
+
 func TestToComposedGraph_FieldsOfUnrelatedTypes_DoNotJoin(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -147,13 +175,14 @@ func TestToComposedGraph_FieldsOfUnrelatedTypes_DoNotJoin(t *testing.T) {
 		{"an interface and an object that doesn't implement it", "Node", "Plain", "petstore_api 1.4.0 resolves Holder.item as Node, but petstore_reviews 2.0.0 as Plain"},
 		{"two implementations of one interface", "Thing", "Other", "petstore_api 1.4.0 resolves Holder.item as Thing, but petstore_reviews 2.0.0 as Other"},
 		{"a list and its item", "[Thing]", "Node", "petstore_api 1.4.0 resolves Holder.item as [Thing], but petstore_reviews 2.0.0 as Node"},
+		{"an interface and another that doesn't implement it", "Node", "Loose", "petstore_api 1.4.0 resolves Holder.item as Node, but petstore_reviews 2.0.0 as Loose"},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			_, errors := graphqlcontracts.ToComposedGraph("petstore_graph", []*model.PersistedContract{
-				compatibleTypesMember(t, "petstore_api", "1.4.0", compatibleTypesHolder("api", tc.one)+"type Plain @shareable { id: ID! }\n"),
-				compatibleTypesMember(t, "petstore_reviews", "2.0.0", compatibleTypesHolder("reviews", tc.other)+"type Plain @shareable { id: ID! }\n"),
+				compatibleTypesMember(t, "petstore_api", "1.4.0", compatibleTypesHolder("api", tc.one)+compatibleTypesUnrelated),
+				compatibleTypesMember(t, "petstore_reviews", "2.0.0", compatibleTypesHolder("reviews", tc.other)+compatibleTypesUnrelated),
 			})
 
 			assert.Equal(t, []string{tc.expected}, errors)

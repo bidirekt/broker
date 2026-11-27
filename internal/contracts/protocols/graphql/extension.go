@@ -9,8 +9,9 @@ import (
 	graphqlmodel "github.com/bidirekt/broker/internal/model/protocols/graphql"
 )
 
-// The type info and the directives are sorted, so the same SDL split into other files, or with its directives in
-// another order, merges into the same extension. A contract belongs to one graph: the first one declared.
+// The type info, the implementations and the directives are sorted, so the same SDL split into other files, or with
+// its directives in another order, merges into the same extension. A contract belongs to one graph: the first one
+// declared.
 func (this Plugin) MergeExtensions(pieces []protocol.ExtensionPiece) (any, []violation.Violation) {
 	var merged graphqlmodel.Extension
 	var violations []violation.Violation
@@ -32,6 +33,7 @@ func (this Plugin) MergeExtensions(pieces []protocol.ExtensionPiece) (any, []vio
 		}
 
 		merged.Types = append(merged.Types, extension.Types...)
+		merged.Implementations = append(merged.Implementations, extension.Implementations...)
 		merged.Directives = append(merged.Directives, extension.Directives...)
 
 		merged.Federation1 = merged.Federation1 || extension.Federation1
@@ -42,6 +44,10 @@ func (this Plugin) MergeExtensions(pieces []protocol.ExtensionPiece) (any, []vio
 
 	slices.SortFunc(merged.Types, func(a, b graphqlmodel.TypeInfo) int {
 		return cmp.Compare(a.Coordinate, b.Coordinate)
+	})
+
+	slices.SortFunc(merged.Implementations, func(a, b graphqlmodel.Implementation) int {
+		return cmp.Or(cmp.Compare(a.Interface, b.Interface), cmp.Compare(a.Implements, b.Implements))
 	})
 
 	// One resolvable @key of a field set makes the type resolvable by it, whatever the order of its repetitions.

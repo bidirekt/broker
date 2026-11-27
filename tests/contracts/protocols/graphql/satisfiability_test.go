@@ -428,3 +428,154 @@ type Owner @key(fields: "id", resolvable: false) {
 
 	assert.Empty(t, errors)
 }
+
+const satisfiabilityUnionHolderSDL = `
+type Query {
+  %s: Holder @shareable
+}
+
+type Holder @shareable {
+  item: Result
+}
+
+union Result = Book
+
+type Book @shareable {
+  id: ID!
+}
+`
+
+const satisfiabilityBookHolderSDL = `
+type Query {
+  %s: Holder @shareable
+}
+
+type Holder @shareable {
+  item: Book
+}
+
+type Book @shareable {
+  id: ID!
+  title: String
+}
+`
+
+func TestToComposedGraph_AFieldOfTheMemberASubgraphReturnsForTheUnion_Composes(t *testing.T) {
+	errors := satisfiabilityErrors(
+		satisfiabilityMember(t, "petstore_api", "1.4.0", fmt.Sprintf(satisfiabilityUnionHolderSDL, "holder")),
+		satisfiabilityMember(t, "petstore_reviews", "2.0.0", fmt.Sprintf(satisfiabilityBookHolderSDL, "holder")),
+	)
+
+	assert.Empty(t, errors)
+}
+
+func TestToComposedGraph_AFieldOfTheMemberReachedOnlyFromTheSubgraphReturningTheUnion_CannotBeResolved(t *testing.T) {
+	errors := satisfiabilityErrors(
+		satisfiabilityMember(t, "petstore_api", "1.4.0", fmt.Sprintf(satisfiabilityUnionHolderSDL, "api")),
+		satisfiabilityMember(t, "petstore_reviews", "2.0.0", fmt.Sprintf(satisfiabilityBookHolderSDL, "reviews")),
+	)
+
+	assert.Equal(t, []string{"query api.item.title can't be resolved: no resolvable @key leads from petstore_api 1.4.0 to petstore_reviews 2.0.0 on Book"}, errors)
+}
+
+func TestToComposedGraph_AFieldOfTheImplementationASubgraphReturnsForTheInterface_Composes(t *testing.T) {
+	errors := satisfiabilityErrors(
+		satisfiabilityMember(t, "petstore_api", "1.4.0", `
+type Query {
+  holder: Holder @shareable
+}
+
+type Holder @shareable {
+  item: Node
+}
+
+interface Node {
+  id: ID!
+}
+
+type Thing implements Node @shareable {
+  id: ID!
+}
+`),
+		satisfiabilityMember(t, "petstore_reviews", "2.0.0", `
+type Query {
+  holder: Holder @shareable
+}
+
+type Holder @shareable {
+  item: Thing
+}
+
+type Thing @shareable {
+  id: ID!
+  rating: Int
+}
+`),
+	)
+
+	assert.Empty(t, errors)
+}
+
+const satisfiabilityNodeHolderSDL = `
+type Query {
+  %s: Holder @shareable
+}
+
+type Holder @shareable {
+  item: Node
+}
+
+interface Node {
+  id: ID!
+}
+
+type Dog implements Node @shareable {
+  id: ID!
+}
+`
+
+const satisfiabilityAnimalHolderSDL = `
+type Query {
+  %s: Holder @shareable
+}
+
+type Holder @shareable {
+  item: Animal
+}
+
+interface Node {
+  id: ID!
+}
+
+interface Animal implements Node {
+  id: ID!
+  name: String
+}
+
+type Dog implements Animal & Node @shareable {
+  id: ID!
+  name: String
+  color: String
+}
+`
+
+func TestToComposedGraph_FieldsOfAnImplementationASubgraphReturnsForAnInterfaceThatImplementsTheOther_Compose(t *testing.T) {
+	errors := satisfiabilityErrors(
+		satisfiabilityMember(t, "petstore_api", "1.4.0", fmt.Sprintf(satisfiabilityNodeHolderSDL, "holder")),
+		satisfiabilityMember(t, "petstore_reviews", "2.0.0", fmt.Sprintf(satisfiabilityAnimalHolderSDL, "holder")),
+	)
+
+	assert.Empty(t, errors)
+}
+
+func TestToComposedGraph_FieldsOfAnImplementationReachedOnlyFromTheSubgraphReturningTheWiderInterface_CannotBeResolved(t *testing.T) {
+	errors := satisfiabilityErrors(
+		satisfiabilityMember(t, "petstore_api", "1.4.0", fmt.Sprintf(satisfiabilityNodeHolderSDL, "api")),
+		satisfiabilityMember(t, "petstore_reviews", "2.0.0", fmt.Sprintf(satisfiabilityAnimalHolderSDL, "reviews")),
+	)
+
+	assert.Equal(t, []string{
+		"query api.item.color can't be resolved: no resolvable @key leads from petstore_api 1.4.0 to petstore_reviews 2.0.0 on Dog",
+		"query api.item.name can't be resolved: no resolvable @key leads from petstore_api 1.4.0 to petstore_reviews 2.0.0 on Dog",
+	}, errors)
+}

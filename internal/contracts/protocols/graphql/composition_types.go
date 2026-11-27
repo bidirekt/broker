@@ -261,12 +261,13 @@ func (this *composition) related(one, other string) bool {
 	return one == other || this.isMemberOf(one, other) || this.isMemberOf(other, one)
 }
 
-// isMemberOf tells whether a subgraph declares the type a member of the union, or an implementation of the interface.
+// isMemberOf tells whether a subgraph declares the type a member of the union, or an implementation of the interface,
+// an interface that implements it included.
 func (this *composition) isMemberOf(typeName, supertype string) bool {
 	return slices.ContainsFunc(this.subgraphs, func(member subgraph) bool {
 		_, declared := member.schemas[supertype][model.MemberSegment(typeName)]
 
-		return declared
+		return declared || slices.Contains(member.implements[typeName], supertype)
 	})
 }
 

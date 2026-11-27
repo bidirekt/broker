@@ -91,6 +91,10 @@ func (this *sdlDeclarations) addDefinition(definition *ast.Definition) {
 		this.addDirectives(definition.Name+"."+value.Name, value.Directives)
 	}
 
+	if definition.Kind == ast.Interface {
+		this.addImplementations(definition)
+	}
+
 	for _, field := range this.declaredFields(definition) {
 		coordinate := definition.Name + "." + field.Name
 		this.addTypeInfo(field.Position, coordinate, graphqlmodel.FieldKind, field.Type.Name())
@@ -163,6 +167,14 @@ func (this *sdlDeclarations) addSchema(position *ast.Position, name string, sche
 		Schema:        schema,
 		KeepUnreached: true,
 	})
+}
+
+// GraphQL makes an interface also list what its interfaces implement, so the list is transitive.
+func (this *sdlDeclarations) addImplementations(definition *ast.Definition) {
+	piece := this.pieceOf(definition.Position.Src.Name)
+	for _, implemented := range definition.Interfaces {
+		piece.Implementations = append(piece.Implementations, graphqlmodel.Implementation{Interface: definition.Name, Implements: implemented})
+	}
 }
 
 func (this *sdlDeclarations) addTypeInfo(position *ast.Position, coordinate, kind, namedType string) {

@@ -13,11 +13,12 @@ import (
 )
 
 // reach is a type a query gets to, with the subgraphs that can be at it: the ones that resolved the field leading
-// there, each with what the @provides on the path select from it below.
+// there, each with what the @provides on the path select from it below, and the type it declares the field returns.
 type reach struct {
 	typeName  string
 	at        []subgraph
 	provided  map[string]ast.SelectionSet
+	own       map[string]string
 	operation string
 	path      []string
 }
@@ -25,7 +26,7 @@ type reach struct {
 func (this reach) key() string {
 	names := make([]string, 0, len(this.at))
 	for _, member := range this.at {
-		names = append(names, strings.TrimSpace(member.name+" "+formatSelections(this.provided[member.name])))
+		names = append(names, strings.TrimSpace(member.name+" "+this.own[member.name]+" "+formatSelections(this.provided[member.name])))
 	}
 
 	return this.typeName + " " + strings.Join(names, " ")
@@ -35,14 +36,16 @@ func (this reach) key() string {
 // under it, and what the field's own @provides selects.
 func (this reach) below(field, coordinate, typeName string, at []subgraph) reach {
 	provided := make(map[string]ast.SelectionSet, len(at))
+	own := make(map[string]string, len(at))
 	for _, member := range at {
+		own[member.name] = member.namedTypes[coordinate]
 		selected, _ := member.selectedUnder(this.provided[member.name], this.typeName, field)
 		if selections := slices.Concat(selected, member.provides[coordinate]); len(selections) > 0 {
 			provided[member.name] = selections
 		}
 	}
 
-	return reach{typeName: typeName, at: at, provided: provided, operation: this.operation, path: append(slices.Clone(this.path), field)}
+	return reach{typeName: typeName, at: at, provided: provided, own: own, operation: this.operation, path: append(slices.Clone(this.path), field)}
 }
 
 // checkSatisfiability walks every query the graph allows, from the root fields down, and reports once each field a
@@ -110,7 +113,8 @@ func (this *composition) reachFields(current reach, unresolved map[string]bool) 
 	return next
 }
 
-// A subgraph returns, for a union or an interface, only the members it declares.
+// A subgraph returns, for a union or an interface, only the members it declares, or the member itself when its field
+// returns that member, not the union or the interface the graph joins the field in.
 func (this *composition) reachMembers(current reach) []reach {
 	var next []reach
 	for _, segment := range slices.Sorted(maps.Keys(this.schemas[current.typeName])) {
@@ -121,7 +125,7 @@ func (this *composition) reachMembers(current reach) []reach {
 		at := slices.DeleteFunc(slices.Clone(current.at), func(member subgraph) bool {
 			_, declares := member.schemas[current.typeName][segment]
 
-			return !declares
+			return !declares && current.own[member.name] != model.MemberKey(segment)
 		})
 
 		if len(at) > 0 {

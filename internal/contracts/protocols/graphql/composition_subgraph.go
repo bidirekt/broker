@@ -12,16 +12,17 @@ import (
 )
 
 // subgraph is a member of a graph as the composition reads it: its schemas, the kind and named type of each
-// coordinate, its federation directives, the coordinates its @key field sets name, the fields another subgraph
-// takes over with @override, the from of each @override that names no member of the graph, the field set each
-// @provides selects, its roots, the roots it names otherwise while a type of its own takes their default name, and
-// whether it is a Federation 1 subgraph.
+// coordinate, the interfaces each interface implements, its federation directives, the coordinates its @key field
+// sets name, the fields another subgraph takes over with @override, the from of each @override that names no member
+// of the graph, the field set each @provides selects, its roots, the roots it names otherwise while a type of its own
+// takes their default name, and whether it is a Federation 1 subgraph.
 type subgraph struct {
 	name           string
 	label          string
 	schemas        model.Schemas
 	kinds          map[string]string
 	namedTypes     map[string]string
+	implements     map[string][]string
 	directives     map[string][]graphqlmodel.Directive
 	keyFields      map[string]bool
 	overridden     map[string]bool
@@ -42,6 +43,7 @@ func toSubgraph(contract *model.PersistedContract) subgraph {
 		schemas:        roots.toSchemas(contract.Schemas[graphqlmodel.Namespace]),
 		kinds:          make(map[string]string, len(extension.Types)),
 		namedTypes:     make(map[string]string, len(extension.Types)),
+		implements:     map[string][]string{},
 		directives:     map[string][]graphqlmodel.Directive{},
 		keyFields:      map[string]bool{},
 		overridden:     map[string]bool{},
@@ -56,6 +58,10 @@ func toSubgraph(contract *model.PersistedContract) subgraph {
 		coordinate := roots.toCoordinate(info.Coordinate)
 		member.kinds[coordinate] = info.Kind
 		member.namedTypes[coordinate] = roots.toTypeName(info.NamedType)
+	}
+
+	for _, implementation := range extension.Implementations {
+		member.implements[implementation.Interface] = append(member.implements[implementation.Interface], implementation.Implements)
 	}
 
 	for _, directive := range extension.Directives {
