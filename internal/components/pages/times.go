@@ -41,10 +41,6 @@ func ListTime(at, now time.Time) string {
 	return at.UTC().Format(dateLayout)
 }
 
-func DetailTime(at, now time.Time) string {
-	return at.UTC().Format(minuteLayout) + " · " + RelativeTime(at, now)
-}
-
 func ExpiryTime(at time.Time) string {
 	return at.UTC().Format(minuteLayout)
 }
@@ -56,9 +52,13 @@ func MachineTime(at time.Time) string {
 func timeFuncs(now func() time.Time) template.FuncMap {
 	return template.FuncMap{
 		"listTime":   func(at time.Time) template.HTML { return timeElement(at, ListTime(at, now())) },
-		"detailTime": func(at time.Time) template.HTML { return timeElement(at, DetailTime(at, now())) },
+		"detailTime": func(at time.Time) template.HTML { return detailTimeElements(at, now()) },
 		"expiryTime": func(at time.Time) template.HTML { return timeElement(at, ExpiryTime(at)) },
 	}
+}
+
+func detailTimeElements(at, now time.Time) template.HTML {
+	return timeElement(at, at.UTC().Format(minuteLayout)) + template.HTML(` <span class="time">· `+RelativeTime(at, now)+`</span>`)
 }
 
 func timeElement(at time.Time, text string) template.HTML {
