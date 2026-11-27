@@ -219,7 +219,7 @@ func (this *IntegrationSuite) TestShowGraph_AGraphThatDoesNotCompose_ListsEveryE
 	this.Contains(production, showGraphDoesNotCompose)
 	this.Contains(production, showGraphMemberRow("petstore_api", "1.4.0"))
 	this.Contains(production, showGraphMemberRow("petstore_orders", "1.0.0"))
-	this.Contains(production, `<ul class="list">
+	this.Contains(production, `<ul class="list errors">
     <li>petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.amount without @shareable</li><li>petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.currency without @shareable</li>
   </ul>`)
 }
@@ -234,7 +234,7 @@ func (this *IntegrationSuite) TestShowGraph_ASubgraphWhoseRenamedQueryRootLeaves
 	production := this.environmentSectionForShowGraph(this.graphPageForShowGraph(), "production")
 
 	this.Contains(production, showGraphDoesNotCompose)
-	this.Contains(production, `<ul class="list">
+	this.Contains(production, `<ul class="list errors">
     <li>petstore_api 1.4.0 has a type named Query, but its query root is RootQuery (ROOT_QUERY_USED)</li>
   </ul>`)
 }
@@ -249,7 +249,7 @@ func (this *IntegrationSuite) TestShowGraph_MembersWithAnOverrideACustomRootAndD
 	production := this.environmentSectionForShowGraph(this.graphPageForShowGraph(), "production")
 
 	this.Contains(production, showGraphComposes)
-	this.NotContains(production, `<ul class="list">`)
+	this.NotContains(production, `<ul class="list errors">`)
 	this.Contains(production, showGraphMemberRow("petstore_api", "1.4.0"))
 	this.Contains(production, showGraphMemberRow("petstore_reviews", "2.0.0"))
 	for _, definition := range []string{"FieldSet", "link__Import", "link__Purpose", "RootQuery"} {
