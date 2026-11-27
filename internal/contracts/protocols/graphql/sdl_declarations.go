@@ -186,6 +186,8 @@ func (this *sdlDeclarations) addDirectives(coordinate string, directives ast.Dir
 			if resolvable := directive.Arguments.ForName("resolvable"); resolvable != nil {
 				kept.Resolvable = resolvable.Value.Raw != "false"
 			}
+		case graphqlmodel.ProvidesDirective:
+			kept.Fields = toNormalizedFieldSet(fieldsOf(directive).Raw)
 		case graphqlmodel.OverrideDirective:
 			if from := directive.Arguments.ForName("from"); from != nil {
 				kept.From = from.Value.Raw

@@ -286,6 +286,53 @@ type Pet @key(fields: "id") {
 	}, merged.Directives)
 }
 
+func TestSDLFormat_Federation_AProvides_IsKeptWithANormalizedFieldSet(t *testing.T) {
+	merged := mergedDirectives(t, model.ContractFile{Source: "schema.graphqls", Content: `extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key", "@external", "@provides"])
+
+type Query {
+  me: User @provides(fields: "name")
+  items: [Item!]! @provides(fields: "...on Book{title}")
+  reviews: [Review!]!
+}
+
+type Review {
+  id: ID!
+  author: User @provides(fields: " name,address{city} ")
+}
+
+type User @key(fields: "id") {
+  id: ID!
+  name: String @external
+  address: Address @external
+}
+
+type Address {
+  city: String @external
+}
+
+interface Item {
+  id: ID!
+}
+
+type Book implements Item @key(fields: "id") {
+  id: ID!
+  title: String @external
+}
+`})
+
+	assert.Equal(t, []graphqlmodel.Directive{
+		{Coordinate: "Address.city", Directive: "external", Resolvable: true},
+		{Coordinate: "Book", Directive: "key", Fields: "id", Resolvable: true},
+		{Coordinate: "Book.title", Directive: "external", Resolvable: true},
+		{Coordinate: "Query.items", Directive: "provides", Fields: "... on Book { title }", Resolvable: true},
+		{Coordinate: "Query.me", Directive: "provides", Fields: "name", Resolvable: true},
+		{Coordinate: "Review.author", Directive: "provides", Fields: "name address { city }", Resolvable: true},
+		{Coordinate: "User", Directive: "key", Fields: "id", Resolvable: true},
+		{Coordinate: "User.address", Directive: "external", Resolvable: true},
+		{Coordinate: "User.name", Directive: "external", Resolvable: true},
+	}, merged.Directives)
+}
+
 func TestSDLFormat_Federation_TheLabelOfAnOverride_IsReadAndDropped(t *testing.T) {
 	overriding := func(arguments string) []graphqlmodel.Directive {
 		return mergedDirectives(t, model.ContractFile{Source: "schema.graphqls", Content: `extend schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@override"])

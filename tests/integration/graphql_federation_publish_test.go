@@ -153,6 +153,47 @@ extend type Pet @key(fields: "id") {
 	this.Equal(1, this.countRows("graphql_federation_directives"))
 }
 
+func (this *IntegrationSuite) TestGraphQLFederationPublish_AFederation2SubgraphWithAnEmptyQueryIsPublished() {
+	sdl := `extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key"])
+
+type Query
+
+type Pet @key(fields: "id") {
+  id: ID!
+  reviews: [String!]!
+}
+`
+	status, body := this.publishFederatedSubgraph(sdl)
+
+	this.Equal(http.StatusOK, status, body)
+	this.Equal(1, this.countRows("contracts"))
+	this.Equal(0, this.countRows("graphql_resources"))
+}
+
+func (this *IntegrationSuite) TestGraphQLFederationPublish_AFederation1SubgraphWithAnEmptyQueryIsPublished() {
+	sdl := `schema {
+  query: Query
+}
+
+type Product @extends @key(fields : "id") {
+  id: ID!
+  reviews: [Review!]!
+}
+
+type Query
+
+type Review {
+  id: ID!
+  text: String!
+}
+`
+	status, body := this.publishFederatedSubgraph(sdl)
+
+	this.Equal(http.StatusOK, status, body)
+	this.Equal(1, this.countRows("contracts"))
+	this.Equal(0, this.countRows("graphql_resources"))
+}
+
 func (this *IntegrationSuite) TestGraphQLFederationPublish_AFederation2SubgraphIsNotMarkedFederation1() {
 	status, body := this.publishFederatedSubgraph(federationPublishSubgraphSDL)
 	this.Require().Equal(http.StatusOK, status, body)

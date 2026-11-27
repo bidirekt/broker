@@ -55,7 +55,12 @@ var typeSystemLocations = []ast.DirectiveLocation{
 // may print them; none is part of the API.
 var federationOperationTypes = []string{"_Any", "_Entity", "_Service"}
 
-var federationOperationFields = []string{"_service", "_entities"}
+const serviceField = "_service"
+
+var federationOperationFields = []string{serviceField, "_entities"}
+
+const serviceDefinitions = `type _Service { sdl: String }
+`
 
 // specLink is one @link: the namespace the elements of its spec take when not imported, and the name the SDL uses
 // for each element it can use.
@@ -137,6 +142,10 @@ func toFederation(sources []*ast.Source, inGraph bool) (federation, error) {
 	}
 
 	addUndefined(definitions, toAcceptedDefinitions(documents, accepted, found.otherLinks), defined)
+	if found.federated() {
+		addServiceField(definitions, documents, defined)
+	}
+
 	found.sharedByTheType = toSharedByTheType(documents, found.localNamesOf("@"+graphqlmodel.ShareableDirective))
 	found.keysOnExtension = toKeysOnExtension(documents, found.localNamesOf("@"+graphqlmodel.KeyDirective))
 
@@ -145,6 +154,50 @@ func toFederation(sources []*ast.Source, inGraph bool) (federation, error) {
 	found.definitions = &ast.Source{Name: federationNamespace, Input: text.String(), BuiltIn: true}
 
 	return found, nil
+}
+
+// Apollo adds _service to the query root of every subgraph, so a subgraph's query root may declare no field of its
+// own. A query root the SDL does not define as an object, or that already prints _service, is left as written.
+func addServiceField(definitions *ast.SchemaDocument, documents []*ast.SchemaDocument, defined map[string]bool) {
+	root := queryRootName(documents)
+	if !definesObject(documents, root) || declaresField(documents, root, serviceField) {
+		return
+	}
+
+	addUndefined(definitions, parseEmbedded(serviceDefinitions), defined)
+	definitions.Extensions = append(definitions.Extensions, &ast.Definition{Kind: ast.Object, Name: root, Fields: ast.FieldList{
+		{Name: serviceField, Type: ast.NonNullNamedType("_Service", nil)},
+	}})
+}
+
+func queryRootName(documents []*ast.SchemaDocument) string {
+	for _, document := range documents {
+		for _, schema := range slices.Concat(document.Schema, document.SchemaExtension) {
+			for _, operation := range schema.OperationTypes {
+				if operation.Operation == ast.Query {
+					return operation.Type
+				}
+			}
+		}
+	}
+
+	return "Query"
+}
+
+func definesObject(documents []*ast.SchemaDocument, name string) bool {
+	return slices.ContainsFunc(documents, func(document *ast.SchemaDocument) bool {
+		definition := document.Definitions.ForName(name)
+
+		return definition != nil && definition.Kind == ast.Object
+	})
+}
+
+func declaresField(documents []*ast.SchemaDocument, typeName, field string) bool {
+	return slices.ContainsFunc(documents, func(document *ast.SchemaDocument) bool {
+		return slices.ContainsFunc(slices.Concat(document.Definitions, document.Extensions), func(declaration *ast.Definition) bool {
+			return declaration.Name == typeName && declaration.Fields.ForName(field) != nil
+		})
+	})
 }
 
 // gqlparser merges a type with its extensions, so only the documents tell which declaration a field and a @shareable
@@ -435,7 +488,7 @@ func errorAtDirective(directive *ast.Directive, message string, args ...any) err
 // countedDirectives maps the local name of each directive the composition counts to its federation name.
 func (this federation) countedDirectives() map[string]string {
 	counted := map[string]string{}
-	for _, directive := range []string{graphqlmodel.KeyDirective, graphqlmodel.ShareableDirective, graphqlmodel.InaccessibleDirective, graphqlmodel.ExternalDirective, graphqlmodel.OverrideDirective} {
+	for _, directive := range []string{graphqlmodel.KeyDirective, graphqlmodel.ShareableDirective, graphqlmodel.InaccessibleDirective, graphqlmodel.ExternalDirective, graphqlmodel.OverrideDirective, graphqlmodel.ProvidesDirective} {
 		for _, name := range this.localNamesOf("@" + directive) {
 			counted[name] = directive
 		}

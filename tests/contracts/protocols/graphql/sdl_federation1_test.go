@@ -62,6 +62,7 @@ func TestSDLFormat_Federation1_ASubgraphWithoutALink_IsReadWithTheFederation1Dir
 		{Coordinate: "Pet", Directive: "key", Fields: "id", Resolvable: true},
 		{Coordinate: "Pet.name", Directive: "external", Resolvable: true},
 		{Coordinate: "Review", Directive: "key", Fields: "id", Resolvable: true},
+		{Coordinate: "Review.pet", Directive: "provides", Fields: "name", Resolvable: true},
 	}, extension.Directives)
 	assert.ElementsMatch(t, []string{"Pet", "Query", "Review", "Query:topReviews:arguments", "Query:topReviews:returns"}, subgraphSchemaNames(declarations))
 }

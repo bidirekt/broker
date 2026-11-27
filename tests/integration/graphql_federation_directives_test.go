@@ -3,6 +3,7 @@ package integration_test
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	graphqlmodel "github.com/bidirekt/broker/internal/model/protocols/graphql"
 	"github.com/bidirekt/broker/internal/repository"
@@ -74,6 +75,60 @@ var directivesTypeInfo = []graphqlmodel.TypeInfo{
 	{Coordinate: "Query", Kind: "object"},
 	{Coordinate: "Query.pet", Kind: "field", NamedType: "Pet"},
 	{Coordinate: "Query.pet(id:)", Kind: "argument", NamedType: "ID"},
+}
+
+const directivesProvidesSDL = `extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key", "@external", "@provides"])
+
+type Query {
+  reviews: [Review!]!
+}
+
+type Review {
+  id: ID!
+  author: Owner @provides(fields: "name address { city }")
+  editor: Owner
+}
+
+type Owner @key(fields: "id") {
+  id: ID!
+  name: String @external
+  address: Address @external
+}
+
+type Address {
+  city: String @external
+}
+`
+
+const directivesProvidesReorderedSDL = `extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@provides", "@external", "@key"])
+
+type Address {
+  city: String @external
+}
+
+type Owner @key(fields: "id") {
+  id: ID!
+  name: String @external
+  address: Address @external
+}
+
+type Review {
+  id: ID!
+  author: Owner @provides(fields: "name,address{city}")
+  editor: Owner
+}
+
+type Query {
+  reviews: [Review!]!
+}
+`
+
+var directivesProvidesStored = []graphqlmodel.Directive{
+	{Coordinate: "Address.city", Directive: "external", Resolvable: true},
+	{Coordinate: "Owner", Directive: "key", Fields: "id", Resolvable: true},
+	{Coordinate: "Owner.address", Directive: "external", Resolvable: true},
+	{Coordinate: "Owner.name", Directive: "external", Resolvable: true},
+	{Coordinate: "Review.author", Directive: "provides", Fields: "name address { city }", Resolvable: true},
 }
 
 func (this *IntegrationSuite) publishDirectivesSubgraph(version string, fragments ...contractFragment) {
@@ -330,6 +385,33 @@ type Pet @key(fields: "id") {
 		{Coordinate: "Pet", Directive: "key", Fields: "id", Resolvable: true},
 		{Coordinate: "Pet.rating", Directive: "override", From: "petstore_orders", Resolvable: true},
 	}, this.storedDirectives())
+}
+
+func (this *IntegrationSuite) TestGraphQLFederationDirectives_AProvides_IsStoredWithItsFieldSetAndLoadedWithTheContract() {
+	this.createDirectivesParticipant()
+	this.publishDirectivesSubgraph("1", contractFragment{"graph.yaml", directivesGraphYAML}, contractFragment{"schema.graphqls", directivesProvidesSDL})
+
+	repo := repository.NewContractRepository(this.Pool, repository.Protocols{
+		Tables:     []repository.ProtocolTable{graphqlrepository.New()},
+		Extensions: []repository.ContractExtensionStore{graphqlrepository.New()},
+	})
+	contract, found := repo.GetContractByNameAndVersion(context.Background(), "petstore_api", "1")
+	this.Require().True(found)
+
+	this.Equal(directivesProvidesStored, this.storedDirectives())
+	this.Equal(directivesProvidesStored, contract.Extensions["graphql"].(graphqlmodel.Extension).Directives)
+}
+
+func (this *IntegrationSuite) TestGraphQLFederationDirectives_AProvides_CountsInTheChecksumButNotTheOrderOrSpacing() {
+	this.createDirectivesParticipant()
+	providedByTheEditorToo := strings.Replace(directivesProvidesSDL, "editor: Owner\n", `editor: Owner @provides(fields: "name")`+"\n", 1)
+
+	this.publishDirectivesSubgraph("1", contractFragment{"graph.yaml", directivesGraphYAML}, contractFragment{"schema.graphqls", directivesProvidesSDL})
+	this.publishDirectivesSubgraph("2", contractFragment{"graph.yaml", directivesGraphYAML}, contractFragment{"schema.graphqls", directivesProvidesReorderedSDL})
+	this.publishDirectivesSubgraph("3", contractFragment{"graph.yaml", directivesGraphYAML}, contractFragment{"schema.graphqls", providedByTheEditorToo})
+
+	this.Equal(2, this.countRows("contracts"))
+	this.Equal(3, this.countRows("contract_versions"))
 }
 
 func (this *IntegrationSuite) TestGraphQLFederationDirectives_ALoadedContract_CarriesTheRootTypesTheSchemaDefinitionNames() {

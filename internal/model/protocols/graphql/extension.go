@@ -17,6 +17,7 @@ const (
 	InaccessibleDirective = "inaccessible"
 	ExternalDirective     = "external"
 	OverrideDirective     = "override"
+	ProvidesDirective     = "provides"
 )
 
 // Extension is what the SDL keeps that the schemas lose: whether a type is an input, the GraphQL name of a
@@ -47,8 +48,8 @@ type TypeInfo struct {
 	NamedType  string `json:"namedType,omitempty"`
 }
 
-// Directive is a federation directive that counts in the composition; Fields is the field set of a @key, From
-// the subgraph an @override takes the field from.
+// Directive is a federation directive that counts in the composition; Fields is the field set of a @key or a
+// @provides, From the subgraph an @override takes the field from.
 type Directive struct {
 	Coordinate string `json:"coordinate"`
 	Directive  string `json:"directive"`
