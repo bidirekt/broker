@@ -226,7 +226,8 @@ func (this *composition) strayOverrideOf(coordinate string, pair ...subgraph) st
 	return ""
 }
 
-// Outputs of the same type join, nullable where any subgraph returns null.
+// Outputs join when they have the same list depth and the same type, or when one is a member or an implementation of
+// the other in any subgraph: the field takes the wider type, nullable where any subgraph returns null.
 func (this *composition) joinOutputs(schemaName, property, coordinate string, resolvers []subgraph) (typed, bool) {
 	first, _ := resolvers[0].typedAt(schemaName, property, coordinate)
 	joined := typed{levels: slices.Clone(first.levels), named: first.named}
@@ -234,19 +235,39 @@ func (this *composition) joinOutputs(schemaName, property, coordinate string, re
 
 	for _, other := range resolvers[1:] {
 		declared, _ := other.typedAt(schemaName, property, coordinate)
-		if !declared.sameShape(first) {
+		if len(declared.levels) != len(joined.levels) || !this.related(joined.named, declared.named) {
 			this.addError(coordinate, fmt.Sprintf("%s resolves %s as %s, but %s as %s", resolvers[0].label, coordinate, first, other.label, declared), resolvers[0], other)
 			joins = false
 
 			continue
 		}
 
-		for index := range joined.levels {
-			joined.levels[index].Nullable = joined.levels[index].Nullable || declared.levels[index].Nullable
+		wider := joined
+		if this.isMemberOf(joined.named, declared.named) {
+			wider = typed{levels: slices.Clone(declared.levels), named: declared.named}
 		}
+
+		for index := range wider.levels {
+			wider.levels[index].Nullable = joined.levels[index].Nullable || declared.levels[index].Nullable
+		}
+
+		joined = wider
 	}
 
 	return joined, joins
+}
+
+func (this *composition) related(one, other string) bool {
+	return one == other || this.isMemberOf(one, other) || this.isMemberOf(other, one)
+}
+
+// isMemberOf tells whether a subgraph declares the type a member of the union, or an implementation of the interface.
+func (this *composition) isMemberOf(typeName, supertype string) bool {
+	return slices.ContainsFunc(this.subgraphs, func(member subgraph) bool {
+		_, declared := member.schemas[supertype][model.MemberSegment(typeName)]
+
+		return declared
+	})
 }
 
 // A field keeps its arguments schema only when an argument is left after the intersection.

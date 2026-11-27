@@ -13,8 +13,9 @@ import (
 
 // subgraph is a member of a graph as the composition reads it: its schemas, the kind and named type of each
 // coordinate, its federation directives, the coordinates its @key field sets name, the fields another subgraph
-// takes over with @override, the from of each @override that names no member of the graph, its roots, the roots it
-// names otherwise while a type of its own takes their default name, and whether it is a Federation 1 subgraph.
+// takes over with @override, the from of each @override that names no member of the graph, the field set each
+// @provides selects, its roots, the roots it names otherwise while a type of its own takes their default name, and
+// whether it is a Federation 1 subgraph.
 type subgraph struct {
 	name           string
 	label          string
@@ -25,6 +26,7 @@ type subgraph struct {
 	keyFields      map[string]bool
 	overridden     map[string]bool
 	strayOverrides map[string]string
+	provides       map[string]ast.SelectionSet
 	roots          graphqlmodel.Roots
 	usedRoots      []rootType
 	federation1    bool
@@ -44,6 +46,7 @@ func toSubgraph(contract *model.PersistedContract) subgraph {
 		keyFields:      map[string]bool{},
 		overridden:     map[string]bool{},
 		strayOverrides: map[string]string{},
+		provides:       map[string]ast.SelectionSet{},
 		roots:          extension.Roots,
 		usedRoots:      toUsedRoots(extension),
 		federation1:    extension.Federation1,
@@ -62,6 +65,10 @@ func toSubgraph(contract *model.PersistedContract) subgraph {
 		if directive.Directive == graphqlmodel.KeyDirective {
 			selections, _ := parseFieldSet(directive.Fields)
 			member.addKeyFields(directive.Coordinate, selections)
+		}
+
+		if directive.Directive == graphqlmodel.ProvidesDirective {
+			member.provides[directive.Coordinate], _ = parseSelections(directive.Fields)
 		}
 	}
 

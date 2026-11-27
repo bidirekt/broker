@@ -12,10 +12,12 @@ import (
 	graphqlmodel "github.com/bidirekt/broker/internal/model/protocols/graphql"
 )
 
-// reach is a type a query gets to, with the subgraphs that can be at it: the ones that resolved the field leading there.
+// reach is a type a query gets to, with the subgraphs that can be at it: the ones that resolved the field leading
+// there, each with what the @provides on the path select from it below.
 type reach struct {
 	typeName  string
 	at        []subgraph
+	provided  map[string]ast.SelectionSet
 	operation string
 	path      []string
 }
@@ -23,10 +25,24 @@ type reach struct {
 func (this reach) key() string {
 	names := make([]string, 0, len(this.at))
 	for _, member := range this.at {
-		names = append(names, member.name)
+		names = append(names, strings.TrimSpace(member.name+" "+formatSelections(this.provided[member.name])))
 	}
 
 	return this.typeName + " " + strings.Join(names, " ")
+}
+
+// below is the reach of a field the subgraphs at resolve: they provide below it what the path's @provides select
+// under it, and what the field's own @provides selects.
+func (this reach) below(field, coordinate, typeName string, at []subgraph) reach {
+	provided := make(map[string]ast.SelectionSet, len(at))
+	for _, member := range at {
+		selected, _ := member.selectedUnder(this.provided[member.name], this.typeName, field)
+		if selections := slices.Concat(selected, member.provides[coordinate]); len(selections) > 0 {
+			provided[member.name] = selections
+		}
+	}
+
+	return reach{typeName: typeName, at: at, provided: provided, operation: this.operation, path: append(slices.Clone(this.path), field)}
 }
 
 // checkSatisfiability walks every query the graph allows, from the root fields down, and reports once each field a
@@ -37,7 +53,7 @@ func (this *composition) checkSatisfiability() {
 	for _, root := range this.roots() {
 		for _, field := range this.fields[root.typeName] {
 			coordinate := root.typeName + "." + field
-			queue = append(queue, reach{typeName: this.namedTypes[coordinate], at: this.resolversOf(coordinate), operation: root.operation, path: []string{field}})
+			queue = append(queue, reach{typeName: root.typeName, operation: root.operation}.below(field, coordinate, this.namedTypes[coordinate], this.resolversOf(coordinate)))
 		}
 	}
 
@@ -64,25 +80,30 @@ func (this *composition) checkSatisfiability() {
 }
 
 func (this *composition) reachFields(current reach, unresolved map[string]bool) []reach {
-	entered := this.enteredFrom(current.typeName, current.at)
+	entered := this.enteredFrom(current)
 
 	var next []reach
 	for _, field := range this.fields[current.typeName] {
 		coordinate := current.typeName + "." + field
 		resolvers := this.resolversOf(coordinate)
 		reachable := slices.DeleteFunc(slices.Clone(resolvers), func(member subgraph) bool { return !containsSubgraph(entered, member) })
-		path := append(slices.Clone(current.path), field)
+
+		for _, member := range current.at {
+			if !containsSubgraph(reachable, member) && member.providesOnPath(current.provided[member.name], current.typeName, field) {
+				reachable = append(reachable, member)
+			}
+		}
 
 		if len(reachable) > 0 {
-			next = append(next, reach{typeName: this.namedTypes[coordinate], at: reachable, operation: current.operation, path: path})
+			next = append(next, current.below(field, coordinate, this.namedTypes[coordinate], reachable))
 
 			continue
 		}
 
 		if !unresolved[coordinate] {
 			unresolved[coordinate] = true
-			this.addError(coordinate, fmt.Sprintf("%s %s can't be resolved: no resolvable @key leads from %s to %s on %s",
-				current.operation, strings.Join(path, "."), current.at[0].label, resolvers[0].label, current.typeName), current.at[0], resolvers[0])
+			this.addError(coordinate, fmt.Sprintf("%s %s.%s can't be resolved: no resolvable @key leads from %s to %s on %s",
+				current.operation, strings.Join(current.path, "."), field, current.at[0].label, resolvers[0].label, current.typeName), current.at[0], resolvers[0])
 		}
 	}
 
@@ -104,7 +125,7 @@ func (this *composition) reachMembers(current reach) []reach {
 		})
 
 		if len(at) > 0 {
-			next = append(next, reach{typeName: model.MemberKey(segment), at: at, operation: current.operation, path: current.path})
+			next = append(next, reach{typeName: model.MemberKey(segment), at: at, provided: current.provided, operation: current.operation, path: current.path})
 		}
 	}
 
@@ -112,9 +133,10 @@ func (this *composition) reachMembers(current reach) []reach {
 }
 
 // enteredFrom grows the subgraphs at a type by the jumps its resolvable @keys allow: a subgraph is entered when one
-// already at the type resolves every field of the key.
-func (this *composition) enteredFrom(typeName string, at []subgraph) []subgraph {
-	entered := slices.Clone(at)
+// already at the type resolves, or is provided on the path, every field of the key.
+func (this *composition) enteredFrom(current reach) []subgraph {
+	typeName := current.typeName
+	entered := slices.Clone(current.at)
 
 	for grown := true; grown; {
 		grown = false
@@ -128,7 +150,7 @@ func (this *composition) enteredFrom(typeName string, at []subgraph) []subgraph 
 				selections, _ := parseFieldSet(key.Fields)
 
 				return key.Directive == graphqlmodel.KeyDirective && key.Resolvable && slices.ContainsFunc(entered, func(from subgraph) bool {
-					return from.resolvesAll(typeName, selections)
+					return from.resolvesAll(typeName, selections, current.provided[from.name])
 				})
 			}) {
 				entered = append(entered, member)
@@ -157,17 +179,71 @@ func (this *composition) keysAt(member subgraph, typeName string) []graphqlmodel
 	return keys
 }
 
-func (this subgraph) resolvesAll(typeName string, selections ast.SelectionSet) bool {
+func (this subgraph) resolvesAll(typeName string, selections, provided ast.SelectionSet) bool {
 	for _, selection := range selections {
 		field := selection.(*ast.Field)
 		coordinate := typeName + "." + field.Name
+		selected, _ := this.selectedUnder(provided, typeName, field.Name)
 
-		if !this.resolves(coordinate) || (len(field.SelectionSet) > 0 && !this.resolvesAll(this.namedTypes[coordinate], field.SelectionSet)) {
+		if !this.resolves(coordinate) && !this.providesOnPath(provided, typeName, field.Name) {
+			return false
+		}
+
+		if len(field.SelectionSet) > 0 && !this.resolvesAll(this.namedTypes[coordinate], field.SelectionSet, selected) {
 			return false
 		}
 	}
 
 	return true
+}
+
+// A @provides counts only for a field the subgraph declares.
+func (this subgraph) providesOnPath(provided ast.SelectionSet, typeName, field string) bool {
+	_, selects := this.selectedUnder(provided, typeName, field)
+
+	return selects && this.kinds[typeName+"."+field] == graphqlmodel.FieldKind
+}
+
+// selectedUnder tells whether a field set selects a field of a type, and what it selects below the field. An inline
+// fragment selects at the type it names, and at every implementation or member of that type.
+func (this subgraph) selectedUnder(selections ast.SelectionSet, typeName, field string) (ast.SelectionSet, bool) {
+	var below ast.SelectionSet
+	selects := false
+
+	for _, selection := range selections {
+		switch selection := selection.(type) {
+		case *ast.Field:
+			if selection.Name == field {
+				below, selects = append(below, selection.SelectionSet...), true
+			}
+		case *ast.InlineFragment:
+			_, isMember := this.schemas[selection.TypeCondition][model.MemberSegment(typeName)]
+			if selection.TypeCondition == "" || selection.TypeCondition == typeName || isMember {
+				fragmentBelow, fragmentSelects := this.selectedUnder(selection.SelectionSet, typeName, field)
+				below, selects = append(below, fragmentBelow...), selects || fragmentSelects
+			}
+		}
+	}
+
+	return below, selects
+}
+
+func formatSelections(selections ast.SelectionSet) string {
+	var written []string
+	for _, selection := range selections {
+		switch selection := selection.(type) {
+		case *ast.Field:
+			written = append(written, strings.TrimSpace(selection.Name+" "+formatSelections(selection.SelectionSet)))
+		case *ast.InlineFragment:
+			written = append(written, "... on "+selection.TypeCondition+" "+formatSelections(selection.SelectionSet))
+		}
+	}
+
+	if len(written) == 0 {
+		return ""
+	}
+
+	return "{ " + strings.Join(written, " ") + " }"
 }
 
 func (this *composition) resolversOf(coordinate string) []subgraph {

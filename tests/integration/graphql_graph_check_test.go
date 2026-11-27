@@ -593,3 +593,137 @@ schemas:
 		WHERE r.consumed_provider = 'petstore_graph'`).Scan(&storedFields))
 	this.Equal([]string{"pet"}, storedFields)
 }
+
+const federationJVMDirectives = `
+directive @federation__composeDirective(name: String!) repeatable on SCHEMA
+
+directive @federation__extends on OBJECT | INTERFACE
+
+directive @federation__external on OBJECT | FIELD_DEFINITION
+
+directive @federation__interfaceObject on OBJECT
+
+directive @federation__override(from: String!) on FIELD_DEFINITION
+
+directive @federation__provides(fields: FieldSet!) on FIELD_DEFINITION
+
+directive @federation__requires(fields: FieldSet!) on FIELD_DEFINITION
+
+directive @federation__shareable repeatable on OBJECT | FIELD_DEFINITION
+
+directive @inaccessible on SCALAR | OBJECT | FIELD_DEFINITION | ARGUMENT_DEFINITION | INTERFACE | UNION | ENUM | ENUM_VALUE | INPUT_OBJECT | INPUT_FIELD_DEFINITION
+
+directive @key(fields: FieldSet!, resolvable: Boolean = true) repeatable on OBJECT | INTERFACE
+
+directive @link(as: String, for: link__Purpose, import: [link__Import], url: String!) repeatable on SCHEMA
+
+directive @tag(name: String!) repeatable on SCALAR | OBJECT | FIELD_DEFINITION | ARGUMENT_DEFINITION | INTERFACE | UNION | ENUM | ENUM_VALUE | INPUT_OBJECT | INPUT_FIELD_DEFINITION
+
+union _Entity = Pet
+
+type _Service {
+  sdl: String!
+}
+
+enum link__Purpose {
+  EXECUTION
+  SECURITY
+}
+
+scalar FieldSet
+
+scalar _Any
+
+scalar link__Import
+`
+
+const federationJVMAPISDL = `schema @link(import : ["@key", "FieldSet"], url : "https://specs.apollo.dev/federation/v2.3"){
+  query: Query
+}
+` + federationJVMDirectives + `
+type Pet @key(fields : "id", resolvable : true) {
+  age: Int
+  id: ID!
+  name: String!
+}
+
+type Query {
+  _entities(representations: [_Any!]!): [_Entity]!
+  _service: _Service!
+  pet(id: ID!): Pet
+}
+`
+
+const federationJVMReviewsSDL = `schema @link(import : ["@key", "FieldSet"], url : "https://specs.apollo.dev/federation/v2.3"){
+  query: Query
+}
+` + federationJVMDirectives + `
+type Pet @key(fields : "id", resolvable : true) {
+  id: ID!
+  reviews: [String!]!
+}
+
+type Query {
+  _entities(representations: [_Any!]!): [_Entity]!
+  _service: _Service!
+}
+`
+
+func (this *IntegrationSuite) TestCanIDeploy_SubgraphsPrintedByFederationJVM_ComposeTheGraphItsConsumerReads() {
+	this.setUpGraphCheck("petstore_api", "petstore_reviews", "petstore_web")
+	this.publishForGraphCheck("petstore_api", "1.4.0", contractFragment{"graph.yaml", graphCheckGraphYAML}, contractFragment{"api.graphqls", federationJVMAPISDL})
+	this.publishForGraphCheck("petstore_reviews", "2.0.0", contractFragment{"graph.yaml", graphCheckGraphYAML}, contractFragment{"reviews.graphqls", federationJVMReviewsSDL})
+	this.deployForGraphCheck("petstore_api", "1.4.0", "production")
+	this.deployForGraphCheck("petstore_reviews", "2.0.0", "production")
+	this.publishForGraphCheck("petstore_web", "3.0.0", contractFragment{"web.yaml", graphCheckWebReadingReviews})
+
+	canIDeploy := this.canIDeployForGraphCheck("petstore_web", "3.0.0", "production")
+
+	this.True(canIDeploy.Deployable)
+	this.JSONEq(`{"petstore_graph": {"deployable": true, "members": {"petstore_api": "1.4.0", "petstore_reviews": "2.0.0"}}}`, string(canIDeploy.Results))
+}
+
+func (this *IntegrationSuite) TestCanIDeployAndValidate_ASharedFieldReturningAnInterfaceAndItsImplementation_ComposesAsTheInterface() {
+	this.setUpGraphCheck("petstore_api", "petstore_reviews", "petstore_web")
+	this.publishForGraphCheck("petstore_api", "1.4.0", contractFragment{"graph.yaml", graphCheckGraphYAML}, contractFragment{"api.graphqls", graphCheckLink + `
+type Query {
+  pet(id: ID!): Pet
+}
+
+interface Animal {
+  id: ID!
+}
+
+type Pet implements Animal @key(fields: "id") {
+  id: ID!
+  friend: Animal @shareable
+}
+`})
+	this.publishForGraphCheck("petstore_reviews", "2.0.0", contractFragment{"graph.yaml", graphCheckGraphYAML}, contractFragment{"reviews.graphqls", graphCheckLink + `
+interface Animal {
+  id: ID!
+}
+
+type Pet implements Animal @key(fields: "id") {
+  id: ID!
+  friend: Pet @shareable
+}
+`})
+	this.deployForGraphCheck("petstore_api", "1.4.0", "production")
+	this.deployForGraphCheck("petstore_reviews", "2.0.0", "production")
+
+	this.assertWebGraphCheck(`consumes:
+  petstore_graph:
+    graphql:
+      query:
+        pet: {arguments: PetArgs, returns: MaybePet}
+schemas:
+  PetArgs: {type: object, properties: {id: {type: string}}}
+  MaybePet: {ref: Pet, nullable: true}
+  Pet: {type: object, properties: {friend: {ref: Friend}}}
+  Friend: {type: object, nullable: true, properties: {id: {type: string}}}
+`, "production", true, `{"petstore_graph": {
+		"deployable": true,
+		"members": {"petstore_api": "1.4.0", "petstore_reviews": "2.0.0"}
+	}}`)
+}

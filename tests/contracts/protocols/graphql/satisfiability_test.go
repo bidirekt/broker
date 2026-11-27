@@ -218,3 +218,213 @@ type Owner @key(fields: "id", resolvable: false) {
 
 	assert.Empty(t, errors)
 }
+
+const providesLink = `extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@external", "@provides"])
+`
+
+func TestToComposedGraph_AnExternalFieldReachedThroughAProvides_Composes(t *testing.T) {
+	errors := satisfiabilityErrors(
+		satisfiabilityMember(t, "petstore_reviews", "2.0.0", providesLink+`
+type Query {
+  reviews: [Review!]!
+}
+
+type Review {
+  id: ID!
+  author: Owner @provides(fields: "name")
+}
+
+type Owner @key(fields: "id") {
+  id: ID!
+  name: String @external
+}
+`),
+		satisfiabilityMember(t, "petstore_owners", "1.4.0", `
+type Owner @key(fields: "id", resolvable: false) {
+  id: ID!
+  name: String @shareable
+}
+`),
+	)
+
+	assert.Empty(t, errors)
+}
+
+func TestToComposedGraph_AnExternalFieldReachedWithoutTheProvides_CannotBeResolved(t *testing.T) {
+	errors := satisfiabilityErrors(
+		satisfiabilityMember(t, "petstore_reviews", "2.0.0", providesLink+`
+type Query {
+  reviews: [Review!]!
+  owner: Owner
+}
+
+type Review {
+  id: ID!
+  author: Owner @provides(fields: "name")
+}
+
+type Owner @key(fields: "id") {
+  id: ID!
+  name: String @external
+}
+`),
+		satisfiabilityMember(t, "petstore_owners", "1.4.0", `
+type Owner @key(fields: "id", resolvable: false) {
+  id: ID!
+  name: String @shareable
+}
+`),
+	)
+
+	assert.Equal(t, []string{"query owner.name can't be resolved: no resolvable @key leads from petstore_reviews 2.0.0 to petstore_owners 1.4.0 on Owner"}, errors)
+}
+
+func TestToComposedGraph_ATypeExternalExtensionReachedThroughAProvides_LeavesOnlyTheKeyFieldUnresolved(t *testing.T) {
+	errors := satisfiabilityErrors(
+		satisfiabilityMember(t, "petstore_reviews", "2.0.0", providesLink+`
+type Query {
+  reviews: [Review!]!
+}
+
+type Review {
+  id: ID!
+  author: Owner @provides(fields: "name email")
+}
+
+type Owner @key(fields: "id") {
+  id: ID!
+}
+
+extend type Owner @external {
+  name: String
+  email: String
+}
+`),
+		satisfiabilityMember(t, "petstore_owners", "1.4.0", `
+type Owner @key(fields: "id") {
+  id: ID!
+  name: String @shareable
+  email: String @shareable
+}
+`),
+	)
+
+	assert.Equal(t, []string{"query reviews.author.id can't be resolved: no resolvable @key leads from petstore_reviews 2.0.0 to petstore_owners 1.4.0 on Owner"}, errors)
+}
+
+func TestToComposedGraph_AFieldANestedProvidesSelects_Composes(t *testing.T) {
+	errors := satisfiabilityErrors(
+		satisfiabilityMember(t, "petstore_reviews", "2.0.0", providesLink+`
+type Query {
+  reviews: [Review!]!
+}
+
+type Review {
+  id: ID!
+  author: Owner @provides(fields: "address { city }")
+}
+
+type Owner @key(fields: "id") {
+  id: ID!
+  address: Address @external
+}
+
+type Address {
+  city: String @external
+}
+`),
+		satisfiabilityMember(t, "petstore_owners", "1.4.0", `
+type Owner @key(fields: "id", resolvable: false) {
+  id: ID!
+  address: Address @shareable
+}
+
+type Address {
+  city: String @shareable
+}
+`),
+	)
+
+	assert.Empty(t, errors)
+}
+
+func TestToComposedGraph_AFieldAProvidesSelectsThroughAnInlineFragment_Composes(t *testing.T) {
+	errors := satisfiabilityErrors(
+		satisfiabilityMember(t, "petstore_reviews", "2.0.0", providesLink+`
+type Query {
+  items: [Item!]! @provides(fields: "... on Book { title }")
+}
+
+interface Item {
+  id: ID!
+}
+
+type Book implements Item @key(fields: "id") {
+  id: ID!
+  title: String @external
+}
+`),
+		satisfiabilityMember(t, "petstore_catalog", "1.4.0", `
+interface Item {
+  id: ID!
+}
+
+type Book implements Item @key(fields: "id", resolvable: false) {
+  id: ID!
+  title: String @shareable
+}
+`),
+	)
+
+	assert.Empty(t, errors)
+}
+
+func TestToComposedGraph_AKeyAProvidesSelects_LeadsToTheSubgraphThatResolvesTheRest(t *testing.T) {
+	errors := satisfiabilityErrors(
+		satisfiabilityMember(t, "petstore_reviews", "2.0.0", providesLink+`
+type Query {
+  reviews: [Review!]!
+}
+
+type Review {
+  id: ID!
+  author: Owner @provides(fields: "id")
+}
+
+type Owner @key(fields: "id") {
+  id: ID! @external
+}
+`),
+		satisfiabilityMember(t, "petstore_owners", "1.4.0", `
+type Owner @key(fields: "id") {
+  id: ID!
+  name: String
+}
+`),
+	)
+
+	assert.Empty(t, errors)
+}
+
+func TestToComposedGraph_AFieldTheProvidesOfARootFieldSelects_Composes(t *testing.T) {
+	errors := satisfiabilityErrors(
+		satisfiabilityMember(t, "petstore_reviews", "2.0.0", providesLink+`
+type Query {
+  me: Owner @provides(fields: "name")
+}
+
+type Owner @key(fields: "id") {
+  id: ID!
+  name: String @external
+}
+`),
+		satisfiabilityMember(t, "petstore_owners", "1.4.0", `
+type Owner @key(fields: "id", resolvable: false) {
+  id: ID!
+  name: String @shareable
+}
+`),
+	)
+
+	assert.Empty(t, errors)
+}
