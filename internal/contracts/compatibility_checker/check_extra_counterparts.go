@@ -84,12 +84,21 @@ func (this *CompatibilityChecker) compareExtra(
 	}
 }
 
+// A pair of shapes is compared once and breaks at the first path that reaches it, so the base and the candidate
+// can report the same break at different paths.
 func containedIn(breaks []ContractBreakingChange) func(ContractBreakingChange) bool {
 	return func(candidate ContractBreakingChange) bool {
 		return slices.ContainsFunc(breaks, func(breakingChange ContractBreakingChange) bool {
-			return breakingChange.Reason == candidate.Reason && maps.Equal(breakingChange.Details, candidate.Details)
+			return breakingChange.Reason == candidate.Reason && maps.Equal(withoutProperty(breakingChange.Details), withoutProperty(candidate.Details))
 		})
 	}
+}
+
+func withoutProperty(details map[string]string) map[string]string {
+	pathless := maps.Clone(details)
+	delete(pathless, "property")
+
+	return pathless
 }
 
 func withDetails(details, added map[string]string) map[string]string {

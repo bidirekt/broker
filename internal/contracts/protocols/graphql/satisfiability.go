@@ -137,10 +137,12 @@ func (this *composition) reachMembers(current reach) []reach {
 }
 
 // enteredFrom grows the subgraphs at a type by the jumps its resolvable @keys allow: a subgraph is entered when one
-// already at the type resolves, or is provided on the path, every field of the key.
+// already at the type resolves, or is provided on the path, every field of the key. A root type, reached by a field
+// that returns it, enters every subgraph that defines it.
 func (this *composition) enteredFrom(current reach) []subgraph {
 	typeName := current.typeName
 	entered := slices.Clone(current.at)
+	root := slices.ContainsFunc(this.roots(), func(root rootType) bool { return root.typeName == typeName })
 
 	for grown := true; grown; {
 		grown = false
@@ -150,7 +152,7 @@ func (this *composition) enteredFrom(current reach) []subgraph {
 				continue
 			}
 
-			if slices.ContainsFunc(this.keysAt(member, typeName), func(key graphqlmodel.Directive) bool {
+			if (root && member.definesType(typeName)) || slices.ContainsFunc(this.keysAt(member, typeName), func(key graphqlmodel.Directive) bool {
 				selections, _ := parseFieldSet(key.Fields)
 
 				return key.Directive == graphqlmodel.KeyDirective && key.Resolvable && slices.ContainsFunc(entered, func(from subgraph) bool {
@@ -193,7 +195,7 @@ func (this subgraph) resolvesAll(typeName string, selections, provided ast.Selec
 			return false
 		}
 
-		if len(field.SelectionSet) > 0 && !this.resolvesAll(this.namedTypes[coordinate], field.SelectionSet, selected) {
+		if len(field.SelectionSet) > 0 && !this.resolvesAll(this.namedTypes[coordinate], field.SelectionSet, slices.Concat(selected, this.provides[coordinate])) {
 			return false
 		}
 	}

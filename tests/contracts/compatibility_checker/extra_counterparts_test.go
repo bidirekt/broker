@@ -202,3 +202,38 @@ func TestExtraCounterparts_AResourceTheProviderUnderCheckDropsAndItsBaseHad_IsRe
 		Role:   model.RoleProvider,
 	}}, report.Hierarchical["petstore_admin"].Trees[restmodel.Protocol].(restmodel.ReportTree)["/pets"]["get"]["200"])
 }
+
+func TestExtraCounterparts_ABreakTheBaseReportsAtAnotherPath_IsNotChargedToTheProviderUnderCheck(t *testing.T) {
+	counterpartConsumer := extraPetsResource(model.Consumes, "petstore_web")
+	counterpartConsumer.Schemas = map[string]model.Schemas{model.YAMLNamespace: {
+		"Pet":   {"": {Type: model.ObjectType}, "a": {Ref: "Money"}, "b": {Ref: "Money"}},
+		"Money": {"": {Type: model.ObjectType}, "amount": {Type: model.StringType}},
+	}}
+
+	base := extraPetsResource(model.Provides, extraComposedName)
+	base.Schemas = map[string]model.Schemas{model.YAMLNamespace: {
+		"Pet":   {"": {Type: model.ObjectType}, "a": {Ref: "Money"}, "b": {Ref: "Money"}},
+		"Money": {"": {Type: model.ObjectType}, "amount": {Type: model.IntegerType}},
+	}}
+
+	fixesA := extraPetsResource(model.Provides, extraComposedName)
+	fixesA.Schemas = map[string]model.Schemas{model.YAMLNamespace: {
+		"Pet":   {"": {Type: model.ObjectType}, "a": {Ref: "Price"}, "b": {Ref: "Money"}},
+		"Money": {"": {Type: model.ObjectType}, "amount": {Type: model.IntegerType}},
+		"Price": {"": {Type: model.ObjectType}, "amount": {Type: model.StringType}},
+	}}
+
+	report := extraCheck(extraConsumerContract(), func(*model.PersistedContract) compatibility_checker.ExtraPairs {
+		return compatibility_checker.ExtraPairs{
+			Pairs: []compatibility_checker.ExtraPair{{
+				Resources:   []model.PersistedResource{counterpartConsumer},
+				Contract:    &model.PersistedContract{Resources: map[string]model.PersistedResource{"get-pets": fixesA}},
+				Base:        &model.PersistedContract{Resources: map[string]model.PersistedResource{"get-pets": base}},
+				Counterpart: compatibility_checker.Counterpart{ParticipantName: "petstore_admin", Role: model.CounterpartConsumer},
+			}},
+		}
+	})
+
+	assert.Empty(t, report.Hierarchical["petstore_admin"].Trees[restmodel.Protocol])
+	assert.True(t, report.Results["petstore_admin"].Deployable)
+}

@@ -579,3 +579,111 @@ func TestToComposedGraph_FieldsOfAnImplementationReachedOnlyFromTheSubgraphRetur
 		"query api.item.name can't be resolved: no resolvable @key leads from petstore_api 1.4.0 to petstore_reviews 2.0.0 on Dog",
 	}, errors)
 }
+
+func TestToComposedGraph_AQueryRootAPayloadReturns_EntersEverySubgraphThatDefinesIt(t *testing.T) {
+	errors := satisfiabilityErrors(
+		satisfiabilityMember(t, "petstore_api", "1.4.0", `
+type Query {
+  status: String
+}
+
+type Mutation {
+  addPet(name: String!): AddPetPayload
+}
+
+type AddPetPayload {
+  query: Query
+}
+`),
+		satisfiabilityMember(t, "petstore_reviews", "2.0.0", `
+type Query {
+  reviews: [Review!]!
+}
+
+type Review {
+  body: String!
+}
+`),
+	)
+
+	assert.Empty(t, errors)
+}
+
+func TestToComposedGraph_AMutationRootAMutationReturns_EntersEverySubgraphThatDefinesIt(t *testing.T) {
+	errors := satisfiabilityErrors(
+		satisfiabilityMember(t, "petstore_api", "1.4.0", `
+type Query {
+  status: String
+}
+
+type Mutation {
+  chain: Mutation
+}
+`),
+		satisfiabilityMember(t, "petstore_reviews", "2.0.0", `
+type Query {
+  reviews: [Review!]!
+}
+
+type Mutation {
+  addReview(body: String!): Review
+}
+
+type Review {
+  body: String!
+}
+`),
+	)
+
+	assert.Empty(t, errors)
+}
+
+const nestedKeyAPISDL = `
+type Query {
+  pet: Pet
+}
+
+type Pet @key(fields: "id") {
+  id: ID!
+  owner: Owner @shareable%s
+}
+
+type Owner @key(fields: "id") {
+  id: ID!
+  email: String @external
+}
+`
+
+const nestedKeyReviewsSDL = `
+type Pet @key(fields: "owner { email }") {
+  owner: Owner @shareable
+  reviews: [Review!]!
+}
+
+type Owner @key(fields: "id") {
+  id: ID!
+  email: String @shareable
+}
+
+type Review {
+  body: String!
+}
+`
+
+func TestToComposedGraph_ANestedKeyFieldTheProvidesOfItsParentFieldSelects_LeadsToTheSubgraphThatResolvesTheRest(t *testing.T) {
+	errors := satisfiabilityErrors(
+		satisfiabilityMember(t, "petstore_api", "1.4.0", providesLink+fmt.Sprintf(nestedKeyAPISDL, ` @provides(fields: "email")`)),
+		satisfiabilityMember(t, "petstore_reviews", "2.0.0", nestedKeyReviewsSDL),
+	)
+
+	assert.Empty(t, errors)
+}
+
+func TestToComposedGraph_ANestedKeyFieldThatIsExternalWithoutAProvides_CannotBeResolved(t *testing.T) {
+	errors := satisfiabilityErrors(
+		satisfiabilityMember(t, "petstore_api", "1.4.0", providesLink+fmt.Sprintf(nestedKeyAPISDL, "")),
+		satisfiabilityMember(t, "petstore_reviews", "2.0.0", nestedKeyReviewsSDL),
+	)
+
+	assert.Equal(t, []string{"query pet.reviews can't be resolved: no resolvable @key leads from petstore_api 1.4.0 to petstore_reviews 2.0.0 on Pet"}, errors)
+}
