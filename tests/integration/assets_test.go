@@ -89,6 +89,13 @@ func (this *IntegrationSuite) TestHappyPath_RestSectionStylesheetIsServedAsCSSWi
 	}
 }
 
+func (this *IntegrationSuite) TestHappyPath_GraphQLSectionStylesheetIsServedAsCSS() {
+	status, contentType, body := this.fetchAsset("/assets/protocols/operations.css")
+	this.Equal(http.StatusOK, status)
+	this.Contains(contentType, "text/css")
+	this.Contains(body, "\n.op-places li{")
+}
+
 func (this *IntegrationSuite) TestHappyPath_StylesheetKeepsOnlyTheRulesOtherPagesShare() {
 	_, _, body := this.fetchAsset("/assets/bundle.css")
 

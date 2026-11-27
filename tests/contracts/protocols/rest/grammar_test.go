@@ -40,7 +40,7 @@ func TestEndpoint_RejectsADynamicSegmentWithAColon(t *testing.T) {
 	require.Len(t, violations, 1)
 	assert.Equal(t, "endpoint.syntax", violations[0].ErrorCode)
 	assert.Equal(t, "/pets/:petId", violations[0].Path)
-	assert.Equal(t, map[string]string{
+	assert.Equal(t, map[string]any{
 		"key":        "/pets/:petId",
 		"error":      "dynamic path segments must use *",
 		"suggestion": "/pets/*",
@@ -71,7 +71,7 @@ func TestStatusCode_RejectsOutOfRangeInStableOrder(t *testing.T) {
 	require.Len(t, violations, 3)
 	assert.Equal(t, "status.out_of_range", violations[0].ErrorCode)
 	assert.Equal(t, "600", violations[0].Path)
-	assert.Equal(t, map[string]string{"key": "600", "error": "must be between 100 and 599"}, violations[0].Details)
+	assert.Equal(t, map[string]any{"key": "600", "error": "must be between 100 and 599"}, violations[0].Details)
 	assert.Equal(t, "7", violations[1].Details["key"])
 	assert.Equal(t, "abc", violations[2].Details["key"])
 }
@@ -104,7 +104,7 @@ func TestEndpoint_DoubleSlashAtTheEndStaysMalformed(t *testing.T) {
 	require.Len(t, violations, 1)
 	assert.Equal(t, "endpoint.syntax", violations[0].ErrorCode)
 	assert.Equal(t, "/users//", violations[0].Path)
-	assert.Equal(t, map[string]string{"key": "/users//", "error": "malformed path"}, violations[0].Details)
+	assert.Equal(t, map[string]any{"key": "/users//", "error": "malformed path"}, violations[0].Details)
 }
 
 func TestEndpoint_RejectsDoubleSlashAsAnEmptySegment(t *testing.T) {
@@ -115,7 +115,7 @@ func TestEndpoint_RejectsDoubleSlashAsAnEmptySegment(t *testing.T) {
 	require.Len(t, violations, 1)
 	assert.Equal(t, "endpoint.syntax", violations[0].ErrorCode)
 	assert.Equal(t, "//", violations[0].Path)
-	assert.Equal(t, map[string]string{"key": "//", "error": "malformed path"}, violations[0].Details)
+	assert.Equal(t, map[string]any{"key": "//", "error": "malformed path"}, violations[0].Details)
 }
 
 func TestEndpoint_AcceptsTheRoot(t *testing.T) {

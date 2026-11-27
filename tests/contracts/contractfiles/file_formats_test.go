@@ -55,7 +55,7 @@ func (this probeProtocol) Rules() []protocol.Rule {
 			schemas = append(schemas, schema.Namespace+":"+schema.Name)
 		}
 
-		return []violation.Violation{{ErrorCode: "probe.seen", Details: map[string]string{
+		return []violation.Violation{{ErrorCode: "probe.seen", Details: map[string]any{
 			"formats":   strings.Join(declarations.Formats, ", "),
 			"extension": extension,
 			"schemas":   strings.Join(schemas, ", "),
@@ -104,7 +104,7 @@ func TestToViolations_FilesOfARegisteredFormat_AreReadByIt_AndJoinedWithTheYAMLB
 	})
 
 	require.NoError(t, readErr)
-	assert.Equal(t, []violation.Violation{{ErrorCode: "probe.seen", Details: map[string]string{
+	assert.Equal(t, []violation.Violation{{ErrorCode: "probe.seen", Details: map[string]any{
 		"formats":   "yaml, probe",
 		"extension": "Scalar,Tagged",
 		"schemas":   "probe:Scalar",

@@ -32,10 +32,6 @@ const recursiveSchemaAPIContract = `provides:
       get:
         responses:
           200: Post
-    /loops:
-      get:
-        responses:
-          200: Loop
 schemas:
   Comment:
     type: object
@@ -56,8 +52,6 @@ schemas:
       posts:
         type: array
         items: { ref: Post }
-  Loop:
-    ref: Loop
 `
 
 const recursiveSchemaSPAContract = `consumes:
@@ -71,10 +65,6 @@ const recursiveSchemaSPAContract = `consumes:
         get:
           responses:
             200: Post
-      /loops:
-        get:
-          responses:
-            200: Loop
 schemas:
   Comment:
     type: object
@@ -95,8 +85,6 @@ schemas:
       posts:
         type: array
         items: { ref: Post }
-  Loop:
-    ref: Loop
 `
 
 func recursiveSchemaAPI(textType string) string {

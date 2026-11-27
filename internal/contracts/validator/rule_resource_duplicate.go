@@ -29,7 +29,7 @@ func duplicateResources(declarations protocol.Declarations) []violation.Violatio
 			ErrorCode: "resource.duplicate",
 			Path:      path,
 			Source:    declaration.Source,
-			Details: map[string]string{
+			Details: map[string]any{
 				"resource":   declaration.Resource.Describe(),
 				"declaredIn": first,
 			},

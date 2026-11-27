@@ -266,6 +266,15 @@ func argumentsSchemaName(typeName, field string) string {
 	return typeName + ":" + field + ":" + graphqlmodel.ArgumentsInteraction
 }
 
+func synthesizedSchemaNameToField(name string) (typeName, field, interaction string, synthesized bool) {
+	parts := strings.Split(name, ":")
+	if len(parts) != 3 || (parts[2] != graphqlmodel.ArgumentsInteraction && parts[2] != graphqlmodel.ReturnsInteraction) {
+		return "", "", "", false
+	}
+
+	return parts[0], parts[1], parts[2], true
+}
+
 func returnsSchemaName(typeName, field string) string {
 	return typeName + ":" + field + ":" + graphqlmodel.ReturnsInteraction
 }

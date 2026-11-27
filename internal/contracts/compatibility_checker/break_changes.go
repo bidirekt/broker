@@ -1,6 +1,8 @@
 package compatibility_checker
 
 import (
+	"strings"
+
 	"github.com/bidirekt/broker/internal/contracts/schemagraph"
 	"github.com/bidirekt/broker/internal/model"
 )
@@ -19,6 +21,11 @@ func (this *ContractBreakingChange) refine(reason model.BreakingReason, details 
 
 	this.Reason = reason
 	this.Details = details
+}
+
+func (this *ContractBreakingChange) placeInArgumentsOf(fieldPath string) {
+	this.Details["argument"] = strings.TrimPrefix(this.Details["property"], "$.")
+	this.Details["property"] = fieldPath
 }
 
 func (this *ContractBreakingChange) IsPropertyBreak() bool {
@@ -143,6 +150,10 @@ func propertyDetails(
 
 // A shape met again while rendering renders as its bare type, so a self-referencing array ends.
 func typeToken(node schemagraph.Node) string {
+	if name, named := node.TypeName(); named {
+		return name
+	}
+
 	return typeTokenOf(node, map[string]bool{})
 }
 

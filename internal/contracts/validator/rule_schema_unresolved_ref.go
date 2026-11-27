@@ -47,7 +47,7 @@ func unresolvedRefsIn(
 			ErrorCode: "schema.unresolved_ref",
 			Path:      documentPath,
 			Source:    declaration.Source,
-			Details: map[string]string{
+			Details: map[string]any{
 				"schema":   name,
 				"property": model.FieldName(declaration.Name, path),
 			},

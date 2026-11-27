@@ -56,7 +56,22 @@ func TestMap_ChaveReprovadaSaiComCodigoChaveEErro(t *testing.T) {
 	assert.Equal(t, "key.short", violations[0].ErrorCode)
 	assert.Equal(t, "ab", violations[0].Path)
 	assert.Equal(t, "api.yaml", violations[0].Source)
-	assert.Equal(t, map[string]string{"key": "ab", "error": "too short"}, violations[0].Details)
+	assert.Equal(t, map[string]any{"key": "ab", "error": "too short"}, violations[0].Details)
+}
+
+func TestMap_ARejectedKeyWithItsOwnDetails_CarriesThemInsteadOfKeyAndError(t *testing.T) {
+	subject := descriptor.Map(descriptor.Key{
+		ErrorCode: "key.short",
+		Check:     atLeastThreeLetters,
+		Details:   func(key string) map[string]any { return map[string]any{"name": key} },
+	}, descriptor.String())
+
+	violations := descriptor.Validate(subject, mapDocument(t, "ab: x\n"), "api.yaml")
+
+	require.Len(t, violations, 1)
+	assert.Equal(t, "key.short", violations[0].ErrorCode)
+	assert.Equal(t, "ab", violations[0].Path)
+	assert.Equal(t, map[string]any{"name": "ab"}, violations[0].Details)
 }
 
 func TestMap_ChaveReprovadaNaoDesceNoValor(t *testing.T) {
@@ -94,5 +109,5 @@ func TestMap_RejeitaSequenciaComoKind(t *testing.T) {
 	require.Len(t, violations, 1)
 	assert.Equal(t, "value.invalid_kind", violations[0].ErrorCode)
 	assert.Equal(t, "", violations[0].Path)
-	assert.Equal(t, map[string]string{"expected": "mapping", "got": "sequence"}, violations[0].Details)
+	assert.Equal(t, map[string]any{"expected": "mapping", "got": "sequence"}, violations[0].Details)
 }

@@ -76,50 +76,6 @@ func NewContractCompatibilityReport(
 }
 
 func (this *ContractCompatibilityReport) AppendResult(counterpartName string, result *CounterpartResult) {
-	hierarchical, exists := this.Hierarchical[counterpartName]
-	if !exists {
-		hierarchical = Hierarchical{
-			Deployable: true,
-			Trees:      make(map[model.Protocol]ReportTree, len(this.protocols)),
-		}
-
-		for _, hooks := range this.protocols {
-			hierarchical.Trees[hooks.Protocol()] = hooks.NewReportTree()
-		}
-	}
-
-	if !hierarchical.Version.Valid {
-		hierarchical.Version = result.Counterpart.ParticipantVersion
-	}
-
-	for _, breakChange := range result.Breaks {
-		role := model.RoleProvider
-		if breakChange.CheckedResource.IsConsumer() {
-			role = model.RoleConsumer
-		}
-
-		hierarchical.appendBreak(
-			breakChange.CheckedResource.Protocol,
-			breakChange.CheckedResource.Identity.Location(),
-			model.ReportBreak{Reason: breakChange.Reason, Role: role, Details: breakChange.Details},
-		)
-	}
-
-	for _, cachedBreak := range result.CachedBreaks {
-		role := model.RoleProvider
-		if cachedBreak.Details["consumerName"] == this.ParticipantName {
-			role = model.RoleConsumer
-		}
-
-		hierarchical.appendBreak(
-			cachedBreak.Protocol,
-			cachedBreak.Location,
-			model.ReportBreak{Reason: cachedBreak.Reason, Role: role, Details: cachedBreak.Details},
-		)
-	}
-
-	this.Hierarchical[counterpartName] = hierarchical
-
 	existing := this.Results[counterpartName]
 
 	if existing.Breaks == nil {
@@ -151,6 +107,46 @@ func (this *ContractCompatibilityReport) AppendResult(counterpartName string, re
 	existing.Deployable = len(existing.Breaks)+len(existing.CachedBreaks) == 0
 
 	this.Results[counterpartName] = existing
+
+	hierarchical, exists := this.Hierarchical[counterpartName]
+	if !exists {
+		hierarchical = Hierarchical{Trees: make(map[model.Protocol]ReportTree, len(this.protocols))}
+
+		for _, hooks := range this.protocols {
+			hierarchical.Trees[hooks.Protocol()] = hooks.NewReportTree()
+		}
+	}
+
+	for _, breakChange := range result.Breaks {
+		role := model.RoleProvider
+		if breakChange.CheckedResource.IsConsumer() {
+			role = model.RoleConsumer
+		}
+
+		hierarchical.appendBreak(
+			breakChange.CheckedResource.Protocol,
+			breakChange.CheckedResource.Identity.Location(),
+			model.ReportBreak{Reason: breakChange.Reason, Role: role, Details: breakChange.Details},
+		)
+	}
+
+	for _, cachedBreak := range result.CachedBreaks {
+		role := model.RoleProvider
+		if cachedBreak.Details["consumerName"] == this.ParticipantName {
+			role = model.RoleConsumer
+		}
+
+		hierarchical.appendBreak(
+			cachedBreak.Protocol,
+			cachedBreak.Location,
+			model.ReportBreak{Reason: cachedBreak.Reason, Role: role, Details: cachedBreak.Details},
+		)
+	}
+
+	hierarchical.Deployable = existing.Deployable
+	hierarchical.Version = existing.Counterpart.ParticipantVersion
+
+	this.Hierarchical[counterpartName] = hierarchical
 }
 
 func ToVerdictBreaks(result CounterpartResult) []model.VerdictBreak {
@@ -189,8 +185,6 @@ func (this *Hierarchical) appendBreak(protocol model.Protocol, location map[stri
 	}
 
 	tree.Append(location, reportBreak)
-
-	this.Deployable = false
 }
 
 type hierarchicalField struct {

@@ -178,6 +178,17 @@ func TestTypeMismatch_StopsTheDescentAtThatField(t *testing.T) {
 	})
 }
 
+func TestTypeMismatch_ASingleValueSentToAList_BreaksARequest(t *testing.T) {
+	sentByTheConsumer := model.Schemas{"Order": {"": {Type: "object"}, "tags": {Type: "string"}}}
+	readByTheProvider := model.Schemas{"Order": {"": {Type: "object"}, "tags": {Type: "array"}, "tags[]": {Type: "string"}}}
+
+	assert.Equal(t, []ordersBreak{
+		{model.ReasonPropertyTypeMismatch, ordersDetails("$.tags", map[string]string{
+			"consumerField": "Order.tags", "providerField": "Order.tags", "consumerPropertyType": "string", "providerPropertyType": "array<string>",
+		})},
+	}, ordersBreaks(t, "request", ordersBody("Order", sentByTheConsumer), ordersBody("Order", readByTheProvider)))
+}
+
 func addressCatalog(cityType string, withZip bool) model.Schemas {
 	address := model.Schema{
 		"":     {Type: "object"},

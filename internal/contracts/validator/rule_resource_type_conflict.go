@@ -107,7 +107,7 @@ func (this *typeConflicts) compareDeclarations(first, other schemagraph.Declarat
 		return
 	}
 
-	details := map[string]string{
+	details := map[string]any{
 		"resource":     this.resource,
 		"property":     property,
 		"type":         typeName(other),

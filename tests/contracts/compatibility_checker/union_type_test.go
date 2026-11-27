@@ -218,3 +218,17 @@ func TestUnionAgainstAnotherTypeIsATypeMismatch(t *testing.T) {
 		})
 	}
 }
+
+func TestUnionReadAsAnObjectIsATypeMismatch(t *testing.T) {
+	consumerSchemas := model.Schemas{"Order": {"": {Type: "object"}, "payment": {Type: "object"}, "payment.number": {Type: "string"}}}
+
+	assertPaymentBreaks(t, "200", []string{"Order"}, consumerSchemas, paymentUnion("OrderRecord", "card"), []paymentBreak{{model.ReasonPropertyTypeMismatch, map[string]string{
+		"property":             "$.payment",
+		"consumerName":         paymentConsumerName,
+		"providerName":         paymentProviderName,
+		"consumerField":        "Order.payment",
+		"providerField":        "OrderRecord.payment",
+		"consumerPropertyType": "object",
+		"providerPropertyType": "union",
+	}}})
+}

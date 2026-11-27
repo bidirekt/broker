@@ -81,6 +81,23 @@ func (this Node) Arguments() string {
 	return this.declarations[0].arguments
 }
 
+// A field without arguments takes an empty object, never nothing: an argument it newly requires must break.
+func (this Node) ArgumentsRoot(join Join) Node {
+	root := Node{graph: this.graph, join: join}
+
+	for _, declaration := range this.declarations {
+		if declaration.arguments != "" {
+			root.declarations = append(root.declarations, this.graph.declaration(declaration.source, Site{Namespace: declaration.site.Namespace, Schema: declaration.arguments}))
+		}
+	}
+
+	if !root.Exists() {
+		root.declarations = []declaration{{fieldType: model.ObjectType}}
+	}
+
+	return root
+}
+
 func (this Node) Optional() bool {
 	if this.join == Senders {
 		return this.lacking || slices.ContainsFunc(this.declarations, func(declaration declaration) bool { return declaration.optional })
@@ -113,13 +130,18 @@ func (this Node) Declarations() []Declaration {
 }
 
 // Field names the first body's field the node was reached at: "Address.city", "Order.items[].sku",
-// "Pets{}.name", or the schema alone at its root.
+// "Pets{}.name", or the schema alone at its root, unless the graph names its fields.
 func (this Node) Field() string {
 	if !this.Exists() {
 		return ""
 	}
 
 	site := this.declarations[0].site
+	if this.graph.fieldName != nil {
+		if name, named := this.graph.fieldName(site); named {
+			return name
+		}
+	}
 
 	return model.FieldName(site.Schema, site.Path)
 }
@@ -186,4 +208,21 @@ func (this Node) ShapeKey() string {
 	}
 
 	return key.String()
+}
+
+func (this Node) TypeName() (string, bool) {
+	if this.graph == nil || this.graph.typeName == nil || !this.Exists() {
+		return "", false
+	}
+
+	return this.graph.typeName(this)
+}
+
+// ShapeName is the schema the first body's refs lead to, or "" when the shape is a field inside a schema.
+func (this Node) ShapeName() string {
+	if !this.Exists() || this.declarations[0].shape.Path != "" {
+		return ""
+	}
+
+	return this.declarations[0].shape.Schema
 }
