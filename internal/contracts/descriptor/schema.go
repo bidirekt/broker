@@ -1,6 +1,7 @@
 package descriptor
 
 import (
+	"maps"
 	"slices"
 	"strings"
 
@@ -9,52 +10,102 @@ import (
 )
 
 func Property() Node {
-	return schema()
+	return CoreVocabulary().Property()
 }
 
 func SchemaAt(position string) Node {
-	return schema(optionalNotAllowedAt(position))
+	return CoreVocabulary().SchemaAt(position)
 }
 
-func schema(positionRules ...Rule) Node {
-	return Object(Fields{
-		"type":        SchemaType,
-		"description": Description,
-		"properties":  Map(PropertyName, Lazy(Property)),
-		"items":       Lazy(func() Node { return SchemaAt("items") }),
-		"values":      Lazy(func() Node { return SchemaAt("values") }),
-		"members": ByType{
-			model.EnumType:  Members(model.EnumType, EnumValues()),
-			model.UnionType: Members(model.UnionType, UnionMembers()),
-		},
-		"ref":      SchemaRef,
-		"optional": Flag,
-		"nullable": Flag,
-	}).Rules(append([]Rule{
-		schemaRequiresTypeOrRef,
-		refExcludes("type"),
-		keyBelongsTo("properties", model.ObjectType),
-		keyBelongsTo("items", model.ArrayType),
-		keyBelongsTo("values", model.MapType),
-		keyBelongsTo("members", model.EnumType, model.UnionType),
-		objectRequiresProperties,
-		arrayRequiresItems,
-		mapRequiresValues,
-		membersRequired,
-	}, positionRules...)...)
+func (this Vocabulary) Property() Node {
+	return this.grammar().property
 }
 
-func schemaRequiresTypeOrRef(present PresentFields) *violation.Violation {
-	if present["type"] != nil || (present["ref"] != nil && present["ref"] != "") {
-		return nil
+func (this Vocabulary) SchemaAt(position string) Node {
+	schema := this.grammar().schema
+
+	return schema.Rules(append(slices.Clip(schema.rules), optionalNotAllowedAt(position))...)
+}
+
+type schemaGrammar struct {
+	schema   ObjectNode
+	property ObjectNode
+}
+
+func (this Vocabulary) grammar() *schemaGrammar {
+	if this.built != nil {
+		return this.built
 	}
 
-	return &violation.Violation{
-		ErrorCode: SchemaType.ErrorCode,
-		Details: map[string]string{
-			"value":   "",
-			"allowed": strings.Join(SchemaType.Allowed, ", "),
-		},
+	bound := this
+	bound.built = &schemaGrammar{}
+	bound.built.schema = bound.schema(nil)
+	bound.built.property = bound.schema(bound.PropertyKeys)
+
+	return bound.built
+}
+
+// A key more than one type takes is chosen by the sibling "type"; a key of one type is validated under any type.
+func (this Vocabulary) schema(extraKeys Keys) ObjectNode {
+	schemaType := this.Type()
+	fields := Fields{
+		"type":        schemaType,
+		"description": Description,
+		"ref":         SchemaRef,
+		"optional":    Flag,
+		"nullable":    Flag,
+	}
+	rules := []Rule{schemaRequiresTypeOrRef(schemaType), refExcludes("type")}
+
+	var keys []string
+	grammars := map[string]ByType{}
+
+	for _, typeVocabulary := range this.Types {
+		for _, key := range slices.Sorted(maps.Keys(typeVocabulary.Keys)) {
+			if grammars[key] == nil {
+				keys = append(keys, key)
+				grammars[key] = ByType{}
+			}
+
+			grammars[key][typeVocabulary.Name] = typeVocabulary.Keys[key](this)
+		}
+	}
+
+	for _, key := range keys {
+		owners := slices.Collect(maps.Keys(grammars[key]))
+
+		fields[key] = grammars[key]
+		if len(owners) == 1 {
+			fields[key] = grammars[key][owners[0]]
+		}
+
+		rules = append(rules, keyBelongsTo(key, schemaType, owners...))
+	}
+
+	for _, typeVocabulary := range this.Types {
+		rules = append(rules, typeVocabulary.Rules...)
+	}
+
+	for key, grammar := range extraKeys {
+		fields[key] = grammar(this)
+	}
+
+	return Object(fields).Rules(rules...)
+}
+
+func schemaRequiresTypeOrRef(schemaType Enum) Rule {
+	return func(present PresentFields) *violation.Violation {
+		if present["type"] != nil || (present["ref"] != nil && present["ref"] != "") {
+			return nil
+		}
+
+		return &violation.Violation{
+			ErrorCode: schemaType.ErrorCode,
+			Details: map[string]string{
+				"value":   "",
+				"allowed": strings.Join(schemaType.Allowed, ", "),
+			},
+		}
 	}
 }
 
@@ -68,7 +119,7 @@ func refExcludes(key string) Rule {
 	}
 }
 
-func keyBelongsTo(key string, schemaTypes ...string) Rule {
+func keyBelongsTo(key string, schemaType Enum, owners ...string) Rule {
 	return func(present PresentFields) *violation.Violation {
 		if present[key] == nil {
 			return nil
@@ -79,7 +130,7 @@ func keyBelongsTo(key string, schemaTypes ...string) Rule {
 		}
 
 		declaredType, valid := present["type"].(string)
-		if !valid || slices.Contains(schemaTypes, declaredType) || !slices.Contains(SchemaType.Allowed, declaredType) {
+		if !valid || slices.Contains(owners, declaredType) || !slices.Contains(schemaType.Allowed, declaredType) {
 			return nil
 		}
 
@@ -123,15 +174,16 @@ func mapRequiresValues(present PresentFields) *violation.Violation {
 	return &violation.Violation{ErrorCode: "schema.map_without_values"}
 }
 
-func membersRequired(present PresentFields) *violation.Violation {
-	schemaType, _ := present["type"].(string)
-	if present["ref"] != nil || (schemaType != model.EnumType && schemaType != model.UnionType) || present["members"] != nil {
-		return nil
-	}
+func membersRequired(schemaType string) Rule {
+	return func(present PresentFields) *violation.Violation {
+		if present["ref"] != nil || present["type"] != schemaType || present["members"] != nil {
+			return nil
+		}
 
-	return &violation.Violation{
-		ErrorCode: "members.required",
-		Details:   map[string]string{"type": schemaType},
+		return &violation.Violation{
+			ErrorCode: "members.required",
+			Details:   map[string]string{"type": schemaType},
+		}
 	}
 }
 

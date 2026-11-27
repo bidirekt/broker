@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/bidirekt/broker/internal/contracts/descriptor"
+	"github.com/bidirekt/broker/internal/contracts/protocol"
 )
 
 const (
@@ -36,7 +37,7 @@ var (
 	StatusCode = descriptor.Key{ErrorCode: "status.out_of_range", Check: statusCodeInRange}
 )
 
-func (this Plugin) Grammar() descriptor.Node {
+func (this Plugin) Grammar() protocol.Grammar {
 	responses := descriptor.Map(StatusCode, descriptor.SchemaRef)
 
 	operations := make(descriptor.Fields, len(methods))
@@ -49,7 +50,9 @@ func (this Plugin) Grammar() descriptor.Node {
 		operations[method.name] = descriptor.Object(operation)
 	}
 
-	return descriptor.Map(Endpoint, descriptor.Object(operations))
+	endpoints := descriptor.Map(Endpoint, descriptor.Object(operations))
+
+	return protocol.Grammar{Provides: endpoints, Consumes: endpoints}
 }
 
 func statusCodeInRange(key string) error {

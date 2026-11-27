@@ -23,7 +23,7 @@ func (this *CompatibilityChecker) CheckRemovedProviderResource(
 	consumers []model.PersistedResource,
 ) []*CounterpartResult {
 	results := make([]*CounterpartResult, 0, len(consumers))
-	reason, details, refined := this.hooksOf(removedResource.Protocol).RefineRemoved(removedResource, checkedResources)
+	reason, details, refined := this.refineRemoved(removedResource, checkedResources)
 
 	for _, consumerResource := range consumers {
 		// ContractID is left zeroed so this break alone never persists a verdict for the pair.
@@ -42,4 +42,16 @@ func (this *CompatibilityChecker) CheckRemovedProviderResource(
 	}
 
 	return results
+}
+
+func (this *CompatibilityChecker) refineRemoved(
+	removedResource *model.PersistedResource,
+	checkedResources map[string]model.PersistedResource,
+) (reason model.BreakingReason, details map[string]string, refined bool) {
+	refiner, refines := this.hooksOf(removedResource.Protocol).(RemovedRefiner)
+	if !refines {
+		return reason, details, false
+	}
+
+	return refiner.RefineRemoved(removedResource, checkedResources)
 }

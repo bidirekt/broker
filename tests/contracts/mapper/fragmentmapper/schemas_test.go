@@ -288,3 +288,23 @@ func TestToSchemaModels_UndescribedBodies_ConvertNoSchema(t *testing.T) {
 
 	assert.Equal(t, model.Schemas{}, schemas)
 }
+
+func TestToSchemaModels_ASchemaKeptUnreached_IsConvertedWithWhatItReaches(t *testing.T) {
+	declarations := protocol.Declarations{
+		Schemas: []protocol.SchemaDeclaration{
+			{Namespace: "sdl", Name: "Owner", Schema: contract.Schema{Type: "object", Properties: map[string]contract.Schema{"pet": {Ref: "Pet"}}}, KeepUnreached: true},
+			{Namespace: "sdl", Name: "Pet", Schema: contract.Schema{Type: "string"}},
+			{Namespace: "sdl", Name: "Unused", Schema: contract.Schema{Type: "string"}},
+		},
+		Catalog: map[string]contract.SchemasMap{"sdl": {
+			"Owner":  {Type: "object", Properties: map[string]contract.Schema{"pet": {Ref: "Pet"}}},
+			"Pet":    {Type: "string"},
+			"Unused": {Type: "string"},
+		}},
+	}
+
+	assert.Equal(t, map[string]model.Schemas{"sdl": {
+		"Owner": {"": {Type: "object"}, "pet": {Ref: "Pet"}},
+		"Pet":   {"": {Type: "string"}},
+	}}, fragmentmapper.ToSchemaModels(declarations))
+}

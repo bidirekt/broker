@@ -12,6 +12,10 @@ type ProtocolTable interface {
 	Protocol() model.Protocol
 	Insert(ctx context.Context, q Querier, resourceID int64, identity model.ResourceIdentity)
 	LoadIdentities(ctx context.Context, q Querier, resourceIDs []int64) map[int64]model.ResourceIdentity
+}
+
+// ProviderHintTable is a ProtocolTable that, for a consumer resource with no provider, finds what the provider declares around it.
+type ProviderHintTable interface {
 	LoadProviderHint(ctx context.Context, q Querier, consumer model.PersistedResource, environmentID int64) (hint any, found bool)
 }
 
@@ -36,8 +40,8 @@ func (this *ContractRepository) tableOf(resourceID int64, protocol model.Protoco
 func (this *ContractRepository) identitiesOf(ctx context.Context, q Querier, rows []tableRow) map[int64]model.ResourceIdentity {
 	idsByProtocol := make(map[model.Protocol][]int64)
 	for _, row := range rows {
-		protocol := model.Protocol(row.ResourceProtocol)
-		idsByProtocol[protocol] = append(idsByProtocol[protocol], row.ResourceID)
+		protocol := model.Protocol(row.ResourceProtocol.String)
+		idsByProtocol[protocol] = append(idsByProtocol[protocol], row.ResourceID.Int64)
 	}
 
 	identities := make(map[int64]model.ResourceIdentity, len(rows))
@@ -48,8 +52,8 @@ func (this *ContractRepository) identitiesOf(ctx context.Context, q Querier, row
 	}
 
 	for _, row := range rows {
-		if _, found := identities[row.ResourceID]; !found {
-			panic(fmt.Errorf("resource %d has no row in its protocol table", row.ResourceID))
+		if _, found := identities[row.ResourceID.Int64]; !found {
+			panic(fmt.Errorf("resource %d has no row in its protocol table", row.ResourceID.Int64))
 		}
 	}
 

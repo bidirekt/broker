@@ -169,6 +169,8 @@ func TestDiff_FieldWhoseAttributeChanged_IsModified(t *testing.T) {
 		{name: "nullable", after: model.Field{Type: "string", Nullable: true}},
 		{name: "ref", after: model.Field{Ref: "PetId"}},
 		{name: "members", after: model.Field{Type: "string", Members: []string{"available"}}},
+		{name: "scalar", after: model.Field{Type: "string", Scalar: "DateTime"}},
+		{name: "arguments", after: model.Field{Type: "string", Arguments: "IdArguments"}},
 	}
 
 	for _, testCase := range cases {

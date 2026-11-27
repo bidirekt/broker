@@ -274,3 +274,21 @@ func TestToSchemaModels_UnionAtTheRoot_HasItsMembersRightAfterTheSchema(t *testi
 	assert.Equal(t, model.Schema{"": {Type: "union"}, "(card)": {Ref: "CardPayment"}}, schemas["Payment"])
 	assert.Equal(t, "Payment(card)", model.FieldName("Payment", "(card)"))
 }
+
+func TestToSchemaModels_ScalarField_KeepsTheScalarName(t *testing.T) {
+	catalog := contract.SchemasMap{
+		"Pet": {
+			Type:       "object",
+			Properties: map[string]contract.Schema{"bornAt": {Type: "scalar", Scalar: "DateTime"}},
+		},
+	}
+
+	schemas := schemamapper.ToSchemaModels(catalog, []string{"Pet"})
+
+	assert.Equal(t, model.Schemas{
+		"Pet": {
+			"":       {Type: "object"},
+			"bornAt": {Type: "scalar", Scalar: "DateTime"},
+		},
+	}, schemas)
+}

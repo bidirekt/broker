@@ -185,7 +185,7 @@ func (this *IntegrationSuite) TestSchemaNamespace_CanIDeploy_ComparesARestConsum
 
 	status, body := this.post("/api/can-i-deploy", `{"participant":"petstore_web","version":"1.0.0","environment":"production"}`)
 	this.Equal(http.StatusOK, status)
-	this.JSONEq(`{"message":"contract checked successfully","participant":"petstore_web","version":"1.0.0","environment":"production","deployable":true,"results":{"petstore_api":{"deployable":true,"participantVersion":"1.0.0","endpoints":{}}}}`, body)
+	this.JSONEq(`{"message":"contract checked successfully","participant":"petstore_web","version":"1.0.0","environment":"production","deployable":true,"results":{"petstore_api":{"deployable":true,"participantVersion":"1.0.0"}}}`, body)
 }
 
 func (this *IntegrationSuite) TestSchemaNamespace_RestOnlyContract_KeepsItsChecksum() {

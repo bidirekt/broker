@@ -1376,3 +1376,215 @@ func TestValidate_ConsumedUnionWithDifferentMembers_JoinsThemWithoutAConflict(t 
 
 	assert.Empty(t, violations)
 }
+
+func petConsumerYAML(schema, bornAt string) string {
+	return `consumes:
+  petstore:
+    rest:
+      /pets:
+        get:
+          responses:
+            200: ` + schema + `
+schemas:
+  ` + schema + `:
+    type: object
+    properties:
+      bornAt:
+` + bornAt
+}
+
+func TestValidate_ConsumedPropertyWithDifferentScalars_IsATypeConflictNamingTheScalars(t *testing.T) {
+	violations := validateFiles(t,
+		validatedFile{"b.yaml", petConsumerYAML("PetWithDate", "        type: scalar\n        name: Date\n")},
+		validatedFile{"a.yaml", petConsumerYAML("Pet", "        type: scalar\n        name: DateTime\n")},
+	)
+
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "resource.type_conflict",
+			Path:      "consumes;petstore;rest;/pets;get;responses;200",
+			Source:    "b.yaml",
+			Details: map[string]string{
+				"resource":     "consumes petstore GET /pets 200",
+				"property":     "$.bornAt",
+				"type":         "Date",
+				"declaredIn":   "a.yaml",
+				"declaredType": "DateTime",
+			},
+		},
+	}, violations)
+}
+
+func TestValidate_ConsumedPropertyWithTheSameScalar_ReportsNothing(t *testing.T) {
+	violations := validateFiles(t,
+		validatedFile{"b.yaml", petConsumerYAML("PetWithDateTime", "        type: scalar\n        name: DateTime\n")},
+		validatedFile{"a.yaml", petConsumerYAML("Pet", "        type: scalar\n        name: DateTime\n")},
+	)
+
+	assert.Empty(t, violations)
+}
+
+func TestValidate_ConsumedPropertyWithDifferentArguments_IsATypeConflictNamingTheArguments(t *testing.T) {
+	violations := validateFiles(t,
+		validatedFile{"b.yaml", petConsumerYAML("PetWithArguments", "        type: string\n        arguments: FormatArguments\n") +
+			"  FormatArguments:\n    type: object\n    properties:\n      format:\n        type: string\n"},
+		validatedFile{"a.yaml", petConsumerYAML("Pet", "        type: string\n")},
+	)
+
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "resource.type_conflict",
+			Path:      "consumes;petstore;rest;/pets;get;responses;200",
+			Source:    "b.yaml",
+			Details: map[string]string{
+				"resource":          "consumes petstore GET /pets 200",
+				"property":          "$.bornAt",
+				"type":              "string",
+				"declaredIn":        "a.yaml",
+				"declaredType":      "string",
+				"arguments":         "FormatArguments",
+				"declaredArguments": "",
+			},
+		},
+	}, violations)
+}
+
+func petOwnerAndVetConsumerYAML(schema, person, vetArguments string) string {
+	return `consumes:
+  petstore:
+    rest:
+      /pets:
+        get:
+          responses:
+            200: ` + schema + `
+schemas:
+  ` + schema + `:
+    type: object
+    properties:
+      owner:
+        ref: ` + person + `
+        arguments: OwnerArguments
+      vet:
+        ref: ` + person + `
+        arguments: ` + vetArguments + `
+`
+}
+
+const personSchemasYAML = `schemas:
+  Person:
+    type: object
+    properties:
+      id:
+        type: string
+  OwnerArguments:
+    type: object
+    properties:
+      since:
+        type: string
+  ClinicArguments:
+    type: object
+    properties:
+      clinic:
+        type: string
+  LicenseArguments:
+    type: object
+    properties:
+      license:
+        type: string
+`
+
+func TestValidate_ConsumedSecondRefToASchemaWithDifferentArguments_IsATypeConflictAtThatRef(t *testing.T) {
+	violations := validateFiles(t,
+		validatedFile{"b.yaml", petOwnerAndVetConsumerYAML("PetSeenByLicense", "Person", "LicenseArguments")},
+		validatedFile{"a.yaml", petOwnerAndVetConsumerYAML("Pet", "Person", "ClinicArguments")},
+		validatedFile{"people.yaml", personSchemasYAML},
+	)
+
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "resource.type_conflict",
+			Path:      "consumes;petstore;rest;/pets;get;responses;200",
+			Source:    "b.yaml",
+			Details: map[string]string{
+				"resource":          "consumes petstore GET /pets 200",
+				"property":          "$.vet",
+				"type":              "object",
+				"declaredIn":        "a.yaml",
+				"declaredType":      "object",
+				"arguments":         "LicenseArguments",
+				"declaredArguments": "ClinicArguments",
+			},
+		},
+	}, violations)
+}
+
+func TestValidate_ConsumedRefsToOneSchemaWithDifferentArguments_ReportAConflictInsideItOnce(t *testing.T) {
+	violations := validateFiles(t,
+		validatedFile{"b.yaml", petOwnerAndVetConsumerYAML("PetWithNumberedPerson", "NumberedPerson", "LicenseArguments") +
+			"  NumberedPerson:\n    type: object\n    properties:\n      id:\n        type: integer\n"},
+		validatedFile{"a.yaml", petOwnerAndVetConsumerYAML("Pet", "Person", "ClinicArguments")},
+		validatedFile{"people.yaml", personSchemasYAML},
+	)
+
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "resource.type_conflict",
+			Path:      "consumes;petstore;rest;/pets;get;responses;200",
+			Source:    "b.yaml",
+			Details: map[string]string{
+				"resource":     "consumes petstore GET /pets 200",
+				"property":     "$.owner.id",
+				"type":         "integer",
+				"declaredIn":   "a.yaml",
+				"declaredType": "string",
+			},
+		},
+		{
+			ErrorCode: "resource.type_conflict",
+			Path:      "consumes;petstore;rest;/pets;get;responses;200",
+			Source:    "b.yaml",
+			Details: map[string]string{
+				"resource":          "consumes petstore GET /pets 200",
+				"property":          "$.vet",
+				"type":              "object",
+				"declaredIn":        "a.yaml",
+				"declaredType":      "object",
+				"arguments":         "LicenseArguments",
+				"declaredArguments": "ClinicArguments",
+			},
+		},
+	}, violations)
+}
+
+func TestValidate_UnresolvedArguments_ReportedAsAnUnresolvedRefWhereWritten(t *testing.T) {
+	violations := validateFiles(t, validatedFile{"pets.yaml", `schemas:
+  Pet:
+    type: object
+    properties:
+      reviews:
+        type: array
+        items:
+          type: string
+        arguments: ReviewsArguments
+      owner:
+        ref: Owner
+        arguments: OwnerArguments
+  Owner:
+    type: string
+`})
+
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "schema.unresolved_ref",
+			Path:      "schemas;Pet;properties;owner",
+			Source:    "pets.yaml",
+			Details:   map[string]string{"schema": "OwnerArguments", "property": "Pet.owner"},
+		},
+		{
+			ErrorCode: "schema.unresolved_ref",
+			Path:      "schemas;Pet;properties;reviews",
+			Source:    "pets.yaml",
+			Details:   map[string]string{"schema": "ReviewsArguments", "property": "Pet.reviews"},
+		},
+	}, violations)
+}

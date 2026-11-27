@@ -1,13 +1,15 @@
 package descriptor
 
 import (
+	"sync"
+
 	"github.com/bidirekt/broker/internal/contracts/violation"
 )
 
 // Go rejects a var that refers to itself in its own initializer, even through a closure;
-// a function may refer to itself, so a recursive grammar is a function resolved at validation time.
+// a function may refer to itself, so a recursive grammar is a function resolved once, at the first validation.
 func Lazy(grammar func() Node) Node {
-	return lazyNode{grammar: grammar}
+	return lazyNode{grammar: sync.OnceValue(grammar)}
 }
 
 type lazyNode struct {

@@ -15,6 +15,10 @@ func (this ReportTree) ReportKey() string {
 	return ReportKey
 }
 
+func (this ReportTree) IsEmpty() bool {
+	return len(this) == 0
+}
+
 func (this ReportTree) Append(location map[string]string, reportBreak model.ReportBreak) {
 	endpoint, method, interaction := location[EndpointKey], location[MethodKey], location[InteractionKey]
 

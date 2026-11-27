@@ -245,7 +245,7 @@ func (this *IntegrationSuite) TestResourceHashProtocolMigration_MatchesProviderA
 		contractFragment{"web.yaml", hashProtocolConsumerYAML}))
 	status, body = this.post("/api/can-i-deploy", `{"participant":"petstore_web","version":"2.0.0","environment":"production"}`)
 	this.Equal(http.StatusOK, status)
-	this.JSONEq(`{"message":"contract checked successfully","participant":"petstore_web","version":"2.0.0","environment":"production","deployable":true,"results":{"petstore_api":{"deployable":true,"participantVersion":"1.0.0","endpoints":{}}}}`, body)
+	this.JSONEq(`{"message":"contract checked successfully","participant":"petstore_web","version":"2.0.0","environment":"production","deployable":true,"results":{"petstore_api":{"deployable":true,"participantVersion":"1.0.0"}}}`, body)
 
 	this.mustPostForHashProtocol("/api/contracts", this.publishBody("petstore_api", "2.0.0",
 		contractFragment{"api.yaml", hashProtocolProviderWithoutIDYAML}))

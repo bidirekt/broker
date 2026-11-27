@@ -281,3 +281,37 @@ func TestNamespaces_BodiesOfOneResource_ResolveTheirSchemaAndRefsInTheirOwnNames
 	assert.Equal(t, []schemagraph.Declaration{{Source: "pets.yaml", Type: "string"}}, pet.Child("owner").Child("name").Declarations())
 	assert.Equal(t, []schemagraph.Declaration{{Source: "pets.graphql", Type: "string"}}, pet.Child("owner").Child("email").Declarations())
 }
+
+func TestScalar_ReachedThroughARef_IsTheTargetScalar(t *testing.T) {
+	catalog := model.Schemas{
+		"Pet": {
+			"":       {Type: "object"},
+			"bornAt": {Ref: "Timestamp"},
+		},
+		"Timestamp": {"": {Type: "scalar", Scalar: "DateTime"}},
+	}
+
+	bornAt := graphRoot(catalog, "Pet").Child("bornAt")
+
+	assert.Equal(t, "scalar", bornAt.Type())
+	assert.Equal(t, "DateTime", bornAt.Scalar())
+	assert.Equal(t, []schemagraph.Declaration{{Source: "orders.yaml", Type: "scalar", Scalar: "DateTime"}}, bornAt.Declarations())
+}
+
+func TestArguments_StayOnThePropertyThatDeclaresThem(t *testing.T) {
+	catalog := model.Schemas{
+		"Pet": {
+			"":        {Type: "object"},
+			"reviews": {Ref: "Reviews", Arguments: "ReviewsArguments"},
+		},
+		"Reviews":          {"": {Type: "array"}, "[]": {Type: "string"}},
+		"ReviewsArguments": {"": {Type: "object"}},
+	}
+
+	reviews := graphRoot(catalog, "Pet").Child("reviews")
+
+	assert.Equal(t, "array", reviews.Type())
+	assert.Equal(t, "ReviewsArguments", reviews.Arguments())
+	assert.Equal(t, []schemagraph.Declaration{{Source: "orders.yaml", Type: "array", Arguments: "ReviewsArguments"}}, reviews.Declarations())
+	assert.Empty(t, reviews.Child("[]").Arguments())
+}

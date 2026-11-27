@@ -365,7 +365,7 @@ func TestHierarchicalNodeWireKeys(t *testing.T) {
 		keys = append(keys, key)
 	}
 
-	assert.ElementsMatch(t, []string{"deployable", "participantVersion", "endpoints"}, keys)
+	assert.ElementsMatch(t, []string{"deployable", "participantVersion"}, keys)
 }
 
 func TestHierarchicalMarshalsFieldsInWireOrder(t *testing.T) {
@@ -385,7 +385,7 @@ func TestHierarchicalMarshalsFieldsInWireOrder(t *testing.T) {
 	brokenData, err := json.Marshal(broken)
 	assert.NoError(t, err)
 
-	assert.Equal(t, `{"deployable":true,"participantVersion":null,"endpoints":{}}`, string(compatibleData))
+	assert.Equal(t, `{"deployable":true,"participantVersion":null}`, string(compatibleData))
 	assert.Equal(t, `{"deployable":false,"participantVersion":"v1","endpoints":{"/things":{"get":{"200":[{"reason":"property_missing_in_provider","role":"consumer"}]}}}}`, string(brokenData))
 }
 

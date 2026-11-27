@@ -13,7 +13,7 @@ import (
 var deployedResourcesByProviderHashAndEnvironmentQuery = `
 		SELECT
 			cd.contract_id,
-			cd.version,` + resourceColumns + `
+			cd.version,` + resourceColumns("rv.change_type") + `
 		FROM
 			resources r
 		JOIN
@@ -96,8 +96,10 @@ func (this *ContractRepository) LoadCounterparts(
 				continue
 			}
 
-			if hint, found := this.tables[resource.Protocol].LoadProviderHint(ctx, this.pool, resource, environmentID); found {
-				counterparts.ProviderHints[resource.ProviderHash] = hint
+			if table, hints := this.tables[resource.Protocol].(ProviderHintTable); hints {
+				if hint, found := table.LoadProviderHint(ctx, this.pool, resource, environmentID); found {
+					counterparts.ProviderHints[resource.ProviderHash] = hint
+				}
 			}
 		case model.Provides:
 			if _, queried := counterparts.Consumers[resource.ProviderHash]; queried {
@@ -183,7 +185,7 @@ func (this *ContractRepository) loadDeployedResources(
 	resources := make([]model.PersistedResource, len(tableRows))
 
 	for index, row := range tableRows {
-		resources[index] = row.toResourceModel(identities[row.ResourceID])
+		resources[index] = row.toResourceModel(identities[row.ResourceID.Int64])
 		resources[index].ParticipantVersion = null.StringFrom(row.ContractVersion)
 	}
 

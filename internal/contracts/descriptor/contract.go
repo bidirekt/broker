@@ -1,9 +1,9 @@
 package descriptor
 
-func Contract(protocolBlocks Fields) Node {
+func Contract(provides Fields, consumes Fields, vocabulary Vocabulary) Node {
 	return Object(Fields{
-		"provides": Object(protocolBlocks),
-		"consumes": Map(ServiceName, Object(protocolBlocks)),
-		"schemas":  Map(SchemaName, SchemaAt("schema")),
+		"provides": Object(provides),
+		"consumes": Map(ServiceName, Object(consumes)),
+		"schemas":  Map(SchemaName, vocabulary.SchemaAt("schema")),
 	})
 }

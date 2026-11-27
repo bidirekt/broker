@@ -321,6 +321,21 @@ func TestSchemaChildren_ArrayItemsAndMapValues(t *testing.T) {
 	}, mapping.Children())
 }
 
+func TestSchemaChildren_UnionPropertiesThenMembers(t *testing.T) {
+	schema := contract.Schema{
+		Type:         "union",
+		Properties:   map[string]contract.Schema{"name": {Type: "string"}, "id": {Type: "string"}},
+		UnionMembers: map[string]contract.Schema{"Person": {Ref: "Person"}, "Org": {Ref: "Org"}},
+	}
+
+	assert.Equal(t, []contract.SchemaChild{
+		{DocumentPath: "properties;id", Segment: "id", Schema: contract.Schema{Type: "string"}},
+		{DocumentPath: "properties;name", Segment: "name", Schema: contract.Schema{Type: "string"}},
+		{DocumentPath: "members;Org", Segment: "(Org)", Schema: contract.Schema{Ref: "Org"}},
+		{DocumentPath: "members;Person", Segment: "(Person)", Schema: contract.Schema{Ref: "Person"}},
+	}, schema.Children())
+}
+
 func TestSchemaChildren_NoneForLeavesRefsAndMissingChildren(t *testing.T) {
 	for name, source := range map[string]string{
 		"primitive":               "type: string\n",
@@ -361,4 +376,24 @@ members:
 		{DocumentPath: "members;card", Segment: "(card)", Schema: contract.Schema{Ref: "CardPayment"}},
 		{DocumentPath: "members;pix", Segment: "(pix)", Schema: contract.Schema{Ref: "PixPayment"}},
 	}, schema.Children())
+}
+
+func TestSchemaFromDocument_ScalarNameAndPropertyArguments(t *testing.T) {
+	schema := contract.SchemaFromDocument(schemaDocument(t, `type: object
+properties:
+  bornAt:
+    type: scalar
+    name: DateTime
+  reviews:
+    ref: ReviewList
+    arguments: ReviewsArguments
+`))
+
+	assert.Equal(t, contract.Schema{
+		Type: "object",
+		Properties: map[string]contract.Schema{
+			"bornAt":  {Type: "scalar", Scalar: "DateTime"},
+			"reviews": {Ref: "ReviewList", Arguments: "ReviewsArguments"},
+		},
+	}, schema)
 }
