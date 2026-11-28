@@ -657,3 +657,39 @@ func TestGraphQLReading_TheSameRequiredArgumentWithoutFromContext_BreaksTheConsu
 		}},
 	})
 }
+
+const readingWeightAsIntSDL = `type Pet {
+  id: ID!
+  weight: Int!
+}
+
+type Query {
+  pet(id: ID!): Pet
+}
+`
+
+func TestGraphQLReading_AFloatOutputChangedToInt_BreaksTheConsumerReadingAFloat(t *testing.T) {
+	assertReadingBreaks(t, readingWeightAsIntSDL, "pet", graphqlmodel.ReturnsInteraction, model.Schemas{
+		"PetRead": {"": {Type: "object", Nullable: true}, "weight": {Type: "float"}},
+	}, "PetRead", []readingBreak{
+		{model.ReasonPropertyTypeMismatch, map[string]string{
+			"property":             "$.weight",
+			"consumerName":         readingConsumerName,
+			"providerName":         readingProviderName,
+			"consumerPropertyType": "Float!",
+			"providerPropertyType": "Int!",
+			"consumerField":        "PetRead.weight",
+			"providerField":        "Pet.weight",
+		}},
+	})
+}
+
+func TestGraphQLReading_AFloatOutputChangedToInt_KeepsTheConsumerReadingANumberOrAnInteger(t *testing.T) {
+	for _, read := range []string{"number", "integer"} {
+		t.Run(read, func(t *testing.T) {
+			assertReadingBreaks(t, readingWeightAsIntSDL, "pet", graphqlmodel.ReturnsInteraction, model.Schemas{
+				"PetRead": {"": {Type: "object", Nullable: true}, "weight": {Type: read}},
+			}, "PetRead", nil)
+		})
+	}
+}

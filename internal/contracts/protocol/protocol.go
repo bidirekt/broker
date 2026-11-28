@@ -65,7 +65,7 @@ func (this Block) ToResourceDeclaration(
 	if schemaRef == nil {
 		resource.Bodies = []model.ResourceBody{{Source: this.Source}}
 
-		return ResourceDeclaration{Source: this.Source, Path: path, Namespace: model.YAMLNamespace, WithoutSchema: true, Resource: resource}
+		return ResourceDeclaration{Source: this.Source, Path: path, WithoutSchema: true, Resource: resource}
 	}
 
 	schemaName, _ := schemaRef.(string)
