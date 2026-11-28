@@ -1,0 +1,4 @@
+{
+  "composes": false,
+  "exception": "Advancing Query(a) (types: [Query]) for pet gave [object Object]"
+}

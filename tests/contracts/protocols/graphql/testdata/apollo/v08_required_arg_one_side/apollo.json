@@ -1,0 +1,6 @@
+{
+  "composes": false,
+  "codes": [
+    "REQUIRED_ARGUMENT_MISSING_IN_SOME_SUBGRAPH"
+  ]
+}

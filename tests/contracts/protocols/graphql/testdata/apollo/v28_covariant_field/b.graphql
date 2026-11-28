@@ -1,0 +1,5 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key", "@shareable", "@external", "@override", "@inaccessible", "@interfaceObject", "@provides", "@requires", "@tag"])
+type Query { b: Holder }
+type Holder @shareable { item: Thing }
+interface Node { id: ID! }
+type Thing implements Node @shareable { id: ID! }

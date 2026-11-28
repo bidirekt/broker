@@ -1,0 +1,6 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key", "@shareable"])
+type Query { a: Holder }
+type Holder @shareable { item: Result }
+union Result = Book | Movie
+type Book @shareable { title: String }
+type Movie @shareable { name: String }

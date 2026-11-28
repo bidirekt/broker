@@ -107,3 +107,20 @@ jobs:
         with:
           node-version: 24
       - run: node --test '.github/cla/**/*.test.js'
+
+  apollo-parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - run: npm ci
+        working-directory: scripts/apollo-parity
+      - run: node write-apollo-results.js
+        working-directory: scripts/apollo-parity
+      - name: Fail when Apollo answers a set otherwise
+        run: |
+          git status --porcelain -- tests/contracts/protocols/graphql/testdata/apollo
+          git diff --exit-code -- tests/contracts/protocols/graphql/testdata/apollo
+          test -z "$(git status --porcelain -- tests/contracts/protocols/graphql/testdata/apollo)"

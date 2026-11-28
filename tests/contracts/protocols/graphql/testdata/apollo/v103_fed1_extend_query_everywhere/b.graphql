@@ -1,0 +1,2 @@
+extend type Query { topStock: [Product] }
+extend type Product @key(fields: "upc") { upc: String! @external stock: Int }

@@ -1,0 +1,4 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key"])
+schema { query: Query mutation: Mutation }
+type Query { a: Int }
+type Mutation { m: Int }

@@ -1,0 +1,4 @@
+{
+  "composes": false,
+  "exception": "Cannot implement non-interface type Thing (of type ObjectType)"
+}

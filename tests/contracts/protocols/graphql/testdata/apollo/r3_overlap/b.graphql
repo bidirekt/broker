@@ -1,0 +1,6 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key", "@shareable", "@external", "@override", "@inaccessible", "@interfaceObject", "@provides", "@requires", "@tag"])
+type Query { result: Result @shareable }
+union Result = Movie | Song
+type Book @shareable { pages: Int }
+type Movie @shareable { name: String year: Int }
+type Song @shareable { title: String }

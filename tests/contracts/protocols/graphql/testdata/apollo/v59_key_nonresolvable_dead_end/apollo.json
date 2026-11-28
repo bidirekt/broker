@@ -1,0 +1,6 @@
+{
+  "composes": false,
+  "codes": [
+    "SATISFIABILITY_ERROR"
+  ]
+}

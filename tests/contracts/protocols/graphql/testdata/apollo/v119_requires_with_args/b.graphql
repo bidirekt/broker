@@ -1,0 +1,2 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key", "@external", "@requires"])
+type Product @key(fields: "id") { id: ID! price(currency: String): Int @external tax: Int @requires(fields: "price(currency: \"USD\")") }

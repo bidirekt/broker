@@ -1,0 +1,6 @@
+{
+  "composes": false,
+  "codes": [
+    "INTERFACE_OBJECT_USAGE_ERROR"
+  ]
+}

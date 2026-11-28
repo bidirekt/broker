@@ -1,0 +1,6 @@
+{
+  "composes": false,
+  "codes": [
+    "ENUM_VALUE_MISMATCH"
+  ]
+}

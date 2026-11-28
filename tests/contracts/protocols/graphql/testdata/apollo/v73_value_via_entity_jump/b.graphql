@@ -1,0 +1,3 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key", "@shareable", "@external", "@override", "@inaccessible", "@interfaceObject", "@provides", "@requires", "@tag"])
+type Product @key(fields: "id") { id: ID! price: Money @shareable }
+type Money @shareable { amount: Int currency: String }

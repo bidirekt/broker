@@ -1,0 +1,7 @@
+{
+  "composes": false,
+  "codes": [
+    "INVALID_FIELD_SHARING",
+    "OVERRIDE_COLLISION_WITH_ANOTHER_DIRECTIVE"
+  ]
+}

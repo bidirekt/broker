@@ -1,0 +1,4 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key", "@shareable", "@external", "@override", "@inaccessible", "@interfaceObject", "@provides", "@requires", "@tag"])
+type Query { a: Int }
+type Money @shareable { amount: Int }
+type Wallet @key(fields: "id") { id: ID! }

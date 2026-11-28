@@ -1,0 +1,7 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key", "@override"])
+
+type Pet @key(fields: "id") {
+  id: ID!
+  reviews: [String!]!
+  rating: Int @override(from: "petstore_legacy")
+}
