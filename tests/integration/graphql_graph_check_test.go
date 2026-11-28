@@ -458,7 +458,7 @@ type Pet @key(fields: "id") {
 		"deployable": false,
 		"members": {"petstore_api": "1.4.0", "petstore_reviews": "2.0.0"},
 		"operations": {"query": {"pet": {"returns": [
-			{"reason": "provider_graph_not_composable", "role": "consumer", "details": {"graph": "petstore_graph", "cause": "petstore_api 1.4.0 has a type named Query, but its query root is RootQuery (ROOT_QUERY_USED)", "causes": "petstore_api 1.4.0 has a type named Query, but its query root is RootQuery (ROOT_QUERY_USED)"}}
+			{"reason": "provider_graph_not_composable", "role": "consumer", "details": {"graph": "petstore_graph", "cause": "petstore_api 1.4.0 has a type named Query, but its query root is RootQuery", "causes": "petstore_api 1.4.0 has a type named Query, but its query root is RootQuery"}}
 		]}}}
 	}}`)
 }

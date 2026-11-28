@@ -235,7 +235,7 @@ func (this *IntegrationSuite) TestShowGraph_ASubgraphWhoseRenamedQueryRootLeaves
 
 	this.Contains(production, showGraphDoesNotCompose)
 	this.Contains(production, `<ul class="list errors">
-    <li>petstore_api 1.4.0 has a type named Query, but its query root is RootQuery (ROOT_QUERY_USED)</li>
+    <li>petstore_api 1.4.0 has a type named Query, but its query root is RootQuery</li>
   </ul>`)
 }
 

@@ -46,7 +46,7 @@ func overrideMember(t *testing.T, name, version, sdl string) *model.PersistedCon
 func overrideErrors(subgraphs ...*model.PersistedContract) []string {
 	_, errors := graphqlcontracts.ToComposedGraph("petstore_graph", subgraphs)
 
-	return errors
+	return graphqlcontracts.CompositionMessages(errors)
 }
 
 const overrideAPISDL = `

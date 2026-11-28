@@ -268,7 +268,7 @@ func toComposedGraph(name string, members []*model.PersistedContract) composedGr
 
 	contract, failures := ToComposedGraph(name, members)
 
-	return composedGraph{name: name, members: versions, contract: contract, failures: failures}
+	return composedGraph{name: name, members: versions, contract: contract, failures: CompositionMessages(failures)}
 }
 
 func (this composedGraph) notComposable() compatibility_checker.ReadyBreak {

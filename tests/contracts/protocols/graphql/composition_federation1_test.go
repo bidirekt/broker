@@ -81,5 +81,5 @@ func TestToComposedGraph_AFederation1SubgraphAndAFederation2OneResolvingTheSameF
 		federation1Member(t, "petstore_reviews", "2.0.0", composedFederation1ReviewsSDL),
 	})
 
-	assert.Equal(t, []string{"petstore_api 1.4.0 and petstore_reviews 2.0.0 both resolve Pet.name without @shareable"}, errors)
+	assert.Equal(t, []graphqlcontracts.CompositionError{{Code: "INVALID_FIELD_SHARING", Message: "petstore_api 1.4.0 and petstore_reviews 2.0.0 both resolve Pet.name without @shareable"}}, errors)
 }

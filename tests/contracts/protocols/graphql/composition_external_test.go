@@ -107,9 +107,9 @@ extend type Pet {
 `),
 	})
 
-	assert.Equal(t, []string{
-		"query reviews.pet.id can't be resolved: no resolvable @key leads from petstore_reviews 2.0.0 to petstore_api 1.4.0 on Pet",
-		"query reviews.pet.name can't be resolved: no resolvable @key leads from petstore_reviews 2.0.0 to petstore_api 1.4.0 on Pet",
+	assert.Equal(t, []graphqlcontracts.CompositionError{
+		{Code: "SATISFIABILITY_ERROR", Message: "query reviews.pet.id can't be resolved: no resolvable @key leads from petstore_reviews 2.0.0 to petstore_api 1.4.0 on Pet"},
+		{Code: "SATISFIABILITY_ERROR", Message: "query reviews.pet.name can't be resolved: no resolvable @key leads from petstore_reviews 2.0.0 to petstore_api 1.4.0 on Pet"},
 	}, errors)
 }
 
