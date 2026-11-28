@@ -13,9 +13,6 @@ import (
 	graphqlmodel "github.com/bidirekt/broker/internal/model/protocols/graphql"
 )
 
-// candidateVersion labels a candidate that has no version yet, the one the validate checks.
-const candidateVersion = "candidate"
-
 type GraphLoader interface {
 	GraphNamed(ctx context.Context, name string) bool
 	DeployedMembers(ctx context.Context, environmentID int64, graph string) []graphqlmodel.DeployedContract
@@ -204,12 +201,7 @@ func (this *graphsInCheck) candidate(ctx context.Context, graph string) composed
 	members := this.deployedOthers(ctx, graph)
 
 	if graphOf(this.contract) == graph {
-		candidate := *this.contract
-		if candidate.Version == "" {
-			candidate.Version = candidateVersion
-		}
-
-		members = append(members, &candidate)
+		members = append(members, this.contract)
 	}
 
 	this.candidates[graph] = toComposedGraph(graph, members)

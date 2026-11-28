@@ -71,8 +71,8 @@ func (this Plugin) FieldName(resource *model.PersistedResource, site schemagraph
 }
 
 func siteCoordinate(resource *model.PersistedResource, site schemagraph.Site) (typeName, field, interaction string, named bool) {
-	if typeName, field, interaction, synthesized := synthesizedSchemaNameToField(site.Schema); synthesized {
-		return typeName, field, interaction, site.Namespace == graphqlmodel.Namespace
+	if typeName, field, interaction, synthesized := synthesizedSchemaNameToField(site.Schema); synthesized && site.Namespace == graphqlmodel.Namespace {
+		return typeName, field, interaction, true
 	}
 
 	identity, rootField := resource.Identity.(graphqlmodel.Identity)

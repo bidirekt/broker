@@ -2,6 +2,7 @@ package publish_contract
 
 import (
 	"encoding/json"
+	"errors"
 
 	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/contracts/contractfiles"
@@ -29,8 +30,13 @@ func (this *PublishContractApiHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondInvalidInput(ctx)
 	}
 
-	if validations.UnpaddedValue(requestBody.ServiceName) != nil || validations.Version(requestBody.Version) != nil || len(requestBody.Contracts) == 0 || contractfiles.HasBlankSource(requestBody.Contracts) {
+	versionErr := validations.Version(requestBody.Version)
+	if validations.UnpaddedValue(requestBody.ServiceName) != nil || errors.Is(versionErr, validations.ErrEmptyVersion) || len(requestBody.Contracts) == 0 || contractfiles.HasBlankSource(requestBody.Contracts) {
 		return this.respondInvalidInput(ctx)
+	}
+
+	if versionErr != nil {
+		return this.respondInvalidVersion(ctx, versionErr)
 	}
 
 	output, err := this.useCase.Execute(ctx.Context(), PublishContractInput{
@@ -84,6 +90,12 @@ func (this *PublishContractApiHandler) respondValidationFailed(ctx fiber.Ctx, vi
 func (this *PublishContractApiHandler) respondInvalidInput(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(PublishContractResponseBody{
 		Message: ContractInvalidInputMessage,
+	})
+}
+
+func (this *PublishContractApiHandler) respondInvalidVersion(ctx fiber.Ctx, err error) error {
+	return ctx.Status(fiber.StatusBadRequest).JSON(PublishContractResponseBody{
+		Message: err.Error(),
 	})
 }
 

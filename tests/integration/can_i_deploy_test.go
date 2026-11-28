@@ -1269,7 +1269,6 @@ func (this *IntegrationSuite) TestCanIDeploy_PaddedParticipantVersionOrEnvironme
 
 	cases := map[string]string{
 		"trailing space in participant":   `{"participant":"api ","version":"v1","environment":"production"}`,
-		"leading space in version":        `{"participant":"api","version":" v1","environment":"production"}`,
 		"trailing newline in environment": `{"participant":"api","version":"v1","environment":"production\n"}`,
 	}
 
@@ -1278,4 +1277,31 @@ func (this *IntegrationSuite) TestCanIDeploy_PaddedParticipantVersionOrEnvironme
 		this.Equal(http.StatusBadRequest, status, name)
 		this.JSONEq(`{"message":"can-i-deploy invalid input"}`, response, name)
 	}
+}
+
+func (this *IntegrationSuite) TestCanIDeploy_VersionWithWhitespaceOrAControlCharacterReturns400() {
+	status, _ := this.post("/api/participants", `{"participant":"api"}`)
+	this.Require().Equal(http.StatusOK, status)
+
+	status, _ = this.post("/api/contracts", this.publishBody("api", "1.0.0+build.5", contractFragment{"api.yaml", apiV1ProviderContract}))
+	this.Require().Equal(http.StatusOK, status)
+
+	status, _ = this.post("/api/environments", `{"environment":"production"}`)
+	this.Require().Equal(http.StatusOK, status)
+
+	cases := map[string]string{
+		`{"participant":"api","version":" v1","environment":"production"}`:      `{"message":"version \" v1\" has whitespace or a control character"}`,
+		`{"participant":"api","version":"1.0 beta","environment":"production"}`: `{"message":"version \"1.0 beta\" has whitespace or a control character"}`,
+		`{"participant":"api","version":"1.0\n2","environment":"production"}`:   `{"message":"version \"1.0\\n2\" has whitespace or a control character"}`,
+		`{"participant":"api","version":"1.0\t","environment":"production"}`:    `{"message":"version \"1.0\\t\" has whitespace or a control character"}`,
+	}
+
+	for body, message := range cases {
+		status, response := this.post("/api/can-i-deploy", body)
+		this.Equal(http.StatusBadRequest, status, body)
+		this.JSONEq(message, response, body)
+	}
+
+	status, response := this.post("/api/can-i-deploy", `{"participant":"api","version":"1.0.0+build.5","environment":"production"}`)
+	this.Equal(http.StatusOK, status, response)
 }

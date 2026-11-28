@@ -33,13 +33,21 @@ type subgraph struct {
 	federation1    bool
 }
 
+func toMemberLabel(contract *model.PersistedContract) string {
+	if contract.Version == "" {
+		return contract.ParticipantName + " (local candidate)"
+	}
+
+	return contract.ParticipantName + " " + contract.Version
+}
+
 func toSubgraph(contract *model.PersistedContract) subgraph {
 	extension, _ := contract.Extensions[graphqlmodel.Protocol.String()].(graphqlmodel.Extension)
 	roots := toRootNames(extension.Roots)
 
 	member := subgraph{
 		name:           contract.ParticipantName,
-		label:          contract.ParticipantName + " " + contract.Version,
+		label:          toMemberLabel(contract),
 		schemas:        roots.toSchemas(contract.Schemas[graphqlmodel.Namespace]),
 		kinds:          make(map[string]string, len(extension.Types)),
 		namedTypes:     make(map[string]string, len(extension.Types)),

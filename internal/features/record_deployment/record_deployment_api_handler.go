@@ -1,6 +1,8 @@
 package record_deployment
 
 import (
+	"errors"
+
 	"github.com/bidirekt/broker/internal/components/access"
 	"github.com/bidirekt/broker/internal/model"
 	"github.com/bidirekt/broker/internal/validations"
@@ -25,8 +27,13 @@ func (this *RecordDeploymentApiHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondInvalidInput(ctx)
 	}
 
-	if validations.UnpaddedValue(requestBody.Participant) != nil || validations.Version(requestBody.Version) != nil || validations.UnpaddedValue(requestBody.Environment) != nil {
+	versionErr := validations.Version(requestBody.Version)
+	if validations.UnpaddedValue(requestBody.Participant) != nil || errors.Is(versionErr, validations.ErrEmptyVersion) || validations.UnpaddedValue(requestBody.Environment) != nil {
 		return this.respondInvalidInput(ctx)
+	}
+
+	if versionErr != nil {
+		return this.respondInvalidVersion(ctx, versionErr)
 	}
 
 	output := this.useCase.Execute(ctx.Context(), RecordDeploymentInput{
@@ -60,6 +67,12 @@ func (this *RecordDeploymentApiHandler) respondForbidden(ctx fiber.Ctx) error {
 func (this *RecordDeploymentApiHandler) respondInvalidInput(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(RecordDeploymentResponseBody{
 		Message: DeploymentInvalidInputMessage,
+	})
+}
+
+func (this *RecordDeploymentApiHandler) respondInvalidVersion(ctx fiber.Ctx, err error) error {
+	return ctx.Status(fiber.StatusBadRequest).JSON(RecordDeploymentResponseBody{
+		Message: err.Error(),
 	})
 }
 
