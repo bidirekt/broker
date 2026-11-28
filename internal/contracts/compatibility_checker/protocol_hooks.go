@@ -24,8 +24,8 @@ type RemovedRefiner interface {
 }
 
 type FieldNamer interface {
-	// Names a field of a schema the protocol synthesizes, whose own name means nothing to a reader.
-	FieldName(site schemagraph.Site) (name string, named bool)
+	// Names a field of the resource whose schema name means less to a reader than the resource itself.
+	FieldName(resource *model.PersistedResource, site schemagraph.Site) (name string, named bool)
 }
 
 type TypeNamer interface {

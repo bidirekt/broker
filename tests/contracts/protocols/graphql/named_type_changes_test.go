@@ -260,7 +260,7 @@ func TestNamedTypeChanges_AScalarRenamedWithTheSameShape_BreaksOnlyByTheName(t *
 	assertNamedTypeBreaks(t, "pet(id: ID!)", "pet(id: String!)", func(viaGraph bool) []namedTypeBreak {
 		return namedTypeBreakAt(viaGraph, model.ReasonPropertyTypeMismatch, map[string]string{
 			"argument": "id", "consumerPropertyType": "ID", "providerPropertyType": "String",
-			"consumerField": "PetArgs.id", "providerField": "Query.pet(id:)",
+			"consumerField": "Query.pet(id:)", "providerField": "Query.pet(id:)",
 		})
 	})
 }
@@ -269,7 +269,7 @@ func TestNamedTypeChanges_AnEnumRenamedWithTheSameValues_BreaksOnlyByTheName(t *
 	assertNamedTypeBreaks(t, "PetStatus", "Status", func(viaGraph bool) []namedTypeBreak {
 		return namedTypeBreakAt(viaGraph, model.ReasonPropertyTypeMismatch, map[string]string{
 			"argument": "status", "consumerPropertyType": "PetStatus", "providerPropertyType": "Status",
-			"consumerField": "TagArgs.status", "providerField": "Query.tag(status:)",
+			"consumerField": "Query.tag(status:)", "providerField": "Query.tag(status:)",
 		})
 	})
 }
@@ -278,7 +278,7 @@ func TestNamedTypeChanges_AScalarFromIDToInt_BreaksOnlyByTheShape(t *testing.T) 
 	assertNamedTypeBreaks(t, "pet(id: ID!)", "pet(id: Int!)", func(viaGraph bool) []namedTypeBreak {
 		return namedTypeBreakAt(viaGraph, model.ReasonPropertyTypeMismatch, map[string]string{
 			"argument": "id", "consumerPropertyType": "String!", "providerPropertyType": "Int!",
-			"consumerField": "PetArgs.id", "providerField": "Query.pet(id:)",
+			"consumerField": "Query.pet(id:)", "providerField": "Query.pet(id:)",
 		})
 	})
 }
@@ -287,7 +287,7 @@ func TestNamedTypeChanges_ASingleValueSentToARenamedList_BreaksOnlyByTheName(t *
 	assertNamedTypeBreaks(t, "one(ids: [ID!]!)", "one(ids: [String!]!)", func(viaGraph bool) []namedTypeBreak {
 		return namedTypeBreakAt(viaGraph, model.ReasonPropertyTypeMismatch, map[string]string{
 			"argument": "ids", "consumerPropertyType": "ID", "providerPropertyType": "String",
-			"consumerField": "OneArgs.ids", "providerField": "Query.one(ids:)",
+			"consumerField": "Query.one(ids:)", "providerField": "Query.one(ids:)",
 		})
 	})
 }
@@ -296,7 +296,7 @@ func TestNamedTypeChanges_AListWhoseItemsNoLongerFit_BreaksOnlyByTheShape(t *tes
 	assertNamedTypeBreaks(t, "pets(ids: [ID!]!)", "pets(ids: [Int!]!)", func(viaGraph bool) []namedTypeBreak {
 		return namedTypeBreakAt(viaGraph, model.ReasonPropertyTypeMismatch, map[string]string{
 			"argument": "ids[]", "consumerPropertyType": "String!", "providerPropertyType": "Int!",
-			"consumerField": "PetsArgs.ids[]", "providerField": "Query.pets(ids:)[]",
+			"consumerField": "Query.pets(ids:)[]", "providerField": "Query.pets(ids:)[]",
 		})
 	})
 }
@@ -305,7 +305,7 @@ func TestNamedTypeChanges_ANullableValueSentToARenamedNonNullType_BreaksOnlyByTh
 	assertNamedTypeBreaks(t, "near(id: ID)", "near(id: String!)", func(viaGraph bool) []namedTypeBreak {
 		return namedTypeBreakAt(viaGraph, model.ReasonPropertyNullableInConsumerNotNullableInProvider, map[string]string{
 			"argument": "id", "propertyType": "String",
-			"consumerField": "NearArgs.id", "providerField": "Query.near(id:)",
+			"consumerField": "Query.near(id:)", "providerField": "Query.near(id:)",
 		})
 	})
 }
@@ -317,7 +317,7 @@ func TestNamedTypeChanges_AnEnumRenamedWithoutAValueTheConsumerSends_BreaksOnlyB
 		func(viaGraph bool) []namedTypeBreak {
 			return namedTypeBreakAt(viaGraph, model.ReasonPropertyMemberMissingInProvider, map[string]string{
 				"argument": "status", "member": "SOLD",
-				"consumerField": "TagArgs.status", "providerField": "Query.tag(status:)",
+				"consumerField": "Query.tag(status:)", "providerField": "Query.tag(status:)",
 			})
 		})
 }

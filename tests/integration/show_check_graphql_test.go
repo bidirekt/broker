@@ -164,7 +164,7 @@ func (this *IntegrationSuite) TestShowCheck_DrawsTheBreaksOfCounterpartsThatBrea
 	this.Contains(body, `<b class="name">petstore_web</b> removed <code>query stats</code>, but <b class="name">petstore_admin</b> still calls it`)
 	this.Contains(body, `<div class="fix self"><span class="side">Fix in <b>petstore_web</b></span><span>keep it until petstore_admin stops calling it</span></div><div class="fix other"><span class="side">or fix in <b>petstore_admin</b></span><span>stop calling it</span></div>`)
 
-	this.Contains(body, `<span class="op-prop">FIELD</span><span>PetArgs.owner</span><span class="badge">1 place</span>`)
+	this.Contains(body, `<span class="op-prop">FIELD</span><span>Query.pet(owner:)</span><span class="badge">1 place</span>`)
 	this.Contains(body, `<li><span class="op-kind">query</span><span>pet</span><span class="at">arguments</span><span class="at">(argument &#34;owner&#34;)</span></li>`)
 	this.Contains(body, `<span class="op-prop">FIELD</span><span>Pet.age</span><span class="badge">1 place</span>`)
 	this.Contains(body, `<b class="name">petstore_web</b> reads it as <code>String!</code>, but <b class="name">petstore_api</b> provides <code>Int!</code>`)

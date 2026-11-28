@@ -168,7 +168,7 @@ func (this *IntegrationSuite) TestCanIDeployAndValidate_AProviderChangingTheName
 		"deployable": false,
 		"participantVersion": "1.0.0",
 		"operations": {"query": {"pet": {"arguments": [
-			{"reason": "property_type_mismatch", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "argument": "id", "consumerPropertyType": "ID", "providerPropertyType": "String", "consumerField": "PetArgs.id", "providerField": "Query.pet(id:)"}}
+			{"reason": "property_type_mismatch", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "argument": "id", "consumerPropertyType": "ID", "providerPropertyType": "String", "consumerField": "Query.pet(id:)", "providerField": "Query.pet(id:)"}}
 		]}}}
 	}}`)
 }
@@ -188,7 +188,7 @@ func (this *IntegrationSuite) TestCanIDeployAndValidate_AProviderChangingAnArgum
 		"deployable": false,
 		"participantVersion": "1.0.0",
 		"operations": {"query": {"pet": {"arguments": [
-			{"reason": "property_type_mismatch", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "argument": "id", "consumerPropertyType": "String!", "providerPropertyType": "Int!", "consumerField": "PetArgs.id", "providerField": "Query.pet(id:)"}}
+			{"reason": "property_type_mismatch", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "argument": "id", "consumerPropertyType": "String!", "providerPropertyType": "Int!", "consumerField": "Query.pet(id:)", "providerField": "Query.pet(id:)"}}
 		]}}}
 	}}`)
 }
@@ -222,7 +222,7 @@ func (this *IntegrationSuite) TestCanIDeployAndValidate_AProviderRenamingAnInput
 		"deployable": false,
 		"participantVersion": "1.0.0",
 		"operations": {"mutation": {"addPet": {"arguments": [
-			{"reason": "property_type_mismatch", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "argument": "input", "consumerPropertyType": "AddPetInput", "providerPropertyType": "NewPetInput", "consumerField": "AddPetArgs.input", "providerField": "Mutation.addPet(input:)"}}
+			{"reason": "property_type_mismatch", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "argument": "input", "consumerPropertyType": "AddPetInput", "providerPropertyType": "NewPetInput", "consumerField": "Mutation.addPet(input:)", "providerField": "Mutation.addPet(input:)"}}
 		]}}}
 	}}`)
 }
@@ -236,7 +236,7 @@ func (this *IntegrationSuite) TestCanIDeployAndValidate_AProviderRenamingAnEnumA
 		"deployable": false,
 		"participantVersion": "1.0.0",
 		"operations": {"mutation": {"tagPets": {"arguments": [
-			{"reason": "property_type_mismatch", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "argument": "status", "consumerPropertyType": "PetStatus", "providerPropertyType": "AdoptionStatus", "consumerField": "TagPetsArgs.status", "providerField": "Mutation.tagPets(status:)"}}
+			{"reason": "property_type_mismatch", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "argument": "status", "consumerPropertyType": "PetStatus", "providerPropertyType": "AdoptionStatus", "consumerField": "Mutation.tagPets(status:)", "providerField": "Mutation.tagPets(status:)"}}
 		]}}}
 	}}`)
 }
@@ -269,7 +269,7 @@ func (this *IntegrationSuite) TestCanIDeployAndValidate_AProviderChangingAListAr
 		"deployable": false,
 		"participantVersion": "1.0.0",
 		"operations": {"query": {"pets": {"arguments": [
-			{"reason": "property_type_mismatch", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "argument": "ids[]", "consumerPropertyType": "String!", "providerPropertyType": "Int!", "consumerField": "PetsArgs.ids[]", "providerField": "Query.pets(ids:)[]"}}
+			{"reason": "property_type_mismatch", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "argument": "ids[]", "consumerPropertyType": "String!", "providerPropertyType": "Int!", "consumerField": "Query.pets(ids:)[]", "providerField": "Query.pets(ids:)[]"}}
 		]}}}
 	}}`)
 }
@@ -279,7 +279,7 @@ func (this *IntegrationSuite) TestCanIDeployAndValidate_AProviderRenamingTheType
 		"deployable": false,
 		"participantVersion": "1.0.0",
 		"operations": {"query": {"near": {"arguments": [
-			{"reason": "property_nullable_in_consumer_not_nullable_in_provider", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "argument": "id", "propertyType": "String", "consumerField": "NearArgs.id", "providerField": "Query.near(id:)"}}
+			{"reason": "property_nullable_in_consumer_not_nullable_in_provider", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "argument": "id", "propertyType": "String", "consumerField": "Query.near(id:)", "providerField": "Query.near(id:)"}}
 		]}}}
 	}}`)
 }
@@ -294,7 +294,7 @@ func (this *IntegrationSuite) TestCanIDeployAndValidate_AProviderRenamingAnEnumW
 		"deployable": false,
 		"participantVersion": "1.0.0",
 		"operations": {"mutation": {"tagPets": {"arguments": [
-			{"reason": "property_member_missing_in_provider", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "argument": "status", "member": "AVAILABLE", "consumerField": "TagPetsArgs.status", "providerField": "Mutation.tagPets(status:)"}}
+			{"reason": "property_member_missing_in_provider", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "argument": "status", "member": "AVAILABLE", "consumerField": "Mutation.tagPets(status:)", "providerField": "Mutation.tagPets(status:)"}}
 		]}}}
 	}}`)
 }
@@ -317,7 +317,7 @@ func (this *IntegrationSuite) TestCanIDeployAndValidate_ASubgraphChangingTheName
 		"deployable": false,
 		"participantVersion": "3.0.0",
 		"operations": {"query": {"pet": {"arguments": [
-			{"reason": "property_type_mismatch", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_graph", "property": "$", "argument": "id", "consumerPropertyType": "ID", "providerPropertyType": "String", "consumerField": "PetArgs.id", "providerField": "Query.pet(id:)", "graph": "petstore_graph"}}
+			{"reason": "property_type_mismatch", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_graph", "property": "$", "argument": "id", "consumerPropertyType": "ID", "providerPropertyType": "String", "consumerField": "Query.pet(id:)", "providerField": "Query.pet(id:)", "graph": "petstore_graph"}}
 		]}}}
 	}}`)
 }
@@ -327,7 +327,7 @@ func (this *IntegrationSuite) TestCanIDeployAndValidate_ASubgraphChangingAnArgum
 		"deployable": false,
 		"participantVersion": "3.0.0",
 		"operations": {"query": {"pet": {"arguments": [
-			{"reason": "property_type_mismatch", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_graph", "property": "$", "argument": "id", "consumerPropertyType": "String!", "providerPropertyType": "Int!", "consumerField": "PetArgs.id", "providerField": "Query.pet(id:)", "graph": "petstore_graph"}}
+			{"reason": "property_type_mismatch", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_graph", "property": "$", "argument": "id", "consumerPropertyType": "String!", "providerPropertyType": "Int!", "consumerField": "Query.pet(id:)", "providerField": "Query.pet(id:)", "graph": "petstore_graph"}}
 		]}}}
 	}}`)
 }
@@ -337,7 +337,7 @@ func (this *IntegrationSuite) TestCanIDeployAndValidate_ASubgraphChangingAListAr
 		"deployable": false,
 		"participantVersion": "3.0.0",
 		"operations": {"query": {"pets": {"arguments": [
-			{"reason": "property_type_mismatch", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_graph", "property": "$", "argument": "ids[]", "consumerPropertyType": "String!", "providerPropertyType": "Int!", "consumerField": "PetsArgs.ids[]", "providerField": "Query.pets(ids:)[]", "graph": "petstore_graph"}}
+			{"reason": "property_type_mismatch", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_graph", "property": "$", "argument": "ids[]", "consumerPropertyType": "String!", "providerPropertyType": "Int!", "consumerField": "Query.pets(ids:)[]", "providerField": "Query.pets(ids:)[]", "graph": "petstore_graph"}}
 		]}}}
 	}}`)
 }
@@ -347,7 +347,7 @@ func (this *IntegrationSuite) TestCanIDeployAndValidate_ASubgraphRenamingTheType
 		"deployable": false,
 		"participantVersion": "3.0.0",
 		"operations": {"query": {"near": {"arguments": [
-			{"reason": "property_nullable_in_consumer_not_nullable_in_provider", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_graph", "property": "$", "argument": "id", "propertyType": "String", "consumerField": "NearArgs.id", "providerField": "Query.near(id:)", "graph": "petstore_graph"}}
+			{"reason": "property_nullable_in_consumer_not_nullable_in_provider", "role": "provider", "details": {"consumerName": "petstore_web", "providerName": "petstore_graph", "property": "$", "argument": "id", "propertyType": "String", "consumerField": "Query.near(id:)", "providerField": "Query.near(id:)", "graph": "petstore_graph"}}
 		]}}}
 	}}`)
 }

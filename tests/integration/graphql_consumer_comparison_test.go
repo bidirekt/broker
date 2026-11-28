@@ -95,7 +95,7 @@ schemas:
 		"deployable": false,
 		"participantVersion": "1.0.0",
 		"operations": {"query": {"pet": {"arguments": [
-			{"reason": "property_missing_in_provider", "role": "consumer", "details": {"consumerName": "petstore_admin", "providerName": "petstore_api", "property": "$", "argument": "tag", "propertyType": "String!", "consumerField": "PetArgs.tag"}}
+			{"reason": "property_missing_in_provider", "role": "consumer", "details": {"consumerName": "petstore_admin", "providerName": "petstore_api", "property": "$", "argument": "tag", "propertyType": "String!", "consumerField": "Query.pet(tag:)"}}
 		]}}}
 	}}`)
 }
