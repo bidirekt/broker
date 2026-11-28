@@ -1,6 +1,7 @@
 package graphql
 
 import (
+	"cmp"
 	"fmt"
 	"maps"
 	"slices"
@@ -15,12 +16,13 @@ import (
 // reach is a type a query gets to, with the subgraphs that can be at it: the ones that resolved the field leading
 // there, each with what the @provides on the path select from it below, and the type it declares the field returns.
 type reach struct {
-	typeName  string
-	at        []subgraph
-	provided  map[string]ast.SelectionSet
-	own       map[string]string
-	operation string
-	path      []string
+	typeName   string
+	at         []subgraph
+	provided   map[string]ast.SelectionSet
+	own        map[string]string
+	coordinate string
+	operation  string
+	path       []string
 }
 
 func (this reach) key() string {
@@ -45,7 +47,7 @@ func (this reach) below(field, coordinate, typeName string, at []subgraph) reach
 		}
 	}
 
-	return reach{typeName: typeName, at: at, provided: provided, own: own, operation: this.operation, path: append(slices.Clone(this.path), field)}
+	return reach{typeName: typeName, at: at, provided: provided, own: own, coordinate: coordinate, operation: this.operation, path: append(slices.Clone(this.path), field)}
 }
 
 // checkSatisfiability walks every query the graph allows, from the root fields down, and reports once each field a
@@ -77,7 +79,7 @@ func (this *composition) checkSatisfiability() {
 		case graphqlmodel.ObjectKind:
 			queue = append(queue, this.reachFields(current, unresolved)...)
 		case graphqlmodel.InterfaceKind, graphqlmodel.UnionKind:
-			queue = append(queue, this.reachMembers(current)...)
+			queue = append(queue, this.reachMembers(current, unresolved)...)
 		}
 	}
 }
@@ -116,29 +118,77 @@ func (this *composition) reachFields(current reach, unresolved map[string]bool) 
 // A subgraph returns, for a union or an interface, only the members it declares, or the member itself when its field
 // returns that member, not the union or the interface the graph joins the field in. A member that a subgraph at the
 // union or the interface never returns isn't walked, unless that subgraph marks the interface @interfaceObject.
-func (this *composition) reachMembers(current reach) []reach {
-	var next []reach
+func (this *composition) reachMembers(current reach, unresolved map[string]bool) []reach {
+	members := map[string][]subgraph{}
 	for _, segment := range slices.Sorted(maps.Keys(this.schemas[current.typeName])) {
 		if !model.IsMemberSegment(segment) {
 			continue
 		}
 
-		at := slices.DeleteFunc(slices.Clone(current.at), func(member subgraph) bool {
+		members[model.MemberKey(segment)] = slices.DeleteFunc(slices.Clone(current.at), func(member subgraph) bool {
 			_, declares := member.schemas[current.typeName][segment]
 
 			return !declares && current.own[member.name] != model.MemberKey(segment)
 		})
+	}
 
+	if this.sharesNoMember(current, members, unresolved) {
+		return nil
+	}
+
+	var next []reach
+	for _, typeName := range slices.Sorted(maps.Keys(members)) {
+		at := members[typeName]
 		neverReturns := slices.ContainsFunc(current.at, func(member subgraph) bool {
 			return !containsSubgraph(at, member) && !member.marks(current.typeName, graphqlmodel.InterfaceObjectDirective)
 		})
 
 		if len(at) > 0 && !neverReturns {
-			next = append(next, reach{typeName: model.MemberKey(segment), at: at, provided: current.provided, operation: current.operation, path: current.path})
+			next = append(next, reach{typeName: typeName, at: at, provided: current.provided, operation: current.operation, path: current.path})
 		}
 	}
 
 	return next
+}
+
+// sharesNoMember reports a shared field whose subgraphs, when at least two of them return the union or the interface
+// itself, have no member they all return: a shared field resolves the same way in every subgraph. A subgraph whose
+// field returns a member counts with that member; one that marks the interface @interfaceObject doesn't count.
+func (this *composition) sharesNoMember(current reach, members map[string][]subgraph, unresolved map[string]bool) bool {
+	var labels, sharing, returned []string
+	common := slices.Sorted(maps.Keys(members))
+	abstract := 0
+
+	for _, member := range current.at {
+		own := current.own[member.name]
+		returns := slices.DeleteFunc(slices.Sorted(maps.Keys(members)), func(typeName string) bool { return !containsSubgraph(members[typeName], member) })
+		returnsAbstract := member.kinds[own] == graphqlmodel.UnionKind || member.kinds[own] == graphqlmodel.InterfaceKind
+
+		if member.marks(own, graphqlmodel.InterfaceObjectDirective) || (!returnsAbstract && len(returns) == 0) {
+			continue
+		}
+
+		if returnsAbstract {
+			abstract++
+		}
+
+		common = slices.DeleteFunc(common, func(typeName string) bool { return !slices.Contains(returns, typeName) })
+		labels = append(labels, member.label)
+		sharing = append(sharing, fmt.Sprintf("%s in %s", cmp.Or(strings.Join(returns, " and "), "no type"), member.label))
+		returned = append(returned, returns...)
+	}
+
+	if abstract < 2 || len(common) > 0 || len(returned) == 0 {
+		return false
+	}
+
+	if !unresolved[current.coordinate] {
+		unresolved[current.coordinate] = true
+		this.addError(current.coordinate, fmt.Sprintf("%s %s can't be resolved: %s share no type of %s: %s",
+			current.operation, strings.Join(current.path, "."), strings.Join(labels, " and "), current.typeName, strings.Join(sharing, ", ")), current.at...)
+	}
+
+	return true
 }
 
 // enteredFrom grows the subgraphs at a type by the jumps its resolvable @keys allow: a subgraph is entered when one

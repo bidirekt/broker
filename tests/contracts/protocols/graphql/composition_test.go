@@ -205,8 +205,8 @@ type Dog implements Animal @shareable {
 `),
 		compositionMember(t, "petstore_reviews", "2.0.0", `
 type Query {
-  search: [Result!]! @shareable
-  animals: [Animal!]! @shareable
+  reviewed: [Result!]!
+  reviewedAnimals: [Animal!]!
 }
 
 union Result = Cat

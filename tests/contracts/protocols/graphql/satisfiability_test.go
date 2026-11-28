@@ -522,6 +522,92 @@ type Movie @shareable {
 	assert.Empty(t, errors)
 }
 
+func TestToComposedGraph_ASharedUnionWhoseSubgraphsReturnNoMemberInCommon_CannotBeResolved(t *testing.T) {
+	errors := satisfiabilityErrors(
+		satisfiabilityMember(t, "petstore_api", "1.4.0", `
+type Query {
+  result: Result @shareable
+}
+
+union Result = Book
+
+type Book @shareable {
+  id: ID!
+  title: String
+}
+
+type Movie @shareable {
+  name: String
+  year: Int
+}
+`),
+		satisfiabilityMember(t, "petstore_reviews", "2.0.0", `
+type Query {
+  result: Result @shareable
+}
+
+union Result = Movie
+
+type Book @shareable {
+  id: ID!
+  pages: Int
+}
+
+type Movie @shareable {
+  name: String
+}
+`),
+	)
+
+	assert.Equal(t, []string{"query result can't be resolved: petstore_api 1.4.0 and petstore_reviews 2.0.0 share no type of Result: Book in petstore_api 1.4.0, Movie in petstore_reviews 2.0.0"}, errors)
+}
+
+func TestToComposedGraph_FieldsOfMembersOnlyOneSubgraphAtASharedUnionReturns_Compose(t *testing.T) {
+	errors := satisfiabilityErrors(
+		satisfiabilityMember(t, "petstore_api", "1.4.0", `
+type Query {
+  result: Result @shareable
+}
+
+union Result = Book | Movie
+
+type Book @shareable {
+  title: String
+}
+
+type Movie @shareable {
+  name: String
+}
+
+type Song @shareable {
+  length: Int
+}
+`),
+		satisfiabilityMember(t, "petstore_reviews", "2.0.0", `
+type Query {
+  result: Result @shareable
+}
+
+union Result = Movie | Song
+
+type Book @shareable {
+  pages: Int
+}
+
+type Movie @shareable {
+  name: String
+  year: Int
+}
+
+type Song @shareable {
+  title: String
+}
+`),
+	)
+
+	assert.Empty(t, errors)
+}
+
 func TestToComposedGraph_AFieldOfAnImplementationASubgraphMarkingTheInterfaceObjectNeverReturns_CannotBeResolved(t *testing.T) {
 	errors := satisfiabilityErrors(
 		satisfiabilityMember(t, "petstore_api", "1.4.0", `
