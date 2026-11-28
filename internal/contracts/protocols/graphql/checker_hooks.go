@@ -49,11 +49,12 @@ func (this Plugin) BodyReading(body model.BodyRole) compatibility_checker.BodyRe
 	return bodyReadings[body]
 }
 
-// A site of a synthesized schema is named by GraphQL coordinates: an argument "Query.pet(id:)", "Pet.reviews(first:)[]",
-// what a field returns "Query.pet", "Query.pets[]", and the arguments as a whole by their field, "Query.pet".
-func (this Plugin) FieldName(site schemagraph.Site) (string, bool) {
-	typeName, field, interaction, synthesized := synthesizedSchemaNameToField(site.Schema)
-	if site.Namespace != graphqlmodel.Namespace || !synthesized {
+// A site of a synthesized schema, or of a root field's own body schema, is named by GraphQL coordinates: an argument
+// "Query.pet(id:)", "Pet.reviews(first:)[]", what a field returns "Query.pet", "Query.pets[]", and the arguments as a
+// whole by their field, "Query.pet". A field the consumer's root schema declares keeps the schema's name, "PetRead.name".
+func (this Plugin) FieldName(resource *model.PersistedResource, site schemagraph.Site) (string, bool) {
+	typeName, field, interaction, named := siteCoordinate(resource, site)
+	if !named {
 		return "", false
 	}
 
@@ -67,6 +68,37 @@ func (this Plugin) FieldName(site schemagraph.Site) (string, bool) {
 	}
 
 	return typeName + "." + field + "(" + site.Path[:argumentEnd] + ":)" + site.Path[argumentEnd:], true
+}
+
+func siteCoordinate(resource *model.PersistedResource, site schemagraph.Site) (typeName, field, interaction string, named bool) {
+	if typeName, field, interaction, synthesized := synthesizedSchemaNameToField(site.Schema); synthesized {
+		return typeName, field, interaction, site.Namespace == graphqlmodel.Namespace
+	}
+
+	identity, rootField := resource.Identity.(graphqlmodel.Identity)
+	if !rootField || !isBodySchema(resource, site) || (identity.Interaction == graphqlmodel.ReturnsInteraction && namesField(site.Path)) {
+		return "", "", "", false
+	}
+
+	root := rootTypes[slices.IndexFunc(rootTypes, func(root rootType) bool { return root.operation == identity.Operation })]
+
+	return root.typeName, identity.Field, identity.Interaction, true
+}
+
+func isBodySchema(resource *model.PersistedResource, site schemagraph.Site) bool {
+	return slices.ContainsFunc(resource.Bodies, func(body model.ResourceBody) bool {
+		return body.SchemaName.Valid && body.Namespace == site.Namespace && body.SchemaName.String == site.Schema
+	})
+}
+
+func namesField(path string) bool {
+	for parent, segment, nested := model.ParentOf(path); nested; parent, segment, nested = model.ParentOf(parent) {
+		if segment != model.ItemsSegment && segment != model.ValuesSegment && !model.IsMemberSegment(segment) {
+			return true
+		}
+	}
+
+	return false
 }
 
 var builtInScalarNames = toBuiltInScalarNames()

@@ -241,7 +241,7 @@ func TestGraphQLReading_AUnionWithoutFieldsReadAsAnObject_IsATypeMismatch(t *tes
 			"providerName":         readingProviderName,
 			"consumerPropertyType": "SearchRead",
 			"providerPropertyType": "SearchResult",
-			"consumerField":        "SearchRead",
+			"consumerField":        "Query.search",
 			"providerField":        "Query.search",
 		}},
 	})
@@ -293,7 +293,7 @@ func TestGraphQLReading_AnIntegerSentToAString_IsATypeMismatch(t *testing.T) {
 			"providerName":         readingProviderName,
 			"consumerPropertyType": "Int!",
 			"providerPropertyType": "String",
-			"consumerField":        "PetArgs.name",
+			"consumerField":        "Query.pet(name:)",
 			"providerField":        "Query.pet(name:)",
 		}},
 	})
@@ -328,7 +328,7 @@ func TestGraphQLReading_ATypenameSentAsAnArgument_Breaks(t *testing.T) {
 			"consumerName":  readingConsumerName,
 			"providerName":  readingProviderName,
 			"propertyType":  "String!",
-			"consumerField": "PetArgs.__typename",
+			"consumerField": "Query.pet(__typename:)",
 		}},
 	})
 }
@@ -451,7 +451,7 @@ func TestGraphQLReading_AnImplementationThatNoLongerImplementsTheInterface_IsAMe
 			"member":        "User",
 			"consumerName":  readingConsumerName,
 			"providerName":  readingProviderName,
-			"consumerField": "Node",
+			"consumerField": "Query.node",
 			"providerField": "Query.node",
 		}},
 	})
@@ -496,7 +496,7 @@ func TestGraphQLReading_ASingleValueOfAnotherTypeSentToAListArgument_IsATypeMism
 			"providerName":         readingProviderName,
 			"consumerPropertyType": "Int!",
 			"providerPropertyType": "[String!]",
-			"consumerField":        "PetsArgs.tags",
+			"consumerField":        "Query.pets(tags:)",
 			"providerField":        "Query.pets(tags:)",
 		}},
 	})
@@ -512,7 +512,7 @@ func TestGraphQLReading_ANullableSingleValueSentToANonNullListArgument_Breaks(t 
 			"consumerName":  readingConsumerName,
 			"providerName":  readingProviderName,
 			"propertyType":  "String",
-			"consumerField": "PetsArgs.names",
+			"consumerField": "Query.pets(names:)",
 			"providerField": "Query.pets(names:)",
 		}},
 	})
@@ -528,7 +528,7 @@ func TestGraphQLReading_AListReturnedReadAsASingleValue_IsATypeMismatch(t *testi
 			"providerName":         readingProviderName,
 			"consumerPropertyType": "PetRead!",
 			"providerPropertyType": "[Pet!]!",
-			"consumerField":        "PetRead",
+			"consumerField":        "Query.pets",
 			"providerField":        "Query.pets",
 		}},
 	})
@@ -591,7 +591,7 @@ func TestGraphQLReading_AUnionOfTheConsumerWithoutASchemaName_IsWrittenWithItsMe
 			"providerName":         readingProviderName,
 			"consumerPropertyType": "union (Owner | Pet)!",
 			"providerPropertyType": "Pet!",
-			"consumerField":        "SearchRead[]",
+			"consumerField":        "Query.search[]",
 			"providerField":        "Query.search[]",
 		}},
 	})

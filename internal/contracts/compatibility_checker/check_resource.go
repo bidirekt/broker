@@ -20,8 +20,8 @@ func (this *CompatibilityChecker) checkResources(checked *model.PersistedResourc
 	reading := hooks.BodyReading(consumer.Body)
 
 	body := compareBodies(checked, counterpart, reading.Rules,
-		schemaGraph(hooks, consumer.Schemas).Root(consumer.Bodies, reading.Join),
-		schemaGraph(hooks, provider.Schemas).Root(provider.Bodies, reading.Join),
+		schemaGraph(hooks, consumer).Root(consumer.Bodies, reading.Join),
+		schemaGraph(hooks, provider).Root(provider.Bodies, reading.Join),
 	)
 
 	breaks := body.breaks
@@ -44,10 +44,10 @@ func (this *CompatibilityChecker) checkResources(checked *model.PersistedResourc
 	return breaks
 }
 
-func schemaGraph(hooks ProtocolHooks, schemas map[string]model.Schemas) *schemagraph.Graph {
-	graph := schemagraph.New(schemas)
+func schemaGraph(hooks ProtocolHooks, resource *model.PersistedResource) *schemagraph.Graph {
+	graph := schemagraph.New(resource.Schemas)
 	if namer, names := hooks.(FieldNamer); names {
-		graph.NamingFields(namer.FieldName)
+		graph.NamingFields(func(site schemagraph.Site) (string, bool) { return namer.FieldName(resource, site) })
 	}
 
 	if namer, names := hooks.(TypeNamer); names {

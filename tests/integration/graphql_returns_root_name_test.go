@@ -54,7 +54,7 @@ func (this *IntegrationSuite) TestCanIDeployAndShowCheck_ABreakAtTheRootOfWhatAF
 		"deployable": false,
 		"participantVersion": "1.0.0",
 		"operations": {"query": {"age": {"returns": [
-			{"reason": "property_type_mismatch", "role": "consumer", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "consumerPropertyType": "String!", "providerPropertyType": "Int!", "consumerField": "Age", "providerField": "Query.age"}}
+			{"reason": "property_type_mismatch", "role": "consumer", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "consumerPropertyType": "String!", "providerPropertyType": "Int!", "consumerField": "Query.age", "providerField": "Query.age"}}
 		]}}}
 	}}`, results)
 
@@ -66,7 +66,7 @@ func (this *IntegrationSuite) TestCanIDeployAndShowCheck_ABreakAtTheRootOfWhatAF
 	this.Require().Equal(http.StatusOK, status, body)
 
 	this.Contains(body, `<span class="op-prop">FIELD</span><span>Query.age</span><span class="badge">1 place</span>`)
-	this.Contains(body, `<span class="cf">(petstore_web: Age)</span>`)
+	this.Contains(body, `<span class="cf">(petstore_web: Query.age)</span>`)
 	this.NotContains(body, `:returns`)
 	this.NotContains(body, `:arguments`)
 }
