@@ -15,7 +15,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Check the compose runs this release
         run: |
-          image="ghcr.io/bidirekt/broker:${GITHUB_REF_NAME#v}"
+          version="${GITHUB_REF_NAME#v}"
+          image="ghcr.io/bidirekt/broker:${version%%+*}"
           if ! grep -qx "    image: $image" docker-compose.yaml; then
             echo "::error file=docker-compose.yaml::pin $image in docker-compose.yaml before tagging $GITHUB_REF_NAME"
             exit 1
