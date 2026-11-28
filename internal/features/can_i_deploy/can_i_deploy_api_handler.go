@@ -25,7 +25,7 @@ func (this *CanIDeployApiHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondInvalidInput(ctx)
 	}
 
-	if validations.UnpaddedValue(requestBody.Participant) != nil || validations.UnpaddedValue(requestBody.Version) != nil || validations.UnpaddedValue(requestBody.Environment) != nil {
+	if validations.UnpaddedValue(requestBody.Participant) != nil || validations.Version(requestBody.Version) != nil || validations.UnpaddedValue(requestBody.Environment) != nil {
 		return this.respondInvalidInput(ctx)
 	}
 

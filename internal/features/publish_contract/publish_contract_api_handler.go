@@ -29,7 +29,7 @@ func (this *PublishContractApiHandler) Handle(ctx fiber.Ctx) error {
 		return this.respondInvalidInput(ctx)
 	}
 
-	if validations.UnpaddedValue(requestBody.ServiceName) != nil || validations.UnpaddedValue(requestBody.Version) != nil || len(requestBody.Contracts) == 0 || contractfiles.HasBlankSource(requestBody.Contracts) {
+	if validations.UnpaddedValue(requestBody.ServiceName) != nil || validations.Version(requestBody.Version) != nil || len(requestBody.Contracts) == 0 || contractfiles.HasBlankSource(requestBody.Contracts) {
 		return this.respondInvalidInput(ctx)
 	}
 
