@@ -4,6 +4,7 @@ import (
 	"context"
 	"maps"
 	"slices"
+	"strings"
 
 	"github.com/guregu/null"
 
@@ -280,8 +281,12 @@ func toComposedGraph(name string, members []*model.PersistedContract) composedGr
 
 func (this composedGraph) notComposable() compatibility_checker.ReadyBreak {
 	return compatibility_checker.ReadyBreak{
-		Reason:  graphqlmodel.ReasonProviderGraphNotComposable,
-		Details: map[string]string{graphqlmodel.GraphKey: this.name, graphqlmodel.CauseKey: this.failures[0]},
+		Reason: graphqlmodel.ReasonProviderGraphNotComposable,
+		Details: map[string]string{
+			graphqlmodel.GraphKey:  this.name,
+			graphqlmodel.CauseKey:  this.failures[0],
+			graphqlmodel.CausesKey: strings.Join(this.failures, "\n"),
+		},
 	}
 }
 

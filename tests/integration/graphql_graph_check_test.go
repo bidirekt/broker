@@ -312,7 +312,7 @@ type Pet @key(fields: "id") {
 	}}`, string(validate.Results))
 }
 
-func (this *IntegrationSuite) TestCanIDeployAndValidate_AGraphThatDoesNotCompose_BreaksEveryFieldTheConsumerReads() {
+func (this *IntegrationSuite) TestCanIDeployAndValidate_AGraphThatDoesNotCompose_BreaksEveryFieldTheConsumerReadsWithEveryCause() {
 	this.setUpGraphCheck("petstore_api", "petstore_reviews", "petstore_orders", "petstore_web")
 	this.publishForGraphCheck("petstore_api", "1.4.0", contractFragment{"graph.yaml", graphCheckGraphYAML}, contractFragment{"api.graphqls", graphCheckLink + `
 type Query {
@@ -326,6 +326,7 @@ type Pet @key(fields: "id") {
 
 type Money {
   amount: Int!
+  currency: String!
 }
 `})
 	this.publishForGraphCheck("petstore_reviews", "2.0.0", contractFragment{"graph.yaml", graphCheckGraphYAML}, contractFragment{"reviews.graphqls", graphCheckReviewsSDL})
@@ -341,13 +342,14 @@ type Order @key(fields: "id") {
 
 type Money @shareable {
   amount: Int!
+  currency: String!
 }
 `})
 	this.deployForGraphCheck("petstore_api", "1.4.0", "production")
 	this.deployForGraphCheck("petstore_reviews", "2.0.0", "production")
 	this.deployForGraphCheck("petstore_orders", "1.0.0", "production")
 
-	notComposable := `{"reason": "provider_graph_not_composable", "role": "consumer", "details": {"graph": "petstore_graph", "cause": "petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.amount without @shareable"}}`
+	notComposable := `{"reason": "provider_graph_not_composable", "role": "consumer", "details": {"graph": "petstore_graph", "cause": "petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.amount without @shareable", "causes": "petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.amount without @shareable\npetstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.currency without @shareable"}}`
 
 	this.assertWebGraphCheck(`consumes:
   petstore_graph:
@@ -423,7 +425,7 @@ type Money {
 		"deployable": false,
 		"members": {"petstore_api": "candidate", "petstore_orders": "1.0.0"},
 		"operations": {"query": {"order": {"returns": [
-			{"reason": "provider_graph_not_composable", "role": "consumer", "details": {"graph": "petstore_graph", "cause": "petstore_api candidate and petstore_orders 1.0.0 both resolve Money.amount without @shareable"}}
+			{"reason": "provider_graph_not_composable", "role": "consumer", "details": {"graph": "petstore_graph", "cause": "petstore_api candidate and petstore_orders 1.0.0 both resolve Money.amount without @shareable", "causes": "petstore_api candidate and petstore_orders 1.0.0 both resolve Money.amount without @shareable"}}
 		]}}}
 	}}`, string(validate.Results))
 }
@@ -456,7 +458,7 @@ type Pet @key(fields: "id") {
 		"deployable": false,
 		"members": {"petstore_api": "1.4.0", "petstore_reviews": "2.0.0"},
 		"operations": {"query": {"pet": {"returns": [
-			{"reason": "provider_graph_not_composable", "role": "consumer", "details": {"graph": "petstore_graph", "cause": "petstore_api 1.4.0 has a type named Query, but its query root is RootQuery (ROOT_QUERY_USED)"}}
+			{"reason": "provider_graph_not_composable", "role": "consumer", "details": {"graph": "petstore_graph", "cause": "petstore_api 1.4.0 has a type named Query, but its query root is RootQuery (ROOT_QUERY_USED)", "causes": "petstore_api 1.4.0 has a type named Query, but its query root is RootQuery (ROOT_QUERY_USED)"}}
 		]}}}
 	}}`)
 }

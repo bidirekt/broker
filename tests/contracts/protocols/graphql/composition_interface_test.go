@@ -63,7 +63,7 @@ func TestToComposedGraph_TheFieldsOfAnInterface_JoinWithoutShareable(t *testing.
 		interfaceMember(t, "petstore_api", "1.4.0", interfaceAPISDL),
 		interfaceMember(t, "petstore_reviews", "2.0.0", `
 type Query {
-  animals: [Animal!]! @shareable
+  reviewedAnimals: [Animal!]!
 }
 
 interface Animal {

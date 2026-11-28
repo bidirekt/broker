@@ -7,7 +7,7 @@ import (
 	"strconv"
 )
 
-const graphPageGraphLink = `<p class="op-see">See <a href="/graphs/petstore_graph">/graphs/petstore_graph</a></p>`
+const graphPageGraphLink = `<p class="op-see">Deployed graph: <a href="/graphs/petstore_graph">/graphs/petstore_graph</a></p>`
 
 const graphPageLink = `extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key", "@shareable"])
 `
@@ -101,7 +101,7 @@ func (this *IntegrationSuite) TestShowCheck_AGraphWithoutDeployedSubgraphs_AsksT
 	this.NotContains(body, `deploy it to production first`)
 }
 
-func (this *IntegrationSuite) TestShowCheck_AGraphThatDoesNotCompose_ShowsTheCauseAndLinksTheGraph() {
+func (this *IntegrationSuite) TestShowCheck_AGraphThatDoesNotCompose_ShowsEveryCauseAndLinksTheDeployedGraph() {
 	this.setUpGraphPage("petstore_api", "petstore_orders", "petstore_web")
 	this.publishForGraphPage("petstore_api", "1.4.0", graphPageGraphFile(), contractFragment{"api.graphqls", graphPageLink + `
 type Query {
@@ -115,6 +115,7 @@ type Pet @key(fields: "id") {
 
 type Money {
   amount: Int!
+  currency: String!
 }
 `})
 	this.publishForGraphPage("petstore_orders", "1.0.0", graphPageGraphFile(), contractFragment{"orders.graphqls", graphPageLink + `
@@ -129,6 +130,7 @@ type Order @key(fields: "id") {
 
 type Money @shareable {
   amount: Int!
+  currency: String!
 }
 `})
 	this.publishForGraphPage("petstore_web", "3.0.0", contractFragment{"web.yaml", graphPageWebContract})
@@ -137,7 +139,8 @@ type Money @shareable {
 
 	body := this.checkPageForGraphPage("petstore_web", "3.0.0")
 
-	this.Contains(body, `<b class="name">petstore_web</b> calls <code>query pet</code>, but <b class="name">petstore_graph</b> can&#39;t be built in <b class="name">production</b>: petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.amount without @shareable`)
+	this.Contains(body, `<b class="name">petstore_web</b> calls <code>query pet</code>, but <b class="name">petstore_graph</b> can&#39;t be built in <b class="name">production</b></span></p>`)
+	this.Contains(body, `<ul class="op-causes"><li>petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.amount without @shareable</li><li>petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.currency without @shareable</li></ul>`)
 	this.Contains(body, `<div class="fix other only"><span class="side">Fix in <b>petstore_graph subgraphs</b></span><span>make it compose</span></div>`)
 	this.Contains(body, graphPageGraphLink)
 	this.NotContains(body, `provider_graph_not_composable`)
@@ -161,7 +164,8 @@ func (this *IntegrationSuite) TestShowCheck_ASubgraphThatMakesItsGraphFailToComp
 
 	body := this.checkPageForGraphPage("petstore_reviews", "2.1.0")
 
-	this.Contains(body, `<b class="name">petstore_reviews</b> (via petstore_graph) makes <b class="name">petstore_graph</b> fail to compose in <b class="name">production</b>: petstore_api 1.4.0 and petstore_reviews 2.1.0 both resolve Pet.name without @shareable, and <b class="name">petstore_web</b> calls <code>query pet</code>`)
+	this.Contains(body, `<b class="name">petstore_reviews</b> (via petstore_graph) makes <b class="name">petstore_graph</b> fail to compose in <b class="name">production</b>, and <b class="name">petstore_web</b> calls <code>query pet</code></span></p>`)
+	this.Contains(body, `<ul class="op-causes"><li>petstore_api 1.4.0 and petstore_reviews 2.1.0 both resolve Pet.name without @shareable</li></ul>`)
 	this.Contains(body, `<div class="fix self only"><span class="side">Fix in <b>petstore_reviews</b></span><span>make petstore_graph compose</span></div>`)
 	this.Contains(body, graphPageGraphLink)
 	this.NotContains(body, `provider_graph_not_composable`)

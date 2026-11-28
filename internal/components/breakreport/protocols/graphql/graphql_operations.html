@@ -8,8 +8,9 @@
     <div class="op-break">
       {{with .Interaction}}<p class="op-ix">{{.}}</p>{{end}}
       <p class="op-brk">{{template "icon_x" 14}}<span>{{template "phrase" .Sentence}}</span></p>
+      {{if .Causes}}<ul class="op-causes">{{range .Causes}}<li>{{.}}</li>{{end}}{{with .MoreCauses}}<li>and {{.}} more</li>{{end}}</ul>{{end}}
       {{template "fixes" .Fixes}}
-      {{with .Graph}}<p class="op-see">See <a href="/graphs/{{.}}">/graphs/{{.}}</a></p>{{end}}
+      {{with .Graph}}<p class="op-see">Deployed graph: <a href="/graphs/{{.}}">/graphs/{{.}}</a></p>{{end}}
     </div>
     {{end}}
   </div>

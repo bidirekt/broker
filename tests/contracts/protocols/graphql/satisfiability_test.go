@@ -14,7 +14,7 @@ import (
 	graphqlmodel "github.com/bidirekt/broker/internal/model/protocols/graphql"
 )
 
-const satisfiabilityLink = `extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key", "@shareable"])
+const satisfiabilityLink = `extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key", "@shareable", "@interfaceObject"])
 `
 
 var satisfiabilityGraph = protocol.Declarations{ExtensionPieces: map[string][]protocol.ExtensionPiece{
@@ -476,6 +476,172 @@ func TestToComposedGraph_AFieldOfTheMemberReachedOnlyFromTheSubgraphReturningThe
 	)
 
 	assert.Equal(t, []string{"query api.item.title can't be resolved: no resolvable @key leads from petstore_api 1.4.0 to petstore_reviews 2.0.0 on Book"}, errors)
+}
+
+func TestToComposedGraph_AFieldOfAMemberASubgraphAtTheUnionNeverReturns_Composes(t *testing.T) {
+	errors := satisfiabilityErrors(
+		satisfiabilityMember(t, "petstore_api", "1.4.0", `
+type Query {
+  holder: Holder @shareable
+}
+
+type Holder @shareable {
+  item: Result
+}
+
+union Result = Book | Movie
+
+type Book @shareable {
+  id: ID!
+}
+
+type Movie @shareable {
+  name: String
+}
+`),
+		satisfiabilityMember(t, "petstore_reviews", "2.0.0", `
+type Query {
+  holder: Holder @shareable
+}
+
+type Holder @shareable {
+  item: Book
+}
+
+type Book @shareable {
+  id: ID!
+}
+
+type Movie @shareable {
+  name: String
+  year: Int
+}
+`),
+	)
+
+	assert.Empty(t, errors)
+}
+
+func TestToComposedGraph_ASharedUnionWhoseSubgraphsReturnNoMemberInCommon_CannotBeResolved(t *testing.T) {
+	errors := satisfiabilityErrors(
+		satisfiabilityMember(t, "petstore_api", "1.4.0", `
+type Query {
+  result: Result @shareable
+}
+
+union Result = Book
+
+type Book @shareable {
+  id: ID!
+  title: String
+}
+
+type Movie @shareable {
+  name: String
+  year: Int
+}
+`),
+		satisfiabilityMember(t, "petstore_reviews", "2.0.0", `
+type Query {
+  result: Result @shareable
+}
+
+union Result = Movie
+
+type Book @shareable {
+  id: ID!
+  pages: Int
+}
+
+type Movie @shareable {
+  name: String
+}
+`),
+	)
+
+	assert.Equal(t, []string{"query result can't be resolved: petstore_api 1.4.0 and petstore_reviews 2.0.0 share no type of Result: Book in petstore_api 1.4.0, Movie in petstore_reviews 2.0.0"}, errors)
+}
+
+func TestToComposedGraph_FieldsOfMembersOnlyOneSubgraphAtASharedUnionReturns_Compose(t *testing.T) {
+	errors := satisfiabilityErrors(
+		satisfiabilityMember(t, "petstore_api", "1.4.0", `
+type Query {
+  result: Result @shareable
+}
+
+union Result = Book | Movie
+
+type Book @shareable {
+  title: String
+}
+
+type Movie @shareable {
+  name: String
+}
+
+type Song @shareable {
+  length: Int
+}
+`),
+		satisfiabilityMember(t, "petstore_reviews", "2.0.0", `
+type Query {
+  result: Result @shareable
+}
+
+union Result = Movie | Song
+
+type Book @shareable {
+  pages: Int
+}
+
+type Movie @shareable {
+  name: String
+  year: Int
+}
+
+type Song @shareable {
+  title: String
+}
+`),
+	)
+
+	assert.Empty(t, errors)
+}
+
+func TestToComposedGraph_AFieldOfAnImplementationASubgraphMarkingTheInterfaceObjectNeverReturns_CannotBeResolved(t *testing.T) {
+	errors := satisfiabilityErrors(
+		satisfiabilityMember(t, "petstore_api", "1.4.0", `
+type Query {
+  media: Media @shareable
+}
+
+interface Media @key(fields: "id") {
+  id: ID!
+}
+
+type Book implements Media @key(fields: "id") {
+  id: ID!
+}
+`),
+		satisfiabilityMember(t, "petstore_reviews", "2.0.0", `
+type Query {
+  media: Media @shareable
+}
+
+type Media @key(fields: "id") @interfaceObject {
+  id: ID!
+  reviews: [String!]!
+}
+`),
+		satisfiabilityMember(t, "petstore_catalog", "3.0.0", `
+type Book @key(fields: "id", resolvable: false) {
+  id: ID!
+  pages: Int
+}
+`),
+	)
+
+	assert.Equal(t, []string{"query media.pages can't be resolved: no resolvable @key leads from petstore_api 1.4.0 to petstore_catalog 3.0.0 on Book"}, errors)
 }
 
 func TestToComposedGraph_AFieldOfTheImplementationASubgraphReturnsForTheInterface_Composes(t *testing.T) {
