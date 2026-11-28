@@ -49,6 +49,7 @@ func TestToResourceDeclaration_ANullSchemaRef_IsABodyWithoutSchema(t *testing.T)
 	declaration := consumedPetsBlock.ToResourceDeclaration(path, model.Input, identity, nil)
 
 	assert.True(t, declaration.WithoutSchema)
+	assert.Empty(t, declaration.Namespace)
 	assert.Empty(t, declaration.SchemaName)
 	assert.Equal(t, []model.ResourceBody{{Source: "web.yaml"}}, declaration.Resource.Bodies)
 }

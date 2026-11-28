@@ -3,6 +3,7 @@ package graphql_test
 import (
 	"html/template"
 	"io/fs"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -44,7 +45,7 @@ func TestToSection_CountsOperationBreaksAndFieldBlocks(t *testing.T) {
 	tree := []byte(`{"query": {
 		"owner": {"returns": [{"reason": "provider_resource_not_found", "role": "consumer"}]},
 		"pet": {
-			"arguments": [{"reason": "property_missing_in_provider", "role": "consumer", "details": {"property": "$", "argument": "owner", "consumerField": "PetArgs.owner"}}],
+			"arguments": [{"reason": "property_missing_in_provider", "role": "consumer", "details": {"property": "$", "argument": "owner", "consumerField": "Query.pet(owner:)"}}],
 			"returns": [{"reason": "property_missing_in_provider", "role": "consumer", "details": {"property": "$.reviews", "argument": "first", "consumerField": "ReviewsArgs.first"}}]
 		}
 	}}`)
@@ -59,7 +60,7 @@ func TestToSection_CountsOperationBreaksAndFieldBlocks(t *testing.T) {
 	require.Len(t, display.Operations, 1)
 	assert.Equal(t, "petstore_web calls query owner, but petstore_api doesn't provide it", display.Operations[0].Breaks[0].Sentence.String())
 	require.Len(t, display.Fields, 2)
-	assert.Equal(t, "PetArgs.owner", display.Fields[0].Field)
+	assert.Equal(t, "Query.pet(owner:)", display.Fields[0].Field)
 	assert.Equal(t, []graphqlbreakreport.Place{{Operation: "query", Field: "pet", Interaction: "arguments", Argument: `"owner"`}}, display.Fields[0].Places)
 	assert.Equal(t, "ReviewsArgs.first", display.Fields[1].Field)
 	assert.Equal(t, "petstore_web sends it, but petstore_api doesn't accept it", display.Fields[1].Sentence.String())
@@ -101,4 +102,83 @@ func TestToSection_ResourceBreaksReadAsTheOperation(t *testing.T) {
 		{Participant: "petstore_web", Action: "keep it until petstore_api stops calling it", Checked: true},
 		{Participant: "petstore_api", Action: "stop calling it"},
 	}, operation.Breaks[0].Fixes)
+}
+
+func TestToSection_AGraphThatDoesNotCompose_RendersEveryCauseAndLinksTheDeployedGraph(t *testing.T) {
+	checked := breakreport.CheckedCounterpart{Participant: "petstore_web", Environment: "production", Counterpart: breakreport.Counterpart{Name: "petstore_graph"}}
+	tree := []byte(`{"query": {"pet": {"returns": [{"reason": "provider_graph_not_composable", "role": "consumer", "details": {
+		"graph": "petstore_graph",
+		"cause": "petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.amount without @shareable",
+		"causes": "petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.amount without @shareable\npetstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.currency without @shareable"
+	}}]}}}`)
+
+	section, err := graphqlbreakreport.New().ToSection(checked, tree)
+	require.NoError(t, err)
+
+	page := renderOperations(t, section)
+	assert.Contains(t, page, `<ul class="op-causes"><li>petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.amount without @shareable</li><li>petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.currency without @shareable</li></ul>`)
+	assert.Contains(t, page, `<p class="op-see">Deployed graph: <a href="/graphs/petstore_graph">/graphs/petstore_graph</a></p>`)
+	assert.NotContains(t, page, "See ")
+}
+
+func TestToSection_AGraphWithMoreThanFiveCauses_RendersTheFirstFiveAndCountsTheRest(t *testing.T) {
+	checked := breakreport.CheckedCounterpart{Participant: "petstore_web", Environment: "production", Counterpart: breakreport.Counterpart{Name: "petstore_graph"}}
+	tree := []byte(`{"query": {"pet": {"returns": [{"reason": "provider_graph_not_composable", "role": "consumer", "details": {
+		"graph": "petstore_graph",
+		"cause": "failure 1",
+		"causes": "failure 1\nfailure 2\nfailure 3\nfailure 4\nfailure 5\nfailure 6\nfailure 7"
+	}}]}}}`)
+
+	section, err := graphqlbreakreport.New().ToSection(checked, tree)
+	require.NoError(t, err)
+
+	page := renderOperations(t, section)
+	assert.Contains(t, page, `<ul class="op-causes"><li>failure 1</li><li>failure 2</li><li>failure 3</li><li>failure 4</li><li>failure 5</li><li>and 2 more</li></ul>`)
+	assert.NotContains(t, page, "failure 6")
+}
+
+func TestToSection_AGraphWithExactlyFiveCauses_RendersThemAllWithoutAMoreLine(t *testing.T) {
+	checked := breakreport.CheckedCounterpart{Participant: "petstore_web", Environment: "production", Counterpart: breakreport.Counterpart{Name: "petstore_graph"}}
+	tree := []byte(`{"query": {"pet": {"returns": [{"reason": "provider_graph_not_composable", "role": "consumer", "details": {
+		"graph": "petstore_graph",
+		"cause": "failure 1",
+		"causes": "failure 1\nfailure 2\nfailure 3\nfailure 4\nfailure 5"
+	}}]}}}`)
+
+	section, err := graphqlbreakreport.New().ToSection(checked, tree)
+	require.NoError(t, err)
+
+	page := renderOperations(t, section)
+	assert.Contains(t, page, `<ul class="op-causes"><li>failure 1</li><li>failure 2</li><li>failure 3</li><li>failure 4</li><li>failure 5</li></ul>`)
+	assert.NotContains(t, page, " more</li>")
+}
+
+func TestToSection_AGraphBreakWithoutCauses_ShowsItsOnlyCause(t *testing.T) {
+	checked := breakreport.CheckedCounterpart{Participant: "petstore_web", Environment: "production", Counterpart: breakreport.Counterpart{Name: "petstore_graph"}}
+	tree := []byte(`{"query": {"pet": {"returns": [{"reason": "provider_graph_not_composable", "role": "consumer", "details": {
+		"graph": "petstore_graph",
+		"cause": "petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.amount without @shareable"
+	}}]}}}`)
+
+	section, err := graphqlbreakreport.New().ToSection(checked, tree)
+	require.NoError(t, err)
+
+	broken := section.Display.(graphqlbreakreport.Operations).Operations[0].Breaks[0]
+	assert.Equal(t, "petstore_web calls query pet, but petstore_graph can't be built in production", broken.Sentence.String())
+	assert.Equal(t, []string{"petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.amount without @shareable"}, broken.Causes)
+}
+
+func renderOperations(t *testing.T, section breakreport.Section) string {
+	t.Helper()
+
+	plugin := graphqlbreakreport.New()
+	templates := template.Must(template.New("partials").Parse(
+		`{{define "icon_x"}}{{end}}{{define "fixes"}}{{end}}{{define "phrase"}}{{range .}}{{.Text}}{{end}}{{end}}`,
+	))
+	templates = template.Must(templates.ParseFS(plugin.Files(), "*.html"))
+
+	var page strings.Builder
+	require.NoError(t, templates.ExecuteTemplate(&page, plugin.Template(), section.Display))
+
+	return page.String()
 }

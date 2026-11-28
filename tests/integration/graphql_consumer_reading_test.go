@@ -227,7 +227,7 @@ schemas:
 		"deployable": false,
 		"participantVersion": "1.0.0",
 		"operations": {"query": {"pet": {"arguments": [
-			{"reason": "property_type_mismatch", "role": "consumer", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "argument": "name", "consumerPropertyType": "Int!", "providerPropertyType": "String", "consumerField": "PetArgs.name", "providerField": "Query.pet(name:)"}}
+			{"reason": "property_type_mismatch", "role": "consumer", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "argument": "name", "consumerPropertyType": "Int!", "providerPropertyType": "String", "consumerField": "Query.pet(name:)", "providerField": "Query.pet(name:)"}}
 		]}}}
 	}}`)
 }

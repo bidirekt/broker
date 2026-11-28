@@ -138,8 +138,8 @@ type namedTypeWalk struct {
 func toNamedTypeBreaks(consumed, provided, changed *model.PersistedResource, changes map[string]namedTypeChange) []compatibility_checker.ReadyBreak {
 	walk := &namedTypeWalk{consumed: consumed, changes: changes, visited: map[[2]string]bool{}}
 	join := bodyReadings[consumed.Body].Join
-	consumer := schemagraph.New(consumed.Schemas).NamingFields(Plugin{}.FieldName).Root(consumed.Bodies, join)
-	provider := schemagraph.New(provided.Schemas).NamingFields(Plugin{}.FieldName).Root(provided.Bodies, join)
+	consumer := coordinateNamedGraph(consumed).Root(consumed.Bodies, join)
+	provider := coordinateNamedGraph(provided).Root(provided.Bodies, join)
 	candidate := schemagraph.New(changed.Schemas).Root(changed.Bodies, join)
 
 	if consumed.Body == model.Input {
@@ -149,6 +149,10 @@ func toNamedTypeBreaks(consumed, provided, changed *model.PersistedResource, cha
 	}
 
 	return walk.breaks
+}
+
+func coordinateNamedGraph(resource *model.PersistedResource) *schemagraph.Graph {
+	return schemagraph.New(resource.Schemas).NamingFields(func(site schemagraph.Site) (string, bool) { return Plugin{}.FieldName(resource, site) })
 }
 
 func (this *namedTypeWalk) walkRead(consumer, provider, candidate schemagraph.Node, path string) {
