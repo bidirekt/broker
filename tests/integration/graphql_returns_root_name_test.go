@@ -66,7 +66,8 @@ func (this *IntegrationSuite) TestCanIDeployAndShowCheck_ABreakAtTheRootOfWhatAF
 	this.Require().Equal(http.StatusOK, status, body)
 
 	this.Contains(body, `<span class="op-prop">FIELD</span><span>Query.age</span><span class="badge">1 place</span>`)
-	this.Contains(body, `<span class="cf">(petstore_web: Query.age)</span>`)
+	this.Contains(body, `<li><span class="op-kind">query</span><span>age</span><span class="at">returns</span><span>at &#34;$&#34;</span></li>`)
+	this.NotContains(body, `<span class="cf">`)
 	this.NotContains(body, `:returns`)
 	this.NotContains(body, `:arguments`)
 }

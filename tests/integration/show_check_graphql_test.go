@@ -169,7 +169,7 @@ func (this *IntegrationSuite) TestShowCheck_DrawsTheBreaksOfCounterpartsThatBrea
 	this.Contains(body, `<span class="op-prop">FIELD</span><span>Pet.age</span><span class="badge">1 place</span>`)
 	this.Contains(body, `<b class="name">petstore_web</b> reads it as <code>String!</code>, but <b class="name">petstore_api</b> provides <code>Int!</code>`)
 	this.Contains(body, `<div class="fix self"><span class="side">Fix in <b>petstore_web</b></span><span>read it as Int!</span></div><div class="fix other"><span class="side">or fix in <b>petstore_api</b></span><span>provide it as String! there</span></div>`)
-	this.Contains(body, `<li><span class="op-kind">query</span><span>pet</span><span class="at">returns</span><span>at &#34;$.age&#34;</span><span class="cf">(petstore_api: Pet.age)</span></li>`)
+	this.Contains(body, `<li><span class="op-kind">query</span><span>pet</span><span class="at">returns</span><span>at &#34;$.age&#34;</span></li>`)
 
 	this.Less(strings.Index(body, `<p class="group-label">Operations</p>`), strings.Index(body, `<p class="group-label">Fields</p>`))
 }
@@ -193,7 +193,7 @@ func (this *IntegrationSuite) TestShowCheck_AnArgumentBreakShowsTheArgumentCoord
 	body := this.graphqlOnlyCheckPage()
 
 	this.Contains(body, `<span class="op-prop">FIELD</span><span>Query.pet(id:)</span><span class="badge">1 place</span>`)
-	this.Contains(body, `<li><span class="op-kind">query</span><span>pet</span><span class="at">arguments</span><span class="at">(argument &#34;id&#34;)</span><span class="cf">(petstore_api: Query.pet(id:))</span></li>`)
+	this.Contains(body, `<li><span class="op-kind">query</span><span>pet</span><span class="at">arguments</span><span class="at">(argument &#34;id&#34;)</span></li>`)
 	this.Contains(body, `<span class="op-prop">FIELD</span><span>Pet.reviews(first:)</span><span class="badge">1 place</span>`)
 	this.NotContains(body, `:arguments`)
 }

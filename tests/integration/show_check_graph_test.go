@@ -155,7 +155,7 @@ func (this *IntegrationSuite) TestShowCheck_ASubgraphBreakingAConsumerOfItsGraph
 	this.Contains(body, `<span class="op-prop">FIELD</span><span>Pet.rating</span><span class="badge">1 place</span>`)
 	this.Contains(body, `<b class="name">petstore_reviews</b> (via petstore_graph) provides it as <code>String!</code>, but <b class="name">petstore_web</b> reads <code>Int!</code>`)
 	this.Contains(body, `<div class="fix self"><span class="side">Fix in <b>petstore_reviews</b></span><span>provide it as Int!</span></div><div class="fix other"><span class="side">or fix in <b>petstore_web</b></span><span>read it as String! there</span></div>`)
-	this.Contains(body, `<li><span class="op-kind">query</span><span>pet</span><span class="at">returns</span><span>at &#34;$.rating&#34;</span><span class="cf">(petstore_web: Pet.rating)</span></li>`)
+	this.Contains(body, `<li><span class="op-kind">query</span><span>pet</span><span class="at">returns</span><span>at &#34;$.rating&#34;</span></li>`)
 }
 
 func (this *IntegrationSuite) TestShowCheck_ASubgraphThatMakesItsGraphFailToCompose_SaysSoAndLinksTheGraph() {
