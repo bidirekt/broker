@@ -84,6 +84,36 @@ func TestToSection_ANestedArgumentBreakOfTheCheckedProviderReadsAsAcceptedArgume
 	}, display.Fields[0].Fixes)
 }
 
+func TestToSection_ARootFieldBreakOfTheCheckedProvider_DoesNotRepeatTheFieldInItsPlace(t *testing.T) {
+	checked := breakreport.CheckedCounterpart{Participant: "petstore_api", Environment: "production", Counterpart: breakreport.Counterpart{Name: "petstore_web"}}
+	tree := []byte(`{"query": {"age": {"returns": [
+		{"reason": "property_type_mismatch", "role": "provider", "details": {"property": "$", "consumerPropertyType": "String!", "providerPropertyType": "Int!", "consumerField": "Query.age", "providerField": "Query.age"}}
+	]}}}`)
+
+	section, err := graphqlbreakreport.New().ToSection(checked, tree)
+
+	require.NoError(t, err)
+	display := section.Display.(graphqlbreakreport.Operations)
+	require.Len(t, display.Fields, 1)
+	assert.Equal(t, "Query.age", display.Fields[0].Field)
+	assert.Equal(t, []graphqlbreakreport.Place{{Operation: "query", Field: "age", Interaction: "returns", Property: `"$"`}}, display.Fields[0].Places)
+}
+
+func TestToSection_ANestedFieldBreakOfTheCheckedProvider_NamesTheCounterpartFieldInItsPlace(t *testing.T) {
+	checked := breakreport.CheckedCounterpart{Participant: "petstore_api", Environment: "production", Counterpart: breakreport.Counterpart{Name: "petstore_web"}}
+	tree := []byte(`{"query": {"pet": {"returns": [
+		{"reason": "property_type_mismatch", "role": "provider", "details": {"property": "$.age", "consumerPropertyType": "String!", "providerPropertyType": "Int!", "consumerField": "PetView.age", "providerField": "Pet.age"}}
+	]}}}`)
+
+	section, err := graphqlbreakreport.New().ToSection(checked, tree)
+
+	require.NoError(t, err)
+	display := section.Display.(graphqlbreakreport.Operations)
+	require.Len(t, display.Fields, 1)
+	assert.Equal(t, "Pet.age", display.Fields[0].Field)
+	assert.Equal(t, []graphqlbreakreport.Place{{Operation: "query", Field: "pet", Interaction: "returns", Property: `"$.age"`, CounterpartField: "PetView.age"}}, display.Fields[0].Places)
+}
+
 func TestToSection_ResourceBreaksReadAsTheOperation(t *testing.T) {
 	checked := breakreport.CheckedCounterpart{Participant: "petstore_web", Environment: "production", Counterpart: breakreport.Counterpart{Name: "petstore_api"}}
 

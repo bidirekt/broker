@@ -39,9 +39,12 @@ func (this fieldBlock) toFieldBlock() FieldBlock {
 	places := make([]Place, 0, len(this.places))
 	otherFix := this.otherFix
 	for _, place := range this.places {
+		if place.CounterpartField == this.field {
+			place.CounterpartField = ""
+		}
 		places = append(places, place.Place)
 	}
-	if slices.ContainsFunc(places, func(place Place) bool { return place.CounterpartField != "" }) {
+	if slices.ContainsFunc(this.places, func(place blockPlace) bool { return place.CounterpartField != "" }) {
 		otherFix.Action += " there"
 	}
 
