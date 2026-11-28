@@ -405,7 +405,6 @@ func (this *IntegrationSuite) TestRecordDeployment_PaddedParticipantVersionOrEnv
 
 	cases := map[string]string{
 		"trailing space in participant":   `{"participant":"api ","version":"v1","environment":"production"}`,
-		"leading space in version":        `{"participant":"api","version":" v1","environment":"production"}`,
 		"trailing newline in environment": `{"participant":"api","version":"v1","environment":"production\n"}`,
 	}
 
@@ -416,6 +415,31 @@ func (this *IntegrationSuite) TestRecordDeployment_PaddedParticipantVersionOrEnv
 	}
 
 	this.Equal(0, this.countRows("deployments"))
+}
+
+func (this *IntegrationSuite) TestRecordDeployment_VersionWithWhitespaceOrAControlCharacterReturns400() {
+	this.seedApiParticipantContractAndProductionEnv()
+
+	cases := map[string]string{
+		`{"participant":"api","version":" v1","environment":"production"}`:      `{"message":"version \" v1\" has whitespace or a control character"}`,
+		`{"participant":"api","version":"1.0 beta","environment":"production"}`: `{"message":"version \"1.0 beta\" has whitespace or a control character"}`,
+		`{"participant":"api","version":"1.0\n2","environment":"production"}`:   `{"message":"version \"1.0\\n2\" has whitespace or a control character"}`,
+		`{"participant":"api","version":"1.0\t","environment":"production"}`:    `{"message":"version \"1.0\\t\" has whitespace or a control character"}`,
+	}
+
+	for body, message := range cases {
+		status, response := this.post("/api/deployments", body)
+		this.Equal(http.StatusBadRequest, status, body)
+		this.JSONEq(message, response, body)
+	}
+
+	this.Equal(0, this.countRows("deployments"))
+
+	status, _ := this.post("/api/contracts", this.publishBody("api", "1.0.0+build.5", contractFragment{"api.yaml", apiV1ContractBody}))
+	this.Require().Equal(http.StatusOK, status)
+
+	status, response := this.post("/api/deployments", `{"participant":"api","version":"1.0.0+build.5","environment":"production"}`)
+	this.Equal(http.StatusOK, status, response)
 }
 
 func (this *IntegrationSuite) TestRecordDeployment_UnknownParticipantReturns404() {

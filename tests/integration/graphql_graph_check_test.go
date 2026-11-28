@@ -308,7 +308,7 @@ type Pet @key(fields: "id") {
 	this.True(validate.Deployable)
 	this.JSONEq(`{"petstore_graph": {
 		"deployable": true,
-		"members": {"petstore_api": "candidate", "petstore_reviews": "2.0.0"}
+		"members": {"petstore_api": "", "petstore_reviews": "2.0.0"}
 	}}`, string(validate.Results))
 }
 
@@ -374,9 +374,9 @@ schemas:
 	}}`)
 }
 
-func (this *IntegrationSuite) TestValidate_ACandidateThatBreaksTheComposition_IsNamedCandidateInTheCause() {
+func (this *IntegrationSuite) TestValidate_ACandidateThatBreaksTheComposition_IsNamedLocalCandidateInTheCause() {
 	this.setUpGraphCheck("petstore_api", "petstore_orders")
-	this.publishForGraphCheck("petstore_orders", "1.0.0", contractFragment{"graph.yaml", graphCheckGraphYAML}, contractFragment{"orders.graphqls", graphCheckLink + `
+	this.publishForGraphCheck("petstore_orders", "candidate", contractFragment{"graph.yaml", graphCheckGraphYAML}, contractFragment{"orders.graphqls", graphCheckLink + `
 type Query {
   order(id: ID!): Order
 }
@@ -390,7 +390,7 @@ type Money @shareable {
   amount: Int!
 }
 `})
-	this.deployForGraphCheck("petstore_orders", "1.0.0", "production")
+	this.deployForGraphCheck("petstore_orders", "candidate", "production")
 
 	validate := this.validateForGraphCheck("petstore_api", "production",
 		contractFragment{"graph.yaml", graphCheckGraphYAML},
@@ -423,9 +423,9 @@ type Money {
 	this.False(validate.Deployable)
 	this.JSONEq(`{"petstore_graph": {
 		"deployable": false,
-		"members": {"petstore_api": "candidate", "petstore_orders": "1.0.0"},
+		"members": {"petstore_api": "", "petstore_orders": "candidate"},
 		"operations": {"query": {"order": {"returns": [
-			{"reason": "provider_graph_not_composable", "role": "consumer", "details": {"graph": "petstore_graph", "cause": "petstore_api candidate and petstore_orders 1.0.0 both resolve Money.amount without @shareable", "causes": "petstore_api candidate and petstore_orders 1.0.0 both resolve Money.amount without @shareable"}}
+			{"reason": "provider_graph_not_composable", "role": "consumer", "details": {"graph": "petstore_graph", "cause": "petstore_api (local candidate) and petstore_orders candidate both resolve Money.amount without @shareable", "causes": "petstore_api (local candidate) and petstore_orders candidate both resolve Money.amount without @shareable"}}
 		]}}}
 	}}`, string(validate.Results))
 }

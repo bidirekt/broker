@@ -224,14 +224,14 @@ func (this *IntegrationSuite) TestShowEnvironment_CountsTheSameBreaksAsTheCheckP
 
 func (this *IntegrationSuite) TestShowEnvironment_VersionLinksArePathEscapedAndDotVersionsHaveNoURL() {
 	this.createForShowEnvironment([]string{"production"}, []string{"petstore_api", "petstore_web"})
-	this.publishForShowEnvironment("petstore_api", "1.0/beta rc", showEnvironmentAPIContract)
-	this.deployForShowEnvironment("petstore_api", "1.0/beta rc", "production")
+	this.publishForShowEnvironment("petstore_api", "1.0/beta?rc", showEnvironmentAPIContract)
+	this.deployForShowEnvironment("petstore_api", "1.0/beta?rc", "production")
 	this.publishForShowEnvironment("petstore_web", "..", showEnvironmentWebCompatibleContract)
 	this.deployForShowEnvironment("petstore_web", "..", "production")
 
 	_, _, body := this.getPage(this.environmentPathForShowEnvironment("production"), this.signInAsAdmin())
 
-	this.Contains(body, `<a class="ver" href="/participants/petstore_api/versions/1.0%2Fbeta%20rc">1.0/beta rc</a>`)
+	this.Contains(body, `<a class="ver" href="/participants/petstore_api/versions/1.0%2Fbeta%3Frc">1.0/beta?rc</a>`)
 	this.Contains(body, `<span class="ver">..</span>`)
 	this.NotContains(body, `/participants/petstore_web/versions/`)
 }

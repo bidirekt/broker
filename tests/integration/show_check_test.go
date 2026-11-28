@@ -292,13 +292,13 @@ func (this *IntegrationSuite) TestShowCheck_VersionLinksArePathEscapedAndDotVers
 	this.createForShowCheck([]string{"production"}, []string{"petstore_api", "petstore_reviews"})
 	this.publishForShowCheck("petstore_api", "..", showCheckAPIv1Contract)
 	this.deployForShowCheck("petstore_api", "..", "production")
-	this.publishForShowCheck("petstore_reviews", "1.0/beta rc", showCheckReviewsConsumerContract)
-	checkPath := this.checkForShowCheck("petstore_reviews", "1.0/beta rc")
+	this.publishForShowCheck("petstore_reviews", "1.0/beta?rc", showCheckReviewsConsumerContract)
+	checkPath := this.checkForShowCheck("petstore_reviews", "1.0/beta?rc")
 
 	_, _, body := this.getPage(checkPath, this.signInAsAdmin())
 
-	this.Contains(body, `<a href="/participants/petstore_reviews/versions/1.0%2Fbeta%20rc">1.0/beta rc</a>`)
-	this.Contains(body, `<a class="ver" href="/participants/petstore_reviews/versions/1.0%2Fbeta%20rc">1.0/beta rc</a>`)
+	this.Contains(body, `<a href="/participants/petstore_reviews/versions/1.0%2Fbeta%3Frc">1.0/beta?rc</a>`)
+	this.Contains(body, `<a class="ver" href="/participants/petstore_reviews/versions/1.0%2Fbeta%3Frc">1.0/beta?rc</a>`)
 	this.Contains(body, `<a class="name" href="/participants/petstore_api">petstore_api</a><span class="ver">..</span>`)
 	this.NotContains(body, `/participants/petstore_api/versions/`)
 }
