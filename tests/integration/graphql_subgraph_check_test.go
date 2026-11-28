@@ -368,7 +368,7 @@ type Pet @key(fields: "id") {
 			"deployable": false,
 			"participantVersion": "3.0.0",
 			"operations": {"query": {"pet": {"returns": [
-				{"reason": "provider_graph_not_composable", "role": "provider", "details": {"graph": "petstore_graph", "cause": "petstore_api 1.4.0 and petstore_reviews ` + label + ` both resolve Pet.name without @shareable"}}
+				{"reason": "provider_graph_not_composable", "role": "provider", "details": {"graph": "petstore_graph", "cause": "petstore_api 1.4.0 and petstore_reviews ` + label + ` both resolve Pet.name without @shareable", "causes": "petstore_api 1.4.0 and petstore_reviews ` + label + ` both resolve Pet.name without @shareable"}}
 			]}}}
 		}}`
 	}

@@ -37,5 +37,9 @@ const (
 // ReasonProviderGraphNotComposable is the break of every field a consumer reads from a graph that does not compose.
 const ReasonProviderGraphNotComposable model.BreakingReason = "provider_graph_not_composable"
 
-// CauseKey is the detail with the first error of a graph that does not compose.
-const CauseKey = "cause"
+const (
+	// CauseKey is the detail with the first error of a graph that does not compose.
+	CauseKey = "cause"
+	// CausesKey is the detail with every error of a graph that does not compose, one per line.
+	CausesKey = "causes"
+)
