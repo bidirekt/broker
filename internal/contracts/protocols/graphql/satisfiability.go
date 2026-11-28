@@ -114,7 +114,8 @@ func (this *composition) reachFields(current reach, unresolved map[string]bool) 
 }
 
 // A subgraph returns, for a union or an interface, only the members it declares, or the member itself when its field
-// returns that member, not the union or the interface the graph joins the field in.
+// returns that member, not the union or the interface the graph joins the field in. A member that a subgraph at the
+// union or the interface never returns isn't walked, unless that subgraph marks the interface @interfaceObject.
 func (this *composition) reachMembers(current reach) []reach {
 	var next []reach
 	for _, segment := range slices.Sorted(maps.Keys(this.schemas[current.typeName])) {
@@ -128,7 +129,11 @@ func (this *composition) reachMembers(current reach) []reach {
 			return !declares && current.own[member.name] != model.MemberKey(segment)
 		})
 
-		if len(at) > 0 {
+		neverReturns := slices.ContainsFunc(current.at, func(member subgraph) bool {
+			return !containsSubgraph(at, member) && !member.marks(current.typeName, graphqlmodel.InterfaceObjectDirective)
+		})
+
+		if len(at) > 0 && !neverReturns {
 			next = append(next, reach{typeName: model.MemberKey(segment), at: at, provided: current.provided, operation: current.operation, path: current.path})
 		}
 	}
