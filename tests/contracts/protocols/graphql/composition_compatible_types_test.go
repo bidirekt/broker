@@ -185,7 +185,7 @@ func TestToComposedGraph_FieldsOfUnrelatedTypes_DoNotJoin(t *testing.T) {
 				compatibleTypesMember(t, "petstore_reviews", "2.0.0", compatibleTypesHolder("reviews", tc.other)+compatibleTypesUnrelated),
 			})
 
-			assert.Equal(t, []string{tc.expected}, errors)
+			assert.Equal(t, []graphqlcontracts.CompositionError{{Code: "FIELD_TYPE_MISMATCH", Message: tc.expected}}, errors)
 		})
 	}
 }

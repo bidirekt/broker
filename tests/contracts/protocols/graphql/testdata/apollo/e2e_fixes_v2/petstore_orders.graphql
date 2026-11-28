@@ -1,0 +1,9 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key", "@shareable"])
+
+type Query {
+  order(id: ID!): Order
+}
+
+type Order @key(fields: "id") {
+  id: ID!
+}

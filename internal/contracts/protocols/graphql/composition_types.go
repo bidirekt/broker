@@ -48,7 +48,7 @@ func (this *composition) agreeOnKind(typeName string, definers []subgraph) bool 
 
 	for _, other := range definers[1:] {
 		if other.kinds[typeName] != first.kinds[typeName] {
-			this.disagree(typeName, first, other, first.kinds[typeName], other.kinds[typeName])
+			this.disagree(typeName, "TYPE_KIND_MISMATCH", first, other, first.kinds[typeName], other.kinds[typeName])
 			agree = false
 		}
 	}
@@ -57,8 +57,8 @@ func (this *composition) agreeOnKind(typeName string, definers []subgraph) bool 
 }
 
 // disagree is the error of every conflict without a rule of its own: the element, then what each subgraph declares.
-func (this *composition) disagree(coordinate string, one, other subgraph, oneDeclares, otherDeclares string) {
-	this.addError(coordinate, fmt.Sprintf("%s and %s disagree on %s: %s in %s, %s in %s",
+func (this *composition) disagree(coordinate, code string, one, other subgraph, oneDeclares, otherDeclares string) {
+	this.addError(coordinate, code, fmt.Sprintf("%s and %s disagree on %s: %s in %s, %s in %s",
 		one.label, other.label, coordinate, oneDeclares, one.name, otherDeclares, other.name), one, other)
 }
 
@@ -90,7 +90,7 @@ func (this *composition) composeObject(typeName string, definers []subgraph) {
 func (this *composition) requireResolver(coordinate string, definers []subgraph) {
 	for _, member := range definers {
 		if member.marks(coordinate, graphqlmodel.ExternalDirective) {
-			this.addError(coordinate, fmt.Sprintf("%s marks %s @external, but no subgraph resolves it", member.label, coordinate), member)
+			this.addError(coordinate, "EXTERNAL_MISSING_ON_BASE", fmt.Sprintf("%s marks %s @external, but no subgraph resolves it", member.label, coordinate), member)
 		}
 	}
 }
@@ -197,14 +197,47 @@ func (this *composition) checkNotEmpty(typeName, kind string, definers []subgrap
 		labels = append(labels, member.label)
 	}
 
-	this.addError(typeName, fmt.Sprintf("%s has no %s left in the graph of %s", typeName, element, strings.Join(labels, " and ")), definers...)
+	this.addError(typeName, this.emptyTypeCode(typeName, kind, definers), fmt.Sprintf("%s has no %s left in the graph of %s", typeName, element, strings.Join(labels, " and ")), definers...)
+}
+
+func (this *composition) emptyTypeCode(typeName, kind string, definers []subgraph) string {
+	switch {
+	case kind == graphqlmodel.ObjectKind || this.onlyInaccessibleChildren(typeName, definers):
+		return "ONLY_INACCESSIBLE_CHILDREN"
+	case kind == graphqlmodel.InputKind:
+		return "EMPTY_MERGED_INPUT_TYPE"
+	default:
+		return "EMPTY_MERGED_ENUM_TYPE"
+	}
+}
+
+func (this *composition) onlyInaccessibleChildren(typeName string, definers []subgraph) bool {
+	for _, member := range definers {
+		schema := member.schemas[typeName]
+		for _, child := range slices.Concat(propertiesOf(schema), schema[""].Members) {
+			if !this.inaccessible(typeName + "." + child) {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+// inputCode tells an argument, whose coordinate is Type.field(argument:), from an input field.
+func inputCode(coordinate, argumentCode, inputFieldCode string) string {
+	if strings.HasSuffix(coordinate, ":)") {
+		return argumentCode
+	}
+
+	return inputFieldCode
 }
 
 func (this *composition) checkShared(coordinate string, resolvers []subgraph) {
 	for index, one := range resolvers {
 		for _, other := range resolvers[index+1:] {
 			if !one.shares(coordinate) || !other.shares(coordinate) {
-				this.addError(coordinate, fmt.Sprintf("%s and %s both resolve %s without @shareable%s", one.label, other.label, coordinate, this.strayOverrideOf(coordinate, one, other)), one, other)
+				this.addError(coordinate, "INVALID_FIELD_SHARING", fmt.Sprintf("%s and %s both resolve %s without @shareable%s", one.label, other.label, coordinate, this.strayOverrideOf(coordinate, one, other)), one, other)
 			}
 		}
 	}
@@ -236,7 +269,7 @@ func (this *composition) joinOutputs(schemaName, property, coordinate string, re
 	for _, other := range resolvers[1:] {
 		declared, _ := other.typedAt(schemaName, property, coordinate)
 		if len(declared.levels) != len(joined.levels) || !this.related(joined.named, declared.named) {
-			this.addError(coordinate, fmt.Sprintf("%s resolves %s as %s, but %s as %s", resolvers[0].label, coordinate, first, other.label, declared), resolvers[0], other)
+			this.addError(coordinate, "FIELD_TYPE_MISMATCH", fmt.Sprintf("%s resolves %s as %s, but %s as %s", resolvers[0].label, coordinate, first, other.label, declared), resolvers[0], other)
 			joins = false
 
 			continue
@@ -327,7 +360,7 @@ func (this *composition) intersectInputs(schemaName string, coordinateOf func(st
 func (this *composition) requireAccessible(coordinate string, definers []subgraph, declared []typed) {
 	for index, member := range definers {
 		if len(declared[index].levels) > 0 && !declared[index].levels[0].Optional {
-			this.addError(coordinate, fmt.Sprintf("%s requires %s, which is @inaccessible", member.label, coordinate), member)
+			this.addError(coordinate, "REQUIRED_INACCESSIBLE", fmt.Sprintf("%s requires %s, which is @inaccessible", member.label, coordinate), member)
 		}
 	}
 }
@@ -339,7 +372,7 @@ func (this *composition) requireDeclared(coordinate string, definers []subgraph,
 		}
 
 		for _, lacking := range missing {
-			this.addError(coordinate, fmt.Sprintf("%s requires %s, which %s doesn't declare", member.label, coordinate, lacking.label), member, lacking)
+			this.addError(coordinate, inputCode(coordinate, "REQUIRED_ARGUMENT_MISSING_IN_SOME_SUBGRAPH", "REQUIRED_INPUT_FIELD_MISSING_IN_SOME_SUBGRAPH"), fmt.Sprintf("%s requires %s, which %s doesn't declare", member.label, coordinate, lacking.label), member, lacking)
 		}
 	}
 }
@@ -351,7 +384,7 @@ func (this *composition) meetInputs(coordinate string, definers []subgraph, decl
 
 	for index, other := range declared[1:] {
 		if !other.sameShape(declared[0]) {
-			this.disagree(coordinate, definers[0], definers[index+1], declared[0].String(), other.String())
+			this.disagree(coordinate, inputCode(coordinate, "FIELD_ARGUMENT_TYPE_MISMATCH", "FIELD_TYPE_MISMATCH"), definers[0], definers[index+1], declared[0].String(), other.String())
 			meets = false
 
 			continue
@@ -396,7 +429,7 @@ func (this *composition) composeEnum(typeName string, definers []subgraph) {
 	case use.input && use.output:
 		for index, other := range definers[1:] {
 			if !slices.Equal(values[0], values[index+1]) {
-				this.addError(typeName, fmt.Sprintf("%s and %s declare different values for %s, used as input and output", definers[0].label, other.label, typeName), definers[0], other)
+				this.addError(typeName, "ENUM_VALUE_MISMATCH", fmt.Sprintf("%s and %s declare different values for %s, used as input and output", definers[0].label, other.label, typeName), definers[0], other)
 			}
 		}
 
@@ -424,7 +457,7 @@ func (this *composition) checkReferences() {
 
 		for _, member := range this.subgraphs {
 			if member.namedTypes[coordinate] == named {
-				this.addError(coordinate, fmt.Sprintf("%s declares %s as %s, which is @inaccessible", member.label, coordinate, named), member)
+				this.addError(coordinate, "REFERENCED_INACCESSIBLE", fmt.Sprintf("%s declares %s as %s, which is @inaccessible", member.label, coordinate, named), member)
 			}
 		}
 	}

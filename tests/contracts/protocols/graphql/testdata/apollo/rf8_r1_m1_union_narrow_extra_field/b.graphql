@@ -1,0 +1,3 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key", "@shareable", "@external", "@provides"])
+type Product @key(fields: "id") { id: ID! media: Image @shareable }
+type Image @shareable { url: String width: Int }

@@ -1,0 +1,7 @@
+{
+  "composes": false,
+  "codes": [
+    "EXTERNAL_TYPE_MISMATCH",
+    "INVALID_FIELD_SHARING"
+  ]
+}

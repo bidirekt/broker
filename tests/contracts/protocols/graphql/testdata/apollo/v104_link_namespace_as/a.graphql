@@ -1,0 +1,3 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", as: "fed")
+type Query { product: Product }
+type Product @fed__key(fields: "id") { id: ID! name: String @fed__shareable }

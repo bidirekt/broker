@@ -1,0 +1,4 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key", "@shareable", "@external", "@override", "@inaccessible", "@interfaceObject", "@provides", "@requires", "@tag"])
+type Product @key(fields: "id") { id: ID! related: Product2 @shareable }
+interface Node { id: ID! }
+type Product2 implements Node @key(fields: "id") { id: ID! }

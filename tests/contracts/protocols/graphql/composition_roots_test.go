@@ -42,7 +42,7 @@ func rootsMember(t *testing.T, sdl string) *model.PersistedContract {
 	}
 }
 
-func rootsErrors(t *testing.T, sdl string) []string {
+func rootsErrors(t *testing.T, sdl string) []graphqlcontracts.CompositionError {
 	t.Helper()
 
 	_, errors := graphqlcontracts.ToComposedGraph("petstore_graph", []*model.PersistedContract{rootsMember(t, sdl)})
@@ -67,19 +67,28 @@ func rootsIdentities(t *testing.T, sdl string) []graphqlmodel.Identity {
 func TestToComposedGraph_AQueryRootNamedOtherwiseNextToATypeNamedQuery_FailsAsApolloDoes(t *testing.T) {
 	errors := rootsErrors(t, "schema {\n  query: RootQuery\n}\n\ntype RootQuery {\n  pet: Int\n}\n\ntype Query {\n  legacy: Int\n}\n")
 
-	assert.Equal(t, []string{"petstore_api 1.4.0 has a type named Query, but its query root is RootQuery (ROOT_QUERY_USED)"}, errors)
+	assert.Equal(t, []graphqlcontracts.CompositionError{{
+		Code:    "ROOT_QUERY_USED",
+		Message: "petstore_api 1.4.0 has a type named Query, but its query root is RootQuery",
+	}}, errors)
 }
 
 func TestToComposedGraph_AQueryRootNamedOtherwiseWhileQueryIsTheMutationRoot_FailsAsApolloDoes(t *testing.T) {
 	errors := rootsErrors(t, "schema {\n  query: RootQuery\n  mutation: Query\n}\n\ntype RootQuery {\n  pet: Int\n}\n\ntype Query {\n  adopt: Int\n}\n")
 
-	assert.Equal(t, []string{"petstore_api 1.4.0 has a type named Query, but its query root is RootQuery (ROOT_QUERY_USED)"}, errors)
+	assert.Equal(t, []graphqlcontracts.CompositionError{{
+		Code:    "ROOT_QUERY_USED",
+		Message: "petstore_api 1.4.0 has a type named Query, but its query root is RootQuery",
+	}}, errors)
 }
 
 func TestToComposedGraph_AMutationRootNamedOtherwiseNextToATypeNamedMutation_FailsAsApolloDoes(t *testing.T) {
 	errors := rootsErrors(t, "schema {\n  query: Query\n  mutation: RootMutation\n}\n\ntype Query {\n  pet: Int\n}\n\ntype RootMutation {\n  adopt: Int\n}\n\ntype Mutation {\n  legacy: Int\n}\n")
 
-	assert.Equal(t, []string{"petstore_api 1.4.0 has a type named Mutation, but its mutation root is RootMutation (ROOT_MUTATION_USED)"}, errors)
+	assert.Equal(t, []graphqlcontracts.CompositionError{{
+		Code:    "ROOT_MUTATION_USED",
+		Message: "petstore_api 1.4.0 has a type named Mutation, but its mutation root is RootMutation",
+	}}, errors)
 }
 
 func TestToComposedGraph_APlainTypeMutationNextToAQueryRootNamedOtherwise_IsNoMutation(t *testing.T) {

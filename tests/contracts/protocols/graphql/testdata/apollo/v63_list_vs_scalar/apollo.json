@@ -1,0 +1,6 @@
+{
+  "composes": false,
+  "codes": [
+    "FIELD_TYPE_MISMATCH"
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "composes": false,
+  "codes": [
+    "OVERRIDE_FROM_SELF_ERROR"
+  ]
+}

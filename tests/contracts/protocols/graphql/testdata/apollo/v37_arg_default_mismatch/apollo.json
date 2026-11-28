@@ -1,0 +1,6 @@
+{
+  "composes": false,
+  "codes": [
+    "FIELD_ARGUMENT_DEFAULT_MISMATCH"
+  ]
+}

@@ -379,7 +379,7 @@ type Pet @key(fields: "id") {
 
 	validate := this.validateForSubgraphCheck("petstore_reviews", candidate...)
 	this.False(validate.Deployable)
-	this.JSONEq(notComposable("candidate"), string(validate.Results))
+	this.JSONEq(notComposable("(local candidate)"), string(validate.Results))
 }
 
 func (this *IntegrationSuite) TestCanIDeployAndValidate_ABreakTheDeployedGraphAlreadyHas_DoesNotBlockASubgraph() {
@@ -523,7 +523,7 @@ type Pet @key(fields: "id") {
 
 	validate := this.validateForSubgraphCheck("petstore_api", candidate...)
 	this.False(validate.Deployable)
-	this.JSONEq(results("candidate"), string(validate.Results))
+	this.JSONEq(results(""), string(validate.Results))
 }
 
 const subgraphCheckAPIWithMoneyNotShareable = subgraphCheckLink + `

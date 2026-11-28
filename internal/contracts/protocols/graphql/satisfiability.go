@@ -107,7 +107,7 @@ func (this *composition) reachFields(current reach, unresolved map[string]bool) 
 
 		if !unresolved[coordinate] {
 			unresolved[coordinate] = true
-			this.addError(coordinate, fmt.Sprintf("%s %s.%s can't be resolved: no resolvable @key leads from %s to %s on %s",
+			this.addError(coordinate, "SATISFIABILITY_ERROR", fmt.Sprintf("%s %s.%s can't be resolved: no resolvable @key leads from %s to %s on %s",
 				current.operation, strings.Join(current.path, "."), field, current.at[0].label, resolvers[0].label, current.typeName), current.at[0], resolvers[0])
 		}
 	}
@@ -184,7 +184,7 @@ func (this *composition) sharesNoMember(current reach, members map[string][]subg
 
 	if !unresolved[current.coordinate] {
 		unresolved[current.coordinate] = true
-		this.addError(current.coordinate, fmt.Sprintf("%s %s can't be resolved: %s share no type of %s: %s",
+		this.addError(current.coordinate, "SHAREABLE_HAS_MISMATCHED_RUNTIME_TYPES", fmt.Sprintf("%s %s can't be resolved: %s share no type of %s: %s",
 			current.operation, strings.Join(current.path, "."), strings.Join(labels, " and "), current.typeName, strings.Join(sharing, ", ")), current.at...)
 	}
 

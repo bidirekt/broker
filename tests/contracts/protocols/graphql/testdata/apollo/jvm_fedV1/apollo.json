@@ -1,0 +1,6 @@
+{
+  "composes": false,
+  "codes": [
+    "EXTENSION_WITH_NO_BASE"
+  ]
+}

@@ -4,3 +4,4 @@
 .env
 tests
 *.md
+scripts/apollo-parity/node_modules

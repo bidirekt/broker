@@ -1,0 +1,6 @@
+{
+  "composes": false,
+  "codes": [
+    "SHAREABLE_HAS_MISMATCHED_RUNTIME_TYPES"
+  ]
+}

@@ -46,7 +46,7 @@ func rulesMember(t *testing.T, name, version, sdl string) *model.PersistedContra
 func rulesErrors(subgraphs ...*model.PersistedContract) []string {
 	_, errors := graphqlcontracts.ToComposedGraph("petstore_graph", subgraphs)
 
-	return errors
+	return graphqlcontracts.CompositionMessages(errors)
 }
 
 const rulesArgumentSDL = `

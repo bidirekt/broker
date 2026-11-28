@@ -42,16 +42,23 @@ type enumUse struct {
 	output bool
 }
 
+// CompositionError is why a graph does not compose: the code of the Apollo rule it breaks, and the message in our
+// words, which never carries the code.
+type CompositionError struct {
+	Code    string
+	Message string
+}
+
 type compositionError struct {
+	CompositionError
 	coordinate string
 	subgraphs  []string
-	message    string
 }
 
 // ToComposedGraph composes a graph from its subgraphs by the Federation 2 rules. The graph is an in-memory
 // contract whose resources are hashed under the graph's name; when it does not compose, the errors come instead,
 // ordered by coordinate and then by subgraph.
-func ToComposedGraph(graph string, subgraphs []*model.PersistedContract) (*model.PersistedContract, []string) {
+func ToComposedGraph(graph string, subgraphs []*model.PersistedContract) (*model.PersistedContract, []CompositionError) {
 	composing := newComposition(graph, subgraphs)
 
 	// A step runs only when the ones before it found no error: a root that takes a type's name garbles the schemas.
@@ -79,8 +86,8 @@ func (this *composition) compose() {
 func (this *composition) checkRootNames() {
 	for _, member := range this.subgraphs {
 		for _, root := range member.usedRoots {
-			this.addError(root.typeName, fmt.Sprintf("%s has a type named %s, but its %s root is %s (ROOT_%s_USED)",
-				member.label, root.typeName, root.operation, root.of(member.roots), strings.ToUpper(root.operation)), member)
+			this.addError(root.typeName, "ROOT_"+strings.ToUpper(root.operation)+"_USED", fmt.Sprintf("%s has a type named %s, but its %s root is %s",
+				member.label, root.typeName, root.operation, root.of(member.roots)), member)
 		}
 	}
 }
@@ -161,7 +168,7 @@ func (this *composition) takeOverrides() {
 
 func (this *composition) takeOverride(member subgraph, coordinate, from string) {
 	if from == member.name {
-		this.addError(coordinate, fmt.Sprintf("%s overrides %s from itself", member.label, coordinate), member)
+		this.addError(coordinate, "OVERRIDE_FROM_SELF_ERROR", fmt.Sprintf("%s overrides %s from itself", member.label, coordinate), member)
 
 		return
 	}
@@ -175,7 +182,7 @@ func (this *composition) takeOverride(member subgraph, coordinate, from string) 
 
 	origin := this.subgraphs[index]
 	if origin.marks(coordinate, graphqlmodel.OverrideDirective) {
-		this.addError(coordinate, fmt.Sprintf("%s overrides %s from %s, which overrides it too", member.label, coordinate, origin.name), member, origin)
+		this.addError(coordinate, "OVERRIDE_SOURCE_HAS_OVERRIDE", fmt.Sprintf("%s overrides %s from %s, which overrides it too", member.label, coordinate, origin.name), member, origin)
 
 		return
 	}
@@ -183,23 +190,32 @@ func (this *composition) takeOverride(member subgraph, coordinate, from string) 
 	origin.overridden[coordinate] = true
 }
 
-func (this *composition) addError(coordinate, message string, subgraphs ...subgraph) {
+func (this *composition) addError(coordinate, code, message string, subgraphs ...subgraph) {
 	names := make([]string, 0, len(subgraphs))
 	for _, member := range subgraphs {
 		names = append(names, member.name)
 	}
 
-	this.errors = append(this.errors, compositionError{coordinate: coordinate, subgraphs: names, message: message})
+	this.errors = append(this.errors, compositionError{CompositionError: CompositionError{Code: code, Message: message}, coordinate: coordinate, subgraphs: names})
 }
 
-func (this *composition) sortedErrors() []string {
+func (this *composition) sortedErrors() []CompositionError {
 	slices.SortStableFunc(this.errors, func(a, b compositionError) int {
 		return cmp.Or(cmp.Compare(a.coordinate, b.coordinate), slices.Compare(a.subgraphs, b.subgraphs))
 	})
 
-	messages := make([]string, 0, len(this.errors))
+	errors := make([]CompositionError, 0, len(this.errors))
 	for _, composed := range this.errors {
-		messages = append(messages, composed.message)
+		errors = append(errors, composed.CompositionError)
+	}
+
+	return errors
+}
+
+func CompositionMessages(errors []CompositionError) []string {
+	var messages []string
+	for _, composed := range errors {
+		messages = append(messages, composed.Message)
 	}
 
 	return messages

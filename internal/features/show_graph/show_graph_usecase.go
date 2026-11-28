@@ -78,7 +78,8 @@ func (this *ShowGraphUseCase) toComposedEnvironment(ctx context.Context, graph s
 
 	composed := ComposedEnvironment{Environment: environment, Members: members}
 	if len(members) > 0 {
-		_, composed.Errors = graphqlcontracts.ToComposedGraph(graph, members)
+		_, errors := graphqlcontracts.ToComposedGraph(graph, members)
+		composed.Errors = graphqlcontracts.CompositionMessages(errors)
 	}
 
 	return composed

@@ -108,7 +108,7 @@ type Cat implements Animal {
 `),
 	})
 
-	assert.Equal(t, []string{"petstore_api 1.4.0 resolves Animal.name as String!, but petstore_reviews 2.0.0 as Int!"}, errors)
+	assert.Equal(t, []graphqlcontracts.CompositionError{{Code: "FIELD_TYPE_MISMATCH", Message: "petstore_api 1.4.0 resolves Animal.name as String!, but petstore_reviews 2.0.0 as Int!"}}, errors)
 }
 
 func TestToComposedGraph_AnInterfaceObject_ComposesAsTheInterfaceWithItsFieldsAdded(t *testing.T) {
@@ -209,5 +209,5 @@ type Media @key(fields: "id", resolvable: false) @interfaceObject {
 `),
 	})
 
-	assert.Equal(t, []string{"query media.reviews can't be resolved: no resolvable @key leads from petstore_api 1.4.0 to petstore_reviews 2.0.0 on Book"}, errors)
+	assert.Equal(t, []graphqlcontracts.CompositionError{{Code: "SATISFIABILITY_ERROR", Message: "query media.reviews can't be resolved: no resolvable @key leads from petstore_api 1.4.0 to petstore_reviews 2.0.0 on Book"}}, errors)
 }

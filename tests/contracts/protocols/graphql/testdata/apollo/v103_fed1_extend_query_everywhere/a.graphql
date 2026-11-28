@@ -1,0 +1,2 @@
+extend type Query { product: Product }
+type Product @key(fields: "upc") { upc: String! name: String }

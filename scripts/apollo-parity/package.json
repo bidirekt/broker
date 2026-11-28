@@ -1,0 +1,9 @@
+{
+  "name": "apollo-parity",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@apollo/composition": "2.14.5",
+    "graphql": "16.14.2"
+  }
+}

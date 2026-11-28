@@ -1,0 +1,5 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key", "@shareable", "@external", "@override", "@inaccessible", "@interfaceObject", "@provides", "@requires", "@tag"])
+type Query { b: Result }
+union Result = Book | Song
+type Book @key(fields: "id") { id: ID! title: String }
+type Song @key(fields: "id") { id: ID! }

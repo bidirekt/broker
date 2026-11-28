@@ -1,0 +1,5 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key"])
+schema { query: RootQuery }
+type RootQuery { product: Product }
+type Query { x: Int }
+type Product @key(fields: "id") { id: ID! }

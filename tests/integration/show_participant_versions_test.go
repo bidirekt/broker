@@ -177,13 +177,13 @@ func (this *IntegrationSuite) TestShowParticipantVersions_ListsVersionsNewestFir
 
 func (this *IntegrationSuite) TestShowParticipantVersions_VersionLinksArePathEscapedAndDotVersionsHaveNoURL() {
 	this.createForShowParticipantVersions(nil, []string{"petstore_api"})
-	for _, version := range []string{".", "..", "1.0/beta rc"} {
+	for _, version := range []string{".", "..", "1.0/beta?rc"} {
 		this.publishForShowParticipantVersions("petstore_api", version, showParticipantVersionsAPIContract)
 	}
 
 	_, _, body := this.getPage("/participants/petstore_api", this.signInAsAdmin())
 
-	this.Contains(body, `<a class="ver" href="/participants/petstore_api/versions/1.0%2Fbeta%20rc">1.0/beta rc</a>`)
+	this.Contains(body, `<a class="ver" href="/participants/petstore_api/versions/1.0%2Fbeta%3Frc">1.0/beta?rc</a>`)
 	this.Contains(body, `<td data-l="Version"><span class="ver">..</span></td>`)
 	this.Contains(body, `<td data-l="Version"><span class="ver">.</span></td>`)
 	this.Equal(2, strings.Count(body, `/participants/petstore_api/versions/`))

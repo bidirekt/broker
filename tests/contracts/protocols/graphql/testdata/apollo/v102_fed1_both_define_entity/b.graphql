@@ -1,0 +1,1 @@
+type Product @key(fields: "upc") { upc: String! stock: Int }

@@ -71,3 +71,42 @@ func (this *IntegrationSuite) TestCanIDeployAndShowCheck_ABreakAtTheRootOfWhatAF
 	this.NotContains(body, `:returns`)
 	this.NotContains(body, `:arguments`)
 }
+
+const returnsRootStatusProviderSDL = `type Query {
+  status: Int!
+}
+`
+
+const returnsRootConsumerWithASynthesizedLookingName = `consumes:
+  petstore_api:
+    graphql:
+      query:
+        status: {returns: "Query:status:returns"}
+schemas:
+  "Query:status:returns": {type: string}
+`
+
+func (this *IntegrationSuite) TestCanIDeployAndShowCheck_AConsumerSchemaNamedLikeASynthesizedOne_NamesTheFieldByItsCoordinate() {
+	this.mustPostForReturnsRoot("/api/environments", `{"environment":"production"}`)
+	this.mustPostForReturnsRoot("/api/participants", `{"participant":"petstore_api"}`)
+	this.mustPostForReturnsRoot("/api/participants", `{"participant":"petstore_web"}`)
+	this.mustPostForReturnsRoot("/api/contracts", this.publishBody("petstore_api", "1.0.0", contractFragment{"schema.graphqls", returnsRootStatusProviderSDL}))
+	this.mustPostForReturnsRoot("/api/deployments", `{"participant":"petstore_api","version":"1.0.0","environment":"production"}`)
+	this.mustPostForReturnsRoot("/api/contracts", this.publishBody("petstore_web", "1.0.0", contractFragment{"web.yaml", returnsRootConsumerWithASynthesizedLookingName}))
+
+	results, checkPath := this.canIDeployForReturnsRoot("petstore_web", "1.0.0")
+	this.JSONEq(`{"petstore_api": {
+		"deployable": false,
+		"participantVersion": "1.0.0",
+		"operations": {"query": {"status": {"returns": [
+			{"reason": "property_type_mismatch", "role": "consumer", "details": {"consumerName": "petstore_web", "providerName": "petstore_api", "property": "$", "consumerPropertyType": "String!", "providerPropertyType": "Int!", "consumerField": "Query.status", "providerField": "Query.status"}}
+		]}}}
+	}}`, results)
+
+	status, _, body := this.getPage(checkPath, this.signInAsAdmin())
+	this.Require().Equal(http.StatusOK, status, body)
+
+	this.Contains(body, `<span class="op-prop">FIELD</span><span>Query.status</span><span class="badge">1 place</span>`)
+	this.NotContains(body, `<span class="cf">`)
+	this.NotContains(body, `:returns`)
+}

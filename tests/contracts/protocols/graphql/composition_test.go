@@ -55,7 +55,7 @@ func composedSchemas(t *testing.T, subgraphs ...*model.PersistedContract) model.
 func compositionErrors(subgraphs ...*model.PersistedContract) []string {
 	_, errors := graphqlcontracts.ToComposedGraph("petstore_graph", subgraphs)
 
-	return errors
+	return graphqlcontracts.CompositionMessages(errors)
 }
 
 const moneyOrdersSDL = `

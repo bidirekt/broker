@@ -1,0 +1,6 @@
+{
+  "composes": false,
+  "codes": [
+    "INTERFACE_KEY_NOT_ON_IMPLEMENTATION"
+  ]
+}

@@ -297,15 +297,13 @@ func (this *IntegrationSuite) TestPublishContract_BlankParticipant() {
 	}
 }
 
-func (this *IntegrationSuite) TestPublishContract_PaddedParticipantOrVersion() {
+func (this *IntegrationSuite) TestPublishContract_PaddedParticipant() {
 	status, _ := this.post("/api/participants", petsServiceParticipantBody)
 	this.Require().Equal(http.StatusOK, status)
 
 	cases := map[string]string{
 		"trailing space in participant": this.publishBody("pets_service ", "1", contractFragment{"api.yaml", contractBody}),
 		"leading space in participant":  this.publishBody(" pets_service", "1", contractFragment{"api.yaml", contractBody}),
-		"leading space in version":      this.publishBody("pets_service", " 1.0.0", contractFragment{"api.yaml", contractBody}),
-		"trailing tab in version":       this.publishBody("pets_service", "1.0.0\t", contractFragment{"api.yaml", contractBody}),
 	}
 
 	for name, body := range cases {
@@ -315,6 +313,34 @@ func (this *IntegrationSuite) TestPublishContract_PaddedParticipantOrVersion() {
 	}
 
 	this.Equal(0, this.countRows("contracts"))
+}
+
+func (this *IntegrationSuite) TestPublishContract_VersionWithWhitespaceOrAControlCharacter() {
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
+	this.Require().Equal(http.StatusOK, status)
+
+	cases := map[string]string{
+		" 1.0.0":   `{"message":"version \" 1.0.0\" has whitespace or a control character"}`,
+		"1.0 beta": `{"message":"version \"1.0 beta\" has whitespace or a control character"}`,
+		"1.0\n2":   `{"message":"version \"1.0\\n2\" has whitespace or a control character"}`,
+		"1.0\t":    `{"message":"version \"1.0\\t\" has whitespace or a control character"}`,
+	}
+
+	for version, message := range cases {
+		status, body := this.post("/api/contracts", this.publishBody("pets_service", version, contractFragment{"api.yaml", contractBody}))
+		this.Equal(http.StatusBadRequest, status, version)
+		this.JSONEq(message, body, version)
+	}
+
+	this.Equal(0, this.countRows("contracts"))
+}
+
+func (this *IntegrationSuite) TestPublishContract_VersionWithBuildMetadata() {
+	status, _ := this.post("/api/participants", petsServiceParticipantBody)
+	this.Require().Equal(http.StatusOK, status)
+
+	status, body := this.post("/api/contracts", this.publishBody("pets_service", "1.0.0+build.5", contractFragment{"api.yaml", contractBody}))
+	this.Equal(http.StatusOK, status, body)
 }
 
 func (this *IntegrationSuite) TestPublishContract_BlankSource() {

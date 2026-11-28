@@ -1,0 +1,6 @@
+{
+  "composes": false,
+  "codes": [
+    "INVALID_LINK_DIRECTIVE_USAGE"
+  ]
+}

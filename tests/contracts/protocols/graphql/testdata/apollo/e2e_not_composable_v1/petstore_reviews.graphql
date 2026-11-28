@@ -1,0 +1,6 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.3", import: ["@key", "@shareable"])
+
+type Pet @key(fields: "id") {
+  id: ID!
+  reviews: [String!]!
+}
