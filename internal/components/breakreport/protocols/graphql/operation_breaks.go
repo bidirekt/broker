@@ -21,6 +21,7 @@ func toOperationBreak(checked checkedOperation, contractBreak model.ReportBreak)
 
 	if contractBreak.Reason == graphqlmodel.ReasonProviderGraphNotComposable {
 		broken.Graph = contractBreak.Details[graphqlmodel.GraphKey]
+		broken.Causes = compositionCauses(contractBreak.Details)
 	}
 
 	return broken
@@ -39,7 +40,7 @@ func operationBreakLine(checked checkedOperation, contractBreak model.ReportBrea
 		}
 	}
 
-	graph, cause := contractBreak.Details[graphqlmodel.GraphKey], contractBreak.Details[graphqlmodel.CauseKey]
+	graph := contractBreak.Details[graphqlmodel.GraphKey]
 
 	subject := breakreport.Phrase{breakreport.Name(me)}
 	if asProvider && graph != "" {
@@ -53,10 +54,10 @@ func operationBreakLine(checked checkedOperation, contractBreak model.ReportBrea
 
 	switch {
 	case reason == graphqlmodel.ReasonProviderGraphNotComposable && asConsumer:
-		return breakreport.Phrase{breakreport.Name(me), breakreport.Plain(" calls "), breakreport.Code(resource), breakreport.Plain(", but "), breakreport.Name(other), breakreport.Plain(" can't be built in "), breakreport.Name(checked.Environment), breakreport.Plain(": " + cause)},
+		return breakreport.Phrase{breakreport.Name(me), breakreport.Plain(" calls "), breakreport.Code(resource), breakreport.Plain(", but "), breakreport.Name(other), breakreport.Plain(" can't be built in "), breakreport.Name(checked.Environment)},
 			[]breakreport.Fix{{Participant: other + " subgraphs", Action: "make it compose"}}
 	case reason == graphqlmodel.ReasonProviderGraphNotComposable && asProvider:
-		return append(subject, breakreport.Plain(" makes "), breakreport.Name(graph), breakreport.Plain(" fail to compose in "), breakreport.Name(checked.Environment), breakreport.Plain(": "+cause+", and "), breakreport.Name(other), breakreport.Plain(" calls "), breakreport.Code(resource)),
+		return append(subject, breakreport.Plain(" makes "), breakreport.Name(graph), breakreport.Plain(" fail to compose in "), breakreport.Name(checked.Environment), breakreport.Plain(", and "), breakreport.Name(other), breakreport.Plain(" calls "), breakreport.Code(resource)),
 			[]breakreport.Fix{{Participant: me, Action: "make " + graph + " compose", Checked: true}}
 	case reason == model.ReasonProviderResourceNotFound && asConsumer:
 		return breakreport.Phrase{breakreport.Name(me), breakreport.Plain(" calls "), breakreport.Code(resource), breakreport.Plain(", but "), breakreport.Name(other), breakreport.Plain(" doesn't provide it")},
@@ -70,6 +71,15 @@ func operationBreakLine(checked checkedOperation, contractBreak model.ReportBrea
 	default:
 		return breakreport.Phrase{breakreport.Plain(fallbackBreakLine(reason, contractBreak.Details))}, nil
 	}
+}
+
+// Checks stored before causes existed carry only the first cause.
+func compositionCauses(details map[string]string) []string {
+	if causes := details[graphqlmodel.CausesKey]; causes != "" {
+		return strings.Split(causes, "\n")
+	}
+
+	return []string{details[graphqlmodel.CauseKey]}
 }
 
 // A subgraph under check breaks a consumer through the graph it belongs to.

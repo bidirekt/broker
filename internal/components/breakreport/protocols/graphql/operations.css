@@ -7,6 +7,8 @@
 .op-ix{font-family:var(--mono);font-size:13px;color:var(--muted);margin-bottom:8px}
 .op-brk{display:flex;gap:8px;align-items:center;margin-top:4px;font-size:14px;line-height:1.5;overflow-wrap:anywhere}
 .op-brk svg{color:var(--alert-ink)}
+.op-causes{margin:8px 0 0;padding:0;list-style:none;font-family:var(--mono);font-size:13px;color:var(--muted)}
+.op-causes li{padding:2px 0;overflow-wrap:anywhere}
 .op-see{margin-top:8px;font-size:13px;color:var(--muted);overflow-wrap:anywhere}
 .op-places{margin:12px 0 0;padding:0;list-style:none;border:1px solid var(--rule);border-radius:var(--r-ctl)}
 .op-places li{padding:8px 14px;border-top:1px solid var(--rule);font-family:var(--mono);font-size:13px;display:flex;flex-wrap:wrap;gap:4px 10px;overflow-wrap:anywhere}

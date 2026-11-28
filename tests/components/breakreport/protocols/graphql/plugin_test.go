@@ -3,6 +3,7 @@ package graphql_test
 import (
 	"html/template"
 	"io/fs"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -101,4 +102,51 @@ func TestToSection_ResourceBreaksReadAsTheOperation(t *testing.T) {
 		{Participant: "petstore_web", Action: "keep it until petstore_api stops calling it", Checked: true},
 		{Participant: "petstore_api", Action: "stop calling it"},
 	}, operation.Breaks[0].Fixes)
+}
+
+func TestToSection_AGraphThatDoesNotCompose_RendersEveryCauseAndLinksTheDeployedGraph(t *testing.T) {
+	checked := breakreport.CheckedCounterpart{Participant: "petstore_web", Environment: "production", Counterpart: breakreport.Counterpart{Name: "petstore_graph"}}
+	tree := []byte(`{"query": {"pet": {"returns": [{"reason": "provider_graph_not_composable", "role": "consumer", "details": {
+		"graph": "petstore_graph",
+		"cause": "petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.amount without @shareable",
+		"causes": "petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.amount without @shareable\npetstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.currency without @shareable"
+	}}]}}}`)
+
+	section, err := graphqlbreakreport.New().ToSection(checked, tree)
+	require.NoError(t, err)
+
+	page := renderOperations(t, section)
+	assert.Contains(t, page, `<ul class="op-causes"><li>petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.amount without @shareable</li><li>petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.currency without @shareable</li></ul>`)
+	assert.Contains(t, page, `<p class="op-see">Deployed graph: <a href="/graphs/petstore_graph">/graphs/petstore_graph</a></p>`)
+	assert.NotContains(t, page, "See ")
+}
+
+func TestToSection_AGraphBreakWithoutCauses_ShowsItsOnlyCause(t *testing.T) {
+	checked := breakreport.CheckedCounterpart{Participant: "petstore_web", Environment: "production", Counterpart: breakreport.Counterpart{Name: "petstore_graph"}}
+	tree := []byte(`{"query": {"pet": {"returns": [{"reason": "provider_graph_not_composable", "role": "consumer", "details": {
+		"graph": "petstore_graph",
+		"cause": "petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.amount without @shareable"
+	}}]}}}`)
+
+	section, err := graphqlbreakreport.New().ToSection(checked, tree)
+	require.NoError(t, err)
+
+	broken := section.Display.(graphqlbreakreport.Operations).Operations[0].Breaks[0]
+	assert.Equal(t, "petstore_web calls query pet, but petstore_graph can't be built in production", broken.Sentence.String())
+	assert.Equal(t, []string{"petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.amount without @shareable"}, broken.Causes)
+}
+
+func renderOperations(t *testing.T, section breakreport.Section) string {
+	t.Helper()
+
+	plugin := graphqlbreakreport.New()
+	templates := template.Must(template.New("partials").Parse(
+		`{{define "icon_x"}}{{end}}{{define "fixes"}}{{end}}{{define "phrase"}}{{range .}}{{.Text}}{{end}}{{end}}`,
+	))
+	templates = template.Must(templates.ParseFS(plugin.Files(), "*.html"))
+
+	var page strings.Builder
+	require.NoError(t, templates.ExecuteTemplate(&page, plugin.Template(), section.Display))
+
+	return page.String()
 }
