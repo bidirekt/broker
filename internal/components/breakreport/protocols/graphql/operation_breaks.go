@@ -21,7 +21,7 @@ func toOperationBreak(checked checkedOperation, contractBreak model.ReportBreak)
 
 	if contractBreak.Reason == graphqlmodel.ReasonProviderGraphNotComposable {
 		broken.Graph = contractBreak.Details[graphqlmodel.GraphKey]
-		broken.Causes = compositionCauses(contractBreak.Details)
+		broken.Causes, broken.MoreCauses = shownCauses(compositionCauses(contractBreak.Details))
 	}
 
 	return broken
@@ -71,6 +71,16 @@ func operationBreakLine(checked checkedOperation, contractBreak model.ReportBrea
 	default:
 		return breakreport.Phrase{breakreport.Plain(fallbackBreakLine(reason, contractBreak.Details))}, nil
 	}
+}
+
+const maxShownCauses = 5
+
+func shownCauses(causes []string) ([]string, int) {
+	if len(causes) <= maxShownCauses {
+		return causes, 0
+	}
+
+	return causes[:maxShownCauses], len(causes) - maxShownCauses
 }
 
 // Checks stored before causes existed carry only the first cause.

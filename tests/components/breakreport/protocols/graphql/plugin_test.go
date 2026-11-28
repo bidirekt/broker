@@ -121,6 +121,38 @@ func TestToSection_AGraphThatDoesNotCompose_RendersEveryCauseAndLinksTheDeployed
 	assert.NotContains(t, page, "See ")
 }
 
+func TestToSection_AGraphWithMoreThanFiveCauses_RendersTheFirstFiveAndCountsTheRest(t *testing.T) {
+	checked := breakreport.CheckedCounterpart{Participant: "petstore_web", Environment: "production", Counterpart: breakreport.Counterpart{Name: "petstore_graph"}}
+	tree := []byte(`{"query": {"pet": {"returns": [{"reason": "provider_graph_not_composable", "role": "consumer", "details": {
+		"graph": "petstore_graph",
+		"cause": "failure 1",
+		"causes": "failure 1\nfailure 2\nfailure 3\nfailure 4\nfailure 5\nfailure 6\nfailure 7"
+	}}]}}}`)
+
+	section, err := graphqlbreakreport.New().ToSection(checked, tree)
+	require.NoError(t, err)
+
+	page := renderOperations(t, section)
+	assert.Contains(t, page, `<ul class="op-causes"><li>failure 1</li><li>failure 2</li><li>failure 3</li><li>failure 4</li><li>failure 5</li><li>and 2 more</li></ul>`)
+	assert.NotContains(t, page, "failure 6")
+}
+
+func TestToSection_AGraphWithExactlyFiveCauses_RendersThemAllWithoutAMoreLine(t *testing.T) {
+	checked := breakreport.CheckedCounterpart{Participant: "petstore_web", Environment: "production", Counterpart: breakreport.Counterpart{Name: "petstore_graph"}}
+	tree := []byte(`{"query": {"pet": {"returns": [{"reason": "provider_graph_not_composable", "role": "consumer", "details": {
+		"graph": "petstore_graph",
+		"cause": "failure 1",
+		"causes": "failure 1\nfailure 2\nfailure 3\nfailure 4\nfailure 5"
+	}}]}}}`)
+
+	section, err := graphqlbreakreport.New().ToSection(checked, tree)
+	require.NoError(t, err)
+
+	page := renderOperations(t, section)
+	assert.Contains(t, page, `<ul class="op-causes"><li>failure 1</li><li>failure 2</li><li>failure 3</li><li>failure 4</li><li>failure 5</li></ul>`)
+	assert.NotContains(t, page, " more</li>")
+}
+
 func TestToSection_AGraphBreakWithoutCauses_ShowsItsOnlyCause(t *testing.T) {
 	checked := breakreport.CheckedCounterpart{Participant: "petstore_web", Environment: "production", Counterpart: breakreport.Counterpart{Name: "petstore_graph"}}
 	tree := []byte(`{"query": {"pet": {"returns": [{"reason": "provider_graph_not_composable", "role": "consumer", "details": {

@@ -31,8 +31,9 @@ type OperationBreak struct {
 	Sentence    breakreport.Phrase
 	Fixes       []breakreport.Fix
 	// Graph names the page of the graph deployed in the environment.
-	Graph  string
-	Causes []string
+	Graph      string
+	Causes     []string
+	MoreCauses int
 }
 
 type FieldBlock struct {
